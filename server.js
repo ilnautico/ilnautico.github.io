@@ -1,18 +1,15 @@
 const express = require("express");
 
 const app = express();
-app.use(express.json());
 
 app.get("/", (req, res) => {
   res.send("FairVia server running");
 });
 
-app.post("/generate-report", async (req, res) => {
+app.get("/health", (req, res) => {
   res.json({ status: "ok" });
 });
 
-const PORT = process.env.PORT || 3000;
-
-app.listen(PORT, () => {
-  console.log("Server running on " + PORT);
+app.listen(process.env.PORT, "0.0.0.0", () => {
+  console.log("Server started");
 });
