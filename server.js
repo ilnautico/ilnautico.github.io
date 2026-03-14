@@ -1,4 +1,5 @@
 import express from "express";
+import puppeteer from "puppeteer";
 
 const app = express();
 app.use(express.json());
@@ -7,7 +8,7 @@ app.get("/", (req,res)=>{
   res.send("FairVia server running");
 });
 
-app.post("/generate-report",(req,res)=>{
+app.post("/generate-report", async (req,res)=>{
 
 const data = req.body;
 
@@ -32,14 +33,33 @@ const html = `
 <h3>AI Technical Assessment</h3>
 
 <p>
-Based on the provided information, the transition to biodegradable material may require evaluation of thermal stability and processing compatibility. Equipment conditions and processing temperatures should be validated to ensure material integrity and manufacturing feasibility.
+Based on the provided information, the transition to biodegradable material may require evaluation of thermal stability and processing compatibility.
 </p>
 
 </body>
 </html>
 `;
 
-res.send(html);
+const browser = await puppeteer.launch({
+args:["--no-sandbox"]
+});
+
+const page = await browser.newPage();
+
+await page.setContent(html);
+
+const pdf = await page.pdf({
+format:"A4"
+});
+
+await browser.close();
+
+res.set({
+"Content-Type":"application/pdf",
+"Content-Disposition":"attachment; filename=fairvia-report.pdf"
+});
+
+res.send(pdf);
 
 });
 
