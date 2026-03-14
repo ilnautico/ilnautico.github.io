@@ -13,9 +13,6 @@ app.post("/generate-report",(req,res)=>{
 
   const html = `
   <html>
-  <head>
-  <title>FairVia Report</title>
-  </head>
   <body>
   <h1>FairVia Screening Report</h1>
 
