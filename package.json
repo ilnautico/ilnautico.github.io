@@ -1,14 +1,12 @@
 {
-  "name": "fairvia-server",
+  "name": "fairvia-api",
   "version": "1.0.0",
-  "type": "module",
-
+  "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },
-
   "dependencies": {
     "express": "^4.18.2",
-    "puppeteer": "^22.0.0"
+    "puppeteer": "^21.3.8"
   }
 }
