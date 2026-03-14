@@ -9,26 +9,40 @@ app.get("/", (req,res)=>{
 
 app.post("/generate-report",(req,res)=>{
 
-  const data = req.body;
+const data = req.body;
 
-  const html = `
-  <html>
-  <body>
-  <h1>FairVia Screening Report</h1>
+const html = `
+<html>
+<body style="font-family:Arial;padding:40px">
 
-  <p><b>Application:</b> ${data.application}</p>
-  <p><b>Material:</b> ${data.material}</p>
-  <p><b>Bio material:</b> ${data.bio_material}</p>
-  <p><b>Equipment:</b> ${data.equipment}</p>
+<h1>FairVia Screening Report</h1>
 
-  </body>
-  </html>
-  `;
+<h3>Application</h3>
+<p>${data.application}</p>
 
-  res.send(html);
+<h3>Current Material</h3>
+<p>${data.material}</p>
+
+<h3>Biodegradable Material</h3>
+<p>${data.bio_material}</p>
+
+<h3>Equipment</h3>
+<p>${data.equipment}</p>
+
+<h3>AI Technical Assessment</h3>
+
+<p>
+Based on the provided information, the transition to biodegradable material may require evaluation of thermal stability and processing compatibility. Equipment conditions and processing temperatures should be validated to ensure material integrity and manufacturing feasibility.
+</p>
+
+</body>
+</html>
+`;
+
+res.send(html);
 
 });
 
 app.listen(process.env.PORT || 3000,()=>{
-  console.log("server started");
+console.log("server started");
 });
