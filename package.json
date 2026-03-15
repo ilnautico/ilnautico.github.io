@@ -1,12 +1,14 @@
 {
   "name": "fairvia-api",
   "version": "1.0.0",
+  "description": "FairVia AI Screening Engine",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },
   "dependencies": {
     "express": "^4.18.2",
-    "openai": "^4.0.0"
+    "openai": "^4.52.0",
+    "puppeteer": "^22.7.0"
   }
 }
