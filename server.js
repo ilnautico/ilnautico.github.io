@@ -3,17 +3,14 @@ const express = require("express");
 const app = express();
 app.use(express.json());
 
-// root
 app.get("/", (req, res) => {
   res.send("FairVia server running");
 });
 
-// health check
 app.get("/health", (req, res) => {
   res.json({ status: "ok" });
 });
 
-// API
 app.post("/generate-report", async (req, res) => {
   try {
     res.json({
