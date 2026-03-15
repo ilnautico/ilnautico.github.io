@@ -3,14 +3,17 @@ const express = require("express");
 const app = express();
 app.use(express.json());
 
+// root
 app.get("/", (req, res) => {
   res.send("FairVia server running");
 });
 
+// health check
 app.get("/health", (req, res) => {
   res.json({ status: "ok" });
 });
 
+// API
 app.post("/generate-report", async (req, res) => {
   try {
     res.json({
@@ -26,5 +29,5 @@ app.post("/generate-report", async (req, res) => {
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, "0.0.0.0", () => {
-  console.log("Server running on " + PORT);
+  console.log("Server running on port " + PORT);
 });
