@@ -8,6 +8,10 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
 });
 
+/* -----------------------------
+   BASIC TEST ROUTES
+------------------------------ */
+
 app.get("/", (req, res) => {
   res.send("FairVia server running");
 });
@@ -15,6 +19,10 @@ app.get("/", (req, res) => {
 app.get("/health", (req, res) => {
   res.json({ status: "ok" });
 });
+
+/* -----------------------------
+   AI REPORT GENERATION
+------------------------------ */
 
 app.post("/generate-report", async (req, res) => {
   try {
@@ -49,12 +57,19 @@ Return a structured professional evaluation.
     });
 
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "AI generation failed" });
+    console.error("AI Error:", error);
+    res.status(500).json({
+      error: "AI generation failed",
+      details: error.message
+    });
   }
 });
 
-const PORT = process.env.PORT || 3000;
+/* -----------------------------
+   SERVER START
+------------------------------ */
+
+const PORT = process.env.PORT || 8080;
 
 app.listen(PORT, "0.0.0.0", () => {
   console.log("Server running on port " + PORT);
