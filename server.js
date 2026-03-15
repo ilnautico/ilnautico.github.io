@@ -11,7 +11,7 @@ const openai = new OpenAI({
 });
 
 const transporter = nodemailer.createTransport({
-  host: "smtp.zoho.com",
+  いhost: "smtp.zoho.com",
   port: 465,
   secure: true,
   auth: {
