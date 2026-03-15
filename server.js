@@ -1,25 +1,52 @@
 const express = require("express");
+const OpenAI = require("openai");
 
 const app = express();
 app.use(express.json());
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY
+});
 
 app.get("/", (req, res) => {
   res.send("FairVia server running");
 });
 
-app.get("/health", (req, res) => {
-  res.json({ status: "ok" });
-});
-
 app.post("/generate-report", async (req, res) => {
   try {
-    res.json({
-      status: "ok",
-      message: "Report generation endpoint working"
+    const data = req.body;
+
+    const prompt = `
+You are a biodegradable materials consultant.
+
+Generate a short technical screening report based on:
+
+Application: ${data.application}
+Current Material: ${data.material}
+Bio Material: ${data.bio_material}
+Equipment: ${data.equipment}
+Concern: ${data.concern}
+Stage: ${data.stage}
+Notes: ${data.notes}
+
+Return a structured professional evaluation.
+`;
+
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4.1-mini",
+      messages: [
+        { role: "system", content: "You are a polymer materials expert." },
+        { role: "user", content: prompt }
+      ]
     });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "server error" });
+
+    res.json({
+      report: completion.choices[0].message.content
+    });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "AI generation failed" });
   }
 });
 
