@@ -4,19 +4,13 @@ const puppeteer = require("puppeteer");
 const nodemailer = require("nodemailer");
 
 const app = express();
-app.use(express.json());
-
-/* -------------------------
-OPENAI
-------------------------- */
+app.use(express.json({ limit: "2mb" }));
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
 });
 
-/* -------------------------
-MAIL
-------------------------- */
+/* SMTP */
 
 const transporter = nodemailer.createTransport({
   host: "smtppro.zoho.com",
@@ -28,10 +22,6 @@ const transporter = nodemailer.createTransport({
   }
 });
 
-/* -------------------------
-TEST ROUTES
-------------------------- */
-
 app.get("/", (req, res) => {
   res.send("FairVia server running");
 });
@@ -39,10 +29,6 @@ app.get("/", (req, res) => {
 app.get("/health", (req, res) => {
   res.json({ status: "ok" });
 });
-
-/* -------------------------
-REPORT GENERATION
-------------------------- */
 
 app.post("/generate-report", async (req, res) => {
 
@@ -52,67 +38,75 @@ app.post("/generate-report", async (req, res) => {
 
     console.log("PAYLOAD:", JSON.stringify(payload, null, 2));
 
-    /* -------------------------
-    EMAIL EXTRACTION (Tally)
-    ------------------------- */
+    /* ---------------------
+    EMAIL DETECTION
+    --------------------- */
 
     let email = null;
 
-    if (payload.data && Array.isArray(payload.data)) {
+    /* case A: payload.fields */
 
-      const emailField = payload.data.find(
-        (f) => f.type === "INPUT_EMAIL"
-      );
+    if (!email && payload.fields && Array.isArray(payload.fields)) {
+      const f = payload.fields.find(x => x.type === "INPUT_EMAIL");
+      if (f) email = f.value;
+    }
 
-      if (emailField) {
-        email = emailField.value;
-      }
+    /* case B: payload.data */
 
+    if (!email && payload.data && Array.isArray(payload.data)) {
+      const f = payload.data.find(x => x.type === "INPUT_EMAIL");
+      if (f) email = f.value;
+    }
+
+    /* case C: payload.data.fields */
+
+    if (
+      !email &&
+      payload.data &&
+      payload.data.fields &&
+      Array.isArray(payload.data.fields)
+    ) {
+      const f = payload.data.fields.find(x => x.type === "INPUT_EMAIL");
+      if (f) email = f.value;
     }
 
     console.log("EMAIL FOUND:", email);
 
-    /* -------------------------
+    /* ---------------------
     AI REPORT
-    ------------------------- */
-
-    const prompt = `
-You are a biodegradable materials consultant.
-
-Generate a short technical screening report.
-`;
+    --------------------- */
 
     const completion = await openai.chat.completions.create({
       model: "gpt-4.1-mini",
       messages: [
         {
           role: "system",
-          content: "You are a polymer materials expert."
+          content: "You are a polymer materials consultant."
         },
         {
           role: "user",
-          content: prompt
+          content: "Generate a short biodegradable material screening report."
         }
       ]
     });
 
     const report = completion.choices[0].message.content;
 
-    /* -------------------------
-    PDF GENERATION
-    ------------------------- */
+    /* ---------------------
+    PDF
+    --------------------- */
 
     const html = `
     <html>
-    <body style="font-family:Arial;padding:40px">
-      <h1>FairVia Screening Report</h1>
-      <p>${report}</p>
-    </body>
+      <body style="font-family:Arial;padding:40px">
+        <h1>FairVia Screening Report</h1>
+        <p>${report}</p>
+      </body>
     </html>
     `;
 
     const browser = await puppeteer.launch({
-      args: ["--no-sandbox", "--disable-setuid-sandbox"]
+      args: ["--no-sandbox","--disable-setuid-sandbox"]
     });
 
     const page = await browser.newPage();
@@ -124,9 +118,9 @@ Generate a short technical screening report.
 
     await browser.close();
 
-    /* -------------------------
+    /* ---------------------
     EMAIL SEND
-    ------------------------- */
+    --------------------- */
 
     if (email) {
 
@@ -151,10 +145,6 @@ Generate a short technical screening report.
 
     }
 
-    /* -------------------------
-    RESPONSE
-    ------------------------- */
-
     res.set({
       "Content-Type": "application/pdf",
       "Content-Disposition": "attachment; filename=fairvia_report.pdf"
@@ -162,22 +152,17 @@ Generate a short technical screening report.
 
     res.send(pdf);
 
-  } catch (error) {
+  } catch (err) {
 
-    console.error("ERROR:", error);
+    console.error("ERROR:", err);
 
     res.status(500).json({
-      error: "AI generation failed",
-      details: error.message
+      error: err.message
     });
 
   }
 
 });
-
-/* -------------------------
-SERVER
-------------------------- */
 
 const PORT = process.env.PORT || 8080;
 
