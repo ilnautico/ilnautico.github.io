@@ -1,5 +1,5 @@
 const express = require("express");
-const OpenAI = require("openai");
+const OpenAI = require("openai").default;
 
 const app = express();
 app.use(express.json());
@@ -10,6 +10,10 @@ const openai = new OpenAI({
 
 app.get("/", (req, res) => {
   res.send("FairVia server running");
+});
+
+app.get("/health", (req, res) => {
+  res.json({ status: "ok" });
 });
 
 app.post("/generate-report", async (req, res) => {
