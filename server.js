@@ -47,25 +47,50 @@ REPORT GENERATION
 app.post("/generate-report", async (req, res) => {
   try {
 
-    const data = req.body;
+    const payload = req.body;
+
+    /* -------------------------
+    EMAIL 取得（Tally対応）
+    ------------------------- */
+
+    let email = null;
+
+    if (payload.email) {
+      email = payload.email;
+    }
+
+    if (!email && payload.data && payload.data.fields) {
+      const emailField = payload.data.fields.find(
+        f => f.key === "email"
+      );
+      if (emailField) {
+        email = emailField.value;
+      }
+    }
+
+    /* -------------------------
+    AI PROMPT
+    ------------------------- */
 
     const prompt = `
 You are a biodegradable materials consultant.
 
 Generate a short technical screening report.
 
-Application: ${data.application}
-Current Material: ${data.material}
-Bio Material: ${data.bio_material}
-Equipment: ${data.equipment}
-Concern: ${data.concern}
-Stage: ${data.stage}
-Notes: ${data.notes}
+Application: ${payload.application || ""}
+Current Material: ${payload.material || ""}
+Bio Material: ${payload.bio_material || ""}
+Equipment: ${payload.equipment || ""}
+Concern: ${payload.concern || ""}
+Stage: ${payload.stage || ""}
+Notes: ${payload.notes || ""}
 
 Return a structured professional evaluation.
 `;
 
-    /* AI */
+    /* -------------------------
+    OPENAI
+    ------------------------- */
 
     const completion = await openai.chat.completions.create({
       model: "gpt-4.1-mini",
@@ -77,7 +102,9 @@ Return a structured professional evaluation.
 
     const report = completion.choices[0].message.content;
 
-    /* HTML */
+    /* -------------------------
+    HTML
+    ------------------------- */
 
     const html = `
     <html>
@@ -91,15 +118,6 @@ Return a structured professional evaluation.
 
     <h1>FairVia Screening Report</h1>
 
-    <h3>Application</h3>
-    <p>${data.application}</p>
-
-    <h3>Current Material</h3>
-    <p>${data.material}</p>
-
-    <h3>Bio Material</h3>
-    <p>${data.bio_material}</p>
-
     <h3>AI Evaluation</h3>
     <p>${report}</p>
 
@@ -107,7 +125,9 @@ Return a structured professional evaluation.
     </html>
     `;
 
-    /* PDF */
+    /* -------------------------
+    PDF
+    ------------------------- */
 
     const browser = await puppeteer.launch({
       args: ["--no-sandbox"]
@@ -123,13 +143,15 @@ Return a structured professional evaluation.
 
     await browser.close();
 
-    /* MAIL */
+    /* -------------------------
+    MAIL
+    ------------------------- */
 
-    if (data.email) {
+    if (email) {
 
       await transporter.sendMail({
         from: process.env.EMAIL_USER,
-        to: data.email,
+        to: email,
         subject: "FairVia Screening Report",
         text: "Your biodegradable material screening report is attached.",
         attachments: [
@@ -140,9 +162,17 @@ Return a structured professional evaluation.
         ]
       });
 
+      console.log("MAIL SENT:", email);
+
+    } else {
+
+      console.log("EMAIL NOT FOUND IN PAYLOAD");
+
     }
 
-    /* RESPONSE */
+    /* -------------------------
+    RESPONSE
+    ------------------------- */
 
     res.set({
       "Content-Type":"application/pdf",
