@@ -1,40 +1,91 @@
-なく
+const express = require("express");
+const OpenAI = require("openai").default;
+const puppeteer = require("puppeteer");
+const nodemailer = require("nodemailer");
+
+const app = express();
+app.use(express.json());
+
+/* -------------------------
+OPENAI
+------------------------- */
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY
+});
+
+/* -------------------------
+MAIL
+------------------------- */
+
+const transporter = nodemailer.createTransport({
+  host: "smtp.zoho.com",
+  port: 465,
+  secure: true,
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS
+  }
+});
+
+/* -------------------------
+TEST
+------------------------- */
+
+app.get("/", (req, res) => {
+  res.send("FairVia server running");
+});
+
+app.get("/health", (req, res) => {
+  res.json({ status: "ok" });
+});
+
+/* -------------------------
+REPORT GENERATION
+------------------------- */
+
+app.post("/generate-report", async (req, res) => {
+
+  try {
+
+    const payload = req.body;
+
+    console.log("PAYLOAD:", JSON.stringify(payload, null, 2));
+
+    /* -------------------------
+    EMAIL取得（Tally対応）
+    ------------------------- */
+
+    let email = null;
+
     if (payload.email) {
       email = payload.email;
     }
 
     if (!email && payload.data && payload.data.fields) {
+
       const emailField = payload.data.fields.find(
-        f => f.key === "email"
+        f =>
+          (f.key && f.key.toLowerCase().includes("email")) ||
+          (f.label && f.label.toLowerCase().includes("email"))
       );
+
       if (emailField) {
         email = emailField.value;
       }
     }
 
+    console.log("EMAIL FOUND:", email);
+
     /* -------------------------
-    AI PROMPT
+    OPENAI
     ------------------------- */
 
     const prompt = `
 You are a biodegradable materials consultant.
 
 Generate a short technical screening report.
-
-Application: ${payload.application || ""}
-Current Material: ${payload.material || ""}
-Bio Material: ${payload.bio_material || ""}
-Equipment: ${payload.equipment || ""}
-Concern: ${payload.concern || ""}
-Stage: ${payload.stage || ""}
-Notes: ${payload.notes || ""}
-
-Return a structured professional evaluation.
 `;
-
-    /* -------------------------
-    OPENAI
-    ------------------------- */
 
     const completion = await openai.chat.completions.create({
       model: "gpt-4.1-mini",
@@ -52,19 +103,9 @@ Return a structured professional evaluation.
 
     const html = `
     <html>
-    <head>
-    <style>
-    body{font-family:Arial;padding:40px;}
-    h1{color:#2c7a7b;}
-    </style>
-    </head>
-    <body>
-
+    <body style="font-family:Arial;padding:40px">
     <h1>FairVia Screening Report</h1>
-
-    <h3>AI Evaluation</h3>
     <p>${report}</p>
-
     </body>
     </html>
     `;
@@ -78,7 +119,6 @@ Return a structured professional evaluation.
     });
 
     const page = await browser.newPage();
-
     await page.setContent(html);
 
     const pdf = await page.pdf({
@@ -110,7 +150,7 @@ Return a structured professional evaluation.
 
     } else {
 
-      console.log("EMAIL NOT FOUND IN PAYLOAD");
+      console.log("EMAIL NOT FOUND");
 
     }
 
@@ -119,8 +159,8 @@ Return a structured professional evaluation.
     ------------------------- */
 
     res.set({
-      "Content-Type":"application/pdf",
-      "Content-Disposition":"attachment; filename=fairvia_report.pdf"
+      "Content-Type": "application/pdf",
+      "Content-Disposition": "attachment; filename=fairvia_report.pdf"
     });
 
     res.send(pdf);
@@ -135,6 +175,7 @@ Return a structured professional evaluation.
     });
 
   }
+
 });
 
 /* -------------------------
