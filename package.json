@@ -1,15 +1,16 @@
 {
-  "name": "fairvia-api",
+  "name": "ai-report",
   "version": "1.0.0",
-  "description": "FairVia AI Screening Engine",
+  "type": "module",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },
   "dependencies": {
-    "express": "^4.18.2",
-    "openai": "^4.52.0",
+    "@sendgrid/mail": "^7.7.0",
+    "express": "^4.19.2",
+    "openai": "^4.0.0",
     "puppeteer": "^22.7.0",
-    "nodemailer": "^6.9.12"
+    "resend": "^3.2.0"
   }
 }
