@@ -4,13 +4,11 @@ const puppeteer = require("puppeteer");
 const nodemailer = require("nodemailer");
 
 const app = express();
-app.use(express.json({ limit: "2mb" }));
+app.use(express.json());
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
 });
-
-/* SMTP */
 
 const transporter = nodemailer.createTransport({
   host: "smtppro.zoho.com",
@@ -38,46 +36,34 @@ app.post("/generate-report", async (req, res) => {
 
     console.log("PAYLOAD:", JSON.stringify(payload, null, 2));
 
-    /* ---------------------
-    EMAIL DETECTION
-    --------------------- */
+    /* EMAIL */
 
     let email = null;
 
-    /* case A: payload.fields */
-
-    if (!email && payload.fields && Array.isArray(payload.fields)) {
-      const f = payload.fields.find(x => x.type === "INPUT_EMAIL");
-      if (f) email = f.value;
-    }
-
-    /* case B: payload.data */
-
-    if (!email && payload.data && Array.isArray(payload.data)) {
-      const f = payload.data.find(x => x.type === "INPUT_EMAIL");
-      if (f) email = f.value;
-    }
-
-    /* case C: payload.data.fields */
-
     if (
-      !email &&
       payload.data &&
       payload.data.fields &&
       Array.isArray(payload.data.fields)
     ) {
-      const f = payload.data.fields.find(x => x.type === "INPUT_EMAIL");
-      if (f) email = f.value;
+
+      const emailField = payload.data.fields.find(
+        f => f.type === "INPUT_EMAIL"
+      );
+
+      if (emailField) {
+        email = emailField.value;
+      }
+
     }
 
     console.log("EMAIL FOUND:", email);
 
-    /* ---------------------
-    AI REPORT
-    --------------------- */
+    /* AI */
 
     const completion = await openai.chat.completions.create({
+
       model: "gpt-4.1-mini",
+
       messages: [
         {
           role: "system",
@@ -88,13 +74,12 @@ app.post("/generate-report", async (req, res) => {
           content: "Generate a short biodegradable material screening report."
         }
       ]
+
     });
 
     const report = completion.choices[0].message.content;
 
-    /* ---------------------
-    PDF
-    --------------------- */
+    /* PDF */
 
     const html = `
     <html>
@@ -110,6 +95,7 @@ app.post("/generate-report", async (req, res) => {
     });
 
     const page = await browser.newPage();
+
     await page.setContent(html);
 
     const pdf = await page.pdf({
@@ -118,23 +104,27 @@ app.post("/generate-report", async (req, res) => {
 
     await browser.close();
 
-    /* ---------------------
-    EMAIL SEND
-    --------------------- */
+    /* MAIL */
 
     if (email) {
 
       await transporter.sendMail({
+
         from: process.env.EMAIL_USER,
+
         to: email,
+
         subject: "FairVia Screening Report",
+
         text: "Your screening report is attached.",
+
         attachments: [
           {
             filename: "fairvia_report.pdf",
             content: pdf
           }
         ]
+
       });
 
       console.log("MAIL SENT:", email);
@@ -152,7 +142,9 @@ app.post("/generate-report", async (req, res) => {
 
     res.send(pdf);
 
-  } catch (err) {
+  }
+
+  catch (err) {
 
     console.error("ERROR:", err);
 
