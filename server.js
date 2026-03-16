@@ -116,7 +116,7 @@ Generate a short biodegradable material screening report.
     await browser.close();
 
     await resend.emails.send({
-      from: "FairVia <onboarding@resend.dev>",
+      from: "FairVia <info@ilnautico.com>",   // ← ここを変更
       to: email,
       subject: "FairVia Screening Report",
       text: "Your screening report is attached.",
