@@ -10,10 +10,12 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
 });
 
+/* SMTP (Railway対応) */
+
 const transporter = nodemailer.createTransport({
   host: "smtppro.zoho.com",
-  port: 465,
-  secure: true,
+  port: 587,
+  secure: false,
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS
@@ -36,7 +38,7 @@ app.post("/generate-report", async (req, res) => {
 
     console.log("PAYLOAD:", JSON.stringify(payload, null, 2));
 
-    /* EMAIL */
+    /* EMAIL取得 */
 
     let email = null;
 
@@ -104,7 +106,7 @@ app.post("/generate-report", async (req, res) => {
 
     await browser.close();
 
-    /* MAIL */
+    /* メール送信 */
 
     if (email) {
 
