@@ -26,14 +26,26 @@ app.post("/generate-report", async (req, res) => {
     // ===== answers（順番固定）=====
     const answers = fields.filter(f => f.type !== "INPUT_EMAIL");
 
-    const application = answers[0]?.value || "";
-    const processing_method = answers[1]?.value || "";
-    const current_material = answers[2]?.value || "";
-    const bio_material = answers[3]?.value || "";
-    const equipment = answers[4]?.value || "";
-    const production_scale = answers[5]?.value || "";
-    const concerns = answers[6]?.value || "";
-    const project_stage = answers[7]?.value || "";
+const val = (i) => {
+  const f = answers[i];
+  if (!f) return "";
+
+  if (Array.isArray(f.options)) {
+    const selected = f.options.find(o => o.id === f.value);
+    return selected?.text || selected?.label || "";
+  }
+
+  return f.value || "";
+};
+
+const application = val(0);
+const processing_method = val(1);
+const current_material = val(2);
+const bio_material = val(3);
+const equipment = val(4);
+const production_scale = val(5);
+const concerns = val(6);
+const project_stage = val(7);
 
     // ===== HTML（そのまま使え）=====
     const htmlTemplate = `
