@@ -12,25 +12,20 @@ const openai = new OpenAI({
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-app.get("/", (req, res) => {
-  res.send("FairVia server running");
-});
-
 app.post("/generate-report", async (req, res) => {
   try {
     const payload = req.body;
-
     const fields = payload?.data?.fields || [];
 
     // ===== email =====
-    const emailField = fields.find(f => f.type === "INPUT_EMAIL");
-    const email = emailField?.value;
+    const email = fields.find(f => f.type === "INPUT_EMAIL")?.value;
+    if (!email) return res.status(400).json({ error: "EMAIL NOT FOUND" });
 
-    if (!email) {
-      return res.status(400).json({ error: "EMAIL NOT FOUND" });
-    }
+    // ===== 安定取得（これが核心）=====
+    const get = (label) =>
+      fields.find(f => f.label?.toLowerCase().includes(label))?.value || "";
 
-    // ===== HTML =====
+    // ===== HTML（お前の原型そのまま）=====
     const htmlTemplate = `
 <!DOCTYPE html>
 <html lang="en">
@@ -1172,20 +1167,23 @@ body {
     const summary =
       completion?.choices?.[0]?.message?.content || "No summary";
 
-    // ===== フォーム → データ（順番固定で取得）=====
+    // ===== データ（完全版）=====
     const data = {
-      application: fields[0]?.value || "",
-      processing_method: fields[1]?.value || "",
-      current_material: fields[2]?.value || "",
-      bio_material: fields[3]?.value || "",
-      equipment: fields[4]?.value || "",
-      production_scale: fields[5]?.value || "",
-      concerns: fields[6]?.value || "",
-      project_stage: fields[7]?.value || "",
+      application: get("product"),
+      processing_method: get("processing"),
+      current_material: get("current"),
+      bio_material: get("material"),
+      equipment: get("equipment"),
+      production_scale: get("scale"),
+      project_stage: get("stage"),
+      concerns: get("concern"),
+
+      submission_reference: "Tally Submission",
 
       client_name: "Client",
       client_company: "Company",
       client_country: "Japan",
+
       report_id: "FV-" + Date.now(),
       report_date: new Date().toLocaleDateString(),
 
@@ -1252,7 +1250,6 @@ body {
 
     // ===== 置換 =====
     let html = htmlTemplate;
-
     Object.keys(data).forEach((key) => {
       html = html.replace(new RegExp(`{{${key}}}`, "g"), data[key]);
     });
