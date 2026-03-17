@@ -1,58 +1,57 @@
 import express from "express";
-import cors from "cors";
-import bodyParser from "body-parser";
-import puppeteer from "puppeteer";
 import OpenAI from "openai";
-import nodemailer from "nodemailer";
+import { Resend } from "resend";
+import puppeteer from "puppeteer";
 
 const app = express();
-app.use(cors());
-app.use(bodyParser.json());
+app.use(express.json({ limit: "2mb" }));
 
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+  apiKey: process.env.OPENAI_API_KEY
 });
 
-app.post("/webhook", async (req, res) => {
+const resend = new Resend(process.env.RESEND_API_KEY);
+
+app.get("/", (req, res) => {
+  res.send("FairVia server running");
+});
+
+app.get("/health", (req, res) => {
+  res.json({ status: "ok" });
+});
+
+app.post("/generate-report", async (req, res) => {
   try {
-    const { email, ...formData } = req.body;
+    const payload = req.body;
 
-    /* ===== ① AI生成 ===== */
-    const prompt = `
-You are a professional consultant specializing in biodegradable materials.
+    console.log("PAYLOAD:", JSON.stringify(payload, null, 2));
 
-Generate a concise professional screening report.
+    let email = null;
 
-Application: ${formData.application}
-Material: ${formData.material}
-Bio Material: ${formData.bio_material}
-Equipment: ${formData.equipment}
+    if (
+      payload &&
+      payload.data &&
+      payload.data.fields &&
+      Array.isArray(payload.data.fields)
+    ) {
+      const emailField = payload.data.fields.find(
+        (f) => f && f.type === "INPUT_EMAIL"
+      );
 
-Return JSON with:
-- executive_summary
-- compatibility_observations (array)
-- potential_risks (array)
-- provisional_conclusion
-`;
-
-    const completion = await openai.chat.completions.create({
-      model: "gpt-5-2",
-      messages: [{ role: "user", content: prompt }],
-    });
-
-    let data;
-    try {
-      data = JSON.parse(completion.choices[0].message.content);
-    } catch {
-      data = {
-        executive_summary: "Initial screening completed.",
-        compatibility_observations: ["General compatibility expected."],
-        potential_risks: ["Further validation required."],
-        provisional_conclusion: "Proceed with pilot testing.",
-      };
+      if (emailField && typeof emailField.value === "string") {
+        email = emailField.value;
+      }
     }
 
-    /* ===== ② HTML（あなたの原型そのまま） ===== */
+    console.log("EMAIL FOUND:", email);
+
+    if (!email) {
+      return res.status(400).json({
+        error: "EMAIL NOT FOUND"
+      });
+    }
+
+    // ===== HTMLテンプレ =====
     const htmlTemplate = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1178,47 +1177,32 @@ body {
 
 
 </body>
-</html>`;
+</html>
+`;
 
-    /* ===== ③ 変数差し込み ===== */
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4.1-mini",
+      messages: [
+        {
+          role: "system",
+          content: "You are a polymer materials consultant."
+        },
+        {
+          role: "user",
+          content: "Generate structured technical screening report data."
+        }
+      ]
+    });
+
+    const report =
+      completion?.choices?.[0]?.message?.content || "No report generated.";
+
+    // 必要ならここで変数置換（後でやる）
     const html = htmlTemplate
-      .replaceAll("{{client_name}}", "Client")
-      .replaceAll("{{client_company}}", "Confidential")
-      .replaceAll("{{client_country}}", "N/A")
-      .replaceAll("{{report_id}}", "FV-" + Date.now())
-      .replaceAll("{{report_date}}", new Date().toLocaleDateString())
+      .replace(/{{executive_summary}}/g, report);
 
-      .replaceAll("{{application}}", formData.application || "")
-      .replaceAll("{{current_material}}", formData.material || "")
-      .replaceAll("{{processing_method}}", formData.processing_method || "")
-      .replaceAll("{{bio_material}}", formData.bio_material || "")
-      .replaceAll("{{equipment}}", formData.equipment || "")
-      .replaceAll("{{production_scale}}", formData.production_scale || "")
-      .replaceAll("{{project_stage}}", formData.project_stage || "")
-      .replaceAll("{{submission_reference}}", "Auto Generated")
-
-      .replaceAll("{{executive_summary}}", data.executive_summary || "")
-      .replaceAll("{{feasibility_level}}", "MODERATE")
-      .replaceAll("{{feasibility_explanation}}", data.provisional_conclusion || "")
-
-      .replaceAll("{{obs_1_title}}", "Material Compatibility")
-      .replaceAll("{{obs_1_body}}", data.compatibility_observations?.[0] || "")
-      .replaceAll("{{obs_2_title}}", "Processing Stability")
-      .replaceAll("{{obs_2_body}}", data.compatibility_observations?.[1] || "")
-      .replaceAll("{{obs_3_title}}", "Performance Impact")
-      .replaceAll("{{obs_3_body}}", data.compatibility_observations?.[2] || "")
-
-      .replaceAll("{{risk_1_title}}", "Cost Risk")
-      .replaceAll("{{risk_1_body}}", data.potential_risks?.[0] || "")
-      .replaceAll("{{risk_2_title}}", "Processing Risk")
-      .replaceAll("{{risk_2_body}}", data.potential_risks?.[1] || "")
-
-      .replaceAll("{{strategic_recommendation}}", data.provisional_conclusion || "")
-      .replaceAll("{{disclaimer}}", "This report is for advisory purposes only.");
-
-    /* ===== ④ PDF生成 ===== */
     const browser = await puppeteer.launch({
-      args: ["--no-sandbox", "--disable-setuid-sandbox"],
+      args: ["--no-sandbox", "--disable-setuid-sandbox"]
     });
 
     const page = await browser.newPage();
@@ -1226,39 +1210,45 @@ body {
 
     const pdf = await page.pdf({
       format: "A4",
-      printBackground: true,
+      printBackground: true
     });
 
     await browser.close();
 
-    /* ===== ⑤ メール送信 ===== */
-    const transporter = nodemailer.createTransport({
-      service: "gmail",
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-      },
-    });
-
-    await transporter.sendMail({
-      from: `"FairVia" <${process.env.EMAIL_USER}>`,
+    const result = await resend.emails.send({
+      from: "FairVia <info@ilnautico.com>",
       to: email,
-      subject: "Your Report",
-      text: "Attached is your report.",
+      subject: "FairVia Screening Report",
+      text: "Your screening report is attached.",
       attachments: [
         {
-          filename: "report.pdf",
-          content: pdf,
-        },
-      ],
+          filename: "fairvia_report.pdf",
+          content: pdf.toString("base64")
+        }
+      ]
     });
 
-    res.json({ status: "ok" });
+    console.log("RESEND RESULT:", result);
+    console.log("MAIL SENT:", email);
+
+    res.set({
+      "Content-Type": "application/pdf",
+      "Content-Disposition": "attachment; filename=fairvia_report.pdf"
+    });
+
+    res.send(pdf);
 
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "failed" });
+    console.error("ERROR:", err);
+
+    res.status(500).json({
+      error: err.message
+    });
   }
 });
 
-app.listen(3000, () => console.log("Server running"));
+const PORT = process.env.PORT || 8080;
+
+app.listen(PORT, "0.0.0.0", () => {
+  console.log("Server running on port " + PORT);
+});
