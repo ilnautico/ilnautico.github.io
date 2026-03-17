@@ -22,7 +22,7 @@ app.post("/generate-report", async (req, res) => {
 
     const fields = payload?.data?.fields || [];
 
-    // ===== email取得 =====
+    // ===== email =====
     const emailField = fields.find(f => f.type === "INPUT_EMAIL");
     const email = emailField?.value;
 
@@ -30,13 +30,7 @@ app.post("/generate-report", async (req, res) => {
       return res.status(400).json({ error: "EMAIL NOT FOUND" });
     }
 
-    // ===== 回答取得関数 =====
-    const getAnswer = (label) => {
-      const f = fields.find(x => x.label === label);
-      return f?.value || "";
-    };
-
-    // ===== HTML（お前の原型そのまま貼る）=====
+    // ===== HTML =====
     const htmlTemplate = `
 <!DOCTYPE html>
 <html lang="en">
@@ -1178,22 +1172,22 @@ body {
     const summary =
       completion?.choices?.[0]?.message?.content || "No summary";
 
-    // ===== フォーム→データ反映 =====
+    // ===== フォーム → データ（順番固定で取得）=====
     const data = {
+      application: fields[0]?.value || "",
+      processing_method: fields[1]?.value || "",
+      current_material: fields[2]?.value || "",
+      bio_material: fields[3]?.value || "",
+      equipment: fields[4]?.value || "",
+      production_scale: fields[5]?.value || "",
+      concerns: fields[6]?.value || "",
+      project_stage: fields[7]?.value || "",
+
       client_name: "Client",
       client_company: "Company",
       client_country: "Japan",
       report_id: "FV-" + Date.now(),
       report_date: new Date().toLocaleDateString(),
-
-      application: getAnswer("What product are you planning to produce?"),
-      processing_method: getAnswer("What processing method do you use?"),
-      current_material: getAnswer("What material are you currently using?"),
-      bio_material: getAnswer("What material are you considering?"),
-      equipment: getAnswer("What type of equipment do you operate?"),
-      production_scale: getAnswer("What production scale are you targeting?"),
-      project_stage: getAnswer("What stage is your project currently in?"),
-      concerns: getAnswer("What are your main technical concerns?"),
 
       executive_summary: summary,
 
