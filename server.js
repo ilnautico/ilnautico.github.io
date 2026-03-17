@@ -16,43 +16,26 @@ app.get("/", (req, res) => {
   res.send("FairVia server running");
 });
 
-app.get("/health", (req, res) => {
-  res.json({ status: "ok" });
-});
-
 app.post("/generate-report", async (req, res) => {
   try {
     const payload = req.body;
 
-    console.log("PAYLOAD:", JSON.stringify(payload, null, 2));
-
     let email = null;
 
-    if (
-      payload &&
-      payload.data &&
-      payload.data.fields &&
-      Array.isArray(payload.data.fields)
-    ) {
+    if (payload?.data?.fields) {
       const emailField = payload.data.fields.find(
-        (f) => f && f.type === "INPUT_EMAIL"
+        (f) => f.type === "INPUT_EMAIL"
       );
-
-      if (emailField && typeof emailField.value === "string") {
-        email = emailField.value;
-      }
+      email = emailField?.value;
     }
-
-    console.log("EMAIL FOUND:", email);
 
     if (!email) {
-      return res.status(400).json({
-        error: "EMAIL NOT FOUND"
-      });
+      return res.status(400).json({ error: "EMAIL NOT FOUND" });
     }
 
-    // ===== HTMLテンプレ =====
-    const htmlTemplate = `<!DOCTYPE html>
+    // ===== HTML（ここにお前の原型そのまま貼る）=====
+    const htmlTemplate = `
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -1180,29 +1163,106 @@ body {
 </html>
 `;
 
+    // ===== AI（サマリーだけ使う）=====
     const completion = await openai.chat.completions.create({
       model: "gpt-4.1-mini",
       messages: [
-        {
-          role: "system",
-          content: "You are a polymer materials consultant."
-        },
-        {
-          role: "user",
-          content: "Generate structured technical screening report data."
-        }
+        { role: "system", content: "You are a polymer materials consultant." },
+        { role: "user", content: "Generate executive summary." }
       ]
     });
 
-    const report =
-      completion?.choices?.[0]?.message?.content || "No report generated.";
+    const summary =
+      completion?.choices?.[0]?.message?.content || "No summary";
 
-    // 必要ならここで変数置換（後でやる）
-    const html = htmlTemplate
-      .replace(/{{executive_summary}}/g, report);
+    // ===== データ（全部ここでまとめる）=====
+    const data = {
+      client_name: "Client Name",
+      client_company: "Company",
+      client_country: "Japan",
+      report_id: "FV-001",
+      report_date: new Date().toLocaleDateString(),
 
+      application: "Packaging",
+      current_material: "PP",
+      processing_method: "Blow molding",
+      bio_material: "PHA",
+      equipment: "Standard",
+      production_scale: "Mass",
+      project_stage: "Evaluation",
+      submission_reference: "Tally",
+
+      executive_summary: summary,
+
+      feasibility_level: "MODERATE",
+      feasibility_explanation: "Feasible with adjustments",
+
+      thermal_risk: "Moderate",
+      thermal_risk_class: "risk-moderate",
+      thermal_note: "Thermal adjustment needed",
+
+      processing_risk: "Moderate",
+      processing_risk_class: "risk-moderate",
+      processing_note: "Parameter tuning required",
+
+      equipment_risk: "Low",
+      equipment_risk_class: "risk-low",
+      equipment_note: "Compatible",
+
+      score_thermal_assessment: "Acceptable",
+      score_thermal_class: "moderate",
+      score_thermal_level: "Moderate",
+      score_thermal_note: "Monitor",
+
+      score_processing_assessment: "Adjustable",
+      score_processing_class: "moderate",
+      score_processing_level: "Moderate",
+      score_processing_note: "Tune",
+
+      score_equipment_assessment: "Compatible",
+      score_equipment_class: "low",
+      score_equipment_level: "Low",
+      score_equipment_note: "OK",
+
+      score_cert_assessment: "Pending",
+      score_cert_class: "na",
+      score_cert_level: "N/A",
+      score_cert_note: "-",
+
+      score_eol_assessment: "Compliant",
+      score_eol_class: "low",
+      score_eol_level: "Low",
+      score_eol_note: "OK",
+
+      obs_1_title: "Material",
+      obs_1_body: "PHA differs from PP",
+
+      obs_2_title: "Processing",
+      obs_2_body: "Requires tuning",
+
+      obs_3_title: "Performance",
+      obs_3_body: "Slightly lower strength",
+
+      risk_1_title: "Cost",
+      risk_1_body: "Higher than PP",
+
+      risk_2_title: "Stability",
+      risk_2_body: "Needs control",
+
+      strategic_recommendation: "Pilot test recommended",
+      disclaimer: "Advisory only"
+    };
+
+    // ===== 全部差し込み（ここが本質）=====
+    let html = htmlTemplate;
+
+    Object.keys(data).forEach((key) => {
+      html = html.replace(new RegExp(`{{${key}}}`, "g"), data[key]);
+    });
+
+    // ===== PDF生成 =====
     const browser = await puppeteer.launch({
-      args: ["--no-sandbox", "--disable-setuid-sandbox"]
+      args: ["--no-sandbox"]
     });
 
     const page = await browser.newPage();
@@ -1215,40 +1275,28 @@ body {
 
     await browser.close();
 
-    const result = await resend.emails.send({
+    // ===== メール送信 =====
+    await resend.emails.send({
       from: "FairVia <info@ilnautico.com>",
       to: email,
-      subject: "FairVia Screening Report",
-      text: "Your screening report is attached.",
+      subject: "FairVia Report",
+      text: "Attached",
       attachments: [
         {
-          filename: "fairvia_report.pdf",
+          filename: "report.pdf",
           content: pdf.toString("base64")
         }
       ]
     });
 
-    console.log("RESEND RESULT:", result);
-    console.log("MAIL SENT:", email);
-
-    res.set({
-      "Content-Type": "application/pdf",
-      "Content-Disposition": "attachment; filename=fairvia_report.pdf"
-    });
-
-    res.send(pdf);
+    res.send("OK");
 
   } catch (err) {
-    console.error("ERROR:", err);
-
-    res.status(500).json({
-      error: err.message
-    });
+    console.error(err);
+    res.status(500).json({ error: err.message });
   }
 });
 
-const PORT = process.env.PORT || 8080;
-
-app.listen(PORT, "0.0.0.0", () => {
-  console.log("Server running on port " + PORT);
+app.listen(8080, () => {
+  console.log("Server running");
 });
