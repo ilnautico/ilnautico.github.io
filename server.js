@@ -1,17 +1,3 @@
-import express from "express";
-import OpenAI from "openai";
-import { Resend } from "resend";
-import puppeteer from "puppeteer";
-
-const app = express();
-app.use(express.json({ limit: "2mb" }));
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
-});
-
-const resend = new Resend(process.env.RESEND_API_KEY);
-
 app.post("/generate-report", async (req, res) => {
   try {
     const payload = req.body;
@@ -21,11 +7,7 @@ app.post("/generate-report", async (req, res) => {
     const email = fields.find(f => f.type === "INPUT_EMAIL")?.value;
     if (!email) return res.status(400).json({ error: "EMAIL NOT FOUND" });
 
-    // ===== 安定取得（これが核心）=====
-    const get = (label) =>
-      fields.find(f => f.label?.toLowerCase().includes(label))?.value || "";
-
-    // ===== HTML（お前の原型そのまま）=====
+    // ===== HTML =====
     const htmlTemplate = `
 <!DOCTYPE html>
 <html lang="en">
@@ -1152,8 +1134,7 @@ body {
 
 
 </body>
-</html>
-`;
+</html>`;
 
     // ===== AI =====
     const completion = await openai.chat.completions.create({
@@ -1167,25 +1148,29 @@ body {
     const summary =
       completion?.choices?.[0]?.message?.content || "No summary";
 
-    // ===== データ（完全版）=====
+    // ============================
+    // 🔥 ここからが今回の修正部分
+    // ============================
+
+    const answers = fields.filter(f => f.type !== "INPUT_EMAIL");
+    const v = (i) => String(answers[i]?.value ?? "");
+
     const data = {
-      application: get("product"),
-      processing_method: get("processing"),
-      current_material: get("current"),
-      bio_material: get("material"),
-      equipment: get("equipment"),
-      production_scale: get("scale"),
-      project_stage: get("stage"),
-      concerns: get("concern"),
-
-      submission_reference: "Tally Submission",
-
-      client_name: "Client",
-      client_company: "Company",
-      client_country: "Japan",
-
+      client_name: email,
+      client_company: "Tally Submission",
+      client_country: "N/A",
       report_id: "FV-" + Date.now(),
       report_date: new Date().toLocaleDateString(),
+      submission_reference: "Tally Submission",
+
+      application: v(0),
+      processing_method: v(1),
+      current_material: v(2),
+      bio_material: v(3),
+      equipment: v(4),
+      production_scale: v(5),
+      concerns: v(6),
+      project_stage: v(7),
 
       executive_summary: summary,
 
@@ -1230,23 +1215,27 @@ body {
       score_eol_note: "OK",
 
       obs_1_title: "Material Behavior",
-      obs_1_body: "Differences observed vs PP",
+      obs_1_body: "Differences observed vs current material baseline.",
 
       obs_2_title: "Processing Impact",
-      obs_2_body: "Requires tuning",
+      obs_2_body: "Processing conditions may require tuning.",
 
       obs_3_title: "Performance Trade-off",
-      obs_3_body: "Strength slightly reduced",
+      obs_3_body: "Performance verification recommended.",
 
       risk_1_title: "Cost Increase",
-      risk_1_body: "Higher than PP",
+      risk_1_body: "Higher than conventional material.",
 
       risk_2_title: "Stability Risk",
-      risk_2_body: "Requires control",
+      risk_2_body: "Requires validation.",
 
-      strategic_recommendation: "Pilot test recommended",
+      strategic_recommendation: "Pilot test recommended.",
       disclaimer: "Advisory only"
     };
+
+    // ============================
+    // 🔥 ここまで修正部分
+    // ============================
 
     // ===== 置換 =====
     let html = htmlTemplate;
@@ -1289,8 +1278,4 @@ body {
     console.error(err);
     res.status(500).json({ error: err.message });
   }
-});
-
-app.listen(8080, () => {
-  console.log("Server running");
 });
