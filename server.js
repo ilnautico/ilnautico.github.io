@@ -20,20 +20,23 @@ app.post("/generate-report", async (req, res) => {
   try {
     const payload = req.body;
 
-    let email = null;
+    const fields = payload?.data?.fields || [];
 
-    if (payload?.data?.fields) {
-      const emailField = payload.data.fields.find(
-        (f) => f.type === "INPUT_EMAIL"
-      );
-      email = emailField?.value;
-    }
+    // ===== email取得 =====
+    const emailField = fields.find(f => f.type === "INPUT_EMAIL");
+    const email = emailField?.value;
 
     if (!email) {
       return res.status(400).json({ error: "EMAIL NOT FOUND" });
     }
 
-    // ===== HTML（ここにお前の原型そのまま貼る）=====
+    // ===== 回答取得関数 =====
+    const getAnswer = (label) => {
+      const f = fields.find(x => x.label === label);
+      return f?.value || "";
+    };
+
+    // ===== HTML（お前の原型そのまま貼る）=====
     const htmlTemplate = `
 <!DOCTYPE html>
 <html lang="en">
@@ -1163,7 +1166,7 @@ body {
 </html>
 `;
 
-    // ===== AI（サマリーだけ使う）=====
+    // ===== AI =====
     const completion = await openai.chat.completions.create({
       model: "gpt-4.1-mini",
       messages: [
@@ -1175,35 +1178,35 @@ body {
     const summary =
       completion?.choices?.[0]?.message?.content || "No summary";
 
-    // ===== データ（全部ここでまとめる）=====
+    // ===== フォーム→データ反映 =====
     const data = {
-      client_name: "Client Name",
+      client_name: "Client",
       client_company: "Company",
       client_country: "Japan",
-      report_id: "FV-001",
+      report_id: "FV-" + Date.now(),
       report_date: new Date().toLocaleDateString(),
 
-      application: "Packaging",
-      current_material: "PP",
-      processing_method: "Blow molding",
-      bio_material: "PHA",
-      equipment: "Standard",
-      production_scale: "Mass",
-      project_stage: "Evaluation",
-      submission_reference: "Tally",
+      application: getAnswer("What product are you planning to produce?"),
+      processing_method: getAnswer("What processing method do you use?"),
+      current_material: getAnswer("What material are you currently using?"),
+      bio_material: getAnswer("What material are you considering?"),
+      equipment: getAnswer("What type of equipment do you operate?"),
+      production_scale: getAnswer("What production scale are you targeting?"),
+      project_stage: getAnswer("What stage is your project currently in?"),
+      concerns: getAnswer("What are your main technical concerns?"),
 
       executive_summary: summary,
 
       feasibility_level: "MODERATE",
-      feasibility_explanation: "Feasible with adjustments",
+      feasibility_explanation: "Feasible with process adjustment.",
 
       thermal_risk: "Moderate",
       thermal_risk_class: "risk-moderate",
-      thermal_note: "Thermal adjustment needed",
+      thermal_note: "Thermal adjustment required",
 
       processing_risk: "Moderate",
       processing_risk_class: "risk-moderate",
-      processing_note: "Parameter tuning required",
+      processing_note: "Parameter tuning needed",
 
       equipment_risk: "Low",
       equipment_risk_class: "risk-low",
@@ -1234,33 +1237,33 @@ body {
       score_eol_level: "Low",
       score_eol_note: "OK",
 
-      obs_1_title: "Material",
-      obs_1_body: "PHA differs from PP",
+      obs_1_title: "Material Behavior",
+      obs_1_body: "Differences observed vs PP",
 
-      obs_2_title: "Processing",
+      obs_2_title: "Processing Impact",
       obs_2_body: "Requires tuning",
 
-      obs_3_title: "Performance",
-      obs_3_body: "Slightly lower strength",
+      obs_3_title: "Performance Trade-off",
+      obs_3_body: "Strength slightly reduced",
 
-      risk_1_title: "Cost",
+      risk_1_title: "Cost Increase",
       risk_1_body: "Higher than PP",
 
-      risk_2_title: "Stability",
-      risk_2_body: "Needs control",
+      risk_2_title: "Stability Risk",
+      risk_2_body: "Requires control",
 
       strategic_recommendation: "Pilot test recommended",
       disclaimer: "Advisory only"
     };
 
-    // ===== 全部差し込み（ここが本質）=====
+    // ===== 置換 =====
     let html = htmlTemplate;
 
     Object.keys(data).forEach((key) => {
       html = html.replace(new RegExp(`{{${key}}}`, "g"), data[key]);
     });
 
-    // ===== PDF生成 =====
+    // ===== PDF =====
     const browser = await puppeteer.launch({
       args: ["--no-sandbox"]
     });
@@ -1275,7 +1278,7 @@ body {
 
     await browser.close();
 
-    // ===== メール送信 =====
+    // ===== メール =====
     await resend.emails.send({
       from: "FairVia <info@ilnautico.com>",
       to: email,
