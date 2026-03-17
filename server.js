@@ -1,3 +1,17 @@
+import express from "express";
+import OpenAI from "openai";
+import { Resend } from "resend";
+import puppeteer from "puppeteer";
+
+const app = express();
+app.use(express.json({ limit: "2mb" }));
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY
+});
+
+const resend = new Resend(process.env.RESEND_API_KEY);
+
 app.post("/generate-report", async (req, res) => {
   try {
     const payload = req.body;
@@ -5,9 +19,23 @@ app.post("/generate-report", async (req, res) => {
 
     // ===== email =====
     const email = fields.find(f => f.type === "INPUT_EMAIL")?.value;
-    if (!email) return res.status(400).json({ error: "EMAIL NOT FOUND" });
+    if (!email) {
+      return res.status(400).json({ error: "EMAIL NOT FOUND" });
+    }
 
-    // ===== HTML =====
+    // ===== answers（順番固定）=====
+    const answers = fields.filter(f => f.type !== "INPUT_EMAIL");
+
+    const application = answers[0]?.value || "";
+    const processing_method = answers[1]?.value || "";
+    const current_material = answers[2]?.value || "";
+    const bio_material = answers[3]?.value || "";
+    const equipment = answers[4]?.value || "";
+    const production_scale = answers[5]?.value || "";
+    const concerns = answers[6]?.value || "";
+    const project_stage = answers[7]?.value || "";
+
+    // ===== HTML（そのまま使え）=====
     const htmlTemplate = `
 <!DOCTYPE html>
 <html lang="en">
@@ -1134,7 +1162,8 @@ body {
 
 
 </body>
-</html>`;
+</html>
+`;
 
     // ===== AI =====
     const completion = await openai.chat.completions.create({
@@ -1148,29 +1177,25 @@ body {
     const summary =
       completion?.choices?.[0]?.message?.content || "No summary";
 
-    // ============================
-    // 🔥 ここからが今回の修正部分
-    // ============================
-
-    const answers = fields.filter(f => f.type !== "INPUT_EMAIL");
-    const v = (i) => String(answers[i]?.value ?? "");
-
+    // ===== データ =====
     const data = {
-      client_name: email,
-      client_company: "Tally Submission",
-      client_country: "N/A",
-      report_id: "FV-" + Date.now(),
-      report_date: new Date().toLocaleDateString(),
+      application,
+      processing_method,
+      current_material,
+      bio_material,
+      equipment,
+      production_scale,
+      concerns,
+      project_stage,
+
       submission_reference: "Tally Submission",
 
-      application: v(0),
-      processing_method: v(1),
-      current_material: v(2),
-      bio_material: v(3),
-      equipment: v(4),
-      production_scale: v(5),
-      concerns: v(6),
-      project_stage: v(7),
+      client_name: "Client",
+      client_company: "Company",
+      client_country: "Japan",
+
+      report_id: "FV-" + Date.now(),
+      report_date: new Date().toLocaleDateString(),
 
       executive_summary: summary,
 
@@ -1215,27 +1240,23 @@ body {
       score_eol_note: "OK",
 
       obs_1_title: "Material Behavior",
-      obs_1_body: "Differences observed vs current material baseline.",
+      obs_1_body: "Differences observed vs PP",
 
       obs_2_title: "Processing Impact",
-      obs_2_body: "Processing conditions may require tuning.",
+      obs_2_body: "Requires tuning",
 
       obs_3_title: "Performance Trade-off",
-      obs_3_body: "Performance verification recommended.",
+      obs_3_body: "Strength slightly reduced",
 
       risk_1_title: "Cost Increase",
-      risk_1_body: "Higher than conventional material.",
+      risk_1_body: "Higher than PP",
 
       risk_2_title: "Stability Risk",
-      risk_2_body: "Requires validation.",
+      risk_2_body: "Requires control",
 
-      strategic_recommendation: "Pilot test recommended.",
+      strategic_recommendation: "Pilot test recommended",
       disclaimer: "Advisory only"
     };
-
-    // ============================
-    // 🔥 ここまで修正部分
-    // ============================
 
     // ===== 置換 =====
     let html = htmlTemplate;
@@ -1278,4 +1299,8 @@ body {
     console.error(err);
     res.status(500).json({ error: err.message });
   }
+});
+
+app.listen(8080, () => {
+  console.log("Server running");
 });
