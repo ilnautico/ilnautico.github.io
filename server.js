@@ -39,7 +39,7 @@ app.post("/generate-report", async (req, res) => {
       );
 
       if (emailField && typeof emailField.value === "string") {
-        email = emailField.value;
+        email = emailField.value.trim();
       }
     }
 
@@ -115,11 +115,16 @@ Generate a short biodegradable material screening report.
 
     await browser.close();
 
-    await resend.emails.send({
-      from: "FairVia <info@ilnautico.com>",   // ← ここを変更
+    const emailResult = await resend.emails.send({
+      from: "FairVia <info@ilnautico.com>",
+      reply_to: "info@ilnautico.com",
       to: email,
       subject: "FairVia Screening Report",
       text: "Your screening report is attached.",
+      html: `
+        <p>Thank you for your submission.</p>
+        <p>Your FairVia screening report is attached as a PDF.</p>
+      `,
       attachments: [
         {
           filename: "fairvia_report.pdf",
@@ -128,6 +133,7 @@ Generate a short biodegradable material screening report.
       ]
     });
 
+    console.log("RESEND RESULT:", JSON.stringify(emailResult, null, 2));
     console.log("MAIL SENT:", email);
 
     res.set({
