@@ -12,18 +12,6 @@ const openai = new OpenAI({
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-app.get("/", (req, res) => {
-  res.send("FairVia server running");
-});
-
-app.get("/health", (req, res) => {
-  res.json({ status: "ok" });
-});
-
-/* =========================
-   Helpers
-========================= */
-
 function escapeHtml(value = "") {
   return String(value)
     .replace(/&/g, "&amp;")
@@ -37,13 +25,8 @@ function normalizeFieldValue(field) {
 
   const { value, options } = field;
 
-  if (typeof value === "string" || typeof value === "number") {
-    return String(value);
-  }
-
-  if (typeof value === "boolean") {
-    return value ? "Yes" : "No";
-  }
+  if (typeof value === "string" || typeof value === "number") return String(value);
+  if (typeof value === "boolean") return value ? "Yes" : "No";
 
   if (Array.isArray(value)) {
     if (Array.isArray(options)) {
@@ -57,9 +40,7 @@ function normalizeFieldValue(field) {
     return value.join(", ");
   }
 
-  if (typeof value === "object") {
-    return JSON.stringify(value);
-  }
+  if (typeof value === "object") return JSON.stringify(value);
 
   return "";
 }
@@ -78,10 +59,6 @@ function getValueByKeywords(fields, keywords = [], fallbackIndex = null) {
   return "";
 }
 
-/* =========================
-   MAIN
-========================= */
-
 app.post("/generate-report", async (req, res) => {
   try {
     const fields = req.body?.data?.fields || [];
@@ -89,9 +66,7 @@ app.post("/generate-report", async (req, res) => {
     const emailField = fields.find((f) => f?.type === "INPUT_EMAIL");
     const email = emailField ? normalizeFieldValue(emailField).trim() : "";
 
-    if (!email) {
-      return res.status(400).json({ error: "EMAIL NOT FOUND" });
-    }
+    if (!email) return res.status(400).json({ error: "EMAIL NOT FOUND" });
 
     const application = getValueByKeywords(fields, ["product"], 0);
     const processingMethod = getValueByKeywords(fields, ["processing"], 1);
@@ -124,11 +99,10 @@ Give 1 professional paragraph summary.
       completion.choices?.[0]?.message?.content || "";
 
     /* =========================
-       HTML TEMPLATE
-       👉ここにあなたのHTMLそのまま貼る
+       👉ここにHTML貼る
     ========================= */
-
-    const htmlTemplate = `<!DOCTYPE html>
+    const htmlTemplate = `
+   <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -1253,10 +1227,11 @@ body {
 
 
 </body>
-</html>`;
+</html>
+    `;
 
     /* =========================
-       DATA
+       DATA（完全一致）
     ========================= */
 
     const data = {
@@ -1267,6 +1242,7 @@ body {
       equipment,
       production_scale: productionScale,
       project_stage: projectStage,
+
       submission_reference: "Tally Form",
 
       client_name: email,
@@ -1338,7 +1314,7 @@ body {
     };
 
     /* =========================
-       💥 完全置換（ここが最重要）
+       💥 完全置換
     ========================= */
 
     let html = htmlTemplate;
@@ -1348,7 +1324,7 @@ body {
     });
 
     /* =========================
-       PDF
+       PDF生成
     ========================= */
 
     const browser = await puppeteer.launch({
@@ -1366,7 +1342,7 @@ body {
     await browser.close();
 
     /* =========================
-       MAIL
+       メール送信
     ========================= */
 
     await resend.emails.send({
@@ -1383,6 +1359,7 @@ body {
     });
 
     res.send(pdf);
+
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err.message });
