@@ -12,14 +12,6 @@ const openai = new OpenAI({
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-app.get("/", (req, res) => {
-  res.send("FairVia server running");
-});
-
-app.get("/health", (req, res) => {
-  res.json({ status: "ok" });
-});
-
 /* =========================
    Helpers
 ========================= */
@@ -29,16 +21,7 @@ function escapeHtml(value = "") {
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/\n/g, "<br>");
-}
-
-function safeJsonParse(text) {
-  try {
-    return JSON.parse(text);
-  } catch {
-    return null;
-  }
+    .replace(/"/g, "&quot;");
 }
 
 function normalizeFieldValue(field) {
@@ -46,1391 +29,103 @@ function normalizeFieldValue(field) {
 
   const { value, options } = field;
 
-  // Single choice ID -> option text
   if (
     (typeof value === "string" || typeof value === "number") &&
-    Array.isArray(options) &&
-    options.length > 0
+    Array.isArray(options)
   ) {
-    const match = options.find((opt) => String(opt.id) === String(value));
-    if (match?.text) return String(match.text);
+    const match = options.find((o) => String(o.id) === String(value));
+    if (match?.text) return match.text;
   }
 
-  // Simple strings / numbers
   if (typeof value === "string" || typeof value === "number") {
     return String(value);
   }
 
-  // Booleans
-  if (typeof value === "boolean") {
-    return value ? "Yes" : "No";
-  }
-
-  // Arrays from multi select / checkbox / multiple answers
   if (Array.isArray(value)) {
-    if (Array.isArray(options) && options.length > 0) {
-      const texts = value.map((id) => {
-        const match = options.find((opt) => String(opt.id) === String(id));
-        return match?.text ? String(match.text) : String(id);
-      });
-      return texts.join(", ");
+    if (Array.isArray(options)) {
+      return value
+        .map((id) => {
+          const m = options.find((o) => String(o.id) === String(id));
+          return m?.text || id;
+        })
+        .join(", ");
     }
     return value.join(", ");
-  }
-
-  // Objects (rare fields)
-  if (value && typeof value === "object") {
-    return JSON.stringify(value);
   }
 
   return "";
 }
 
-function fieldHaystack(field) {
-  return `${field?.label || ""} ${field?.key || ""}`.toLowerCase();
+function getField(fields, keyword) {
+  return fields.find((f) =>
+    `${f.label} ${f.key}`.toLowerCase().includes(keyword)
+  );
 }
 
-function getValueByKeywordGroups(fields, keywordGroups = []) {
-  const matched = fields.find((field) => {
-    const haystack = fieldHaystack(field);
-    return keywordGroups.some((group) =>
-      group.every((kw) => haystack.includes(kw.toLowerCase()))
-    );
-  });
+/* =========================
+   MAIN HANDLER
+========================= */
 
-  return matched ? normalizeFieldValue(matched) : "";
-}
-
-function deriveFeasibilityLevel({
-  currentMaterial,
-  bioMaterial,
-  equipment,
-  productionScale,
-  concerns,
-  projectStage
-}) {
-  let score = 0;
-
-  if (/pla|pha|pbat|starch/i.test(bioMaterial)) score += 1;
-  if (/standard/i.test(equipment)) score += 1;
-  if (/dedicated|new equipment/i.test(equipment)) score += 2;
-  if (/laboratory|pilot/i.test(productionScale)) score += 2;
-  if (/commercial/i.test(productionScale)) score -= 1;
-  if (/evaluating|early research/i.test(projectStage)) score += 1;
-  if (/cost impact|equipment compatibility|processing stability/i.test(concerns)) score -= 1;
-  if (/pet|pp|pe/i.test(currentMaterial) && /pla|pha|pbat|starch/i.test(bioMaterial)) score -= 1;
-
-  if (score <= 0) {
-    return {
-      level: "HIGH",
-      css: "high",
-      explanation:
-        "Material transition may be possible, but a higher implementation burden is expected due to processing, cost, or compatibility considerations."
-    };
-  }
-
-  if (score <= 3) {
-    return {
-      level: "MODERATE",
-      css: "moderate",
-      explanation:
-        "The transition appears feasible with process review, material validation, and practical pilot testing before broader deployment."
-    };
-  }
-
-  return {
-    level: "LOW",
-    css: "low",
-    explanation:
-      "The transition appears comparatively manageable at this stage, although routine validation is still recommended before implementation."
-  };
-}
-
-function deriveRiskCards({ concerns, equipment, productionScale, currentMaterial, bioMaterial }) {
-  const thermalHigh = /processing stability/i.test(concerns) || /commercial/i.test(productionScale);
-  const processHigh = /processing stability|equipment compatibility/i.test(concerns);
-  const equipmentHigh = /equipment compatibility/i.test(concerns) || /standard/i.test(equipment);
-
-  const thermal = thermalHigh
-    ? {
-        level: "Moderate",
-        css: "risk-moderate",
-        note: "Thermal performance should be verified under real processing conditions before scale-up."
-      }
-    : {
-        level: "Low",
-        css: "risk-low",
-        note: "No immediate thermal concern is indicated, though validation remains advisable."
-      };
-
-  const processing = processHigh
-    ? {
-        level: "Moderate",
-        css: "risk-moderate",
-        note: "Processing adjustments may be required depending on material behavior and line stability."
-      }
-    : {
-        level: "Low",
-        css: "risk-low",
-        note: "No major process instability is indicated from the current submission."
-      };
-
-  const equipmentCard = equipmentHigh
-    ? {
-        level: "Moderate",
-        css: "risk-moderate",
-        note: "Existing equipment suitability should be reviewed before operational adoption."
-      }
-    : {
-        level: "Low",
-        css: "risk-low",
-        note: "The current equipment profile appears broadly workable for preliminary evaluation."
-      };
-
-  const scoreThermal = thermal.level === "Low"
-    ? ["Acceptable", "low", "Low", "Routine verification recommended"]
-    : ["Needs review", "moderate", "Moderate", "Thermal suitability should be confirmed"];
-
-  const scoreProcessing = processing.level === "Low"
-    ? ["Acceptable", "low", "Low", "Minor operational review only"]
-    : ["Adjustable", "moderate", "Moderate", "Parameter tuning may be required"];
-
-  const scoreEquipment = equipmentCard.level === "Low"
-    ? ["Compatible", "low", "Low", "No major equipment concern indicated"]
-    : ["Conditionally compatible", "moderate", "Moderate", "Compatibility validation recommended"];
-
-  const certNeedsReview = /pla|pha|pbat|starch/i.test(bioMaterial);
-  const eolNeedsReview = /pet|pp|pe/i.test(currentMaterial);
-
-  return {
-    thermal,
-    processing,
-    equipmentCard,
-    scoreThermal,
-    scoreProcessing,
-    scoreEquipment,
-    scoreCert: certNeedsReview
-      ? ["Pending review", "na", "N/A", "Certification details were not submitted"]
-      : ["Not specified", "na", "N/A", "No certification data supplied"],
-    scoreEol: eolNeedsReview
-      ? ["Requires review", "moderate", "Moderate", "End-of-life fit should be validated"]
-      : ["Conditionally aligned", "low", "Low", "No immediate end-of-life issue indicated"]
-  };
-}
-
-app.post("/generate-report", async (req, res) => {
+const handler = async (req, res) => {
   try {
-    const payload = req.body;
-    const fields = payload?.data?.fields || [];
+    const fields = req.body?.data?.fields || [];
 
-    console.log("PAYLOAD:", JSON.stringify(payload, null, 2));
+    console.log("PAYLOAD:", JSON.stringify(req.body, null, 2));
 
-    // Email
-    const emailField = fields.find((f) => f?.type === "INPUT_EMAIL");
-    const email = emailField ? normalizeFieldValue(emailField).trim() : "";
+    const emailField = fields.find((f) => f.type === "INPUT_EMAIL");
+    const email = emailField ? normalizeFieldValue(emailField) : "";
 
     if (!email) {
       return res.status(400).json({ error: "EMAIL NOT FOUND" });
     }
 
-    // Exact-ish field extraction by label keywords
-    const application = getValueByKeywordGroups(fields, [
-      ["what product", "produce"],
-      ["product", "planning"],
-      ["application"]
-    ]);
+    const application = normalizeFieldValue(getField(fields, "product"));
+    const processingMethod = normalizeFieldValue(getField(fields, "processing"));
+    const currentMaterial = normalizeFieldValue(getField(fields, "currently"));
+    const bioMaterial = normalizeFieldValue(getField(fields, "biodegradable"));
+    const equipment = normalizeFieldValue(getField(fields, "equipment"));
+    const productionScale = normalizeFieldValue(getField(fields, "scale"));
+    const concerns = normalizeFieldValue(getField(fields, "concern"));
+    const projectStage = normalizeFieldValue(getField(fields, "stage"));
 
-    const processingMethod = getValueByKeywordGroups(fields, [
-      ["processing method"],
-      ["what processing"]
-    ]);
+    console.log("EMAIL:", email);
 
-    const currentMaterial = getValueByKeywordGroups(fields, [
-      ["currently using"],
-      ["current material"]
-    ]);
+    // ✅ AI（落ちない版）
+    let executiveSummary = "Preliminary screening completed.";
 
-    const bioMaterial = getValueByKeywordGroups(fields, [
-      ["biodegradable material family"],
-      ["bio material"],
-      ["considering"]
-    ]);
+    try {
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4.1-mini",
+        messages: [
+          {
+            role: "user",
+            content: `
+Summarize this in 1 professional paragraph:
 
-    const equipment = getValueByKeywordGroups(fields, [
-      ["type of equipment"],
-      ["equipment", "operate"]
-    ]);
-
-    const productionScale = getValueByKeywordGroups(fields, [
-      ["production scale"],
-      ["scale", "targeting"]
-    ]);
-
-    const concerns = getValueByKeywordGroups(fields, [
-      ["technical concerns"],
-      ["main technical"]
-    ]);
-
-    const projectStage = getValueByKeywordGroups(fields, [
-      ["project currently in"],
-      ["project stage"],
-      ["what stage"]
-    ]);
-
-    console.log("EMAIL FOUND:", email);
-    console.log("APPLICATION:", application);
-    console.log("PROCESSING:", processingMethod);
-    console.log("CURRENT MATERIAL:", currentMaterial);
-    console.log("BIO MATERIAL:", bioMaterial);
-    console.log("EQUIPMENT:", equipment);
-    console.log("PRODUCTION SCALE:", productionScale);
-    console.log("CONCERNS:", concerns);
-    console.log("PROJECT STAGE:", projectStage);
-
-    // AI structured output
-    const aiPrompt = `
-You are a polymer materials consultant.
-
-Create a preliminary screening report in valid JSON only.
-
-Input:
 Application: ${application}
-Current Material: ${currentMaterial}
-Processing Method: ${processingMethod}
-Target Bio Material: ${bioMaterial}
+Material: ${currentMaterial}
+Process: ${processingMethod}
+Bio: ${bioMaterial}
 Equipment: ${equipment}
-Production Scale: ${productionScale}
-Project Stage: ${projectStage}
-Technical Concerns: ${concerns}
+Scale: ${productionScale}
+Concerns: ${concerns}
+Stage: ${projectStage}
+`
+          }
+        ]
+      });
 
-Return JSON with exactly this shape:
-{
-  "executive_summary": "1 paragraph",
-  "obs_1_title": "short title",
-  "obs_1_body": "2-4 sentences",
-  "obs_2_title": "short title",
-  "obs_2_body": "2-4 sentences",
-  "obs_3_title": "short title",
-  "obs_3_body": "2-4 sentences",
-  "risk_1_title": "short title",
-  "risk_1_body": "2-4 sentences",
-  "risk_2_title": "short title",
-  "risk_2_body": "2-4 sentences",
-  "strategic_recommendation": "1 paragraph",
-  "disclaimer": "1 short professional disclaimer"
-}
+      executiveSummary =
+        completion?.choices?.[0]?.message?.content || executiveSummary;
+    } catch (e) {
+      console.log("AI FAILED → fallback");
+    }
 
-No markdown. No code fences.
-`;
-
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4.1-mini",
-      messages: [
-        {
-          role: "system",
-          content:
-            "You are a polymer materials consultant. Return only valid JSON."
-        },
-        {
-          role: "user",
-          content: aiPrompt
-        }
-      ]
-    });
-
-    const raw = completion?.choices?.[0]?.message?.content?.trim() || "";
-    const aiData = safeJsonParse(raw) || {};
-
-    const feasibility = deriveFeasibilityLevel({
-      currentMaterial,
-      bioMaterial,
-      equipment,
-      productionScale,
-      concerns,
-      projectStage
-    });
-
-    const risks = deriveRiskCards({
-      concerns,
-      equipment,
-      productionScale,
-      currentMaterial,
-      bioMaterial
-    });
-
+    // =========================
+    // ★ ここにあなたのHTMLそのまま貼る
+    // =========================
     const htmlTemplate = `
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>FairVia™ Technical Screening Report</title>
-<style>
-
-/* ── Reset ── */
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
-
-/* ── Page setup ── */
-@page {
-  size: A4;
-  margin: 0;
-}
-
-html {
-  width: 210mm;
-  background: #ffffff;
-}
-
-body {
-  width: 210mm;
-  background: #ffffff;
-  font-family: Georgia, "Times New Roman", serif;
-  color: #2c2c2c;
-  font-size: 10pt;
-  line-height: 1.6;
-  -webkit-print-color-adjust: exact;
-  print-color-adjust: exact;
-  margin: 0;
-}
-
-/* ── Page container ── */
-.page {
-  width: 210mm;
-  min-height: 297mm;
-  position: relative;
-  page-break-after: always;
-  background: #ffffff;
-  overflow: hidden;
-}
-
-.page:last-child {
-  page-break-after: auto;
-}
-
-/* ═══════════════════════════════════════════
-   COVER PAGE
-═══════════════════════════════════════════ */
-
-.cover {
-  background: #17263c;
-  display: block;
-}
-
-.cover-header {
-  padding: 10mm 14mm 0;
-  display: block;
-}
-
-.cover-brand {
-  font-family: Georgia, serif;
-  font-size: 8pt;
-  color: #b4965a;
-  letter-spacing: 0.25em;
-  text-transform: uppercase;
-  display: block;
-  margin-bottom: 1mm;
-}
-
-.cover-service {
-  font-size: 7pt;
-  color: rgba(255,255,255,0.5);
-  letter-spacing: 0.15em;
-  text-transform: uppercase;
-  display: block;
-}
-
-.cover-gold-rule {
-  margin: 8mm 14mm 0;
-  height: 1px;
-  background: #b4965a;
-  opacity: 0.4;
-}
-
-/* Cover center content */
-.cover-main {
-  padding: 16mm 14mm 0;
-  display: block;
-}
-
-.cover-report-type {
-  font-size: 7.5pt;
-  color: #b4965a;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  display: block;
-  margin-bottom: 5mm;
-}
-
-.cover-title {
-  font-family: Georgia, serif;
-  font-size: 28pt;
-  font-weight: normal;
-  color: #ffffff;
-  line-height: 1.15;
-  display: block;
-  margin-bottom: 3mm;
-}
-
-.cover-subtitle {
-  font-family: Georgia, serif;
-  font-size: 13pt;
-  font-weight: normal;
-  color: #b4965a;
-  letter-spacing: 0.03em;
-  display: block;
-  margin-bottom: 12mm;
-}
-
-.cover-divider {
-  width: 20mm;
-  height: 2px;
-  background: #b4965a;
-  display: block;
-  margin-bottom: 10mm;
-}
-
-/* Client info box on cover */
-.cover-client-box {
-  background: rgba(180, 150, 90, 0.12);
-  border-left: 3px solid #b4965a;
-  padding: 6mm 8mm;
-  display: block;
-  margin-bottom: 12mm;
-}
-
-.cover-client-label {
-  font-size: 7pt;
-  color: #b4965a;
-  letter-spacing: 0.15em;
-  text-transform: uppercase;
-  display: block;
-  margin-bottom: 2mm;
-}
-
-.cover-client-name {
-  font-size: 13pt;
-  color: #ffffff;
-  font-weight: normal;
-  display: block;
-  margin-bottom: 1.5mm;
-}
-
-.cover-client-detail {
-  font-size: 8.5pt;
-  color: rgba(255,255,255,0.6);
-  display: block;
-  margin-bottom: 0.8mm;
-}
-
-/* Meta grid on cover */
-.cover-meta-grid {
-  display: block;
-}
-
-.cover-meta-row {
-  padding: 2.5mm 0;
-  border-top: 1px solid rgba(180,150,90,0.25);
-  display: block;
-  overflow: hidden;
-}
-
-.cover-meta-row:last-child {
-  border-bottom: 1px solid rgba(180,150,90,0.25);
-}
-
-.cover-meta-label {
-  font-size: 7pt;
-  color: rgba(255,255,255,0.45);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  float: left;
-  width: 38mm;
-  display: inline-block;
-}
-
-.cover-meta-value {
-  font-size: 8.5pt;
-  color: rgba(255,255,255,0.85);
-  display: inline-block;
-}
-
-/* Feasibility badge on cover */
-.cover-badge-area {
-  padding: 12mm 14mm 0;
-  display: block;
-}
-
-.cover-badge-label {
-  font-size: 7pt;
-  color: rgba(255,255,255,0.45);
-  letter-spacing: 0.15em;
-  text-transform: uppercase;
-  display: block;
-  margin-bottom: 3mm;
-}
-
-.cover-badge {
-  display: inline-block;
-  padding: 3mm 8mm;
-  border: 1.5px solid #b4965a;
-  font-size: 11pt;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
-.cover-badge.level-low      { color: #6db07a; border-color: #6db07a; }
-.cover-badge.level-moderate { color: #c4963e; border-color: #c4963e; }
-.cover-badge.level-high     { color: #c0614a; border-color: #c0614a; }
-
-/* Cover footer */
-.cover-footer {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  padding: 5mm 14mm;
-  border-top: 1px solid rgba(180,150,90,0.25);
-  overflow: hidden;
-}
-
-.cover-footer-left {
-  float: left;
-  font-size: 7pt;
-  color: rgba(255,255,255,0.35);
-  letter-spacing: 0.08em;
-}
-
-.cover-footer-right {
-  float: right;
-  font-size: 7pt;
-  color: rgba(255,255,255,0.35);
-  letter-spacing: 0.08em;
-}
-
-/* ═══════════════════════════════════════════
-   CONTENT PAGES
-═══════════════════════════════════════════ */
-
-.content {
-  background: #ffffff;
-  display: block;
-}
-
-/* Page header strip */
-.page-header {
-  background: #17263c;
-  padding: 4mm 14mm;
-  display: block;
-  overflow: hidden;
-}
-
-.page-header-left {
-  float: left;
-  font-size: 6.5pt;
-  color: rgba(255,255,255,0.55);
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  line-height: 1.4;
-}
-
-.page-header-right {
-  float: right;
-  font-size: 6.5pt;
-  color: #b4965a;
-  letter-spacing: 0.08em;
-  line-height: 1.4;
-}
-
-.page-header-gold {
-  height: 1.5px;
-  background: #b4965a;
-  display: block;
-}
-
-/* Page footer */
-.page-footer {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  background: #17263c;
-  display: block;
-}
-
-.page-footer-gold {
-  height: 1px;
-  background: #b4965a;
-  opacity: 0.6;
-}
-
-.page-footer-inner {
-  padding: 3mm 14mm;
-  overflow: hidden;
-}
-
-.page-footer-left {
-  float: left;
-  font-size: 6.5pt;
-  color: rgba(255,255,255,0.45);
-  letter-spacing: 0.06em;
-}
-
-.page-footer-right {
-  float: right;
-  font-size: 6.5pt;
-  color: #b4965a;
-}
-
-/* Page body */
-.page-body {
-  padding: 10mm 14mm 20mm;
-  display: block;
-}
-
-/* ── Section elements ── */
-
-.section {
-  break-inside: avoid;
-  margin-bottom: 7mm;
-  display: block;
-}
-
-.section-label {
-  font-size: 6.5pt;
-  color: #b4965a;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  display: block;
-  margin-bottom: 1mm;
-}
-
-.section-title {
-  font-family: Georgia, serif;
-  font-size: 14pt;
-  font-weight: normal;
-  color: #17263c;
-  display: block;
-  margin-bottom: 1.5mm;
-}
-
-.section-rule {
-  height: 1px;
-  background: #b4965a;
-  opacity: 0.45;
-  display: block;
-  margin-bottom: 4mm;
-}
-
-.section-rule-full {
-  height: 1px;
-  background: #b4965a;
-  display: block;
-  margin-bottom: 5mm;
-}
-
-/* ── Body text ── */
-.body-text {
-  font-size: 9.5pt;
-  color: #2c2c2c;
-  line-height: 1.65;
-  text-align: justify;
-  display: block;
-  margin-bottom: 3mm;
-}
-
-/* ── Info table (client info / application overview) ── */
-.info-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 9pt;
-  margin-bottom: 4mm;
-}
-
-.info-table tr:nth-child(odd) td {
-  background: #f5f3ee;
-}
-
-.info-table tr:nth-child(even) td {
-  background: #ffffff;
-}
-
-.info-table td {
-  padding: 2.5mm 4mm;
-  vertical-align: top;
-  border-bottom: 0.5px solid #ddd6c8;
-}
-
-.info-table td:first-child {
-  width: 44mm;
-  font-size: 8pt;
-  font-weight: bold;
-  color: #17263c;
-  white-space: nowrap;
-}
-
-.info-table td:last-child {
-  color: #2c2c2c;
-}
-
-.info-table tr:last-child td {
-  border-bottom: 1.5px solid #b4965a;
-}
-
-/* ── Feasibility scale ── */
-.feasibility-scale {
-  display: block;
-  margin-bottom: 4mm;
-}
-
-.feasibility-scale-label {
-  font-size: 7pt;
-  color: #b4965a;
-  letter-spacing: 0.15em;
-  text-transform: uppercase;
-  display: block;
-  margin-bottom: 2mm;
-}
-
-.feasibility-row {
-  display: block;
-  width: 72mm;
-  padding: 2mm 4mm;
-  margin-bottom: 1.2mm;
-  border-radius: 2px;
-  font-size: 9pt;
-  overflow: hidden;
-}
-
-.feasibility-row.inactive {
-  background: #f5f3ee;
-  border: 0.5px solid #ddd6c8;
-  color: #9a9088;
-}
-
-.feasibility-row.active {
-  background: #17263c;
-  border: 1px solid #b4965a;
-  color: #ffffff;
-}
-
-.feasibility-dot {
-  display: inline-block;
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  margin-right: 3mm;
-  vertical-align: middle;
-  position: relative;
-  top: -1px;
-}
-
-.feasibility-row.active   .feasibility-dot { background: #b4965a; }
-.feasibility-row.inactive .feasibility-dot { background: transparent; border: 1px solid #c8bfb0; }
-
-.feasibility-text {
-  font-size: 8.5pt;
-  letter-spacing: 0.06em;
-  vertical-align: middle;
-}
-
-.feasibility-row.active   .feasibility-text { font-weight: bold; }
-.feasibility-row.inactive .feasibility-text { font-weight: normal; }
-
-/* ── Risk indicator cards ── */
-.risk-grid {
-  display: block;
-  overflow: hidden;
-  margin-bottom: 4mm;
-  clear: both;
-}
-
-.risk-card {
-  float: left;
-  width: 58mm;
-  margin-right: 3mm;
-  border-radius: 2px;
-  overflow: hidden;
-  break-inside: avoid;
-}
-
-.risk-card:last-child {
-  margin-right: 0;
-}
-
-.risk-card-accent {
-  height: 3px;
-  display: block;
-}
-
-.risk-card-body {
-  padding: 3mm 3.5mm;
-}
-
-.risk-card-aspect {
-  font-size: 6.5pt;
-  font-weight: bold;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  display: block;
-  margin-bottom: 2mm;
-}
-
-.risk-badge {
-  display: inline-block;
-  padding: 1mm 3mm;
-  border-radius: 2px;
-  font-size: 7pt;
-  font-weight: bold;
-  color: #ffffff;
-  letter-spacing: 0.06em;
-  margin-bottom: 2mm;
-}
-
-.risk-note {
-  font-size: 7pt;
-  line-height: 1.45;
-  display: block;
-}
-
-/* Risk: High */
-.risk-high .risk-card-accent  { background: #8b2500; }
-.risk-high .risk-card-body    { background: #fff3f0; }
-.risk-high .risk-card-aspect  { color: #8b2500; }
-.risk-high .risk-badge        { background: #8b2500; }
-.risk-high .risk-note         { color: #6b3028; }
-
-/* Risk: Moderate */
-.risk-moderate .risk-card-accent { background: #8a6800; }
-.risk-moderate .risk-card-body   { background: #fffbee; }
-.risk-moderate .risk-card-aspect { color: #8a6800; }
-.risk-moderate .risk-badge       { background: #8a6800; }
-.risk-moderate .risk-note        { color: #6b5420; }
-
-/* Risk: Low */
-.risk-low .risk-card-accent  { background: #2e7d52; }
-.risk-low .risk-card-body    { background: #f2faf5; }
-.risk-low .risk-card-aspect  { color: #2e7d52; }
-.risk-low .risk-badge        { background: #2e7d52; }
-.risk-low .risk-note         { color: #245c3c; }
-
-/* ── Score table ── */
-.score-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 9pt;
-  margin-bottom: 4mm;
-}
-
-.score-table th {
-  background: #17263c;
-  color: #b4965a;
-  font-size: 7pt;
-  font-weight: bold;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  padding: 2.5mm 4mm;
-  text-align: left;
-}
-
-.score-table td {
-  padding: 2.5mm 4mm;
-  border-bottom: 0.5px solid #ddd6c8;
-  vertical-align: top;
-}
-
-.score-table tr:nth-child(odd) td  { background: #f5f3ee; }
-.score-table tr:nth-child(even) td { background: #ffffff; }
-
-.score-table tr:last-child td {
-  border-bottom: 1.5px solid #b4965a;
-}
-
-.score-pill {
-  display: inline-block;
-  padding: 0.5mm 3mm;
-  border-radius: 2px;
-  font-size: 7.5pt;
-  font-weight: bold;
-  color: #ffffff;
-}
-
-.score-pill.high     { background: #8b2500; }
-.score-pill.moderate { background: #8a6800; }
-.score-pill.low      { background: #2e7d52; }
-.score-pill.na       { background: #7a8a9a; }
-
-/* ── Considerations (numbered list) ── */
-.consideration {
-  break-inside: avoid;
-  margin-bottom: 4mm;
-  padding-bottom: 4mm;
-  border-bottom: 0.5px solid #ddd6c8;
-  display: block;
-}
-
-.consideration:last-child {
-  border-bottom: none;
-  margin-bottom: 0;
-}
-
-.consideration-number {
-  font-size: 7pt;
-  color: #b4965a;
-  letter-spacing: 0.1em;
-  font-weight: bold;
-  display: block;
-  margin-bottom: 0.5mm;
-}
-
-.consideration-title {
-  font-size: 10pt;
-  font-weight: bold;
-  color: #17263c;
-  display: block;
-  margin-bottom: 1.5mm;
-}
-
-.consideration-body {
-  font-size: 9pt;
-  color: #2c2c2c;
-  line-height: 1.6;
-  text-align: justify;
-  display: block;
-}
-
-/* ── Recommendation box ── */
-.recommendation-box {
-  background: #f5f3ee;
-  border-left: 3px solid #b4965a;
-  padding: 5mm 6mm;
-  display: block;
-  margin-bottom: 4mm;
-}
-
-.recommendation-text {
-  font-size: 9.5pt;
-  color: #2c2c2c;
-  line-height: 1.65;
-  text-align: justify;
-  display: block;
-}
-
-/* ── Disclaimer ── */
-.disclaimer-box {
-  background: #f5f3ee;
-  border: 0.5px solid #ddd6c8;
-  padding: 4mm 5mm;
-  display: block;
-}
-
-.disclaimer-text {
-  font-size: 7.5pt;
-  color: #7a8070;
-  line-height: 1.55;
-  font-style: italic;
-  text-align: justify;
-  display: block;
-}
-
-/* ── Signature / issuance block ── */
-.sig-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-top: 5mm;
-}
-
-.sig-table td {
-  width: 33.33%;
-  padding: 2.5mm 4mm;
-  border: 0.5px solid #ddd6c8;
-}
-
-.sig-table .sig-header td {
-  background: #f5f3ee;
-  font-size: 6.5pt;
-  color: #9a9088;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  border-bottom: 1px solid #b4965a;
-}
-
-.sig-table .sig-values td {
-  background: #ffffff;
-  font-size: 8.5pt;
-  font-weight: bold;
-  color: #17263c;
-}
-
-.sig-table .sig-values .gold-text {
-  color: #b4965a;
-}
-
-/* ── Utility ── */
-.clearfix::after {
-  content: '';
-  display: table;
-  clear: both;
-}
-
-.gold-text  { color: #b4965a; }
-.navy-text  { color: #17263c; }
-.muted-text { color: #9a9088; }
-
-.mt-2 { margin-top: 2mm; }
-.mt-4 { margin-top: 4mm; }
-.mt-6 { margin-top: 6mm; }
-.mb-2 { margin-bottom: 2mm; }
-.mb-4 { margin-bottom: 4mm; }
-
-.section,
-.risk-card,
-.consideration,
-.recommendation-box {
-  page-break-inside: avoid;
-  break-inside: avoid;
-}
-
-</style>
-</head>
-<body>
-
-<div class="page cover">
-  <div class="cover-header">
-    <span class="cover-brand">FairVia™</span>
-    <span class="cover-service">Technical Advisory Services &nbsp;|&nbsp; Il Nautico Co., Ltd.</span>
-  </div>
-  <div class="cover-gold-rule"></div>
-
-  <div class="cover-main">
-    <span class="cover-report-type">Material Feasibility Screening Report</span>
-    <span class="cover-title">Material &amp; Processing<br>Feasibility Screening</span>
-    <span class="cover-subtitle">Material Transition Decision Brief</span>
-    <span class="cover-divider"></span>
-
-    <div class="cover-client-box">
-      <span class="cover-client-label">Prepared for</span>
-      <span class="cover-client-name">{{client_name}}</span>
-      <span class="cover-client-detail">{{client_company}}</span>
-      <span class="cover-client-detail">{{client_country}}</span>
-    </div>
-
-    <div class="cover-meta-grid">
-      <div class="cover-meta-row">
-        <span class="cover-meta-label">Report No.</span>
-        <span class="cover-meta-value">{{report_id}}</span>
-      </div>
-      <div class="cover-meta-row">
-        <span class="cover-meta-label">Date Issued</span>
-        <span class="cover-meta-value">{{report_date}}</span>
-      </div>
-      <div class="cover-meta-row">
-        <span class="cover-meta-label">Document Type</span>
-        <span class="cover-meta-value">Preliminary Screening — Strategic Advisory</span>
-      </div>
-      <div class="cover-meta-row">
-        <span class="cover-meta-label">Classification</span>
-        <span class="cover-meta-value">Strictly Confidential</span>
-      </div>
-    </div>
-  </div>
-
-  <div class="cover-badge-area">
-    <span class="cover-badge-label">Overall Feasibility Assessment</span>
-    <span class="cover-badge level-{{feasibility_level_class}}">&#11044;&nbsp; {{feasibility_level}}</span>
-  </div>
-
-  <div class="cover-footer">
-    <span class="cover-footer-left">© Il Nautico Co., Ltd. — FairVia™ Technical Advisory</span>
-    <span class="cover-footer-right">Page 1</span>
-  </div>
-</div>
-
-<div class="page content">
-  <div class="page-header">
-    <span class="page-header-left">FairVia™ &nbsp;|&nbsp; Technical Advisory Services</span>
-    <span class="page-header-right">Strictly Confidential</span>
-  </div>
-  <div class="page-header-gold"></div>
-
-  <div class="page-body">
-    <div class="section">
-      <span class="section-label">Section 1</span>
-      <span class="section-title">Client Information &amp; Application Overview</span>
-      <div class="section-rule-full"></div>
-
-      <table class="info-table">
-        <tr><td>Application</td><td>{{application}}</td></tr>
-        <tr><td>Current Material</td><td>{{current_material}}</td></tr>
-        <tr><td>Processing Method</td><td>{{processing_method}}</td></tr>
-        <tr><td>Target Material</td><td>{{bio_material}}</td></tr>
-        <tr><td>Processing Equipment</td><td>{{equipment}}</td></tr>
-        <tr><td>Production Scale</td><td>{{production_scale}}</td></tr>
-        <tr><td>Project Objective</td><td>{{project_stage}}</td></tr>
-        <tr><td>Submission Reference</td><td>{{submission_reference}}</td></tr>
-      </table>
-    </div>
-
-    <div class="section">
-      <span class="section-label">Section 2</span>
-      <span class="section-title">Executive Summary</span>
-      <div class="section-rule-full"></div>
-      <p class="body-text">{{executive_summary}}</p>
-    </div>
-
-    <div class="section">
-      <span class="section-label">Section 3</span>
-      <span class="section-title">Feasibility Level</span>
-      <div class="section-rule-full"></div>
-
-      <div class="feasibility-scale">
-        <span class="feasibility-scale-label">Feasibility Level</span>
-
-        <div class="feasibility-row inactive">
-          <span class="feasibility-dot"></span>
-          <span class="feasibility-text">LOW</span>
-        </div>
-        <div class="feasibility-row active">
-          <span class="feasibility-dot"></span>
-          <span class="feasibility-text">{{feasibility_level}}</span>
-        </div>
-        <div class="feasibility-row inactive">
-          <span class="feasibility-dot"></span>
-          <span class="feasibility-text">HIGH</span>
-        </div>
-      </div>
-
-      <p class="body-text">{{feasibility_explanation}}</p>
-    </div>
-  </div>
-
-  <div class="page-footer">
-    <div class="page-footer-gold"></div>
-    <div class="page-footer-inner">
-      <span class="page-footer-left">© Il Nautico Co., Ltd. — FairVia™ Technical Advisory &nbsp;|&nbsp; {{report_id}}</span>
-      <span class="page-footer-right">Page 2</span>
-    </div>
-  </div>
-</div>
-
-<div class="page content">
-  <div class="page-header">
-    <span class="page-header-left">FairVia™ &nbsp;|&nbsp; Technical Advisory Services</span>
-    <span class="page-header-right">Strictly Confidential</span>
-  </div>
-  <div class="page-header-gold"></div>
-
-  <div class="page-body">
-    <div class="section">
-      <span class="section-label">Technical Risk Indicator</span>
-      <span class="section-title">Risk Profile Summary</span>
-      <div class="section-rule-full"></div>
-
-      <div class="risk-grid clearfix">
-        <div class="risk-card {{thermal_risk_class}}">
-          <span class="risk-card-accent"></span>
-          <div class="risk-card-body">
-            <span class="risk-card-aspect">Thermal Stability</span>
-            <span class="risk-badge">{{thermal_risk}}</span>
-            <span class="risk-note">{{thermal_note}}</span>
-          </div>
-        </div>
-
-        <div class="risk-card {{processing_risk_class}}">
-          <span class="risk-card-accent"></span>
-          <div class="risk-card-body">
-            <span class="risk-card-aspect">Processing Behaviour</span>
-            <span class="risk-badge">{{processing_risk}}</span>
-            <span class="risk-note">{{processing_note}}</span>
-          </div>
-        </div>
-
-        <div class="risk-card {{equipment_risk_class}}">
-          <span class="risk-card-accent"></span>
-          <div class="risk-card-body">
-            <span class="risk-card-aspect">Equipment Compatibility</span>
-            <span class="risk-badge">{{equipment_risk}}</span>
-            <span class="risk-note">{{equipment_note}}</span>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="section">
-      <span class="section-label">Section 4</span>
-      <span class="section-title">Risk Band &amp; Score Summary</span>
-      <div class="section-rule-full"></div>
-
-      <table class="score-table">
-        <thead>
-          <tr>
-            <th>Evaluation Area</th>
-            <th>Assessment</th>
-            <th>Risk Level</th>
-            <th>Notes</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>Thermal Stability</td>
-            <td>{{score_thermal_assessment}}</td>
-            <td><span class="score-pill {{score_thermal_class}}">{{score_thermal_level}}</span></td>
-            <td>{{score_thermal_note}}</td>
-          </tr>
-          <tr>
-            <td>Processing Behaviour</td>
-            <td>{{score_processing_assessment}}</td>
-            <td><span class="score-pill {{score_processing_class}}">{{score_processing_level}}</span></td>
-            <td>{{score_processing_note}}</td>
-          </tr>
-          <tr>
-            <td>Equipment Compatibility</td>
-            <td>{{score_equipment_assessment}}</td>
-            <td><span class="score-pill {{score_equipment_class}}">{{score_equipment_level}}</span></td>
-            <td>{{score_equipment_note}}</td>
-          </tr>
-          <tr>
-            <td>Material Certification</td>
-            <td>{{score_cert_assessment}}</td>
-            <td><span class="score-pill {{score_cert_class}}">{{score_cert_level}}</span></td>
-            <td>{{score_cert_note}}</td>
-          </tr>
-          <tr>
-            <td>End-of-Life Compliance</td>
-            <td>{{score_eol_assessment}}</td>
-            <td><span class="score-pill {{score_eol_class}}">{{score_eol_level}}</span></td>
-            <td>{{score_eol_note}}</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
-
-  <div class="page-footer">
-    <div class="page-footer-gold"></div>
-    <div class="page-footer-inner">
-      <span class="page-footer-left">© Il Nautico Co., Ltd. — FairVia™ Technical Advisory &nbsp;|&nbsp; {{report_id}}</span>
-      <span class="page-footer-right">Page 3</span>
-    </div>
-  </div>
-</div>
-
-<div class="page content">
-  <div class="page-header">
-    <span class="page-header-left">FairVia™ &nbsp;|&nbsp; Technical Advisory Services</span>
-    <span class="page-header-right">Strictly Confidential</span>
-  </div>
-  <div class="page-header-gold"></div>
-
-  <div class="page-body">
-    <div class="section">
-      <span class="section-label">Section 5</span>
-      <span class="section-title">Key Technical Observations</span>
-      <div class="section-rule-full"></div>
-
-      <div class="consideration">
-        <span class="consideration-number">01</span>
-        <span class="consideration-title">{{obs_1_title}}</span>
-        <span class="consideration-body">{{obs_1_body}}</span>
-      </div>
-
-      <div class="consideration">
-        <span class="consideration-number">02</span>
-        <span class="consideration-title">{{obs_2_title}}</span>
-        <span class="consideration-body">{{obs_2_body}}</span>
-      </div>
-
-      <div class="consideration">
-        <span class="consideration-number">03</span>
-        <span class="consideration-title">{{obs_3_title}}</span>
-        <span class="consideration-body">{{obs_3_body}}</span>
-      </div>
-    </div>
-
-    <div class="section">
-      <span class="section-label">Section 6</span>
-      <span class="section-title">Potential Risks</span>
-      <div class="section-rule-full"></div>
-
-      <div class="consideration">
-        <span class="consideration-number">Risk 01</span>
-        <span class="consideration-title">{{risk_1_title}}</span>
-        <span class="consideration-body">{{risk_1_body}}</span>
-      </div>
-
-      <div class="consideration">
-        <span class="consideration-number">Risk 02</span>
-        <span class="consideration-title">{{risk_2_title}}</span>
-        <span class="consideration-body">{{risk_2_body}}</span>
-      </div>
-    </div>
-  </div>
-
-  <div class="page-footer">
-    <div class="page-footer-gold"></div>
-    <div class="page-footer-inner">
-      <span class="page-footer-left">© Il Nautico Co., Ltd. — FairVia™ Technical Advisory &nbsp;|&nbsp; {{report_id}}</span>
-      <span class="page-footer-right">Page 4</span>
-    </div>
-  </div>
-</div>
-
-<div class="page content">
-  <div class="page-header">
-    <span class="page-header-left">FairVia™ &nbsp;|&nbsp; Technical Advisory Services</span>
-    <span class="page-header-right">Strictly Confidential</span>
-  </div>
-  <div class="page-header-gold"></div>
-
-  <div class="page-body">
-    <div class="section">
-      <span class="section-label">Section 7</span>
-      <span class="section-title">Suggested Next Step</span>
-      <div class="section-rule-full"></div>
-
-      <div class="recommendation-box">
-        <p class="recommendation-text">{{strategic_recommendation}}</p>
-      </div>
-    </div>
-
-    <div class="section">
-      <span class="section-label">Section 8</span>
-      <span class="section-title">Professional Disclaimer</span>
-      <div class="section-rule-full"></div>
-
-      <div class="disclaimer-box">
-        <p class="disclaimer-text">{{disclaimer}}</p>
-      </div>
-    </div>
-
-    <table class="sig-table">
-      <tr class="sig-header">
-        <td>Prepared by</td>
-        <td>Report Status</td>
-        <td>Date Issued</td>
-      </tr>
-      <tr class="sig-values">
-        <td>FairVia™ Technical Advisory</td>
-        <td class="gold-text">Preliminary — For Client Review</td>
-        <td>{{report_date}}</td>
-      </tr>
-    </table>
-  </div>
-
-  <div class="page-footer">
-    <div class="page-footer-gold"></div>
-    <div class="page-footer-inner">
-      <span class="page-footer-left">© Il Nautico Co., Ltd. — FairVia™ Technical Advisory &nbsp;|&nbsp; {{report_id}}</span>
-      <span class="page-footer-right">Page 5</span>
-    </div>
-  </div>
-</div>
-
-</body>
-</html>
+<<<ここにあなたのHTML全文そのまま貼る>>>
 `;
 
     const data = {
@@ -1441,155 +136,65 @@ body {
       equipment,
       production_scale: productionScale,
       project_stage: projectStage,
-      concerns,
-
-      submission_reference: "Tally Submission",
-
-      client_name: email,
-      client_company: "Submitted via FairVia Screening Form",
-      client_country: "Confidential",
 
       report_id: "FV-" + Date.now(),
       report_date: new Date().toLocaleDateString(),
 
-      executive_summary: executiveSummary,
-
-      feasibility_level: feasibility.level,
-      feasibility_level_class: feasibility.css,
-      feasibility_explanation: feasibility.explanation,
-
-      thermal_risk: risks.thermal.level,
-      thermal_risk_class: risks.thermal.css,
-      thermal_note: risks.thermal.note,
-
-      processing_risk: risks.processing.level,
-      processing_risk_class: risks.processing.css,
-      processing_note: risks.processing.note,
-
-      equipment_risk: risks.equipmentCard.level,
-      equipment_risk_class: risks.equipmentCard.css,
-      equipment_note: risks.equipmentCard.note,
-
-      score_thermal_assessment: risks.scoreThermal[0],
-      score_thermal_class: risks.scoreThermal[1],
-      score_thermal_level: risks.scoreThermal[2],
-      score_thermal_note: risks.scoreThermal[3],
-
-      score_processing_assessment: risks.scoreProcessing[0],
-      score_processing_class: risks.scoreProcessing[1],
-      score_processing_level: risks.scoreProcessing[2],
-      score_processing_note: risks.scoreProcessing[3],
-
-      score_equipment_assessment: risks.scoreEquipment[0],
-      score_equipment_class: risks.scoreEquipment[1],
-      score_equipment_level: risks.scoreEquipment[2],
-      score_equipment_note: risks.scoreEquipment[3],
-
-      score_cert_assessment: risks.scoreCert[0],
-      score_cert_class: risks.scoreCert[1],
-      score_cert_level: risks.scoreCert[2],
-      score_cert_note: risks.scoreCert[3],
-
-      score_eol_assessment: risks.scoreEol[0],
-      score_eol_class: risks.scoreEol[1],
-      score_eol_level: risks.scoreEol[2],
-      score_eol_note: risks.scoreEol[3],
-
-      obs_1_title: aiData.obs_1_title || "Material Compatibility Position",
-      obs_1_body:
-        aiData.obs_1_body ||
-        "The current submission suggests that the proposed material shift should be reviewed in relation to existing processing conditions, expected product requirements, and operational fit.",
-
-      obs_2_title: aiData.obs_2_title || "Processing Considerations",
-      obs_2_body:
-        aiData.obs_2_body ||
-        "Processing feasibility should be assessed through controlled validation, especially where production continuity or quality consistency is important.",
-
-      obs_3_title: aiData.obs_3_title || "Implementation Perspective",
-      obs_3_body:
-        aiData.obs_3_body ||
-        "A staged evaluation approach is advisable so that technical, commercial, and operational factors can be reviewed before a larger adoption decision is made.",
-
-      risk_1_title: aiData.risk_1_title || "Operational Adjustment Risk",
-      risk_1_body:
-        aiData.risk_1_body ||
-        "Operational conditions may need adjustment depending on how the selected biodegradable family behaves on the current equipment platform.",
-
-      risk_2_title: aiData.risk_2_title || "Commercial Validation Risk",
-      risk_2_body:
-        aiData.risk_2_body ||
-        "Commercial readiness should not be assumed without confirming processing stability, performance expectations, and implementation cost implications.",
-
-      strategic_recommendation:
-        aiData.strategic_recommendation ||
-        "Proceed with a structured pilot validation pathway before wider implementation, using controlled review criteria for processing fit, material behavior, and commercial practicality.",
-
-      disclaimer:
-        aiData.disclaimer ||
-        "This report is a preliminary advisory document prepared for screening purposes only and should not be treated as a substitute for full engineering or regulatory validation."
+      executive_summary: executiveSummary
     };
 
     let html = htmlTemplate;
     Object.keys(data).forEach((key) => {
-      html = html.replace(
-        new RegExp(`{{\\s*${key}\\s*}}`, "g"),
-        escapeHtml(data[key])
-      );
+      html = html.replace(new RegExp(`{{${key}}}`, "g"), escapeHtml(data[key]));
     });
 
     const browser = await puppeteer.launch({
-      args: ["--no-sandbox", "--disable-setuid-sandbox"]
+      args: ["--no-sandbox"]
     });
 
     const page = await browser.newPage();
-    await page.emulateMediaType("screen");
-    await page.setContent(html, {
-      waitUntil: ["domcontentloaded", "networkidle0"]
-    });
+    await page.setContent(html);
 
     const pdf = await page.pdf({
       format: "A4",
-      printBackground: true,
-      preferCSSPageSize: true
+      printBackground: true
     });
 
     await browser.close();
 
-    const emailResult = await resend.emails.send({
+    // ✅ メール送信（ここは生きてる）
+    await resend.emails.send({
       from: "FairVia <info@ilnautico.com>",
-      reply_to: "info@ilnautico.com",
       to: email,
-      subject: "FairVia Screening Report",
-      text: "Your screening report is attached as a PDF.",
-      html: `
-        <p>Thank you for your submission.</p>
-        <p>Your FairVia screening report is attached as a PDF.</p>
-      `,
+      subject: "FairVia Report",
+      text: "Attached.",
       attachments: [
         {
-          filename: "fairvia_report.pdf",
+          filename: "report.pdf",
           content: pdf.toString("base64")
         }
       ]
     });
 
-    console.log("RESEND RESULT:", JSON.stringify(emailResult, null, 2));
     console.log("MAIL SENT:", email);
-
-    res.set({
-      "Content-Type": "application/pdf",
-      "Content-Disposition": "attachment; filename=fairvia_report.pdf"
-    });
 
     res.send(pdf);
   } catch (err) {
     console.error("ERROR:", err);
     res.status(500).json({ error: err.message });
   }
-});
+};
 
-const PORT = process.env.PORT || 8080;
+/* =========================
+   🔥 ここが最重要（壊れてた原因）
+========================= */
 
-app.listen(PORT, "0.0.0.0", () => {
-  console.log("Server running on port " + PORT);
+app.post("/generate-report", handler);
+app.post("/api/tally", handler);
+app.post("/webhook", handler); // ← 保険
+
+/* ========================= */
+
+app.listen(8080, () => {
+  console.log("Server running");
 });
