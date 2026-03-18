@@ -12,6 +12,14 @@ const openai = new OpenAI({
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
+app.get("/", (req, res) => {
+  res.send("FairVia server running");
+});
+
+app.get("/health", (req, res) => {
+  res.json({ status: "ok" });
+});
+
 /* =========================
    Helpers
 ========================= */
@@ -29,103 +37,98 @@ function normalizeFieldValue(field) {
 
   const { value, options } = field;
 
-  if (
-    (typeof value === "string" || typeof value === "number") &&
-    Array.isArray(options)
-  ) {
-    const match = options.find((o) => String(o.id) === String(value));
-    if (match?.text) return match.text;
-  }
-
   if (typeof value === "string" || typeof value === "number") {
     return String(value);
+  }
+
+  if (typeof value === "boolean") {
+    return value ? "Yes" : "No";
   }
 
   if (Array.isArray(value)) {
     if (Array.isArray(options)) {
       return value
         .map((id) => {
-          const m = options.find((o) => String(o.id) === String(id));
-          return m?.text || id;
+          const match = options.find((opt) => opt.id === id);
+          return match ? match.text : id;
         })
         .join(", ");
     }
     return value.join(", ");
   }
 
+  if (typeof value === "object") {
+    return JSON.stringify(value);
+  }
+
   return "";
 }
 
-function getField(fields, keyword) {
-  return fields.find((f) =>
-    `${f.label} ${f.key}`.toLowerCase().includes(keyword)
-  );
+function getValueByKeywords(fields, keywords = [], fallbackIndex = null) {
+  const matched = fields.find((f) => {
+    const str = `${f?.label || ""} ${f?.key || ""}`.toLowerCase();
+    return keywords.some((kw) => str.includes(kw));
+  });
+
+  if (matched) return normalizeFieldValue(matched);
+  if (fallbackIndex !== null && fields[fallbackIndex]) {
+    return normalizeFieldValue(fields[fallbackIndex]);
+  }
+
+  return "";
 }
 
 /* =========================
-   MAIN HANDLER
+   MAIN
 ========================= */
 
-const handler = async (req, res) => {
+app.post("/generate-report", async (req, res) => {
   try {
     const fields = req.body?.data?.fields || [];
 
-    console.log("PAYLOAD:", JSON.stringify(req.body, null, 2));
-
-    const emailField = fields.find((f) => f.type === "INPUT_EMAIL");
-    const email = emailField ? normalizeFieldValue(emailField) : "";
+    const emailField = fields.find((f) => f?.type === "INPUT_EMAIL");
+    const email = emailField ? normalizeFieldValue(emailField).trim() : "";
 
     if (!email) {
       return res.status(400).json({ error: "EMAIL NOT FOUND" });
     }
 
-    const application = normalizeFieldValue(getField(fields, "product"));
-    const processingMethod = normalizeFieldValue(getField(fields, "processing"));
-    const currentMaterial = normalizeFieldValue(getField(fields, "currently"));
-    const bioMaterial = normalizeFieldValue(getField(fields, "biodegradable"));
-    const equipment = normalizeFieldValue(getField(fields, "equipment"));
-    const productionScale = normalizeFieldValue(getField(fields, "scale"));
-    const concerns = normalizeFieldValue(getField(fields, "concern"));
-    const projectStage = normalizeFieldValue(getField(fields, "stage"));
+    const application = getValueByKeywords(fields, ["product"], 0);
+    const processingMethod = getValueByKeywords(fields, ["processing"], 1);
+    const currentMaterial = getValueByKeywords(fields, ["current"], 2);
+    const bioMaterial = getValueByKeywords(fields, ["bio"], 3);
+    const equipment = getValueByKeywords(fields, ["equipment"], 4);
+    const productionScale = getValueByKeywords(fields, ["scale"], 5);
+    const concerns = getValueByKeywords(fields, ["concern"], 6);
+    const projectStage = getValueByKeywords(fields, ["stage"], 7);
 
-    console.log("EMAIL:", email);
-
-    // ✅ AI（落ちない版）
-    let executiveSummary = "Preliminary screening completed.";
-
-    try {
-      const completion = await openai.chat.completions.create({
-        model: "gpt-4.1-mini",
-        messages: [
-          {
-            role: "user",
-            content: `
-Summarize this in 1 professional paragraph:
-
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4.1-mini",
+      messages: [
+        {
+          role: "user",
+          content: `
 Application: ${application}
 Material: ${currentMaterial}
 Process: ${processingMethod}
 Bio: ${bioMaterial}
-Equipment: ${equipment}
-Scale: ${productionScale}
 Concerns: ${concerns}
-Stage: ${projectStage}
+
+Give 1 professional paragraph summary.
 `
-          }
-        ]
-      });
+        }
+      ]
+    });
 
-      executiveSummary =
-        completion?.choices?.[0]?.message?.content || executiveSummary;
-    } catch (e) {
-      console.log("AI FAILED → fallback");
-    }
+    const executiveSummary =
+      completion.choices?.[0]?.message?.content || "";
 
-    // =========================
-    // ★ ここにあなたのHTMLそのまま貼る
-    // =========================
-    const htmlTemplate = `
-<!DOCTYPE html>
+    /* =========================
+       HTML TEMPLATE
+       👉ここにあなたのHTMLそのまま貼る
+    ========================= */
+
+    const htmlTemplate = `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -1250,8 +1253,11 @@ body {
 
 
 </body>
-</html>
-`;
+</html>`;
+
+    /* =========================
+       DATA
+    ========================= */
 
     const data = {
       application,
@@ -1261,24 +1267,96 @@ body {
       equipment,
       production_scale: productionScale,
       project_stage: projectStage,
+      submission_reference: "Tally Form",
+
+      client_name: email,
+      client_company: "-",
+      client_country: "-",
 
       report_id: "FV-" + Date.now(),
       report_date: new Date().toLocaleDateString(),
 
-      executive_summary: executiveSummary
+      executive_summary: executiveSummary,
+
+      feasibility_level: "MODERATE",
+      feasibility_explanation: "Feasible with adjustments",
+
+      thermal_risk: "Moderate",
+      thermal_risk_class: "risk-moderate",
+      thermal_note: "Thermal tuning required",
+
+      processing_risk: "Moderate",
+      processing_risk_class: "risk-moderate",
+      processing_note: "Process tuning needed",
+
+      equipment_risk: "Low",
+      equipment_risk_class: "risk-low",
+      equipment_note: "Compatible",
+
+      score_thermal_assessment: "Acceptable",
+      score_thermal_class: "moderate",
+      score_thermal_level: "Moderate",
+      score_thermal_note: "Monitor",
+
+      score_processing_assessment: "Adjustable",
+      score_processing_class: "moderate",
+      score_processing_level: "Moderate",
+      score_processing_note: "Tune",
+
+      score_equipment_assessment: "Compatible",
+      score_equipment_class: "low",
+      score_equipment_level: "Low",
+      score_equipment_note: "OK",
+
+      score_cert_assessment: "Pending",
+      score_cert_class: "na",
+      score_cert_level: "N/A",
+      score_cert_note: "-",
+
+      score_eol_assessment: "Compliant",
+      score_eol_class: "low",
+      score_eol_level: "Low",
+      score_eol_note: "OK",
+
+      obs_1_title: "Material Behavior",
+      obs_1_body: "Differences vs PP observed",
+
+      obs_2_title: "Processing Impact",
+      obs_2_body: "Requires tuning",
+
+      obs_3_title: "Performance Trade-off",
+      obs_3_body: "Slight strength reduction",
+
+      risk_1_title: "Cost Increase",
+      risk_1_body: "Higher cost than PP",
+
+      risk_2_title: "Stability Risk",
+      risk_2_body: "Needs control",
+
+      strategic_recommendation: "Pilot test recommended",
+      disclaimer: "Advisory only"
     };
 
+    /* =========================
+       💥 完全置換（ここが最重要）
+    ========================= */
+
     let html = htmlTemplate;
-    Object.keys(data).forEach((key) => {
-      html = html.replace(new RegExp(`{{${key}}}`, "g"), escapeHtml(data[key]));
+
+    Object.entries(data).forEach(([key, value]) => {
+      html = html.split(`{{${key}}}`).join(escapeHtml(value ?? ""));
     });
 
+    /* =========================
+       PDF
+    ========================= */
+
     const browser = await puppeteer.launch({
-      args: ["--no-sandbox"]
+      args: ["--no-sandbox", "--disable-setuid-sandbox"]
     });
 
     const page = await browser.newPage();
-    await page.setContent(html);
+    await page.setContent(html, { waitUntil: "networkidle0" });
 
     const pdf = await page.pdf({
       format: "A4",
@@ -1287,12 +1365,15 @@ body {
 
     await browser.close();
 
-    // ✅ メール送信（ここは生きてる）
+    /* =========================
+       MAIL
+    ========================= */
+
     await resend.emails.send({
       from: "FairVia <info@ilnautico.com>",
       to: email,
       subject: "FairVia Report",
-      text: "Attached.",
+      html: "<p>Your report is attached</p>",
       attachments: [
         {
           filename: "report.pdf",
@@ -1301,24 +1382,12 @@ body {
       ]
     });
 
-    console.log("MAIL SENT:", email);
-
     res.send(pdf);
   } catch (err) {
-    console.error("ERROR:", err);
+    console.error(err);
     res.status(500).json({ error: err.message });
   }
-};
-
-/* =========================
-   🔥 ここが最重要（壊れてた原因）
-========================= */
-
-app.post("/generate-report", handler);
-app.post("/api/tally", handler);
-app.post("/webhook", handler); // ← 保険
-
-/* ========================= */
+});
 
 app.listen(8080, () => {
   console.log("Server running");
