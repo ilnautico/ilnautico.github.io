@@ -12,42 +12,197 @@ const openai = new OpenAI({
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
+app.get("/", (req, res) => {
+  res.send("FairVia server running");
+});
+
+app.get("/health", (req, res) => {
+  res.json({ status: "ok" });
+});
+
+/* =========================
+   Helpers
+========================= */
+
+function escapeHtml(value = "") {
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function normalizeFieldValue(field) {
+  if (!field) return "";
+
+  const { value, options } = field;
+
+  // Simple strings / numbers
+  if (typeof value === "string" || typeof value === "number") {
+    return String(value);
+  }
+
+  // Booleans
+  if (typeof value === "boolean") {
+    return value ? "Yes" : "No";
+  }
+
+  // Arrays from dropdown / multi select / multiple choice / checkboxes
+  if (Array.isArray(value)) {
+    if (Array.isArray(options) && options.length > 0) {
+      const texts = value.map((id) => {
+        const match = options.find((opt) => opt.id === id);
+        return match ? match.text : String(id);
+      });
+      return texts.join(", ");
+    }
+    return value.join(", ");
+  }
+
+  // Objects (rare fields)
+  if (value && typeof value === "object") {
+    return JSON.stringify(value);
+  }
+
+  return "";
+}
+
+function findFieldByKeywords(fields, keywords = []) {
+  return fields.find((field) => {
+    const haystack = `${field?.label || ""} ${field?.key || ""}`.toLowerCase();
+    return keywords.some((kw) => haystack.includes(kw.toLowerCase()));
+  });
+}
+
+function getValueByKeywords(fields, keywords = [], fallbackIndex = null) {
+  const matched = findFieldByKeywords(fields, keywords);
+  if (matched) return normalizeFieldValue(matched);
+
+  if (
+    fallbackIndex !== null &&
+    Array.isArray(fields) &&
+    fields[fallbackIndex]
+  ) {
+    return normalizeFieldValue(fields[fallbackIndex]);
+  }
+
+  return "";
+}
+
 app.post("/generate-report", async (req, res) => {
   try {
     const payload = req.body;
     const fields = payload?.data?.fields || [];
 
-    // ===== email =====
-    const email = fields.find(f => f.type === "INPUT_EMAIL")?.value;
+    console.log("PAYLOAD:", JSON.stringify(payload, null, 2));
+
+    // Email
+    const emailField = fields.find((f) => f?.type === "INPUT_EMAIL");
+    const email = emailField ? normalizeFieldValue(emailField).trim() : "";
+
     if (!email) {
       return res.status(400).json({ error: "EMAIL NOT FOUND" });
     }
 
-    // ===== answers（順番固定）=====
-    const answers = fields.filter(f => f.type !== "INPUT_EMAIL");
+    // Robust field extraction
+    const application = getValueByKeywords(
+      fields,
+      ["what product", "product are you planning", "application"],
+      0
+    );
 
-const val = (i) => {
-  const f = answers[i];
-  if (!f) return "";
+    const processingMethod = getValueByKeywords(
+      fields,
+      ["processing method", "what processing"],
+      1
+    );
 
-  if (Array.isArray(f.options)) {
-    const selected = f.options.find(o => o.id === f.value);
-    return selected?.text || selected?.label || "";
-  }
+    const currentMaterial = getValueByKeywords(
+      fields,
+      ["current material", "currently using"],
+      2
+    );
 
-  return f.value || "";
-};
+    const bioMaterial = getValueByKeywords(
+      fields,
+      ["bio material", "biodegradable material", "considering"],
+      3
+    );
 
-const application = val(0);
-const processing_method = val(1);
-const current_material = val(2);
-const bio_material = val(3);
-const equipment = val(4);
-const production_scale = val(5);
-const concerns = val(6);
-const project_stage = val(7);
+    const equipment = getValueByKeywords(
+      fields,
+      ["equipment", "type of equipment"],
+      4
+    );
 
-    // ===== HTML（そのまま使え）=====
+    const productionScale = getValueByKeywords(
+      fields,
+      ["production scale", "scale"],
+      5
+    );
+
+    const concerns = getValueByKeywords(
+      fields,
+      ["technical concerns", "concern"],
+      6
+    );
+
+    const projectStage = getValueByKeywords(
+      fields,
+      ["project stage", "what stage"],
+      7
+    );
+
+    console.log("EMAIL FOUND:", email);
+    console.log("APPLICATION:", application);
+    console.log("PROCESSING:", processingMethod);
+    console.log("CURRENT MATERIAL:", currentMaterial);
+    console.log("BIO MATERIAL:", bioMaterial);
+    console.log("EQUIPMENT:", equipment);
+    console.log("PRODUCTION SCALE:", productionScale);
+    console.log("CONCERNS:", concerns);
+    console.log("PROJECT STAGE:", projectStage);
+
+    // AI summary
+    const aiPrompt = `
+You are a polymer materials consultant.
+
+Create a concise executive summary for a preliminary biodegradable material screening report.
+
+Application: ${application}
+Current Material: ${currentMaterial}
+Processing Method: ${processingMethod}
+Target Bio Material: ${bioMaterial}
+Equipment: ${equipment}
+Production Scale: ${productionScale}
+Project Stage: ${projectStage}
+Technical Concerns: ${concerns}
+
+Return 1 professional paragraph in English.
+`;
+
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4.1-mini",
+      messages: [
+        {
+          role: "system",
+          content: "You are a polymer materials consultant."
+        },
+        {
+          role: "user",
+          content: aiPrompt
+        }
+      ]
+    });
+
+    const executiveSummary =
+      completion?.choices?.[0]?.message?.content?.trim() ||
+      "Preliminary screening completed.";
+
+    // =========================
+    // YOUR ORIGINAL HTML TEMPLATE
+    // Paste your original template exactly here
+    // =========================
     const htmlTemplate = `
 <!DOCTYPE html>
 <html lang="en">
@@ -788,12 +943,7 @@ body {
 </head>
 <body>
 
-
-<!-- ═══════════════════════════════════════════════════════
-     PAGE 1 — COVER
-═══════════════════════════════════════════════════════ -->
 <div class="page cover">
-
   <div class="cover-header">
     <span class="cover-brand">FairVia™</span>
     <span class="cover-service">Technical Advisory Services &nbsp;|&nbsp; Il Nautico Co., Ltd.</span>
@@ -835,7 +985,6 @@ body {
 
   <div class="cover-badge-area">
     <span class="cover-badge-label">Overall Feasibility Assessment</span>
-    <!-- Set class to: level-low / level-moderate / level-high -->
     <span class="cover-badge level-moderate">&#11044;&nbsp; {{feasibility_level}}</span>
   </div>
 
@@ -843,15 +992,9 @@ body {
     <span class="cover-footer-left">© Il Nautico Co., Ltd. — FairVia™ Technical Advisory</span>
     <span class="cover-footer-right">Page 1</span>
   </div>
-
 </div>
 
-
-<!-- ═══════════════════════════════════════════════════════
-     PAGE 2 — CLIENT INFORMATION + EXECUTIVE SUMMARY
-═══════════════════════════════════════════════════════ -->
 <div class="page content">
-
   <div class="page-header">
     <span class="page-header-left">FairVia™ &nbsp;|&nbsp; Technical Advisory Services</span>
     <span class="page-header-right">Strictly Confidential</span>
@@ -859,35 +1002,30 @@ body {
   <div class="page-header-gold"></div>
 
   <div class="page-body">
-
-    <!-- Section: Client Information -->
     <div class="section">
       <span class="section-label">Section 1</span>
       <span class="section-title">Client Information &amp; Application Overview</span>
       <div class="section-rule-full"></div>
 
       <table class="info-table">
-        <tr><td>Application</td>          <td>{{application}}</td></tr>
-        <tr><td>Current Material</td>     <td>{{current_material}}</td></tr>
-        <tr><td>Processing Method</td>    <td>{{processing_method}}</td></tr>
-        <tr><td>Target Material</td>      <td>{{bio_material}}</td></tr>
-        <tr><td>Processing Equipment</td> <td>{{equipment}}</td></tr>
-        <tr><td>Production Scale</td>     <td>{{production_scale}}</td></tr>
-        <tr><td>Project Objective</td>    <td>{{project_stage}}</td></tr>
-        <tr><td>Submission Reference</td> <td>{{submission_reference}}</td></tr>
+        <tr><td>Application</td><td>{{application}}</td></tr>
+        <tr><td>Current Material</td><td>{{current_material}}</td></tr>
+        <tr><td>Processing Method</td><td>{{processing_method}}</td></tr>
+        <tr><td>Target Material</td><td>{{bio_material}}</td></tr>
+        <tr><td>Processing Equipment</td><td>{{equipment}}</td></tr>
+        <tr><td>Production Scale</td><td>{{production_scale}}</td></tr>
+        <tr><td>Project Objective</td><td>{{project_stage}}</td></tr>
+        <tr><td>Submission Reference</td><td>{{submission_reference}}</td></tr>
       </table>
     </div>
 
-    <!-- Section: Executive Summary -->
     <div class="section">
       <span class="section-label">Section 2</span>
       <span class="section-title">Executive Summary</span>
       <div class="section-rule-full"></div>
-
       <p class="body-text">{{executive_summary}}</p>
     </div>
 
-    <!-- Section: Feasibility Level -->
     <div class="section">
       <span class="section-label">Section 3</span>
       <span class="section-title">Feasibility Level</span>
@@ -912,8 +1050,7 @@ body {
 
       <p class="body-text">{{feasibility_explanation}}</p>
     </div>
-
-  </div><!-- /page-body -->
+  </div>
 
   <div class="page-footer">
     <div class="page-footer-gold"></div>
@@ -922,15 +1059,9 @@ body {
       <span class="page-footer-right">Page 2</span>
     </div>
   </div>
-
 </div>
 
-
-<!-- ═══════════════════════════════════════════════════════
-     PAGE 3 — RISK INDICATOR + SCORE TABLE
-═══════════════════════════════════════════════════════ -->
 <div class="page content">
-
   <div class="page-header">
     <span class="page-header-left">FairVia™ &nbsp;|&nbsp; Technical Advisory Services</span>
     <span class="page-header-right">Strictly Confidential</span>
@@ -938,15 +1069,12 @@ body {
   <div class="page-header-gold"></div>
 
   <div class="page-body">
-
-    <!-- Section: Risk Indicator -->
     <div class="section">
       <span class="section-label">Technical Risk Indicator</span>
       <span class="section-title">Risk Profile Summary</span>
       <div class="section-rule-full"></div>
 
       <div class="risk-grid clearfix">
-
         <div class="risk-card {{thermal_risk_class}}">
           <span class="risk-card-accent"></span>
           <div class="risk-card-body">
@@ -973,11 +1101,9 @@ body {
             <span class="risk-note">{{equipment_note}}</span>
           </div>
         </div>
-
       </div>
     </div>
 
-    <!-- Section: Score Table -->
     <div class="section">
       <span class="section-label">Section 4</span>
       <span class="section-title">Risk Band &amp; Score Summary</span>
@@ -1026,8 +1152,7 @@ body {
         </tbody>
       </table>
     </div>
-
-  </div><!-- /page-body -->
+  </div>
 
   <div class="page-footer">
     <div class="page-footer-gold"></div>
@@ -1036,15 +1161,9 @@ body {
       <span class="page-footer-right">Page 3</span>
     </div>
   </div>
-
 </div>
 
-
-<!-- ═══════════════════════════════════════════════════════
-     PAGE 4 — TECHNICAL OBSERVATIONS + POTENTIAL RISKS
-═══════════════════════════════════════════════════════ -->
 <div class="page content">
-
   <div class="page-header">
     <span class="page-header-left">FairVia™ &nbsp;|&nbsp; Technical Advisory Services</span>
     <span class="page-header-right">Strictly Confidential</span>
@@ -1052,8 +1171,6 @@ body {
   <div class="page-header-gold"></div>
 
   <div class="page-body">
-
-    <!-- Section: Technical Observations -->
     <div class="section">
       <span class="section-label">Section 5</span>
       <span class="section-title">Key Technical Observations</span>
@@ -1078,7 +1195,6 @@ body {
       </div>
     </div>
 
-    <!-- Section: Potential Risks -->
     <div class="section">
       <span class="section-label">Section 6</span>
       <span class="section-title">Potential Risks</span>
@@ -1095,10 +1211,8 @@ body {
         <span class="consideration-title">{{risk_2_title}}</span>
         <span class="consideration-body">{{risk_2_body}}</span>
       </div>
-
     </div>
-
-  </div><!-- /page-body -->
+  </div>
 
   <div class="page-footer">
     <div class="page-footer-gold"></div>
@@ -1107,15 +1221,9 @@ body {
       <span class="page-footer-right">Page 4</span>
     </div>
   </div>
-
 </div>
 
-
-<!-- ═══════════════════════════════════════════════════════
-     PAGE 5 — RECOMMENDATION + DISCLAIMER
-═══════════════════════════════════════════════════════ -->
 <div class="page content">
-
   <div class="page-header">
     <span class="page-header-left">FairVia™ &nbsp;|&nbsp; Technical Advisory Services</span>
     <span class="page-header-right">Strictly Confidential</span>
@@ -1123,8 +1231,6 @@ body {
   <div class="page-header-gold"></div>
 
   <div class="page-body">
-
-    <!-- Section: Suggested Next Step -->
     <div class="section">
       <span class="section-label">Section 7</span>
       <span class="section-title">Suggested Next Step</span>
@@ -1135,7 +1241,6 @@ body {
       </div>
     </div>
 
-    <!-- Section: Disclaimer -->
     <div class="section">
       <span class="section-label">Section 8</span>
       <span class="section-title">Professional Disclaimer</span>
@@ -1146,7 +1251,6 @@ body {
       </div>
     </div>
 
-    <!-- Signature / Issuance block -->
     <table class="sig-table">
       <tr class="sig-header">
         <td>Prepared by</td>
@@ -1159,8 +1263,7 @@ body {
         <td>{{report_date}}</td>
       </tr>
     </table>
-
-  </div><!-- /page-body -->
+  </div>
 
   <div class="page-footer">
     <div class="page-footer-gold"></div>
@@ -1169,36 +1272,21 @@ body {
       <span class="page-footer-right">Page 5</span>
     </div>
   </div>
-
 </div>
-
 
 </body>
 </html>
 `;
 
-    // ===== AI =====
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4.1-mini",
-      messages: [
-        { role: "system", content: "You are a polymer materials consultant." },
-        { role: "user", content: "Generate executive summary." }
-      ]
-    });
-
-    const summary =
-      completion?.choices?.[0]?.message?.content || "No summary";
-
-    // ===== データ =====
     const data = {
       application,
-      processing_method,
-      current_material,
-      bio_material,
+      processing_method: processingMethod,
+      current_material: currentMaterial,
+      bio_material: bioMaterial,
       equipment,
-      production_scale,
+      production_scale: productionScale,
+      project_stage: projectStage,
       concerns,
-      project_stage,
 
       submission_reference: "Tally Submission",
 
@@ -1209,7 +1297,7 @@ body {
       report_id: "FV-" + Date.now(),
       report_date: new Date().toLocaleDateString(),
 
-      executive_summary: summary,
+      executive_summary: executiveSummary,
 
       feasibility_level: "MODERATE",
       feasibility_explanation: "Feasible with process adjustment.",
@@ -1270,15 +1358,13 @@ body {
       disclaimer: "Advisory only"
     };
 
-    // ===== 置換 =====
     let html = htmlTemplate;
     Object.keys(data).forEach((key) => {
-      html = html.replace(new RegExp(`{{${key}}}`, "g"), data[key]);
+      html = html.replace(new RegExp(`{{${key}}}`, "g"), escapeHtml(data[key]));
     });
 
-    // ===== PDF =====
     const browser = await puppeteer.launch({
-      args: ["--no-sandbox"]
+      args: ["--no-sandbox", "--disable-setuid-sandbox"]
     });
 
     const page = await browser.newPage();
@@ -1291,28 +1377,41 @@ body {
 
     await browser.close();
 
-    // ===== メール =====
-    await resend.emails.send({
+    const emailResult = await resend.emails.send({
       from: "FairVia <info@ilnautico.com>",
+      reply_to: "info@ilnautico.com",
       to: email,
-      subject: "FairVia Report",
-      text: "Attached",
+      subject: "FairVia Screening Report",
+      text: "Your screening report is attached as a PDF.",
+      html: `
+        <p>Thank you for your submission.</p>
+        <p>Your FairVia screening report is attached as a PDF.</p>
+      `,
       attachments: [
         {
-          filename: "report.pdf",
+          filename: "fairvia_report.pdf",
           content: pdf.toString("base64")
         }
       ]
     });
 
-    res.send("OK");
+    console.log("RESEND RESULT:", JSON.stringify(emailResult, null, 2));
+    console.log("MAIL SENT:", email);
 
+    res.set({
+      "Content-Type": "application/pdf",
+      "Content-Disposition": "attachment; filename=fairvia_report.pdf"
+    });
+
+    res.send(pdf);
   } catch (err) {
-    console.error(err);
+    console.error("ERROR:", err);
     res.status(500).json({ error: err.message });
   }
 });
 
-app.listen(8080, () => {
-  console.log("Server running");
+const PORT = process.env.PORT || 8080;
+
+app.listen(PORT, "0.0.0.0", () => {
+  console.log("Server running on port " + PORT);
 });
