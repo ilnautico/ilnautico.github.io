@@ -29,7 +29,8 @@ function escapeHtml(value = "") {
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
+    .replace(/"/g, "&quot;")
+    .replace(/\n/g, "<br>");
 }
 
 function normalizeFieldValue(field) {
@@ -37,17 +38,14 @@ function normalizeFieldValue(field) {
 
   const { value, options } = field;
 
-  // Simple strings / numbers
   if (typeof value === "string" || typeof value === "number") {
     return String(value);
   }
 
-  // Booleans
   if (typeof value === "boolean") {
     return value ? "Yes" : "No";
   }
 
-  // Arrays from dropdown / multi select / multiple choice / checkboxes
   if (Array.isArray(value)) {
     if (Array.isArray(options) && options.length > 0) {
       const texts = value.map((id) => {
@@ -59,7 +57,6 @@ function normalizeFieldValue(field) {
     return value.join(", ");
   }
 
-  // Objects (rare fields)
   if (value && typeof value === "object") {
     return JSON.stringify(value);
   }
@@ -67,15 +64,21 @@ function normalizeFieldValue(field) {
   return "";
 }
 
-function findFieldByKeywords(fields, keywords = []) {
+function fieldLabel(field) {
+  return `${field?.label || ""} ${field?.key || ""}`.toLowerCase();
+}
+
+function findFieldByKeywordGroups(fields, keywordGroups = []) {
   return fields.find((field) => {
-    const haystack = `${field?.label || ""} ${field?.key || ""}`.toLowerCase();
-    return keywords.some((kw) => haystack.includes(kw.toLowerCase()));
+    const haystack = fieldLabel(field);
+    return keywordGroups.some((group) =>
+      group.every((kw) => haystack.includes(kw.toLowerCase()))
+    );
   });
 }
 
-function getValueByKeywords(fields, keywords = [], fallbackIndex = null) {
-  const matched = findFieldByKeywords(fields, keywords);
+function getValueByKeywords(fields, keywordGroups = [], fallbackIndex = null) {
+  const matched = findFieldByKeywordGroups(fields, keywordGroups);
   if (matched) return normalizeFieldValue(matched);
 
   if (
@@ -107,49 +110,75 @@ app.post("/generate-report", async (req, res) => {
     // Robust field extraction
     const application = getValueByKeywords(
       fields,
-      ["what product", "product are you planning", "application"],
+      [
+        ["what", "product"],
+        ["product", "planning"],
+        ["application"]
+      ],
       0
     );
 
     const processingMethod = getValueByKeywords(
       fields,
-      ["processing method", "what processing"],
+      [
+        ["processing", "method"],
+        ["what", "processing"]
+      ],
       1
     );
 
     const currentMaterial = getValueByKeywords(
       fields,
-      ["current material", "currently using"],
+      [
+        ["current", "material"],
+        ["currently", "using"]
+      ],
       2
     );
 
     const bioMaterial = getValueByKeywords(
       fields,
-      ["bio material", "biodegradable material", "considering"],
+      [
+        ["bio", "material"],
+        ["biodegradable", "material"],
+        ["material", "considering"]
+      ],
       3
     );
 
     const equipment = getValueByKeywords(
       fields,
-      ["equipment", "type of equipment"],
+      [
+        ["equipment"],
+        ["type", "equipment"]
+      ],
       4
     );
 
     const productionScale = getValueByKeywords(
       fields,
-      ["production scale", "scale"],
+      [
+        ["production", "scale"],
+        ["scale"]
+      ],
       5
     );
 
     const concerns = getValueByKeywords(
       fields,
-      ["technical concerns", "concern"],
+      [
+        ["technical", "concern"],
+        ["concern"]
+      ],
       6
     );
 
     const projectStage = getValueByKeywords(
       fields,
-      ["project stage", "what stage"],
+      [
+        ["project", "stage"],
+        ["what", "stage"]
+      ],
       7
     );
 
@@ -199,10 +228,6 @@ Return 1 professional paragraph in English.
       completion?.choices?.[0]?.message?.content?.trim() ||
       "Preliminary screening completed.";
 
-    // =========================
-    // YOUR ORIGINAL HTML TEMPLATE
-    // Paste your original template exactly here
-    // =========================
     const htmlTemplate = `
 <!DOCTYPE html>
 <html lang="en">
@@ -985,7 +1010,7 @@ body {
 
   <div class="cover-badge-area">
     <span class="cover-badge-label">Overall Feasibility Assessment</span>
-    <span class="cover-badge level-moderate">&#11044;&nbsp; {{feasibility_level}}</span>
+    <span class="cover-badge level-{{feasibility_level_class}}">&#11044;&nbsp; {{feasibility_level}}</span>
   </div>
 
   <div class="cover-footer">
@@ -1300,6 +1325,7 @@ body {
       executive_summary: executiveSummary,
 
       feasibility_level: "MODERATE",
+      feasibility_level_class: "moderate",
       feasibility_explanation: "Feasible with process adjustment.",
 
       thermal_risk: "Moderate",
@@ -1360,7 +1386,10 @@ body {
 
     let html = htmlTemplate;
     Object.keys(data).forEach((key) => {
-      html = html.replace(new RegExp(`{{${key}}}`, "g"), escapeHtml(data[key]));
+      html = html.replace(
+        new RegExp(`{{\\s*${key}\\s*}}`, "g"),
+        escapeHtml(data[key])
+      );
     });
 
     const browser = await puppeteer.launch({
@@ -1368,11 +1397,15 @@ body {
     });
 
     const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: "networkidle0" });
+    await page.emulateMediaType("screen");
+    await page.setContent(html, {
+      waitUntil: ["domcontentloaded", "networkidle0"]
+    });
 
     const pdf = await page.pdf({
       format: "A4",
-      printBackground: true
+      printBackground: true,
+      preferCSSPageSize: true
     });
 
     await browser.close();
