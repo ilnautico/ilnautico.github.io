@@ -33,30 +33,52 @@ function escapeHtml(value = "") {
     .replace(/\n/g, "<br>");
 }
 
+function safeJsonParse(text) {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
+}
+
 function normalizeFieldValue(field) {
   if (!field) return "";
 
   const { value, options } = field;
 
+  // Single choice ID -> option text
+  if (
+    (typeof value === "string" || typeof value === "number") &&
+    Array.isArray(options) &&
+    options.length > 0
+  ) {
+    const match = options.find((opt) => String(opt.id) === String(value));
+    if (match?.text) return String(match.text);
+  }
+
+  // Simple strings / numbers
   if (typeof value === "string" || typeof value === "number") {
     return String(value);
   }
 
+  // Booleans
   if (typeof value === "boolean") {
     return value ? "Yes" : "No";
   }
 
+  // Arrays from multi select / checkbox / multiple answers
   if (Array.isArray(value)) {
     if (Array.isArray(options) && options.length > 0) {
       const texts = value.map((id) => {
-        const match = options.find((opt) => opt.id === id);
-        return match ? match.text : String(id);
+        const match = options.find((opt) => String(opt.id) === String(id));
+        return match?.text ? String(match.text) : String(id);
       });
       return texts.join(", ");
     }
     return value.join(", ");
   }
 
+  // Objects (rare fields)
   if (value && typeof value === "object") {
     return JSON.stringify(value);
   }
@@ -64,32 +86,136 @@ function normalizeFieldValue(field) {
   return "";
 }
 
-function fieldLabel(field) {
+function fieldHaystack(field) {
   return `${field?.label || ""} ${field?.key || ""}`.toLowerCase();
 }
 
-function findFieldByKeywordGroups(fields, keywordGroups = []) {
-  return fields.find((field) => {
-    const haystack = fieldLabel(field);
+function getValueByKeywordGroups(fields, keywordGroups = []) {
+  const matched = fields.find((field) => {
+    const haystack = fieldHaystack(field);
     return keywordGroups.some((group) =>
       group.every((kw) => haystack.includes(kw.toLowerCase()))
     );
   });
+
+  return matched ? normalizeFieldValue(matched) : "";
 }
 
-function getValueByKeywords(fields, keywordGroups = [], fallbackIndex = null) {
-  const matched = findFieldByKeywordGroups(fields, keywordGroups);
-  if (matched) return normalizeFieldValue(matched);
+function deriveFeasibilityLevel({
+  currentMaterial,
+  bioMaterial,
+  equipment,
+  productionScale,
+  concerns,
+  projectStage
+}) {
+  let score = 0;
 
-  if (
-    fallbackIndex !== null &&
-    Array.isArray(fields) &&
-    fields[fallbackIndex]
-  ) {
-    return normalizeFieldValue(fields[fallbackIndex]);
+  if (/pla|pha|pbat|starch/i.test(bioMaterial)) score += 1;
+  if (/standard/i.test(equipment)) score += 1;
+  if (/dedicated|new equipment/i.test(equipment)) score += 2;
+  if (/laboratory|pilot/i.test(productionScale)) score += 2;
+  if (/commercial/i.test(productionScale)) score -= 1;
+  if (/evaluating|early research/i.test(projectStage)) score += 1;
+  if (/cost impact|equipment compatibility|processing stability/i.test(concerns)) score -= 1;
+  if (/pet|pp|pe/i.test(currentMaterial) && /pla|pha|pbat|starch/i.test(bioMaterial)) score -= 1;
+
+  if (score <= 0) {
+    return {
+      level: "HIGH",
+      css: "high",
+      explanation:
+        "Material transition may be possible, but a higher implementation burden is expected due to processing, cost, or compatibility considerations."
+    };
   }
 
-  return "";
+  if (score <= 3) {
+    return {
+      level: "MODERATE",
+      css: "moderate",
+      explanation:
+        "The transition appears feasible with process review, material validation, and practical pilot testing before broader deployment."
+    };
+  }
+
+  return {
+    level: "LOW",
+    css: "low",
+    explanation:
+      "The transition appears comparatively manageable at this stage, although routine validation is still recommended before implementation."
+  };
+}
+
+function deriveRiskCards({ concerns, equipment, productionScale, currentMaterial, bioMaterial }) {
+  const thermalHigh = /processing stability/i.test(concerns) || /commercial/i.test(productionScale);
+  const processHigh = /processing stability|equipment compatibility/i.test(concerns);
+  const equipmentHigh = /equipment compatibility/i.test(concerns) || /standard/i.test(equipment);
+
+  const thermal = thermalHigh
+    ? {
+        level: "Moderate",
+        css: "risk-moderate",
+        note: "Thermal performance should be verified under real processing conditions before scale-up."
+      }
+    : {
+        level: "Low",
+        css: "risk-low",
+        note: "No immediate thermal concern is indicated, though validation remains advisable."
+      };
+
+  const processing = processHigh
+    ? {
+        level: "Moderate",
+        css: "risk-moderate",
+        note: "Processing adjustments may be required depending on material behavior and line stability."
+      }
+    : {
+        level: "Low",
+        css: "risk-low",
+        note: "No major process instability is indicated from the current submission."
+      };
+
+  const equipmentCard = equipmentHigh
+    ? {
+        level: "Moderate",
+        css: "risk-moderate",
+        note: "Existing equipment suitability should be reviewed before operational adoption."
+      }
+    : {
+        level: "Low",
+        css: "risk-low",
+        note: "The current equipment profile appears broadly workable for preliminary evaluation."
+      };
+
+  const scoreThermal = thermal.level === "Low"
+    ? ["Acceptable", "low", "Low", "Routine verification recommended"]
+    : ["Needs review", "moderate", "Moderate", "Thermal suitability should be confirmed"];
+
+  const scoreProcessing = processing.level === "Low"
+    ? ["Acceptable", "low", "Low", "Minor operational review only"]
+    : ["Adjustable", "moderate", "Moderate", "Parameter tuning may be required"];
+
+  const scoreEquipment = equipmentCard.level === "Low"
+    ? ["Compatible", "low", "Low", "No major equipment concern indicated"]
+    : ["Conditionally compatible", "moderate", "Moderate", "Compatibility validation recommended"];
+
+  const certNeedsReview = /pla|pha|pbat|starch/i.test(bioMaterial);
+  const eolNeedsReview = /pet|pp|pe/i.test(currentMaterial);
+
+  return {
+    thermal,
+    processing,
+    equipmentCard,
+    scoreThermal,
+    scoreProcessing,
+    scoreEquipment,
+    scoreCert: certNeedsReview
+      ? ["Pending review", "na", "N/A", "Certification details were not submitted"]
+      : ["Not specified", "na", "N/A", "No certification data supplied"],
+    scoreEol: eolNeedsReview
+      ? ["Requires review", "moderate", "Moderate", "End-of-life fit should be validated"]
+      : ["Conditionally aligned", "low", "Low", "No immediate end-of-life issue indicated"]
+  };
 }
 
 app.post("/generate-report", async (req, res) => {
@@ -107,80 +233,49 @@ app.post("/generate-report", async (req, res) => {
       return res.status(400).json({ error: "EMAIL NOT FOUND" });
     }
 
-    // Robust field extraction
-    const application = getValueByKeywords(
-      fields,
-      [
-        ["what", "product"],
-        ["product", "planning"],
-        ["application"]
-      ],
-      0
-    );
+    // Exact-ish field extraction by label keywords
+    const application = getValueByKeywordGroups(fields, [
+      ["what product", "produce"],
+      ["product", "planning"],
+      ["application"]
+    ]);
 
-    const processingMethod = getValueByKeywords(
-      fields,
-      [
-        ["processing", "method"],
-        ["what", "processing"]
-      ],
-      1
-    );
+    const processingMethod = getValueByKeywordGroups(fields, [
+      ["processing method"],
+      ["what processing"]
+    ]);
 
-    const currentMaterial = getValueByKeywords(
-      fields,
-      [
-        ["current", "material"],
-        ["currently", "using"]
-      ],
-      2
-    );
+    const currentMaterial = getValueByKeywordGroups(fields, [
+      ["currently using"],
+      ["current material"]
+    ]);
 
-    const bioMaterial = getValueByKeywords(
-      fields,
-      [
-        ["bio", "material"],
-        ["biodegradable", "material"],
-        ["material", "considering"]
-      ],
-      3
-    );
+    const bioMaterial = getValueByKeywordGroups(fields, [
+      ["biodegradable material family"],
+      ["bio material"],
+      ["considering"]
+    ]);
 
-    const equipment = getValueByKeywords(
-      fields,
-      [
-        ["equipment"],
-        ["type", "equipment"]
-      ],
-      4
-    );
+    const equipment = getValueByKeywordGroups(fields, [
+      ["type of equipment"],
+      ["equipment", "operate"]
+    ]);
 
-    const productionScale = getValueByKeywords(
-      fields,
-      [
-        ["production", "scale"],
-        ["scale"]
-      ],
-      5
-    );
+    const productionScale = getValueByKeywordGroups(fields, [
+      ["production scale"],
+      ["scale", "targeting"]
+    ]);
 
-    const concerns = getValueByKeywords(
-      fields,
-      [
-        ["technical", "concern"],
-        ["concern"]
-      ],
-      6
-    );
+    const concerns = getValueByKeywordGroups(fields, [
+      ["technical concerns"],
+      ["main technical"]
+    ]);
 
-    const projectStage = getValueByKeywords(
-      fields,
-      [
-        ["project", "stage"],
-        ["what", "stage"]
-      ],
-      7
-    );
+    const projectStage = getValueByKeywordGroups(fields, [
+      ["project currently in"],
+      ["project stage"],
+      ["what stage"]
+    ]);
 
     console.log("EMAIL FOUND:", email);
     console.log("APPLICATION:", application);
@@ -192,12 +287,13 @@ app.post("/generate-report", async (req, res) => {
     console.log("CONCERNS:", concerns);
     console.log("PROJECT STAGE:", projectStage);
 
-    // AI summary
+    // AI structured output
     const aiPrompt = `
 You are a polymer materials consultant.
 
-Create a concise executive summary for a preliminary biodegradable material screening report.
+Create a preliminary screening report in valid JSON only.
 
+Input:
 Application: ${application}
 Current Material: ${currentMaterial}
 Processing Method: ${processingMethod}
@@ -207,7 +303,24 @@ Production Scale: ${productionScale}
 Project Stage: ${projectStage}
 Technical Concerns: ${concerns}
 
-Return 1 professional paragraph in English.
+Return JSON with exactly this shape:
+{
+  "executive_summary": "1 paragraph",
+  "obs_1_title": "short title",
+  "obs_1_body": "2-4 sentences",
+  "obs_2_title": "short title",
+  "obs_2_body": "2-4 sentences",
+  "obs_3_title": "short title",
+  "obs_3_body": "2-4 sentences",
+  "risk_1_title": "short title",
+  "risk_1_body": "2-4 sentences",
+  "risk_2_title": "short title",
+  "risk_2_body": "2-4 sentences",
+  "strategic_recommendation": "1 paragraph",
+  "disclaimer": "1 short professional disclaimer"
+}
+
+No markdown. No code fences.
 `;
 
     const completion = await openai.chat.completions.create({
@@ -215,7 +328,8 @@ Return 1 professional paragraph in English.
       messages: [
         {
           role: "system",
-          content: "You are a polymer materials consultant."
+          content:
+            "You are a polymer materials consultant. Return only valid JSON."
         },
         {
           role: "user",
@@ -224,9 +338,25 @@ Return 1 professional paragraph in English.
       ]
     });
 
-    const executiveSummary =
-      completion?.choices?.[0]?.message?.content?.trim() ||
-      "Preliminary screening completed.";
+    const raw = completion?.choices?.[0]?.message?.content?.trim() || "";
+    const aiData = safeJsonParse(raw) || {};
+
+    const feasibility = deriveFeasibilityLevel({
+      currentMaterial,
+      bioMaterial,
+      equipment,
+      productionScale,
+      concerns,
+      projectStage
+    });
+
+    const risks = deriveRiskCards({
+      concerns,
+      equipment,
+      productionScale,
+      currentMaterial,
+      bioMaterial
+    });
 
     const htmlTemplate = `
 <!DOCTYPE html>
@@ -1315,73 +1445,88 @@ body {
 
       submission_reference: "Tally Submission",
 
-      client_name: "Client",
-      client_company: "Company",
-      client_country: "Japan",
+      client_name: email,
+      client_company: "Submitted via FairVia Screening Form",
+      client_country: "Confidential",
 
       report_id: "FV-" + Date.now(),
       report_date: new Date().toLocaleDateString(),
 
       executive_summary: executiveSummary,
 
-      feasibility_level: "MODERATE",
-      feasibility_level_class: "moderate",
-      feasibility_explanation: "Feasible with process adjustment.",
+      feasibility_level: feasibility.level,
+      feasibility_level_class: feasibility.css,
+      feasibility_explanation: feasibility.explanation,
 
-      thermal_risk: "Moderate",
-      thermal_risk_class: "risk-moderate",
-      thermal_note: "Thermal adjustment required",
+      thermal_risk: risks.thermal.level,
+      thermal_risk_class: risks.thermal.css,
+      thermal_note: risks.thermal.note,
 
-      processing_risk: "Moderate",
-      processing_risk_class: "risk-moderate",
-      processing_note: "Parameter tuning needed",
+      processing_risk: risks.processing.level,
+      processing_risk_class: risks.processing.css,
+      processing_note: risks.processing.note,
 
-      equipment_risk: "Low",
-      equipment_risk_class: "risk-low",
-      equipment_note: "Compatible",
+      equipment_risk: risks.equipmentCard.level,
+      equipment_risk_class: risks.equipmentCard.css,
+      equipment_note: risks.equipmentCard.note,
 
-      score_thermal_assessment: "Acceptable",
-      score_thermal_class: "moderate",
-      score_thermal_level: "Moderate",
-      score_thermal_note: "Monitor",
+      score_thermal_assessment: risks.scoreThermal[0],
+      score_thermal_class: risks.scoreThermal[1],
+      score_thermal_level: risks.scoreThermal[2],
+      score_thermal_note: risks.scoreThermal[3],
 
-      score_processing_assessment: "Adjustable",
-      score_processing_class: "moderate",
-      score_processing_level: "Moderate",
-      score_processing_note: "Tune",
+      score_processing_assessment: risks.scoreProcessing[0],
+      score_processing_class: risks.scoreProcessing[1],
+      score_processing_level: risks.scoreProcessing[2],
+      score_processing_note: risks.scoreProcessing[3],
 
-      score_equipment_assessment: "Compatible",
-      score_equipment_class: "low",
-      score_equipment_level: "Low",
-      score_equipment_note: "OK",
+      score_equipment_assessment: risks.scoreEquipment[0],
+      score_equipment_class: risks.scoreEquipment[1],
+      score_equipment_level: risks.scoreEquipment[2],
+      score_equipment_note: risks.scoreEquipment[3],
 
-      score_cert_assessment: "Pending",
-      score_cert_class: "na",
-      score_cert_level: "N/A",
-      score_cert_note: "-",
+      score_cert_assessment: risks.scoreCert[0],
+      score_cert_class: risks.scoreCert[1],
+      score_cert_level: risks.scoreCert[2],
+      score_cert_note: risks.scoreCert[3],
 
-      score_eol_assessment: "Compliant",
-      score_eol_class: "low",
-      score_eol_level: "Low",
-      score_eol_note: "OK",
+      score_eol_assessment: risks.scoreEol[0],
+      score_eol_class: risks.scoreEol[1],
+      score_eol_level: risks.scoreEol[2],
+      score_eol_note: risks.scoreEol[3],
 
-      obs_1_title: "Material Behavior",
-      obs_1_body: "Differences observed vs PP",
+      obs_1_title: aiData.obs_1_title || "Material Compatibility Position",
+      obs_1_body:
+        aiData.obs_1_body ||
+        "The current submission suggests that the proposed material shift should be reviewed in relation to existing processing conditions, expected product requirements, and operational fit.",
 
-      obs_2_title: "Processing Impact",
-      obs_2_body: "Requires tuning",
+      obs_2_title: aiData.obs_2_title || "Processing Considerations",
+      obs_2_body:
+        aiData.obs_2_body ||
+        "Processing feasibility should be assessed through controlled validation, especially where production continuity or quality consistency is important.",
 
-      obs_3_title: "Performance Trade-off",
-      obs_3_body: "Strength slightly reduced",
+      obs_3_title: aiData.obs_3_title || "Implementation Perspective",
+      obs_3_body:
+        aiData.obs_3_body ||
+        "A staged evaluation approach is advisable so that technical, commercial, and operational factors can be reviewed before a larger adoption decision is made.",
 
-      risk_1_title: "Cost Increase",
-      risk_1_body: "Higher than PP",
+      risk_1_title: aiData.risk_1_title || "Operational Adjustment Risk",
+      risk_1_body:
+        aiData.risk_1_body ||
+        "Operational conditions may need adjustment depending on how the selected biodegradable family behaves on the current equipment platform.",
 
-      risk_2_title: "Stability Risk",
-      risk_2_body: "Requires control",
+      risk_2_title: aiData.risk_2_title || "Commercial Validation Risk",
+      risk_2_body:
+        aiData.risk_2_body ||
+        "Commercial readiness should not be assumed without confirming processing stability, performance expectations, and implementation cost implications.",
 
-      strategic_recommendation: "Pilot test recommended",
-      disclaimer: "Advisory only"
+      strategic_recommendation:
+        aiData.strategic_recommendation ||
+        "Proceed with a structured pilot validation pathway before wider implementation, using controlled review criteria for processing fit, material behavior, and commercial practicality.",
+
+      disclaimer:
+        aiData.disclaimer ||
+        "This report is a preliminary advisory document prepared for screening purposes only and should not be treated as a substitute for full engineering or regulatory validation."
     };
 
     let html = htmlTemplate;
