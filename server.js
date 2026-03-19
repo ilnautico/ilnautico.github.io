@@ -12,129 +12,118 @@ const openai = new OpenAI({
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-/* =========================
-   Helpers
-========================= */
-
-function escapeHtml(value = "") {
-  return String(value)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
-
-function normalizeFieldValue(field) {
-  if (!field) return "";
-
-  const { value, options } = field;
-
-  if (typeof value === "string" || typeof value === "number") return String(value);
-  if (typeof value === "boolean") return value ? "Yes" : "No";
-
-  if (Array.isArray(value)) {
-    if (Array.isArray(options)) {
-      return value
-        .map((id) => {
-          const match = options.find((opt) => opt.id === id);
-          return match ? match.text : id;
-        })
-        .join(", ");
-    }
-    return value.join(", ");
-  }
-
-  if (typeof value === "object") return JSON.stringify(value);
-
-  return "";
-}
-
-function getValueByKeywords(fields, keywords = [], fallbackIndex = null) {
-  const matched = fields.find((f) => {
-    const str = `${f?.label || ""} ${f?.key || ""}`.toLowerCase();
-    return keywords.some((kw) => str.includes(kw));
-  });
-
-  if (matched) return normalizeFieldValue(matched);
-  if (fallbackIndex !== null && fields[fallbackIndex]) {
-    return normalizeFieldValue(fields[fallbackIndex]);
-  }
-
-  return "";
-}
-
-/* =========================
-   MAIN
-========================= */
-
 app.post("/generate-report", async (req, res) => {
   try {
-    const fields = req.body?.data?.fields || [];
+    const payload = req.body;
 
-    const emailField = fields.find((f) => f?.type === "INPUT_EMAIL");
-    const email = emailField ? normalizeFieldValue(emailField).trim() : "";
+    // ===== メール取得 =====
+    const emailField = payload?.data?.fields?.find(
+      (f) => f.type === "INPUT_EMAIL"
+    );
 
-    if (!email) return res.status(400).json({ error: "EMAIL NOT FOUND" });
+    const email = emailField?.value;
 
-    // =========================
-    // フォームデータ取得
-    // =========================
+    if (!email) {
+      return res.status(400).json({ error: "EMAIL NOT FOUND" });
+    }
 
-    const clientName = getValueByKeywords(fields, ["name", "contact"]);
-    const clientCompany = getValueByKeywords(fields, ["company"]);
-    const clientCountry = getValueByKeywords(fields, ["country"]);
-
-    const application = getValueByKeywords(fields, ["product"], 0);
-    const processingMethod = getValueByKeywords(fields, ["processing"], 1);
-    const currentMaterial = getValueByKeywords(fields, ["current"], 2);
-    const bioMaterial = getValueByKeywords(fields, ["bio"], 3);
-    const equipment = getValueByKeywords(fields, ["equipment"], 4);
-    const productionScale = getValueByKeywords(fields, ["scale"], 5);
-    const concerns = getValueByKeywords(fields, ["concern"], 6);
-    const projectStage = getValueByKeywords(fields, ["stage"], 7);
-
-    // =========================
-    // AI生成（強化版）
-    // =========================
-
+    // ===== GPT生成 =====
     const completion = await openai.chat.completions.create({
       model: "gpt-4.1-mini",
       messages: [
         {
           role: "system",
-          content: "You are a senior polymer materials consultant."
+          content: "You are a polymer materials consultant."
         },
         {
           role: "user",
-          content: `
-Create a professional screening report.
-
-Application: ${application}
-Material: ${currentMaterial}
-Process: ${processingMethod}
-Bio: ${bioMaterial}
-Concerns: ${concerns}
-
-Output:
-1. Executive summary
-2. 3 technical observations
-3. 2 risks
-4. 1 recommendation
-
-Be specific and professional.
-`
+          content: "Generate a material screening report."
         }
       ]
     });
 
-    const executiveSummary =
-      completion.choices?.[0]?.message?.content || "";
+    const reportText =
+      completion?.choices?.[0]?.message?.content || "No report";
 
-    // =========================
-    // HTML（そのまま貼る）
-    // =========================
+    // ===== 仮データ（ここは後でTallyと連携） =====
+    const data = {
+      feasibility_level: "MODERATE",
+      feasibility_class: "level-moderate",
 
-    const htmlTemplate = `
+      client_name: "Sample Client",
+      client_company: "Sample Company",
+      client_country: "Japan",
+
+      report_id: "FV-001",
+      report_date: new Date().toISOString().split("T")[0],
+
+      application: "Packaging",
+      current_material: "PE",
+      processing_method: "Injection",
+      bio_material: "PLA",
+      equipment: "Standard",
+      production_scale: "Medium",
+      project_stage: "Evaluation",
+
+      executive_summary: reportText,
+      feasibility_explanation: reportText,
+
+      thermal_risk: "Moderate",
+      thermal_note: reportText,
+      thermal_risk_class: "risk-moderate",
+
+      processing_risk: "Moderate",
+      processing_note: reportText,
+      processing_risk_class: "risk-moderate",
+
+      equipment_risk: "Low",
+      equipment_note: reportText,
+      equipment_risk_class: "risk-low",
+
+      score_thermal_assessment: "Stable",
+      score_thermal_level: "Moderate",
+      score_thermal_class: "moderate",
+      score_thermal_note: reportText,
+
+      score_processing_assessment: "Requires tuning",
+      score_processing_level: "Moderate",
+      score_processing_class: "moderate",
+      score_processing_note: reportText,
+
+      score_equipment_assessment: "Compatible",
+      score_equipment_level: "Low",
+      score_equipment_class: "low",
+      score_equipment_note: reportText,
+
+      score_cert_assessment: "Pending",
+      score_cert_level: "N/A",
+      score_cert_class: "na",
+      score_cert_note: reportText,
+
+      score_eol_assessment: "Compliant",
+      score_eol_level: "Low",
+      score_eol_class: "low",
+      score_eol_note: reportText,
+
+      obs_1_title: "Observation 1",
+      obs_1_body: reportText,
+      obs_2_title: "Observation 2",
+      obs_2_body: reportText,
+      obs_3_title: "Observation 3",
+      obs_3_body: reportText,
+
+      risk_1_title: "Risk 1",
+      risk_1_body: reportText,
+      risk_2_title: "Risk 2",
+      risk_2_body: reportText,
+
+      strategic_recommendation: reportText,
+      disclaimer:
+        "This report is preliminary and based on provided information."
+    };
+
+    // ===== HTMLテンプレ =====
+    let html = `かくにんして
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -621,7 +610,6 @@ body {
   display: block;
   overflow: hidden;
   margin-bottom: 4mm;
-  clear: both;
 }
 
 .risk-card {
@@ -922,7 +910,7 @@ body {
   <div class="cover-badge-area">
     <span class="cover-badge-label">Overall Feasibility Assessment</span>
     <!-- Set class to: level-low / level-moderate / level-high -->
-    <span class="cover-badge level-moderate">&#11044;&nbsp; {{feasibility_level}}</span>
+    <span class="cover-badge {{feasibility_class}}">&#11044;&nbsp; {{feasibility_level}}</span>
   </div>
 
   <div class="cover-footer">
@@ -960,7 +948,6 @@ body {
         <tr><td>Processing Equipment</td> <td>{{equipment}}</td></tr>
         <tr><td>Production Scale</td>     <td>{{production_scale}}</td></tr>
         <tr><td>Project Objective</td>    <td>{{project_stage}}</td></tr>
-        <tr><td>Submission Reference</td> <td>{{submission_reference}}</td></tr>
       </table>
     </div>
 
@@ -1263,101 +1250,12 @@ body {
 </html>
 `;
 
-    // =========================
-    // データ
-    // =========================
-
-    const data = {
-      client_name: clientName || email,
-      client_company: clientCompany || "-",
-      client_country: clientCountry || "-",
-
-      application,
-      processing_method: processingMethod,
-      current_material: currentMaterial,
-      bio_material: bioMaterial,
-      equipment,
-      production_scale: productionScale,
-      project_stage: projectStage,
-
-      report_id: "FV-" + Date.now(),
-      report_date: new Date().toLocaleDateString(),
-
-      executive_summary: executiveSummary,
-
-      feasibility_level: "MODERATE",
-      feasibility_explanation: "Feasible with adjustments",
-
-      thermal_risk: "Moderate",
-      thermal_risk_class: "risk-moderate",
-      thermal_note: "Thermal tuning required",
-
-      processing_risk: "Moderate",
-      processing_risk_class: "risk-moderate",
-      processing_note: "Process tuning needed",
-
-      equipment_risk: "Low",
-      equipment_risk_class: "risk-low",
-      equipment_note: "Compatible",
-
-      score_thermal_assessment: "Acceptable",
-      score_thermal_class: "moderate",
-      score_thermal_level: "Moderate",
-      score_thermal_note: "Monitor",
-
-      score_processing_assessment: "Adjustable",
-      score_processing_class: "moderate",
-      score_processing_level: "Moderate",
-      score_processing_note: "Tune",
-
-      score_equipment_assessment: "Compatible",
-      score_equipment_class: "low",
-      score_equipment_level: "Low",
-      score_equipment_note: "OK",
-
-      score_cert_assessment: "Pending",
-      score_cert_class: "na",
-      score_cert_level: "N/A",
-      score_cert_note: "-",
-
-      score_eol_assessment: "Compliant",
-      score_eol_class: "low",
-      score_eol_level: "Low",
-      score_eol_note: "OK",
-
-      obs_1_title: "Material Behavior",
-      obs_1_body: "Differences vs PP observed",
-
-      obs_2_title: "Processing Impact",
-      obs_2_body: "Requires tuning",
-
-      obs_3_title: "Performance Trade-off",
-      obs_3_body: "Slight strength reduction",
-
-      risk_1_title: "Cost Increase",
-      risk_1_body: "Higher cost than PP",
-
-      risk_2_title: "Stability Risk",
-      risk_2_body: "Needs control",
-
-      strategic_recommendation: "Pilot test recommended",
-      disclaimer: "Advisory only"
-    };
-
-    // =========================
-    // 💥 完全置換（最重要）
-    // =========================
-
-    let html = htmlTemplate;
-
-    Object.entries(data).forEach(([key, value]) => {
-      html = html.split(`{{${key}}}`).join(escapeHtml(value ?? ""));
+    // ===== 変数置換（重要） =====
+    Object.keys(data).forEach((key) => {
+      html = html.replaceAll(`{{${key}}}`, data[key]);
     });
 
-    // =========================
-    // PDF
-    // =========================
-
+    // ===== PDF生成 =====
     const browser = await puppeteer.launch({
       args: ["--no-sandbox", "--disable-setuid-sandbox"]
     });
@@ -1372,15 +1270,12 @@ body {
 
     await browser.close();
 
-    // =========================
-    // メール
-    // =========================
-
+    // ===== メール送信 =====
     await resend.emails.send({
       from: "FairVia <info@ilnautico.com>",
       to: email,
-      subject: "FairVia Report",
-      html: "<p>Your report is attached.</p>",
+      subject: "FairVia Screening Report",
+      text: "Your report is attached.",
       attachments: [
         {
           filename: "report.pdf",
@@ -1390,7 +1285,6 @@ body {
     });
 
     res.send(pdf);
-
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err.message });
