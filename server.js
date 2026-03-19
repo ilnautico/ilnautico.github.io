@@ -12,6 +12,10 @@ const openai = new OpenAI({
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
+/* =========================
+   Helpers
+========================= */
+
 function escapeHtml(value = "") {
   return String(value)
     .replace(/&/g, "&amp;")
@@ -59,6 +63,10 @@ function getValueByKeywords(fields, keywords = [], fallbackIndex = null) {
   return "";
 }
 
+/* =========================
+   MAIN
+========================= */
+
 app.post("/generate-report", async (req, res) => {
   try {
     const fields = req.body?.data?.fields || [];
@@ -67,6 +75,14 @@ app.post("/generate-report", async (req, res) => {
     const email = emailField ? normalizeFieldValue(emailField).trim() : "";
 
     if (!email) return res.status(400).json({ error: "EMAIL NOT FOUND" });
+
+    // =========================
+    // フォームデータ取得
+    // =========================
+
+    const clientName = getValueByKeywords(fields, ["name", "contact"]);
+    const clientCompany = getValueByKeywords(fields, ["company"]);
+    const clientCountry = getValueByKeywords(fields, ["country"]);
 
     const application = getValueByKeywords(fields, ["product"], 0);
     const processingMethod = getValueByKeywords(fields, ["processing"], 1);
@@ -77,19 +93,35 @@ app.post("/generate-report", async (req, res) => {
     const concerns = getValueByKeywords(fields, ["concern"], 6);
     const projectStage = getValueByKeywords(fields, ["stage"], 7);
 
+    // =========================
+    // AI生成（強化版）
+    // =========================
+
     const completion = await openai.chat.completions.create({
       model: "gpt-4.1-mini",
       messages: [
         {
+          role: "system",
+          content: "You are a senior polymer materials consultant."
+        },
+        {
           role: "user",
           content: `
+Create a professional screening report.
+
 Application: ${application}
 Material: ${currentMaterial}
 Process: ${processingMethod}
 Bio: ${bioMaterial}
 Concerns: ${concerns}
 
-Give 1 professional paragraph summary.
+Output:
+1. Executive summary
+2. 3 technical observations
+3. 2 risks
+4. 1 recommendation
+
+Be specific and professional.
 `
         }
       ]
@@ -98,11 +130,12 @@ Give 1 professional paragraph summary.
     const executiveSummary =
       completion.choices?.[0]?.message?.content || "";
 
-    /* =========================
-       👉ここにHTML貼る
-    ========================= */
+    // =========================
+    // HTML（そのまま貼る）
+    // =========================
+
     const htmlTemplate = `
-   <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -1228,13 +1261,17 @@ body {
 
 </body>
 </html>
-    `;
+`;
 
-    /* =========================
-       DATA（完全一致）
-    ========================= */
+    // =========================
+    // データ
+    // =========================
 
     const data = {
+      client_name: clientName || email,
+      client_company: clientCompany || "-",
+      client_country: clientCountry || "-",
+
       application,
       processing_method: processingMethod,
       current_material: currentMaterial,
@@ -1242,12 +1279,6 @@ body {
       equipment,
       production_scale: productionScale,
       project_stage: projectStage,
-
-      submission_reference: "Tally Form",
-
-      client_name: email,
-      client_company: "-",
-      client_country: "-",
 
       report_id: "FV-" + Date.now(),
       report_date: new Date().toLocaleDateString(),
@@ -1313,9 +1344,9 @@ body {
       disclaimer: "Advisory only"
     };
 
-    /* =========================
-       💥 完全置換
-    ========================= */
+    // =========================
+    // 💥 完全置換（最重要）
+    // =========================
 
     let html = htmlTemplate;
 
@@ -1323,9 +1354,9 @@ body {
       html = html.split(`{{${key}}}`).join(escapeHtml(value ?? ""));
     });
 
-    /* =========================
-       PDF生成
-    ========================= */
+    // =========================
+    // PDF
+    // =========================
 
     const browser = await puppeteer.launch({
       args: ["--no-sandbox", "--disable-setuid-sandbox"]
@@ -1341,15 +1372,15 @@ body {
 
     await browser.close();
 
-    /* =========================
-       メール送信
-    ========================= */
+    // =========================
+    // メール
+    // =========================
 
     await resend.emails.send({
       from: "FairVia <info@ilnautico.com>",
       to: email,
       subject: "FairVia Report",
-      html: "<p>Your report is attached</p>",
+      html: "<p>Your report is attached.</p>",
       attachments: [
         {
           filename: "report.pdf",
