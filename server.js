@@ -1,129 +1,11 @@
 import express from "express";
-import OpenAI from "openai";
-import { Resend } from "resend";
 import puppeteer from "puppeteer";
 
 const app = express();
 app.use(express.json({ limit: "2mb" }));
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
-});
-
-const resend = new Resend(process.env.RESEND_API_KEY);
-
-app.post("/generate-report", async (req, res) => {
-  try {
-    const payload = req.body;
-
-    // ===== メール取得 =====
-    const emailField = payload?.data?.fields?.find(
-      (f) => f.type === "INPUT_EMAIL"
-    );
-
-    const email = emailField?.value;
-
-    if (!email) {
-      return res.status(400).json({ error: "EMAIL NOT FOUND" });
-    }
-
-    // ===== GPT生成 =====
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4.1-mini",
-      messages: [
-        {
-          role: "system",
-          content: "You are a polymer materials consultant."
-        },
-        {
-          role: "user",
-          content: "Generate a material screening report."
-        }
-      ]
-    });
-
-    const reportText =
-      completion?.choices?.[0]?.message?.content || "No report";
-
-    // ===== 仮データ（ここは後でTallyと連携） =====
-    const data = {
-      feasibility_level: "MODERATE",
-      feasibility_class: "level-moderate",
-
-      client_name: "Sample Client",
-      client_company: "Sample Company",
-      client_country: "Japan",
-
-      report_id: "FV-001",
-      report_date: new Date().toISOString().split("T")[0],
-
-      application: "Packaging",
-      current_material: "PE",
-      processing_method: "Injection",
-      bio_material: "PLA",
-      equipment: "Standard",
-      production_scale: "Medium",
-      project_stage: "Evaluation",
-
-      executive_summary: reportText,
-      feasibility_explanation: reportText,
-
-      thermal_risk: "Moderate",
-      thermal_note: reportText,
-      thermal_risk_class: "risk-moderate",
-
-      processing_risk: "Moderate",
-      processing_note: reportText,
-      processing_risk_class: "risk-moderate",
-
-      equipment_risk: "Low",
-      equipment_note: reportText,
-      equipment_risk_class: "risk-low",
-
-      score_thermal_assessment: "Stable",
-      score_thermal_level: "Moderate",
-      score_thermal_class: "moderate",
-      score_thermal_note: reportText,
-
-      score_processing_assessment: "Requires tuning",
-      score_processing_level: "Moderate",
-      score_processing_class: "moderate",
-      score_processing_note: reportText,
-
-      score_equipment_assessment: "Compatible",
-      score_equipment_level: "Low",
-      score_equipment_class: "low",
-      score_equipment_note: reportText,
-
-      score_cert_assessment: "Pending",
-      score_cert_level: "N/A",
-      score_cert_class: "na",
-      score_cert_note: reportText,
-
-      score_eol_assessment: "Compliant",
-      score_eol_level: "Low",
-      score_eol_class: "low",
-      score_eol_note: reportText,
-
-      obs_1_title: "Observation 1",
-      obs_1_body: reportText,
-      obs_2_title: "Observation 2",
-      obs_2_body: reportText,
-      obs_3_title: "Observation 3",
-      obs_3_body: reportText,
-
-      risk_1_title: "Risk 1",
-      risk_1_body: reportText,
-      risk_2_title: "Risk 2",
-      risk_2_body: reportText,
-
-      strategic_recommendation: reportText,
-      disclaimer:
-        "This report is preliminary and based on provided information."
-    };
-
-    // ===== HTMLテンプレ =====
-    let html = `<!DOCTYPE html>
+// ===== HTMLテンプレ（あなたの完成版そのまま入れる） =====
+const htmlTemplate = `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -419,6 +301,7 @@ body {
 /* Page footer */
 .page-footer {
   position: relative;
+  margin-top: auto;
   background: #17263c;
   display: block;
 }
@@ -1275,18 +1158,121 @@ body {
 </body>
 </html>`;
 
-    // ===== 変数置換（重要） =====
-    Object.keys(data).forEach((key) => {
-      html = html.replaceAll(`{{${key}}}`, data[key]);
-    });
+// ===== HTMLエスケープ =====
+function escapeHtml(str = "") {
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
 
-    // ===== PDF生成 =====
+// ===== HTML差し込み =====
+function injectData(template, data) {
+  return template
+
+    // CLIENT
+    .replace(/{{client_name}}/g, escapeHtml(data.client_name))
+    .replace(/{{client_company}}/g, escapeHtml(data.client_company))
+    .replace(/{{client_country}}/g, escapeHtml(data.client_country))
+
+    // META
+    .replace(/{{report_id}}/g, escapeHtml(data.report_id))
+    .replace(/{{report_date}}/g, escapeHtml(data.report_date))
+
+    // BASIC INFO
+    .replace(/{{application}}/g, escapeHtml(data.application))
+    .replace(/{{current_material}}/g, escapeHtml(data.current_material))
+    .replace(/{{processing_method}}/g, escapeHtml(data.processing_method))
+    .replace(/{{bio_material}}/g, escapeHtml(data.bio_material))
+    .replace(/{{equipment}}/g, escapeHtml(data.equipment))
+    .replace(/{{production_scale}}/g, escapeHtml(data.production_scale))
+    .replace(/{{project_stage}}/g, escapeHtml(data.project_stage))
+
+    // SUMMARY
+    .replace(/{{executive_summary_overview}}/g, escapeHtml(data.executive_summary_overview))
+    .replace(/{{executive_summary_findings}}/g, escapeHtml(data.executive_summary_findings))
+    .replace(/{{executive_summary_conclusion}}/g, escapeHtml(data.executive_summary_conclusion))
+
+    // FEASIBILITY
+    .replace(/{{feasibility_level}}/g, escapeHtml(data.feasibility_level))
+    .replace(/{{feasibility_explanation}}/g, escapeHtml(data.feasibility_explanation))
+    .replace(/{{feasibility_class}}/g, data.feasibility_class)
+
+    // RISKS
+    .replace(/{{thermal_risk}}/g, escapeHtml(data.thermal_risk))
+    .replace(/{{thermal_note}}/g, escapeHtml(data.thermal_note))
+    .replace(/{{thermal_risk_class}}/g, data.thermal_risk_class)
+
+    .replace(/{{processing_risk}}/g, escapeHtml(data.processing_risk))
+    .replace(/{{processing_note}}/g, escapeHtml(data.processing_note))
+    .replace(/{{processing_risk_class}}/g, data.processing_risk_class)
+
+    .replace(/{{equipment_risk}}/g, escapeHtml(data.equipment_risk))
+    .replace(/{{equipment_note}}/g, escapeHtml(data.equipment_note))
+    .replace(/{{equipment_risk_class}}/g, data.equipment_risk_class)
+
+    // SCORES
+    .replace(/{{score_thermal_assessment}}/g, escapeHtml(data.score_thermal_assessment))
+    .replace(/{{score_thermal_level}}/g, escapeHtml(data.score_thermal_level))
+    .replace(/{{score_thermal_note}}/g, escapeHtml(data.score_thermal_note))
+    .replace(/{{score_thermal_class}}/g, data.score_thermal_class)
+
+    .replace(/{{score_processing_assessment}}/g, escapeHtml(data.score_processing_assessment))
+    .replace(/{{score_processing_level}}/g, escapeHtml(data.score_processing_level))
+    .replace(/{{score_processing_note}}/g, escapeHtml(data.score_processing_note))
+    .replace(/{{score_processing_class}}/g, data.score_processing_class)
+
+    .replace(/{{score_equipment_assessment}}/g, escapeHtml(data.score_equipment_assessment))
+    .replace(/{{score_equipment_level}}/g, escapeHtml(data.score_equipment_level))
+    .replace(/{{score_equipment_note}}/g, escapeHtml(data.score_equipment_note))
+    .replace(/{{score_equipment_class}}/g, data.score_equipment_class)
+
+    .replace(/{{score_cert_assessment}}/g, escapeHtml(data.score_cert_assessment))
+    .replace(/{{score_cert_level}}/g, escapeHtml(data.score_cert_level))
+    .replace(/{{score_cert_note}}/g, escapeHtml(data.score_cert_note))
+    .replace(/{{score_cert_class}}/g, data.score_cert_class)
+
+    .replace(/{{score_eol_assessment}}/g, escapeHtml(data.score_eol_assessment))
+    .replace(/{{score_eol_level}}/g, escapeHtml(data.score_eol_level))
+    .replace(/{{score_eol_note}}/g, escapeHtml(data.score_eol_note))
+    .replace(/{{score_eol_class}}/g, data.score_eol_class)
+
+    // OBS
+    .replace(/{{obs_1_title}}/g, escapeHtml(data.obs_1_title))
+    .replace(/{{obs_1_body}}/g, escapeHtml(data.obs_1_body))
+    .replace(/{{obs_2_title}}/g, escapeHtml(data.obs_2_title))
+    .replace(/{{obs_2_body}}/g, escapeHtml(data.obs_2_body))
+    .replace(/{{obs_3_title}}/g, escapeHtml(data.obs_3_title))
+    .replace(/{{obs_3_body}}/g, escapeHtml(data.obs_3_body))
+
+    // RISKS TEXT
+    .replace(/{{risk_1_title}}/g, escapeHtml(data.risk_1_title))
+    .replace(/{{risk_1_body}}/g, escapeHtml(data.risk_1_body))
+    .replace(/{{risk_2_title}}/g, escapeHtml(data.risk_2_title))
+    .replace(/{{risk_2_body}}/g, escapeHtml(data.risk_2_body))
+
+    // FINAL
+    .replace(/{{strategic_recommendation}}/g, escapeHtml(data.strategic_recommendation))
+    .replace(/{{disclaimer}}/g, escapeHtml(data.disclaimer));
+}
+
+// ===== API =====
+app.post("/generate", async (req, res) => {
+  try {
+    const data = req.body;
+
+    // ① HTMLに流し込み
+    const finalHtml = injectData(htmlTemplate, data);
+
+    // ② PDF生成
     const browser = await puppeteer.launch({
-      args: ["--no-sandbox", "--disable-setuid-sandbox"]
+      headless: "new",
+      args: ["--no-sandbox"]
     });
 
     const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: "networkidle0" });
+    await page.setContent(finalHtml, { waitUntil: "networkidle0" });
 
     const pdf = await page.pdf({
       format: "A4",
@@ -1295,27 +1281,20 @@ body {
 
     await browser.close();
 
-    // ===== メール送信 =====
-    await resend.emails.send({
-      from: "FairVia <info@ilnautico.com>",
-      to: email,
-      subject: "FairVia Screening Report",
-      text: "Your report is attached.",
-      attachments: [
-        {
-          filename: "report.pdf",
-          content: pdf.toString("base64")
-        }
-      ]
+    // ③ PDF返す
+    res.set({
+      "Content-Type": "application/pdf",
+      "Content-Disposition": "attachment; filename=report.pdf"
     });
 
     res.send(pdf);
+
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: err.message });
+    res.status(500).send("ERROR");
   }
 });
 
-app.listen(8080, () => {
-  console.log("Server running");
+app.listen(3000, () => {
+  console.log("Server running on port 3000");
 });
