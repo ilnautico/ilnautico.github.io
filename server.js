@@ -123,8 +123,7 @@ app.post("/generate-report", async (req, res) => {
     };
 
     // ===== HTMLテンプレ =====
-    let html = `かくにんして
-<!DOCTYPE html>
+    let html = `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -166,7 +165,8 @@ body {
 .page {
   width: 210mm;
   min-height: 297mm;
-  position: relative;
+  display: flex;
+  flex-direction: column;
   page-break-after: always;
   background: #ffffff;
   overflow: hidden;
@@ -418,10 +418,7 @@ body {
 
 /* Page footer */
 .page-footer {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
+  position: relative;
   background: #17263c;
   display: block;
 }
@@ -454,6 +451,7 @@ body {
 .page-body {
   padding: 10mm 14mm 20mm;
   display: block;
+  flex: 1;
 }
 
 /* ── Section elements ── */
@@ -833,6 +831,23 @@ body {
   color: #b4965a;
 }
 
+/* ── Executive Summary blocks ── */
+.summary-block {
+  border-left: 3px solid #b4965a;
+  padding-left: 4mm;
+  margin-bottom: 4mm;
+}
+
+.summary-heading {
+  display: block;
+  font-size: 8pt;
+  font-weight: bold;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #b4965a;
+  margin-bottom: 1.5mm;
+}
+
 /* ── Utility ── */
 .clearfix::after {
   content: '';
@@ -883,8 +898,8 @@ body {
     <div class="cover-client-box">
       <span class="cover-client-label">Prepared for</span>
       <span class="cover-client-name">{{client_name}}</span>
-      <span class="cover-client-detail">{{client_company}}</span>
-      <span class="cover-client-detail">{{client_country}}</span>
+      <span class="cover-client-detail"><strong>Company:</strong> {{client_company}}</span>
+      <span class="cover-client-detail"><strong>Country:</strong> {{client_country}}</span>
     </div>
 
     <div class="cover-meta-grid">
@@ -957,7 +972,18 @@ body {
       <span class="section-title">Executive Summary</span>
       <div class="section-rule-full"></div>
 
-      <p class="body-text">{{executive_summary}}</p>
+      <div class="summary-block">
+        <span class="summary-heading">Overview</span>
+        <p class="body-text">{{executive_summary_overview}}</p>
+      </div>
+      <div class="summary-block">
+        <span class="summary-heading">Key Findings</span>
+        <p class="body-text">{{executive_summary_findings}}</p>
+      </div>
+      <div class="summary-block">
+        <span class="summary-heading">Assessment Conclusion</span>
+        <p class="body-text">{{executive_summary_conclusion}}</p>
+      </div>
     </div>
 
     <!-- Section: Feasibility Level -->
@@ -1247,8 +1273,7 @@ body {
 
 
 </body>
-</html>
-`;
+</html>`;
 
     // ===== 変数置換（重要） =====
     Object.keys(data).forEach((key) => {
