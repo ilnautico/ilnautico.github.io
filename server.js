@@ -1,11 +1,9 @@
-import express from "express";
-import puppeteer from "puppeteer";
+/* =========================
+   ① HTMLテンプレ（ここに入れる）
+========================= */
 
-const app = express();
-app.use(express.json({ limit: "2mb" }));
-
-// ===== HTMLテンプレ（あなたの完成版そのまま入れる） =====
-const htmlTemplate = `<!DOCTYPE html>
+const htmlTemplate = `
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -1156,145 +1154,73 @@ body {
 
 
 </body>
-</html>`;
+</html>
+`;
 
-// ===== HTMLエスケープ =====
-function escapeHtml(str = "") {
+
+/* =========================
+   ② HTML変換エンジン（触らない）
+========================= */
+
+function escapeHtml(str) {
   return String(str)
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
+    .replace(/>/g, "&gt;");
 }
 
-// ===== HTML差し込み =====
-function injectData(template, data) {
-  return template
+function injectHtml(template, data) {
+  let html = template;
 
-    // CLIENT
-    .replace(/{{client_name}}/g, escapeHtml(data.client_name))
-    .replace(/{{client_company}}/g, escapeHtml(data.client_company))
-    .replace(/{{client_country}}/g, escapeHtml(data.client_country))
+  const rawKeys = [
+    "feasibility_class",
+    "thermal_risk_class",
+    "processing_risk_class",
+    "equipment_risk_class",
+    "score_thermal_class",
+    "score_processing_class",
+    "score_equipment_class",
+    "score_cert_class",
+    "score_eol_class"
+  ];
 
-    // META
-    .replace(/{{report_id}}/g, escapeHtml(data.report_id))
-    .replace(/{{report_date}}/g, escapeHtml(data.report_date))
+  // class置換
+  rawKeys.forEach((key) => {
+    html = html.replace(
+      new RegExp(`{{\\s*${key}\\s*}}`, "g"),
+      data[key] || ""
+    );
+  });
 
-    // BASIC INFO
-    .replace(/{{application}}/g, escapeHtml(data.application))
-    .replace(/{{current_material}}/g, escapeHtml(data.current_material))
-    .replace(/{{processing_method}}/g, escapeHtml(data.processing_method))
-    .replace(/{{bio_material}}/g, escapeHtml(data.bio_material))
-    .replace(/{{equipment}}/g, escapeHtml(data.equipment))
-    .replace(/{{production_scale}}/g, escapeHtml(data.production_scale))
-    .replace(/{{project_stage}}/g, escapeHtml(data.project_stage))
+  // 通常テキスト置換
+  Object.keys(data).forEach((key) => {
+    if (rawKeys.includes(key)) return;
 
-    // SUMMARY
-    .replace(/{{executive_summary_overview}}/g, escapeHtml(data.executive_summary_overview))
-    .replace(/{{executive_summary_findings}}/g, escapeHtml(data.executive_summary_findings))
-    .replace(/{{executive_summary_conclusion}}/g, escapeHtml(data.executive_summary_conclusion))
+    html = html.replace(
+      new RegExp(`{{\\s*${key}\\s*}}`, "g"),
+      escapeHtml(data[key] || "")
+    );
+  });
 
-    // FEASIBILITY
-    .replace(/{{feasibility_level}}/g, escapeHtml(data.feasibility_level))
-    .replace(/{{feasibility_explanation}}/g, escapeHtml(data.feasibility_explanation))
-    .replace(/{{feasibility_class}}/g, data.feasibility_class)
+  // 未置換削除
+  html = html.replace(/{{.*?}}/g, "");
 
-    // RISKS
-    .replace(/{{thermal_risk}}/g, escapeHtml(data.thermal_risk))
-    .replace(/{{thermal_note}}/g, escapeHtml(data.thermal_note))
-    .replace(/{{thermal_risk_class}}/g, data.thermal_risk_class)
+  // undefined削除
+  html = html.replace(/undefined/g, "");
 
-    .replace(/{{processing_risk}}/g, escapeHtml(data.processing_risk))
-    .replace(/{{processing_note}}/g, escapeHtml(data.processing_note))
-    .replace(/{{processing_risk_class}}/g, data.processing_risk_class)
-
-    .replace(/{{equipment_risk}}/g, escapeHtml(data.equipment_risk))
-    .replace(/{{equipment_note}}/g, escapeHtml(data.equipment_note))
-    .replace(/{{equipment_risk_class}}/g, data.equipment_risk_class)
-
-    // SCORES
-    .replace(/{{score_thermal_assessment}}/g, escapeHtml(data.score_thermal_assessment))
-    .replace(/{{score_thermal_level}}/g, escapeHtml(data.score_thermal_level))
-    .replace(/{{score_thermal_note}}/g, escapeHtml(data.score_thermal_note))
-    .replace(/{{score_thermal_class}}/g, data.score_thermal_class)
-
-    .replace(/{{score_processing_assessment}}/g, escapeHtml(data.score_processing_assessment))
-    .replace(/{{score_processing_level}}/g, escapeHtml(data.score_processing_level))
-    .replace(/{{score_processing_note}}/g, escapeHtml(data.score_processing_note))
-    .replace(/{{score_processing_class}}/g, data.score_processing_class)
-
-    .replace(/{{score_equipment_assessment}}/g, escapeHtml(data.score_equipment_assessment))
-    .replace(/{{score_equipment_level}}/g, escapeHtml(data.score_equipment_level))
-    .replace(/{{score_equipment_note}}/g, escapeHtml(data.score_equipment_note))
-    .replace(/{{score_equipment_class}}/g, data.score_equipment_class)
-
-    .replace(/{{score_cert_assessment}}/g, escapeHtml(data.score_cert_assessment))
-    .replace(/{{score_cert_level}}/g, escapeHtml(data.score_cert_level))
-    .replace(/{{score_cert_note}}/g, escapeHtml(data.score_cert_note))
-    .replace(/{{score_cert_class}}/g, data.score_cert_class)
-
-    .replace(/{{score_eol_assessment}}/g, escapeHtml(data.score_eol_assessment))
-    .replace(/{{score_eol_level}}/g, escapeHtml(data.score_eol_level))
-    .replace(/{{score_eol_note}}/g, escapeHtml(data.score_eol_note))
-    .replace(/{{score_eol_class}}/g, data.score_eol_class)
-
-    // OBS
-    .replace(/{{obs_1_title}}/g, escapeHtml(data.obs_1_title))
-    .replace(/{{obs_1_body}}/g, escapeHtml(data.obs_1_body))
-    .replace(/{{obs_2_title}}/g, escapeHtml(data.obs_2_title))
-    .replace(/{{obs_2_body}}/g, escapeHtml(data.obs_2_body))
-    .replace(/{{obs_3_title}}/g, escapeHtml(data.obs_3_title))
-    .replace(/{{obs_3_body}}/g, escapeHtml(data.obs_3_body))
-
-    // RISKS TEXT
-    .replace(/{{risk_1_title}}/g, escapeHtml(data.risk_1_title))
-    .replace(/{{risk_1_body}}/g, escapeHtml(data.risk_1_body))
-    .replace(/{{risk_2_title}}/g, escapeHtml(data.risk_2_title))
-    .replace(/{{risk_2_body}}/g, escapeHtml(data.risk_2_body))
-
-    // FINAL
-    .replace(/{{strategic_recommendation}}/g, escapeHtml(data.strategic_recommendation))
-    .replace(/{{disclaimer}}/g, escapeHtml(data.disclaimer));
+  return html;
 }
 
-// ===== API =====
-app.post("/generate", async (req, res) => {
-  try {
-    const data = req.body;
 
-    // ① HTMLに流し込み
-    const finalHtml = injectData(htmlTemplate, data);
+/* =========================
+   ③ 実行（ここだけ使う）
+========================= */
 
-    // ② PDF生成
-    const browser = await puppeteer.launch({
-      headless: "new",
-      args: ["--no-sandbox"]
-    });
+const html = injectHtml(htmlTemplate, data);
 
-    const page = await browser.newPage();
-    await page.setContent(finalHtml, { waitUntil: "networkidle0" });
 
-    const pdf = await page.pdf({
-      format: "A4",
-      printBackground: true
-    });
+/* =========================
+   ④ デバッグ（1回だけ）
+========================= */
 
-    await browser.close();
-
-    // ③ PDF返す
-    res.set({
-      "Content-Type": "application/pdf",
-      "Content-Disposition": "attachment; filename=report.pdf"
-    });
-
-    res.send(pdf);
-
-  } catch (err) {
-    console.error(err);
-    res.status(500).send("ERROR");
-  }
-});
-
-app.listen(3000, () => {
-  console.log("Server running on port 3000");
-});
+// console.log(html);
