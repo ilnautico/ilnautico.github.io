@@ -3,10 +3,6 @@ import OpenAI from "openai";
 import { Resend } from "resend";
 import puppeteer from "puppeteer";
 
-/* =========================
-   ① 初期化（←ここが今回の事故ポイント）
-========================= */
-
 const app = express();
 app.use(express.json({ limit: "2mb" }));
 
@@ -18,15 +14,60 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 
 
 /* =========================
-   ② HTML変換エンジン
+   Helpers
 ========================= */
 
-function escapeHtml(str) {
+function escapeHtml(str = "") {
   return String(str)
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;");
 }
+
+function normalizeFieldValue(field) {
+  if (!field) return "";
+
+  const { value, options } = field;
+
+  if (typeof value === "string" || typeof value === "number") {
+    return String(value);
+  }
+
+  if (typeof value === "boolean") {
+    return value ? "Yes" : "No";
+  }
+
+  if (Array.isArray(value)) {
+    if (Array.isArray(options)) {
+      return value.map(v => {
+        const found = options.find(o => o.id === v);
+        return found ? found.text : v;
+      }).join(", ");
+    }
+    return value.join(", ");
+  }
+
+  return "";
+}
+
+function fieldLabel(field) {
+  return `${field?.label || ""} ${field?.key || ""}`.toLowerCase();
+}
+
+function getValueByKeywords(fields, keywordGroups = []) {
+  const found = fields.find(f => {
+    const label = fieldLabel(f);
+    return keywordGroups.some(group =>
+      group.every(k => label.includes(k))
+    );
+  });
+  return normalizeFieldValue(found);
+}
+
+
+/* =========================
+   HTML Inject
+========================= */
 
 function injectHtml(template, data) {
   let html = template;
@@ -43,16 +84,14 @@ function injectHtml(template, data) {
     "score_eol_class"
   ];
 
-  // class系
-  rawKeys.forEach((key) => {
+  rawKeys.forEach(key => {
     html = html.replace(
       new RegExp(`{{\\s*${key}\\s*}}`, "g"),
       data[key] || ""
     );
   });
 
-  // テキスト系
-  Object.keys(data).forEach((key) => {
+  Object.keys(data).forEach(key => {
     if (rawKeys.includes(key)) return;
 
     html = html.replace(
@@ -69,58 +108,76 @@ function injectHtml(template, data) {
 
 
 /* =========================
-   ③ ルート確認
+   Routes
 ========================= */
 
 app.get("/", (req, res) => {
   res.send("Server running");
 });
 
-app.get("/health", (req, res) => {
-  res.json({ status: "ok" });
-});
-
-
-/* =========================
-   ④ メイン処理
-========================= */
-
 app.post("/generate-report", async (req, res) => {
   try {
-    const payload = req.body;
-    const fields = payload?.data?.fields || [];
+    const fields = req.body?.data?.fields || [];
 
-    // メール取得
-    const emailField = fields.find((f) => f?.type === "INPUT_EMAIL");
-    const email = emailField?.value || "";
+    /* ===== メール ===== */
+    const email = normalizeFieldValue(
+      fields.find(f => f.type === "INPUT_EMAIL")
+    );
 
-    if (!email) {
-      return res.status(400).json({ error: "EMAIL NOT FOUND" });
-    }
+    if (!email) return res.status(400).json({ error: "EMAIL NOT FOUND" });
 
-    /* =========================
-       ▼ データ（仮）
-    ========================= */
+    /* ===== フィールド取得 ===== */
+
+    const clientName = getValueByKeywords(fields, [["name"]]);
+    const clientCompany = getValueByKeywords(fields, [["company"]]);
+    const clientCountry = getValueByKeywords(fields, [["country"]]);
+
+    const application = getValueByKeywords(fields, [["application"]]);
+    const processingMethod = getValueByKeywords(fields, [["processing"]]);
+    const currentMaterial = getValueByKeywords(fields, [["current"]]);
+    const bioMaterial = getValueByKeywords(fields, [["target"], ["bio"]]);
+    const equipment = getValueByKeywords(fields, [["equipment"]]);
+    const productionScale = getValueByKeywords(fields, [["scale"]]);
+    const projectStage = getValueByKeywords(fields, [["stage"]]);
+
+    /* ===== AI ===== */
+
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4.1-mini",
+      messages: [
+        {
+          role: "user",
+          content: `Write executive summary:
+Application: ${application}
+Material: ${currentMaterial}`
+        }
+      ]
+    });
+
+    const summary =
+      completion?.choices?.[0]?.message?.content || "";
+
+    /* ===== データ ===== */
 
     const data = {
-      application: "Packaging",
-      current_material: "PE",
-      processing_method: "Injection",
-      bio_material: "PLA",
-      equipment: "Standard",
-      production_scale: "Medium",
-      project_stage: "Evaluation",
+      client_name: clientName || "—",
+      client_company: clientCompany || "—",
+      client_country: clientCountry || "—",
 
-      client_name: "Client",
-      client_company: "Company",
-      client_country: "Japan",
+      application,
+      current_material: currentMaterial,
+      processing_method: processingMethod,
+      bio_material: bioMaterial,
+      equipment,
+      production_scale: productionScale,
+      project_stage: projectStage,
 
       report_id: "FV-" + Date.now(),
       report_date: new Date().toLocaleDateString(),
 
-      executive_summary_overview: "Overview text",
-      executive_summary_findings: "Key findings text",
-      executive_summary_conclusion: "Conclusion text",
+      executive_summary_overview: summary,
+      executive_summary_findings: summary,
+      executive_summary_conclusion: summary,
 
       feasibility_level: "MODERATE",
       feasibility_class: "level-moderate",
@@ -136,7 +193,7 @@ app.post("/generate-report", async (req, res) => {
 
       equipment_risk: "Low",
       equipment_risk_class: "risk-low",
-      equipment_note: "Compatible",
+      equipment_note: "OK",
 
       score_thermal_assessment: "Acceptable",
       score_thermal_class: "moderate",
@@ -182,9 +239,7 @@ app.post("/generate-report", async (req, res) => {
       disclaimer: "Advisory only"
     };
 
-    /* =========================
-       ▼ HTML（ここにあなたのHTML入れる）
-    ========================= */
+    /* ===== HTML ===== */
 
     const htmlTemplate = `
     <!DOCTYPE html>
@@ -1343,9 +1398,7 @@ body {
 
     const html = injectHtml(htmlTemplate, data);
 
-    /* =========================
-       ▼ PDF生成
-    ========================= */
+    /* ===== PDF ===== */
 
     const browser = await puppeteer.launch({
       args: ["--no-sandbox"]
@@ -1361,14 +1414,12 @@ body {
 
     await browser.close();
 
-    /* =========================
-       ▼ メール送信
-    ========================= */
+    /* ===== MAIL ===== */
 
     await resend.emails.send({
       from: "info@ilnautico.com",
       to: email,
-      subject: "Your Report",
+      subject: "FairVia Report",
       html: "<p>Attached</p>",
       attachments: [
         {
@@ -1381,18 +1432,14 @@ body {
     res.send("OK");
 
   } catch (err) {
-    console.error("ERROR:", err);
+    console.error(err);
     res.status(500).json({ error: err.message });
   }
 });
 
 
-/* =========================
-   ⑤ サーバー起動
-========================= */
-
 const PORT = process.env.PORT || 8080;
 
-app.listen(PORT, "0.0.0.0", () => {
-  console.log("Server running on port " + PORT);
+app.listen(PORT, () => {
+  console.log("Server running");
 });
