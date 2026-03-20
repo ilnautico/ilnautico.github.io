@@ -48,15 +48,17 @@ function getValue(fields, keywords) {
 }
 
 /* =========================
-   🔥 自動推測（超重要）
+   🔥 Application推測（最重要）
 ========================= */
 
-function inferApplication(material, method) {
-  const text = (material + " " + method).toLowerCase();
+function inferApplication(product, method) {
+  const text = (product + " " + method).toLowerCase();
 
-  if (text.includes("film") || text.includes("bag")) return "Packaging";
+  if (text.includes("film")) return "Flexible Packaging Film";
+  if (text.includes("mulch")) return "Agricultural Film";
+  if (text.includes("rigid")) return "Rigid Packaging";
   if (text.includes("injection")) return "Injection Molded Product";
-  if (text.includes("extrusion")) return "Extruded Product";
+  if (text.includes("blow")) return "Blow Molded Product";
 
   return "General Plastic Application";
 }
@@ -122,19 +124,25 @@ app.post("/generate-report", async (req, res) => {
     const clientCompany = getValue(fields, [["company"]]);
     const clientCountry = getValue(fields, [["country"]]);
 
+    const product = getValue(fields, [["product"]]);
     const currentMaterial = getValue(fields, [["current","material"]]);
-    const bioMaterial = getValue(fields, [["target","material"],["bio"]]);
+    const bioMaterial = getValue(fields, [["biodegradable"],["target","material"]]);
     const processingMethod = getValue(fields, [["processing","method"]]);
 
     /* ===== 自動補完 ===== */
 
-    const application = inferApplication(currentMaterial, processingMethod);
+    const application = inferApplication(product, processingMethod);
 
-    /* ===== Executive Summary（完全整形版） ===== */
+    /* ===== Executive Summary（完全整形） ===== */
 
-    const overview = "This report provides an initial technical assessment of biodegradable material compatibility.";
-    const findings = "The evaluation indicates moderate compatibility with some required adjustments in processing.";
-    const conclusion = "A pilot validation is recommended prior to full-scale implementation.";
+    const overview =
+      "This report provides an initial technical assessment of biodegradable material compatibility.";
+
+    const findings =
+      "The evaluation indicates moderate compatibility with potential adjustments required in processing and material handling.";
+
+    const conclusion =
+      "A pilot validation is recommended prior to full-scale implementation.";
 
     /* ===== DATA ===== */
 
@@ -144,6 +152,7 @@ app.post("/generate-report", async (req, res) => {
       client_country: clientCountry || "—",
 
       application,
+      product,
       current_material: currentMaterial,
       bio_material: bioMaterial,
       processing_method: processingMethod,
@@ -173,19 +182,19 @@ app.post("/generate-report", async (req, res) => {
       score_equipment_class: "low",
 
       obs_1_title: "Material Behavior",
-      obs_1_body: "Differences observed",
+      obs_1_body: "Material behavior differs from conventional plastics under standard processing conditions.",
 
-      risk_1_title: "Cost Increase",
-      risk_1_body: "Higher cost",
+      risk_1_title: "Processing Stability",
+      risk_1_body: "Stability may vary depending on processing temperature and residence time.",
 
-      strategic_recommendation: "Pilot validation recommended",
-      disclaimer: "Advisory only"
+      strategic_recommendation: "Conduct pilot-scale validation before full implementation.",
+      disclaimer: "This report is advisory only."
     };
 
-    /* ===== HTML ===== */
+    /* ===== HTML（あなたのHTML貼る場所） ===== */
 
     const htmlTemplate = `
-    <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -1337,7 +1346,7 @@ body {
 
 </body>
 </html>
-    `;
+`;
 
     const html = injectHtml(htmlTemplate, data);
 
@@ -1361,7 +1370,7 @@ body {
       from: "FairVia <info@ilnautico.com>",
       to: email,
       subject: "FairVia Report",
-      html: "<p>Attached</p>",
+      html: "<p>Your report is attached.</p>",
       attachments: [
         {
           filename: "report.pdf",
