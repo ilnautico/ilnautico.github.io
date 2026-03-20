@@ -12,9 +12,8 @@ const openai = new OpenAI({
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-
 /* =========================
-   Helpers
+   Utility
 ========================= */
 
 function escapeHtml(str = "") {
@@ -26,27 +25,8 @@ function escapeHtml(str = "") {
 
 function normalizeFieldValue(field) {
   if (!field) return "";
-
-  const { value, options } = field;
-
-  if (typeof value === "string" || typeof value === "number") {
-    return String(value);
-  }
-
-  if (typeof value === "boolean") {
-    return value ? "Yes" : "No";
-  }
-
-  if (Array.isArray(value)) {
-    if (Array.isArray(options)) {
-      return value.map(v => {
-        const found = options.find(o => o.id === v);
-        return found ? found.text : v;
-      }).join(", ");
-    }
-    return value.join(", ");
-  }
-
+  if (typeof field.value === "string") return field.value;
+  if (typeof field.value === "boolean") return field.value ? "Yes" : "No";
   return "";
 }
 
@@ -54,16 +34,32 @@ function fieldLabel(field) {
   return `${field?.label || ""} ${field?.key || ""}`.toLowerCase();
 }
 
-function getValueByKeywords(fields, keywordGroups = []) {
-  const found = fields.find(f => {
-    const label = fieldLabel(f);
-    return keywordGroups.some(group =>
-      group.every(k => label.includes(k))
-    );
-  });
-  return normalizeFieldValue(found);
+function findField(fields, keywords) {
+  return fields.find(f =>
+    keywords.some(group =>
+      group.every(k => fieldLabel(f).includes(k))
+    )
+  );
 }
 
+function getValue(fields, keywords) {
+  const f = findField(fields, keywords);
+  return normalizeFieldValue(f);
+}
+
+/* =========================
+   🔥 自動推測（超重要）
+========================= */
+
+function inferApplication(material, method) {
+  const text = (material + " " + method).toLowerCase();
+
+  if (text.includes("film") || text.includes("bag")) return "Packaging";
+  if (text.includes("injection")) return "Injection Molded Product";
+  if (text.includes("extrusion")) return "Extruded Product";
+
+  return "General Plastic Application";
+}
 
 /* =========================
    HTML Inject
@@ -106,58 +102,41 @@ function injectHtml(template, data) {
   return html;
 }
 
-
 /* =========================
-   Routes
+   MAIN
 ========================= */
-
-app.get("/", (req, res) => {
-  res.send("Server running");
-});
 
 app.post("/generate-report", async (req, res) => {
   try {
     const fields = req.body?.data?.fields || [];
 
-    /* ===== メール ===== */
     const email = normalizeFieldValue(
       fields.find(f => f.type === "INPUT_EMAIL")
     );
 
     if (!email) return res.status(400).json({ error: "EMAIL NOT FOUND" });
 
-    /* ===== フィールド取得 ===== */
+    /* ===== フォーム取得 ===== */
 
-    const clientName = getValueByKeywords(fields, [["name"]]);
-    const clientCompany = getValueByKeywords(fields, [["company"]]);
-    const clientCountry = getValueByKeywords(fields, [["country"]]);
+    const clientName = getValue(fields, [["name"]]);
+    const clientCompany = getValue(fields, [["company"]]);
+    const clientCountry = getValue(fields, [["country"]]);
 
-    const application = getValueByKeywords(fields, [["application"]]);
-    const processingMethod = getValueByKeywords(fields, [["processing"]]);
-    const currentMaterial = getValueByKeywords(fields, [["current"]]);
-    const bioMaterial = getValueByKeywords(fields, [["target"], ["bio"]]);
-    const equipment = getValueByKeywords(fields, [["equipment"]]);
-    const productionScale = getValueByKeywords(fields, [["scale"]]);
-    const projectStage = getValueByKeywords(fields, [["stage"]]);
+    const currentMaterial = getValue(fields, [["current","material"]]);
+    const bioMaterial = getValue(fields, [["target","material"],["bio"]]);
+    const processingMethod = getValue(fields, [["processing","method"]]);
 
-    /* ===== AI ===== */
+    /* ===== 自動補完 ===== */
 
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4.1-mini",
-      messages: [
-        {
-          role: "user",
-          content: `Write executive summary:
-Application: ${application}
-Material: ${currentMaterial}`
-        }
-      ]
-    });
+    const application = inferApplication(currentMaterial, processingMethod);
 
-    const summary =
-      completion?.choices?.[0]?.message?.content || "";
+    /* ===== Executive Summary（完全整形版） ===== */
 
-    /* ===== データ ===== */
+    const overview = "This report provides an initial technical assessment of biodegradable material compatibility.";
+    const findings = "The evaluation indicates moderate compatibility with some required adjustments in processing.";
+    const conclusion = "A pilot validation is recommended prior to full-scale implementation.";
+
+    /* ===== DATA ===== */
 
     const data = {
       client_name: clientName || "—",
@@ -166,18 +145,15 @@ Material: ${currentMaterial}`
 
       application,
       current_material: currentMaterial,
-      processing_method: processingMethod,
       bio_material: bioMaterial,
-      equipment,
-      production_scale: productionScale,
-      project_stage: projectStage,
+      processing_method: processingMethod,
 
       report_id: "FV-" + Date.now(),
       report_date: new Date().toLocaleDateString(),
 
-      executive_summary_overview: summary,
-      executive_summary_findings: summary,
-      executive_summary_conclusion: summary,
+      executive_summary_overview: overview,
+      executive_summary_findings: findings,
+      executive_summary_conclusion: conclusion,
 
       feasibility_level: "MODERATE",
       feasibility_class: "level-moderate",
@@ -185,57 +161,24 @@ Material: ${currentMaterial}`
 
       thermal_risk: "Moderate",
       thermal_risk_class: "risk-moderate",
-      thermal_note: "Monitor",
 
       processing_risk: "Moderate",
       processing_risk_class: "risk-moderate",
-      processing_note: "Tune",
 
       equipment_risk: "Low",
       equipment_risk_class: "risk-low",
-      equipment_note: "OK",
 
-      score_thermal_assessment: "Acceptable",
       score_thermal_class: "moderate",
-      score_thermal_level: "Moderate",
-      score_thermal_note: "OK",
-
-      score_processing_assessment: "Adjustable",
       score_processing_class: "moderate",
-      score_processing_level: "Moderate",
-      score_processing_note: "Tune",
-
-      score_equipment_assessment: "Compatible",
       score_equipment_class: "low",
-      score_equipment_level: "Low",
-      score_equipment_note: "OK",
-
-      score_cert_assessment: "Pending",
-      score_cert_class: "na",
-      score_cert_level: "N/A",
-      score_cert_note: "-",
-
-      score_eol_assessment: "Compliant",
-      score_eol_class: "low",
-      score_eol_level: "Low",
-      score_eol_note: "OK",
 
       obs_1_title: "Material Behavior",
       obs_1_body: "Differences observed",
 
-      obs_2_title: "Processing Impact",
-      obs_2_body: "Requires tuning",
-
-      obs_3_title: "Performance Trade-off",
-      obs_3_body: "Slight reduction",
-
       risk_1_title: "Cost Increase",
       risk_1_body: "Higher cost",
 
-      risk_2_title: "Stability Risk",
-      risk_2_body: "Needs control",
-
-      strategic_recommendation: "Pilot test recommended",
+      strategic_recommendation: "Pilot validation recommended",
       disclaimer: "Advisory only"
     };
 
@@ -1400,11 +1343,9 @@ body {
 
     /* ===== PDF ===== */
 
-    const browser = await puppeteer.launch({
-      args: ["--no-sandbox"]
-    });
-
+    const browser = await puppeteer.launch({ args: ["--no-sandbox"] });
     const page = await browser.newPage();
+
     await page.setContent(html, { waitUntil: "networkidle0" });
 
     const pdf = await page.pdf({
@@ -1414,10 +1355,10 @@ body {
 
     await browser.close();
 
-    /* ===== MAIL ===== */
+    /* ===== EMAIL ===== */
 
     await resend.emails.send({
-      from: "info@ilnautico.com",
+      from: "FairVia <info@ilnautico.com>",
       to: email,
       subject: "FairVia Report",
       html: "<p>Attached</p>",
@@ -1437,9 +1378,4 @@ body {
   }
 });
 
-
-const PORT = process.env.PORT || 8080;
-
-app.listen(PORT, () => {
-  console.log("Server running");
-});
+app.listen(8080, () => console.log("Server running"));
