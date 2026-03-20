@@ -234,17 +234,57 @@ body {
 
 /* ── Page container ── */
 .page {
-  width: 210mm;
-  min-height: 297mm;
   display: flex;
   flex-direction: column;
+  width: 210mm;
+  height: 297mm;
+  box-sizing: border-box;
   page-break-after: always;
   background: #ffffff;
-  overflow: hidden;
+  position: relative;
 }
 
 .page:last-child {
   page-break-after: auto;
+}
+
+/* ── Page body grows to push footer down ── */
+.page-body {
+  flex: 1;
+  min-height: 0;
+  padding: 8mm 14mm 14mm;
+}
+
+/* ── Page footer: always at bottom ── */
+.page-footer {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  background: #17263c;
+}
+
+.page-footer-gold {
+  height: 1px;
+  background: #b4965a;
+  opacity: 0.6;
+}
+
+.page-footer-inner {
+  padding: 3mm 14mm;
+  display: flex;
+  justify-content: space-between;
+}
+
+.page-footer-left {
+  font-size: 6.5pt;
+  color: rgba(255,255,255,0.45);
+  letter-spacing: 0.06em;
+}
+
+.page-footer-right {
+  font-size: 6.5pt;
+  color: #b4965a;
 }
 
 /* ═══════════════════════════════════════════
@@ -253,7 +293,13 @@ body {
 
 .cover {
   background: #17263c;
-  display: block;
+}
+
+.cover-inner {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
 }
 
 .cover-header {
@@ -286,10 +332,10 @@ body {
   opacity: 0.4;
 }
 
-/* Cover center content */
 .cover-main {
   padding: 16mm 14mm 0;
   display: block;
+  flex: 1;
 }
 
 .cover-report-type {
@@ -329,7 +375,6 @@ body {
   margin-bottom: 10mm;
 }
 
-/* Client info box on cover */
 .cover-client-box {
   background: rgba(180, 150, 90, 0.12);
   border-left: 3px solid #b4965a;
@@ -362,7 +407,6 @@ body {
   margin-bottom: 0.8mm;
 }
 
-/* Meta grid on cover */
 .cover-meta-grid {
   display: block;
 }
@@ -394,9 +438,8 @@ body {
   display: inline-block;
 }
 
-/* Feasibility badge on cover */
 .cover-badge-area {
-  padding: 12mm 14mm 0;
+  padding: 10mm 14mm 0;
   display: block;
 }
 
@@ -424,48 +467,41 @@ body {
 
 /* Cover footer */
 .cover-footer {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  padding: 5mm 14mm;
+  background: #17263c;
   border-top: 1px solid rgba(180,150,90,0.25);
-  overflow: hidden;
+  padding: 5mm 14mm;
+  display: flex;
+  justify-content: space-between;
+  flex-shrink: 0;
 }
 
 .cover-footer-left {
-  float: left;
   font-size: 7pt;
   color: rgba(255,255,255,0.35);
   letter-spacing: 0.08em;
 }
 
 .cover-footer-right {
-  float: right;
   font-size: 7pt;
   color: rgba(255,255,255,0.35);
   letter-spacing: 0.08em;
 }
 
 /* ═══════════════════════════════════════════
-   CONTENT PAGES
+   CONTENT PAGES — header strip
 ═══════════════════════════════════════════ */
 
-.content {
-  background: #ffffff;
-  display: block;
-}
-
-/* Page header strip */
 .page-header {
   background: #17263c;
   padding: 4mm 14mm;
-  display: block;
+  flex-shrink: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   overflow: hidden;
 }
 
 .page-header-left {
-  float: left;
   font-size: 6.5pt;
   color: rgba(255,255,255,0.55);
   letter-spacing: 0.12em;
@@ -474,7 +510,6 @@ body {
 }
 
 .page-header-right {
-  float: right;
   font-size: 6.5pt;
   color: #b4965a;
   letter-spacing: 0.08em;
@@ -484,52 +519,14 @@ body {
 .page-header-gold {
   height: 1.5px;
   background: #b4965a;
-  display: block;
-}
-
-/* Page footer */
-.page-footer {
-  position: relative;
-  margin-top: auto;
-  background: #17263c;
-  display: block;
-}
-
-.page-footer-gold {
-  height: 1px;
-  background: #b4965a;
-  opacity: 0.6;
-}
-
-.page-footer-inner {
-  padding: 3mm 14mm;
-  overflow: hidden;
-}
-
-.page-footer-left {
-  float: left;
-  font-size: 6.5pt;
-  color: rgba(255,255,255,0.45);
-  letter-spacing: 0.06em;
-}
-
-.page-footer-right {
-  float: right;
-  font-size: 6.5pt;
-  color: #b4965a;
-}
-
-/* Page body */
-.page-body {
-  padding: 10mm 14mm 20mm;
-  display: block;
-  flex: 1;
+  flex-shrink: 0;
 }
 
 /* ── Section elements ── */
 
 .section {
   break-inside: avoid;
+  page-break-inside: avoid;
   margin-bottom: 7mm;
   display: block;
 }
@@ -552,14 +549,6 @@ body {
   margin-bottom: 1.5mm;
 }
 
-.section-rule {
-  height: 1px;
-  background: #b4965a;
-  opacity: 0.45;
-  display: block;
-  margin-bottom: 4mm;
-}
-
 .section-rule-full {
   height: 1px;
   background: #b4965a;
@@ -577,7 +566,7 @@ body {
   margin-bottom: 3mm;
 }
 
-/* ── Info table (client info / application overview) ── */
+/* ── Info table ── */
 .info-table {
   width: 100%;
   border-collapse: collapse;
@@ -585,13 +574,8 @@ body {
   margin-bottom: 4mm;
 }
 
-.info-table tr:nth-child(odd) td {
-  background: #f5f3ee;
-}
-
-.info-table tr:nth-child(even) td {
-  background: #ffffff;
-}
+.info-table tr:nth-child(odd) td  { background: #f5f3ee; }
+.info-table tr:nth-child(even) td { background: #ffffff; }
 
 .info-table td {
   padding: 2.5mm 4mm;
@@ -607,12 +591,25 @@ body {
   white-space: nowrap;
 }
 
-.info-table td:last-child {
-  color: #2c2c2c;
+.info-table td:last-child { color: #2c2c2c; }
+
+.info-table tr:last-child td { border-bottom: 1.5px solid #b4965a; }
+
+/* ── Executive Summary blocks ── */
+.summary-block {
+  border-left: 3px solid #b4965a;
+  padding-left: 4mm;
+  margin-bottom: 4mm;
 }
 
-.info-table tr:last-child td {
-  border-bottom: 1.5px solid #b4965a;
+.summary-heading {
+  display: block;
+  font-size: 8pt;
+  font-weight: bold;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #b4965a;
+  margin-bottom: 1.5mm;
 }
 
 /* ── Feasibility scale ── */
@@ -680,6 +677,7 @@ body {
   display: block;
   overflow: hidden;
   margin-bottom: 4mm;
+  clear: both;
 }
 
 .risk-card {
@@ -689,20 +687,14 @@ body {
   border-radius: 2px;
   overflow: hidden;
   break-inside: avoid;
+  page-break-inside: avoid;
 }
 
-.risk-card:last-child {
-  margin-right: 0;
-}
+.risk-card:last-child { margin-right: 0; }
 
-.risk-card-accent {
-  height: 3px;
-  display: block;
-}
+.risk-card-accent { height: 3px; display: block; }
 
-.risk-card-body {
-  padding: 3mm 3.5mm;
-}
+.risk-card-body { padding: 3mm 3.5mm; }
 
 .risk-card-aspect {
   font-size: 6.5pt;
@@ -724,27 +716,20 @@ body {
   margin-bottom: 2mm;
 }
 
-.risk-note {
-  font-size: 7pt;
-  line-height: 1.45;
-  display: block;
-}
+.risk-note { font-size: 7pt; line-height: 1.45; display: block; }
 
-/* Risk: High */
 .risk-high .risk-card-accent  { background: #8b2500; }
 .risk-high .risk-card-body    { background: #fff3f0; }
 .risk-high .risk-card-aspect  { color: #8b2500; }
 .risk-high .risk-badge        { background: #8b2500; }
 .risk-high .risk-note         { color: #6b3028; }
 
-/* Risk: Moderate */
 .risk-moderate .risk-card-accent { background: #8a6800; }
 .risk-moderate .risk-card-body   { background: #fffbee; }
 .risk-moderate .risk-card-aspect { color: #8a6800; }
 .risk-moderate .risk-badge       { background: #8a6800; }
 .risk-moderate .risk-note        { color: #6b5420; }
 
-/* Risk: Low */
 .risk-low .risk-card-accent  { background: #2e7d52; }
 .risk-low .risk-card-body    { background: #f2faf5; }
 .risk-low .risk-card-aspect  { color: #2e7d52; }
@@ -778,10 +763,7 @@ body {
 
 .score-table tr:nth-child(odd) td  { background: #f5f3ee; }
 .score-table tr:nth-child(even) td { background: #ffffff; }
-
-.score-table tr:last-child td {
-  border-bottom: 1.5px solid #b4965a;
-}
+.score-table tr:last-child td      { border-bottom: 1.5px solid #b4965a; }
 
 .score-pill {
   display: inline-block;
@@ -797,19 +779,17 @@ body {
 .score-pill.low      { background: #2e7d52; }
 .score-pill.na       { background: #7a8a9a; }
 
-/* ── Considerations (numbered list) ── */
+/* ── Considerations ── */
 .consideration {
   break-inside: avoid;
+  page-break-inside: avoid;
   margin-bottom: 4mm;
   padding-bottom: 4mm;
   border-bottom: 0.5px solid #ddd6c8;
   display: block;
 }
 
-.consideration:last-child {
-  border-bottom: none;
-  margin-bottom: 0;
-}
+.consideration:last-child { border-bottom: none; margin-bottom: 0; }
 
 .consideration-number {
   font-size: 7pt;
@@ -843,6 +823,8 @@ body {
   padding: 5mm 6mm;
   display: block;
   margin-bottom: 4mm;
+  break-inside: avoid;
+  page-break-inside: avoid;
 }
 
 .recommendation-text {
@@ -870,7 +852,7 @@ body {
   display: block;
 }
 
-/* ── Signature / issuance block ── */
+/* ── Signature block ── */
 .sig-table {
   width: 100%;
   border-collapse: collapse;
@@ -899,51 +881,13 @@ body {
   color: #17263c;
 }
 
-.sig-table .sig-values .gold-text {
-  color: #b4965a;
-}
-
-/* ── Executive Summary blocks ── */
-.summary-block {
-  border-left: 3px solid #b4965a;
-  padding-left: 4mm;
-  margin-bottom: 4mm;
-}
-
-.summary-heading {
-  display: block;
-  font-size: 8pt;
-  font-weight: bold;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: #b4965a;
-  margin-bottom: 1.5mm;
-}
+.sig-table .sig-values .gold-text { color: #b4965a; }
 
 /* ── Utility ── */
-.clearfix::after {
-  content: '';
-  display: table;
-  clear: both;
-}
-
+.clearfix::after { content: ''; display: table; clear: both; }
 .gold-text  { color: #b4965a; }
 .navy-text  { color: #17263c; }
 .muted-text { color: #9a9088; }
-
-.mt-2 { margin-top: 2mm; }
-.mt-4 { margin-top: 4mm; }
-.mt-6 { margin-top: 6mm; }
-.mb-2 { margin-bottom: 2mm; }
-.mb-4 { margin-bottom: 4mm; }
-
-.section,
-.risk-card,
-.consideration,
-.recommendation-box {
-  page-break-inside: avoid;
-  break-inside: avoid;
-}
 
 </style>
 </head>
@@ -955,50 +899,51 @@ body {
 ═══════════════════════════════════════════════════════ -->
 <div class="page cover">
 
-  <div class="cover-header">
-    <span class="cover-brand">FairVia™</span>
-    <span class="cover-service">Technical Advisory Services &nbsp;|&nbsp; Il Nautico Co., Ltd.</span>
-  </div>
-  <div class="cover-gold-rule"></div>
+  <div class="cover-inner">
+    <div class="cover-header">
+      <span class="cover-brand">FairVia™</span>
+      <span class="cover-service">Technical Advisory Services &nbsp;|&nbsp; Il Nautico Co., Ltd.</span>
+    </div>
+    <div class="cover-gold-rule"></div>
 
-  <div class="cover-main">
-    <span class="cover-report-type">Material Feasibility Screening Report</span>
-    <span class="cover-title">Material &amp; Processing<br>Feasibility Screening</span>
-    <span class="cover-subtitle">Material Transition Decision Brief</span>
-    <span class="cover-divider"></span>
+    <div class="cover-main">
+      <span class="cover-report-type">Material Feasibility Screening Report</span>
+      <span class="cover-title">Material &amp; Processing<br>Feasibility Screening</span>
+      <span class="cover-subtitle">Material Transition Decision Brief</span>
+      <span class="cover-divider"></span>
 
-    <div class="cover-client-box">
-      <span class="cover-client-label">Prepared for</span>
-      <span class="cover-client-name">{{client_name}}</span>
-      <span class="cover-client-detail"><strong>Company:</strong> {{client_company}}</span>
-      <span class="cover-client-detail"><strong>Country:</strong> {{client_country}}</span>
+      <div class="cover-client-box">
+        <span class="cover-client-label">Prepared for</span>
+        <span class="cover-client-name">{{client_name}}</span>
+        <span class="cover-client-detail"><strong>Company:</strong> {{client_company}}</span>
+        <span class="cover-client-detail"><strong>Country:</strong> {{client_country}}</span>
+      </div>
+
+      <div class="cover-meta-grid">
+        <div class="cover-meta-row">
+          <span class="cover-meta-label">Report No.</span>
+          <span class="cover-meta-value">{{report_id}}</span>
+        </div>
+        <div class="cover-meta-row">
+          <span class="cover-meta-label">Date Issued</span>
+          <span class="cover-meta-value">{{report_date}}</span>
+        </div>
+        <div class="cover-meta-row">
+          <span class="cover-meta-label">Document Type</span>
+          <span class="cover-meta-value">Preliminary Screening — Strategic Advisory</span>
+        </div>
+        <div class="cover-meta-row">
+          <span class="cover-meta-label">Classification</span>
+          <span class="cover-meta-value">Strictly Confidential</span>
+        </div>
+      </div>
     </div>
 
-    <div class="cover-meta-grid">
-      <div class="cover-meta-row">
-        <span class="cover-meta-label">Report No.</span>
-        <span class="cover-meta-value">{{report_id}}</span>
-      </div>
-      <div class="cover-meta-row">
-        <span class="cover-meta-label">Date Issued</span>
-        <span class="cover-meta-value">{{report_date}}</span>
-      </div>
-      <div class="cover-meta-row">
-        <span class="cover-meta-label">Document Type</span>
-        <span class="cover-meta-value">Preliminary Screening — Strategic Advisory</span>
-      </div>
-      <div class="cover-meta-row">
-        <span class="cover-meta-label">Classification</span>
-        <span class="cover-meta-value">Strictly Confidential</span>
-      </div>
+    <div class="cover-badge-area">
+      <span class="cover-badge-label">Overall Feasibility Assessment</span>
+      <span class="cover-badge {{feasibility_class}}">&#11044;&nbsp; {{feasibility_level}}</span>
     </div>
-  </div>
-
-  <div class="cover-badge-area">
-    <span class="cover-badge-label">Overall Feasibility Assessment</span>
-    <!-- Set class to: level-low / level-moderate / level-high -->
-    <span class="cover-badge {{feasibility_class}}">&#11044;&nbsp; {{feasibility_level}}</span>
-  </div>
+  </div><!-- /cover-inner -->
 
   <div class="cover-footer">
     <span class="cover-footer-left">© Il Nautico Co., Ltd. — FairVia™ Technical Advisory</span>
@@ -1013,78 +958,71 @@ body {
 ═══════════════════════════════════════════════════════ -->
 <div class="page content">
 
-  <div class="page-header">
-    <span class="page-header-left">FairVia™ &nbsp;|&nbsp; Technical Advisory Services</span>
-    <span class="page-header-right">Strictly Confidential</span>
-  </div>
-  <div class="page-header-gold"></div>
-
-  <div class="page-body">
-
-    <!-- Section: Client Information -->
-    <div class="section">
-      <span class="section-label">Section 1</span>
-      <span class="section-title">Client Information &amp; Application Overview</span>
-      <div class="section-rule-full"></div>
-
-      <table class="info-table">
-        <tr><td>Application</td>          <td>{{application}}</td></tr>
-        <tr><td>Current Material</td>     <td>{{current_material}}</td></tr>
-        <tr><td>Processing Method</td>    <td>{{processing_method}}</td></tr>
-        <tr><td>Target Material</td>      <td>{{bio_material}}</td></tr>
-        <tr><td>Processing Equipment</td> <td>{{equipment}}</td></tr>
-        <tr><td>Production Scale</td>     <td>{{production_scale}}</td></tr>
-        <tr><td>Project Objective</td>    <td>{{project_stage}}</td></tr>
-      </table>
+    <div class="page-header">
+      <span class="page-header-left">FairVia™ &nbsp;|&nbsp; Technical Advisory Services</span>
+      <span class="page-header-right">Strictly Confidential</span>
     </div>
+    <div class="page-header-gold"></div>
 
-    <!-- Section: Executive Summary -->
-    <div class="section">
-      <span class="section-label">Section 2</span>
-      <span class="section-title">Executive Summary</span>
-      <div class="section-rule-full"></div>
+    <div class="page-body">
 
-      <div class="summary-block">
-        <span class="summary-heading">Overview</span>
-        <p class="body-text">{{executive_summary_overview}}</p>
+      <div class="section">
+        <span class="section-label">Section 1</span>
+        <span class="section-title">Client Information &amp; Application Overview</span>
+        <div class="section-rule-full"></div>
+        <table class="info-table">
+          <tr><td>Application</td>          <td>{{application}}</td></tr>
+          <tr><td>Current Material</td>     <td>{{current_material}}</td></tr>
+          <tr><td>Processing Method</td>    <td>{{processing_method}}</td></tr>
+          <tr><td>Target Material</td>      <td>{{bio_material}}</td></tr>
+          <tr><td>Processing Equipment</td> <td>{{equipment}}</td></tr>
+          <tr><td>Production Scale</td>     <td>{{production_scale}}</td></tr>
+          <tr><td>Project Objective</td>    <td>{{project_stage}}</td></tr>
+          <tr><td>Submission Reference</td> <td>{{submission_reference}}</td></tr>
+        </table>
       </div>
-      <div class="summary-block">
-        <span class="summary-heading">Key Findings</span>
-        <p class="body-text">{{executive_summary_findings}}</p>
-      </div>
-      <div class="summary-block">
-        <span class="summary-heading">Assessment Conclusion</span>
-        <p class="body-text">{{executive_summary_conclusion}}</p>
-      </div>
-    </div>
 
-    <!-- Section: Feasibility Level -->
-    <div class="section">
-      <span class="section-label">Section 3</span>
-      <span class="section-title">Feasibility Level</span>
-      <div class="section-rule-full"></div>
-
-      <div class="feasibility-scale">
-        <span class="feasibility-scale-label">Feasibility Level</span>
-
-        <div class="feasibility-row inactive">
-          <span class="feasibility-dot"></span>
-          <span class="feasibility-text">LOW</span>
+      <div class="section">
+        <span class="section-label">Section 2</span>
+        <span class="section-title">Executive Summary</span>
+        <div class="section-rule-full"></div>
+        <div class="summary-block">
+          <span class="summary-heading">Overview</span>
+          <p class="body-text">{{executive_summary_overview}}</p>
         </div>
-        <div class="feasibility-row active">
-          <span class="feasibility-dot"></span>
-          <span class="feasibility-text">{{feasibility_level}}</span>
+        <div class="summary-block">
+          <span class="summary-heading">Key Findings</span>
+          <p class="body-text">{{executive_summary_findings}}</p>
         </div>
-        <div class="feasibility-row inactive">
-          <span class="feasibility-dot"></span>
-          <span class="feasibility-text">HIGH</span>
+        <div class="summary-block">
+          <span class="summary-heading">Assessment Conclusion</span>
+          <p class="body-text">{{executive_summary_conclusion}}</p>
         </div>
       </div>
 
-      <p class="body-text">{{feasibility_explanation}}</p>
-    </div>
+      <div class="section">
+        <span class="section-label">Section 3</span>
+        <span class="section-title">Feasibility Level</span>
+        <div class="section-rule-full"></div>
+        <div class="feasibility-scale">
+          <span class="feasibility-scale-label">Feasibility Level</span>
+          <div class="feasibility-row inactive">
+            <span class="feasibility-dot"></span>
+            <span class="feasibility-text">LOW</span>
+          </div>
+          <div class="feasibility-row active">
+            <span class="feasibility-dot"></span>
+            <span class="feasibility-text">{{feasibility_level}}</span>
+          </div>
+          <div class="feasibility-row inactive">
+            <span class="feasibility-dot"></span>
+            <span class="feasibility-text">HIGH</span>
+          </div>
+        </div>
+        <p class="body-text">{{feasibility_explanation}}</p>
+      </div>
 
-  </div><!-- /page-body -->
+    </div><!-- /page-body -->
 
   <div class="page-footer">
     <div class="page-footer-gold"></div>
@@ -1102,103 +1040,95 @@ body {
 ═══════════════════════════════════════════════════════ -->
 <div class="page content">
 
-  <div class="page-header">
-    <span class="page-header-left">FairVia™ &nbsp;|&nbsp; Technical Advisory Services</span>
-    <span class="page-header-right">Strictly Confidential</span>
-  </div>
-  <div class="page-header-gold"></div>
+    <div class="page-header">
+      <span class="page-header-left">FairVia™ &nbsp;|&nbsp; Technical Advisory Services</span>
+      <span class="page-header-right">Strictly Confidential</span>
+    </div>
+    <div class="page-header-gold"></div>
 
-  <div class="page-body">
+    <div class="page-body">
 
-    <!-- Section: Risk Indicator -->
-    <div class="section">
-      <span class="section-label">Technical Risk Indicator</span>
-      <span class="section-title">Risk Profile Summary</span>
-      <div class="section-rule-full"></div>
-
-      <div class="risk-grid clearfix">
-
-        <div class="risk-card {{thermal_risk_class}}">
-          <span class="risk-card-accent"></span>
-          <div class="risk-card-body">
-            <span class="risk-card-aspect">Thermal Stability</span>
-            <span class="risk-badge">{{thermal_risk}}</span>
-            <span class="risk-note">{{thermal_note}}</span>
+      <div class="section">
+        <span class="section-label">Technical Risk Indicator</span>
+        <span class="section-title">Risk Profile Summary</span>
+        <div class="section-rule-full"></div>
+        <div class="risk-grid clearfix">
+          <div class="risk-card {{thermal_risk_class}}">
+            <span class="risk-card-accent"></span>
+            <div class="risk-card-body">
+              <span class="risk-card-aspect">Thermal Stability</span>
+              <span class="risk-badge">{{thermal_risk}}</span>
+              <span class="risk-note">{{thermal_note}}</span>
+            </div>
+          </div>
+          <div class="risk-card {{processing_risk_class}}">
+            <span class="risk-card-accent"></span>
+            <div class="risk-card-body">
+              <span class="risk-card-aspect">Processing Behaviour</span>
+              <span class="risk-badge">{{processing_risk}}</span>
+              <span class="risk-note">{{processing_note}}</span>
+            </div>
+          </div>
+          <div class="risk-card {{equipment_risk_class}}">
+            <span class="risk-card-accent"></span>
+            <div class="risk-card-body">
+              <span class="risk-card-aspect">Equipment Compatibility</span>
+              <span class="risk-badge">{{equipment_risk}}</span>
+              <span class="risk-note">{{equipment_note}}</span>
+            </div>
           </div>
         </div>
-
-        <div class="risk-card {{processing_risk_class}}">
-          <span class="risk-card-accent"></span>
-          <div class="risk-card-body">
-            <span class="risk-card-aspect">Processing Behaviour</span>
-            <span class="risk-badge">{{processing_risk}}</span>
-            <span class="risk-note">{{processing_note}}</span>
-          </div>
-        </div>
-
-        <div class="risk-card {{equipment_risk_class}}">
-          <span class="risk-card-accent"></span>
-          <div class="risk-card-body">
-            <span class="risk-card-aspect">Equipment Compatibility</span>
-            <span class="risk-badge">{{equipment_risk}}</span>
-            <span class="risk-note">{{equipment_note}}</span>
-          </div>
-        </div>
-
       </div>
-    </div>
 
-    <!-- Section: Score Table -->
-    <div class="section">
-      <span class="section-label">Section 4</span>
-      <span class="section-title">Risk Band &amp; Score Summary</span>
-      <div class="section-rule-full"></div>
+      <div class="section">
+        <span class="section-label">Section 4</span>
+        <span class="section-title">Risk Band &amp; Score Summary</span>
+        <div class="section-rule-full"></div>
+        <table class="score-table">
+          <thead>
+            <tr>
+              <th>Evaluation Area</th>
+              <th>Assessment</th>
+              <th>Risk Level</th>
+              <th>Notes</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Thermal Stability</td>
+              <td>{{score_thermal_assessment}}</td>
+              <td><span class="score-pill {{score_thermal_class}}">{{score_thermal_level}}</span></td>
+              <td>{{score_thermal_note}}</td>
+            </tr>
+            <tr>
+              <td>Processing Behaviour</td>
+              <td>{{score_processing_assessment}}</td>
+              <td><span class="score-pill {{score_processing_class}}">{{score_processing_level}}</span></td>
+              <td>{{score_processing_note}}</td>
+            </tr>
+            <tr>
+              <td>Equipment Compatibility</td>
+              <td>{{score_equipment_assessment}}</td>
+              <td><span class="score-pill {{score_equipment_class}}">{{score_equipment_level}}</span></td>
+              <td>{{score_equipment_note}}</td>
+            </tr>
+            <tr>
+              <td>Material Certification</td>
+              <td>{{score_cert_assessment}}</td>
+              <td><span class="score-pill {{score_cert_class}}">{{score_cert_level}}</span></td>
+              <td>{{score_cert_note}}</td>
+            </tr>
+            <tr>
+              <td>End-of-Life Compliance</td>
+              <td>{{score_eol_assessment}}</td>
+              <td><span class="score-pill {{score_eol_class}}">{{score_eol_level}}</span></td>
+              <td>{{score_eol_note}}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
 
-      <table class="score-table">
-        <thead>
-          <tr>
-            <th>Evaluation Area</th>
-            <th>Assessment</th>
-            <th>Risk Level</th>
-            <th>Notes</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>Thermal Stability</td>
-            <td>{{score_thermal_assessment}}</td>
-            <td><span class="score-pill {{score_thermal_class}}">{{score_thermal_level}}</span></td>
-            <td>{{score_thermal_note}}</td>
-          </tr>
-          <tr>
-            <td>Processing Behaviour</td>
-            <td>{{score_processing_assessment}}</td>
-            <td><span class="score-pill {{score_processing_class}}">{{score_processing_level}}</span></td>
-            <td>{{score_processing_note}}</td>
-          </tr>
-          <tr>
-            <td>Equipment Compatibility</td>
-            <td>{{score_equipment_assessment}}</td>
-            <td><span class="score-pill {{score_equipment_class}}">{{score_equipment_level}}</span></td>
-            <td>{{score_equipment_note}}</td>
-          </tr>
-          <tr>
-            <td>Material Certification</td>
-            <td>{{score_cert_assessment}}</td>
-            <td><span class="score-pill {{score_cert_class}}">{{score_cert_level}}</span></td>
-            <td>{{score_cert_note}}</td>
-          </tr>
-          <tr>
-            <td>End-of-Life Compliance</td>
-            <td>{{score_eol_assessment}}</td>
-            <td><span class="score-pill {{score_eol_class}}">{{score_eol_level}}</span></td>
-            <td>{{score_eol_note}}</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-
-  </div><!-- /page-body -->
+    </div><!-- /page-body -->
 
   <div class="page-footer">
     <div class="page-footer-gold"></div>
@@ -1216,60 +1146,52 @@ body {
 ═══════════════════════════════════════════════════════ -->
 <div class="page content">
 
-  <div class="page-header">
-    <span class="page-header-left">FairVia™ &nbsp;|&nbsp; Technical Advisory Services</span>
-    <span class="page-header-right">Strictly Confidential</span>
-  </div>
-  <div class="page-header-gold"></div>
-
-  <div class="page-body">
-
-    <!-- Section: Technical Observations -->
-    <div class="section">
-      <span class="section-label">Section 5</span>
-      <span class="section-title">Key Technical Observations</span>
-      <div class="section-rule-full"></div>
-
-      <div class="consideration">
-        <span class="consideration-number">01</span>
-        <span class="consideration-title">{{obs_1_title}}</span>
-        <span class="consideration-body">{{obs_1_body}}</span>
-      </div>
-
-      <div class="consideration">
-        <span class="consideration-number">02</span>
-        <span class="consideration-title">{{obs_2_title}}</span>
-        <span class="consideration-body">{{obs_2_body}}</span>
-      </div>
-
-      <div class="consideration">
-        <span class="consideration-number">03</span>
-        <span class="consideration-title">{{obs_3_title}}</span>
-        <span class="consideration-body">{{obs_3_body}}</span>
-      </div>
+    <div class="page-header">
+      <span class="page-header-left">FairVia™ &nbsp;|&nbsp; Technical Advisory Services</span>
+      <span class="page-header-right">Strictly Confidential</span>
     </div>
+    <div class="page-header-gold"></div>
 
-    <!-- Section: Potential Risks -->
-    <div class="section">
-      <span class="section-label">Section 6</span>
-      <span class="section-title">Potential Risks</span>
-      <div class="section-rule-full"></div>
+    <div class="page-body">
 
-      <div class="consideration">
-        <span class="consideration-number">Risk 01</span>
-        <span class="consideration-title">{{risk_1_title}}</span>
-        <span class="consideration-body">{{risk_1_body}}</span>
+      <div class="section">
+        <span class="section-label">Section 5</span>
+        <span class="section-title">Key Technical Observations</span>
+        <div class="section-rule-full"></div>
+        <div class="consideration">
+          <span class="consideration-number">01</span>
+          <span class="consideration-title">{{obs_1_title}}</span>
+          <span class="consideration-body">{{obs_1_body}}</span>
+        </div>
+        <div class="consideration">
+          <span class="consideration-number">02</span>
+          <span class="consideration-title">{{obs_2_title}}</span>
+          <span class="consideration-body">{{obs_2_body}}</span>
+        </div>
+        <div class="consideration">
+          <span class="consideration-number">03</span>
+          <span class="consideration-title">{{obs_3_title}}</span>
+          <span class="consideration-body">{{obs_3_body}}</span>
+        </div>
       </div>
 
-      <div class="consideration">
-        <span class="consideration-number">Risk 02</span>
-        <span class="consideration-title">{{risk_2_title}}</span>
-        <span class="consideration-body">{{risk_2_body}}</span>
+      <div class="section">
+        <span class="section-label">Section 6</span>
+        <span class="section-title">Potential Risks</span>
+        <div class="section-rule-full"></div>
+        <div class="consideration">
+          <span class="consideration-number">Risk 01</span>
+          <span class="consideration-title">{{risk_1_title}}</span>
+          <span class="consideration-body">{{risk_1_body}}</span>
+        </div>
+        <div class="consideration">
+          <span class="consideration-number">Risk 02</span>
+          <span class="consideration-title">{{risk_2_title}}</span>
+          <span class="consideration-body">{{risk_2_body}}</span>
+        </div>
       </div>
 
-    </div>
-
-  </div><!-- /page-body -->
+    </div><!-- /page-body -->
 
   <div class="page-footer">
     <div class="page-footer-gold"></div>
@@ -1287,51 +1209,46 @@ body {
 ═══════════════════════════════════════════════════════ -->
 <div class="page content">
 
-  <div class="page-header">
-    <span class="page-header-left">FairVia™ &nbsp;|&nbsp; Technical Advisory Services</span>
-    <span class="page-header-right">Strictly Confidential</span>
-  </div>
-  <div class="page-header-gold"></div>
-
-  <div class="page-body">
-
-    <!-- Section: Suggested Next Step -->
-    <div class="section">
-      <span class="section-label">Section 7</span>
-      <span class="section-title">Suggested Next Step</span>
-      <div class="section-rule-full"></div>
-
-      <div class="recommendation-box">
-        <p class="recommendation-text">{{strategic_recommendation}}</p>
-      </div>
+    <div class="page-header">
+      <span class="page-header-left">FairVia™ &nbsp;|&nbsp; Technical Advisory Services</span>
+      <span class="page-header-right">Strictly Confidential</span>
     </div>
+    <div class="page-header-gold"></div>
 
-    <!-- Section: Disclaimer -->
-    <div class="section">
-      <span class="section-label">Section 8</span>
-      <span class="section-title">Professional Disclaimer</span>
-      <div class="section-rule-full"></div>
+    <div class="page-body">
 
-      <div class="disclaimer-box">
-        <p class="disclaimer-text">{{disclaimer}}</p>
+      <div class="section">
+        <span class="section-label">Section 7</span>
+        <span class="section-title">Suggested Next Step</span>
+        <div class="section-rule-full"></div>
+        <div class="recommendation-box">
+          <p class="recommendation-text">{{strategic_recommendation}}</p>
+        </div>
       </div>
-    </div>
 
-    <!-- Signature / Issuance block -->
-    <table class="sig-table">
-      <tr class="sig-header">
-        <td>Prepared by</td>
-        <td>Report Status</td>
-        <td>Date Issued</td>
-      </tr>
-      <tr class="sig-values">
-        <td>FairVia™ Technical Advisory</td>
-        <td class="gold-text">Preliminary — For Client Review</td>
-        <td>{{report_date}}</td>
-      </tr>
-    </table>
+      <div class="section">
+        <span class="section-label">Section 8</span>
+        <span class="section-title">Professional Disclaimer</span>
+        <div class="section-rule-full"></div>
+        <div class="disclaimer-box">
+          <p class="disclaimer-text">{{disclaimer}}</p>
+        </div>
+      </div>
 
-  </div><!-- /page-body -->
+      <table class="sig-table">
+        <tr class="sig-header">
+          <td>Prepared by</td>
+          <td>Report Status</td>
+          <td>Date Issued</td>
+        </tr>
+        <tr class="sig-values">
+          <td>FairVia™ Technical Advisory</td>
+          <td class="gold-text">Preliminary — For Client Review</td>
+          <td>{{report_date}}</td>
+        </tr>
+      </table>
+
+    </div><!-- /page-body -->
 
   <div class="page-footer">
     <div class="page-footer-gold"></div>
