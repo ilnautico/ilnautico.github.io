@@ -1,9 +1,193 @@
+import express from "express";
+import OpenAI from "openai";
+import { Resend } from "resend";
+import puppeteer from "puppeteer";
+
 /* =========================
-   ① HTMLテンプレ（ここに入れる）
+   ① 初期化（←ここが今回の事故ポイント）
 ========================= */
 
-const htmlTemplate = `
-<!DOCTYPE html>
+const app = express();
+app.use(express.json({ limit: "2mb" }));
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY
+});
+
+const resend = new Resend(process.env.RESEND_API_KEY);
+
+
+/* =========================
+   ② HTML変換エンジン
+========================= */
+
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+function injectHtml(template, data) {
+  let html = template;
+
+  const rawKeys = [
+    "feasibility_class",
+    "thermal_risk_class",
+    "processing_risk_class",
+    "equipment_risk_class",
+    "score_thermal_class",
+    "score_processing_class",
+    "score_equipment_class",
+    "score_cert_class",
+    "score_eol_class"
+  ];
+
+  // class系
+  rawKeys.forEach((key) => {
+    html = html.replace(
+      new RegExp(`{{\\s*${key}\\s*}}`, "g"),
+      data[key] || ""
+    );
+  });
+
+  // テキスト系
+  Object.keys(data).forEach((key) => {
+    if (rawKeys.includes(key)) return;
+
+    html = html.replace(
+      new RegExp(`{{\\s*${key}\\s*}}`, "g"),
+      escapeHtml(data[key] || "")
+    );
+  });
+
+  html = html.replace(/{{.*?}}/g, "");
+  html = html.replace(/undefined/g, "");
+
+  return html;
+}
+
+
+/* =========================
+   ③ ルート確認
+========================= */
+
+app.get("/", (req, res) => {
+  res.send("Server running");
+});
+
+app.get("/health", (req, res) => {
+  res.json({ status: "ok" });
+});
+
+
+/* =========================
+   ④ メイン処理
+========================= */
+
+app.post("/generate-report", async (req, res) => {
+  try {
+    const payload = req.body;
+    const fields = payload?.data?.fields || [];
+
+    // メール取得
+    const emailField = fields.find((f) => f?.type === "INPUT_EMAIL");
+    const email = emailField?.value || "";
+
+    if (!email) {
+      return res.status(400).json({ error: "EMAIL NOT FOUND" });
+    }
+
+    /* =========================
+       ▼ データ（仮）
+    ========================= */
+
+    const data = {
+      application: "Packaging",
+      current_material: "PE",
+      processing_method: "Injection",
+      bio_material: "PLA",
+      equipment: "Standard",
+      production_scale: "Medium",
+      project_stage: "Evaluation",
+
+      client_name: "Client",
+      client_company: "Company",
+      client_country: "Japan",
+
+      report_id: "FV-" + Date.now(),
+      report_date: new Date().toLocaleDateString(),
+
+      executive_summary_overview: "Overview text",
+      executive_summary_findings: "Key findings text",
+      executive_summary_conclusion: "Conclusion text",
+
+      feasibility_level: "MODERATE",
+      feasibility_class: "level-moderate",
+      feasibility_explanation: "Feasible with adjustments.",
+
+      thermal_risk: "Moderate",
+      thermal_risk_class: "risk-moderate",
+      thermal_note: "Monitor",
+
+      processing_risk: "Moderate",
+      processing_risk_class: "risk-moderate",
+      processing_note: "Tune",
+
+      equipment_risk: "Low",
+      equipment_risk_class: "risk-low",
+      equipment_note: "Compatible",
+
+      score_thermal_assessment: "Acceptable",
+      score_thermal_class: "moderate",
+      score_thermal_level: "Moderate",
+      score_thermal_note: "OK",
+
+      score_processing_assessment: "Adjustable",
+      score_processing_class: "moderate",
+      score_processing_level: "Moderate",
+      score_processing_note: "Tune",
+
+      score_equipment_assessment: "Compatible",
+      score_equipment_class: "low",
+      score_equipment_level: "Low",
+      score_equipment_note: "OK",
+
+      score_cert_assessment: "Pending",
+      score_cert_class: "na",
+      score_cert_level: "N/A",
+      score_cert_note: "-",
+
+      score_eol_assessment: "Compliant",
+      score_eol_class: "low",
+      score_eol_level: "Low",
+      score_eol_note: "OK",
+
+      obs_1_title: "Material Behavior",
+      obs_1_body: "Differences observed",
+
+      obs_2_title: "Processing Impact",
+      obs_2_body: "Requires tuning",
+
+      obs_3_title: "Performance Trade-off",
+      obs_3_body: "Slight reduction",
+
+      risk_1_title: "Cost Increase",
+      risk_1_body: "Higher cost",
+
+      risk_2_title: "Stability Risk",
+      risk_2_body: "Needs control",
+
+      strategic_recommendation: "Pilot test recommended",
+      disclaimer: "Advisory only"
+    };
+
+    /* =========================
+       ▼ HTML（ここにあなたのHTML入れる）
+    ========================= */
+
+    const htmlTemplate = `
+    <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -1155,72 +1339,60 @@ body {
 
 </body>
 </html>
-`;
+    `;
+
+    const html = injectHtml(htmlTemplate, data);
+
+    /* =========================
+       ▼ PDF生成
+    ========================= */
+
+    const browser = await puppeteer.launch({
+      args: ["--no-sandbox"]
+    });
+
+    const page = await browser.newPage();
+    await page.setContent(html, { waitUntil: "networkidle0" });
+
+    const pdf = await page.pdf({
+      format: "A4",
+      printBackground: true
+    });
+
+    await browser.close();
+
+    /* =========================
+       ▼ メール送信
+    ========================= */
+
+    await resend.emails.send({
+      from: "info@ilnautico.com",
+      to: email,
+      subject: "Your Report",
+      html: "<p>Attached</p>",
+      attachments: [
+        {
+          filename: "report.pdf",
+          content: pdf.toString("base64")
+        }
+      ]
+    });
+
+    res.send("OK");
+
+  } catch (err) {
+    console.error("ERROR:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
 
 
 /* =========================
-   ② HTML変換エンジン（触らない）
+   ⑤ サーバー起動
 ========================= */
 
-function escapeHtml(str) {
-  return String(str)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
-}
+const PORT = process.env.PORT || 8080;
 
-function injectHtml(template, data) {
-  let html = template;
-
-  const rawKeys = [
-    "feasibility_class",
-    "thermal_risk_class",
-    "processing_risk_class",
-    "equipment_risk_class",
-    "score_thermal_class",
-    "score_processing_class",
-    "score_equipment_class",
-    "score_cert_class",
-    "score_eol_class"
-  ];
-
-  // class置換
-  rawKeys.forEach((key) => {
-    html = html.replace(
-      new RegExp(`{{\\s*${key}\\s*}}`, "g"),
-      data[key] || ""
-    );
-  });
-
-  // 通常テキスト置換
-  Object.keys(data).forEach((key) => {
-    if (rawKeys.includes(key)) return;
-
-    html = html.replace(
-      new RegExp(`{{\\s*${key}\\s*}}`, "g"),
-      escapeHtml(data[key] || "")
-    );
-  });
-
-  // 未置換削除
-  html = html.replace(/{{.*?}}/g, "");
-
-  // undefined削除
-  html = html.replace(/undefined/g, "");
-
-  return html;
-}
-
-
-/* =========================
-   ③ 実行（ここだけ使う）
-========================= */
-
-const html = injectHtml(htmlTemplate, data);
-
-
-/* =========================
-   ④ デバッグ（1回だけ）
-========================= */
-
-// console.log(html);
+app.listen(PORT, "0.0.0.0", () => {
+  console.log("Server running on port " + PORT);
+});
