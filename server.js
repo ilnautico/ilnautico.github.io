@@ -23,72 +23,26 @@ function escapeHtml(str = "") {
     .replace(/>/g, "&gt;");
 }
 
-/* 🔥 シンプル正規化（確定） */
-function normalizeFieldValue(field) {
-  if (!field) return "";
-  return String(field.value || "").toLowerCase();
-}
-
 /* =========================
-   🔥 完全一致抽出（これが最終）
+   🔥 フィールド取得（確定版）
 ========================= */
 
-function extractFromText(text) {
-
-  return {
-    processingMethod:
-      text.includes("blow molding") ? "Blow molding" :
-      text.includes("injection molding") ? "Injection molding" :
-      text.includes("film extrusion") ? "Film extrusion" :
-      text.includes("thermoforming") ? "Thermoforming" :
-      "Not specified",
-
-    currentMaterial:
-      text.includes("pet") ? "PET" :
-      text.includes("pp") ? "PP" :
-      text.includes("pe") ? "PE" :
-      text.includes("pla") ? "PLA" :
-      text.includes("pbat") ? "PBAT" :
-      "Not specified",
-
-    bioMaterial:
-      text.includes("starch-based materials") ? "Starch-based materials" :
-      text.includes("pla-based materials") ? "PLA-based materials" :
-      text.includes("pha-based materials") ? "PHA-based materials" :
-      "Not specified",
-
-    productionScale:
-      text.includes("laboratory evaluation") ? "Laboratory evaluation" :
-      text.includes("pilot trial") ? "Pilot trial" :
-      text.includes("small-scale production") ? "Small-scale production" :
-      text.includes("commercial production") ? "Commercial production" :
-      "Not specified",
-
-    projectStage:
-      text.includes("early research") ? "Early research" :
-      text.includes("evaluating materials") ? "Evaluating materials" :
-      text.includes("planning pilot trials") ? "Planning pilot trials" :
-      text.includes("preparing production") ? "Preparing production" :
-      "Preliminary evaluation stage",
-
-    equipment:
-      text.includes("standard plastic processing equipment") ? "Standard plastic processing equipment" :
-      text.includes("partially modified") ? "Equipment partially modified" :
-      text.includes("dedicated biodegradable line") ? "Dedicated biodegradable line" :
-      text.includes("new equipment planned") ? "New equipment planned" :
-      "Standard processing equipment (assumed)"
-  };
-}
-
-/* =========================
-   顧客情報
-========================= */
-
-function getByKeyword(fields, keyword) {
-  const f = fields.find(f =>
+function getField(fields, keyword) {
+  return fields.find(f =>
     (f.label || "").toLowerCase().includes(keyword)
   );
-  return f ? String(f.value || "").trim() : "";
+}
+
+function getValue(fields, keyword) {
+  const f = getField(fields, keyword);
+  if (!f) return "";
+
+  const v = f.value;
+
+  if (typeof v === "string") return v;
+  if (typeof v === "object" && v !== null) return v.label || v.value || "";
+
+  return "";
 }
 
 /* =========================
@@ -96,11 +50,14 @@ function getByKeyword(fields, keyword) {
 ========================= */
 
 function inferApplication(text) {
-  if (text.includes("film")) return "Flexible Packaging Film";
-  if (text.includes("mulch")) return "Agricultural Film";
-  if (text.includes("rigid")) return "Rigid Packaging";
-  if (text.includes("injection")) return "Injection Molded Product";
-  if (text.includes("blow")) return "Blow Molded Product";
+  const t = text.toLowerCase();
+
+  if (t.includes("film")) return "Flexible Packaging Film";
+  if (t.includes("mulch")) return "Agricultural Film";
+  if (t.includes("rigid")) return "Rigid Packaging";
+  if (t.includes("injection")) return "Injection Molded Product";
+  if (t.includes("blow")) return "Blow Molded Product";
+
   return "General Plastic Application";
 }
 
@@ -130,23 +87,28 @@ app.post("/generate-report", async (req, res) => {
     const emailField = fields.find(f => f.type === "INPUT_EMAIL");
     const email = emailField?.value;
 
-    if (!email) return res.status(400).json({ error: "EMAIL NOT FOUND" });
+    if (!email) {
+      return res.status(400).json({ error: "EMAIL NOT FOUND" });
+    }
 
-    /* 🔥 全入力まとめ */
+    /* =========================
+       🔥 顧客情報（確実取得）
+    ========================= */
 
-    const rawText = fields
-      .map(f => normalizeFieldValue(f))
-      .join(" ");
+    const clientName = getValue(fields, "name") || "—";
+    const clientCompany = getValue(fields, "company") || "—";
+    const clientCountry = getValue(fields, "country") || "—";
 
-    /* 🔥 顧客情報 */
+    /* =========================
+       🔥 フォーム値（完全一致取得）
+    ========================= */
 
-    const clientName = getByKeyword(fields, "name") || "—";
-    const clientCompany = getByKeyword(fields, "company") || "—";
-    const clientCountry = getByKeyword(fields, "country") || "—";
-
-    /* 🔥 抽出 */
-
-    const extracted = extractFromText(rawText);
+    const processing = getValue(fields, "processing method");
+    const currentMaterial = getValue(fields, "current material");
+    const bioMaterial = getValue(fields, "target material");
+    const productionScale = getValue(fields, "production scale");
+    const projectStage = getValue(fields, "project stage");
+    const equipment = getValue(fields, "equipment");
 
     /* =========================
        DATA
@@ -157,14 +119,14 @@ app.post("/generate-report", async (req, res) => {
       client_company: clientCompany,
       client_country: clientCountry,
 
-      application: inferApplication(rawText),
+      application: inferApplication(processing || ""),
 
-      current_material: extracted.currentMaterial,
-      bio_material: extracted.bioMaterial,
-      processing_method: extracted.processingMethod,
-      production_scale: extracted.productionScale,
-      project_stage: extracted.projectStage,
-      equipment: extracted.equipment,
+      current_material: currentMaterial || "Not specified",
+      bio_material: bioMaterial || "Not specified",
+      processing_method: processing || "Not specified",
+      production_scale: productionScale || "Not specified",
+      project_stage: projectStage || "Preliminary evaluation stage",
+      equipment: equipment || "Standard processing equipment (assumed)",
 
       submission_reference: "Initial screening input",
 
