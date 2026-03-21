@@ -23,7 +23,7 @@ function escapeHtml(str = "") {
     .replace(/>/g, "&gt;");
 }
 
-/* 🔥 完全normalize */
+/* 🔥 完全対応 normalize（最終） */
 function normalizeFieldValue(field) {
   if (!field) return "";
 
@@ -32,84 +32,41 @@ function normalizeFieldValue(field) {
   if (typeof v === "string") return v.toLowerCase();
 
   if (typeof v === "object" && v !== null) {
-    return [
-      v.label,
-      v.value,
-      JSON.stringify(v)
-    ].join(" ").toLowerCase();
+    return (v.label || v.value || "").toLowerCase();
   }
 
   if (Array.isArray(v)) {
-    return v.map(x =>
-      (x.label || x.value || JSON.stringify(x))
-    ).join(" ").toLowerCase();
+    return v.map(x => (x.label || x.value || "")).join(" ").toLowerCase();
   }
 
   return "";
 }
 
 /* =========================
-   🔥 同義語辞書（コア）
+   抽出ロジック（確定版）
 ========================= */
-
-const DICT = {
-  processing: {
-    blow: ["blow", "blow molding", "blow_molding"],
-    injection: ["injection", "injection molding"],
-    extrusion: ["extrusion", "extrude"]
-  },
-
-  material: {
-    pet: ["pet", "polyethylene terephthalate"],
-    pp: ["pp", "polypropylene"],
-    pe: ["pe", "polyethylene"]
-  },
-
-  bio: {
-    starch: ["starch", "starch-based"],
-    pla: ["pla"],
-    pha: ["pha"]
-  },
-
-  scale: {
-    small: ["small", "small-scale"],
-    medium: ["medium"],
-    large: ["large"]
-  },
-
-  stage: {
-    pilot: ["pilot"],
-    planning: ["planning"],
-    trial: ["trial"]
-  }
-};
-
-/* =========================
-   抽出ロジック
-========================= */
-
-function findMatch(text, dict, fallback) {
-  for (const key in dict) {
-    for (const p of dict[key]) {
-      if (text.includes(p)) return key;
-    }
-  }
-  return fallback;
-}
 
 function extractFromText(text) {
+
+  const pick = (patterns, fallback) => {
+    for (const p of patterns) {
+      if (text.includes(p)) return p;
+    }
+    return fallback;
+  };
+
   return {
-    processingMethod: findMatch(text, DICT.processing, "Not specified"),
-    currentMaterial: findMatch(text, DICT.material, "Not specified"),
-    bioMaterial: findMatch(text, DICT.bio, "Not specified"),
-    productionScale: findMatch(text, DICT.scale, "Not specified"),
-    projectStage: findMatch(text, DICT.stage, "Preliminary evaluation stage"),
+    processingMethod: pick(["blow", "injection", "extrusion"], "Not specified"),
+    currentMaterial: pick(["pet", "pp", "pe", "ps"], "Not specified"),
+    bioMaterial: pick(["starch", "pla", "pha", "biodegradable"], "Not specified"),
+    productionScale: pick(["small", "medium", "large"], "Not specified"),
+    projectStage: pick(["pilot", "planning", "trial"], "Preliminary evaluation stage"),
     equipment: "Standard processing equipment (assumed)"
   };
 }
 
 /* =========================
-   顧客情報取得
+   顧客情報
 ========================= */
 
 function getByKeyword(fields, keyword) {
@@ -160,7 +117,7 @@ app.post("/generate-report", async (req, res) => {
 
     if (!email) return res.status(400).json({ error: "EMAIL NOT FOUND" });
 
-    /* 🔥 全入力統合 */
+    /* 🔥 全テキスト化 */
 
     const rawText = fields
       .map(f => normalizeFieldValue(f))
