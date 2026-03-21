@@ -23,27 +23,14 @@ function escapeHtml(str = "") {
     .replace(/>/g, "&gt;");
 }
 
-/* 🔥 完全対応 normalize（最終） */
+/* 🔥 シンプル正規化（Tally対応） */
 function normalizeFieldValue(field) {
   if (!field) return "";
-
-  const v = field.value;
-
-  if (typeof v === "string") return v.toLowerCase();
-
-  if (typeof v === "object" && v !== null) {
-    return (v.label || v.value || "").toLowerCase();
-  }
-
-  if (Array.isArray(v)) {
-    return v.map(x => (x.label || x.value || "")).join(" ").toLowerCase();
-  }
-
-  return "";
+  return String(field.value || "").toLowerCase();
 }
 
 /* =========================
-   抽出ロジック（確定版）
+   抽出ロジック（フォーム完全対応）
 ========================= */
 
 function extractFromText(text) {
@@ -56,12 +43,35 @@ function extractFromText(text) {
   };
 
   return {
-    processingMethod: pick(["blow", "injection", "extrusion"], "Not specified"),
-    currentMaterial: pick(["pet", "pp", "pe", "ps"], "Not specified"),
-    bioMaterial: pick(["starch", "pla", "pha", "biodegradable"], "Not specified"),
-    productionScale: pick(["small", "medium", "large"], "Not specified"),
-    projectStage: pick(["pilot", "planning", "trial"], "Preliminary evaluation stage"),
-    equipment: "Standard processing equipment (assumed)"
+    processingMethod: pick(
+      ["blow molding", "injection molding", "film extrusion", "thermoforming"],
+      "Not specified"
+    ),
+
+    currentMaterial: pick(
+      ["pet", "pp", "pe", "pla", "pbat"],
+      "Not specified"
+    ),
+
+    bioMaterial: pick(
+      ["starch-based", "pla-based", "pha-based"],
+      "Not specified"
+    ),
+
+    productionScale: pick(
+      ["laboratory", "pilot", "small-scale", "commercial"],
+      "Not specified"
+    ),
+
+    projectStage: pick(
+      ["early research", "evaluating", "planning pilot", "preparing"],
+      "Preliminary evaluation stage"
+    ),
+
+    equipment: pick(
+      ["standard plastic processing", "modified", "dedicated", "new equipment"],
+      "Standard processing equipment (assumed)"
+    )
   };
 }
 
@@ -117,7 +127,7 @@ app.post("/generate-report", async (req, res) => {
 
     if (!email) return res.status(400).json({ error: "EMAIL NOT FOUND" });
 
-    /* 🔥 全テキスト化 */
+    /* 🔥 全入力統合 */
 
     const rawText = fields
       .map(f => normalizeFieldValue(f))
@@ -231,7 +241,7 @@ app.post("/generate-report", async (req, res) => {
        HTML
     ========================= */
 
-    const htmlTemplate = `<!DOCTYPE html>
+    const htmlTemplate =`<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -1299,7 +1309,7 @@ body {
 
 
 </body>
-</html>`;
+</html> `;
 
     const html = injectHtml(htmlTemplate, data);
 
