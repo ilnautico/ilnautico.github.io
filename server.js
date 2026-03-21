@@ -1,14 +1,9 @@
 import express from "express";
-import OpenAI from "openai";
 import { Resend } from "resend";
 import puppeteer from "puppeteer";
 
 const app = express();
 app.use(express.json({ limit: "2mb" }));
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
-});
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -47,10 +42,6 @@ function getValue(fields, keywords) {
   return normalizeFieldValue(f);
 }
 
-/* =========================
-   🔥 Application推測（最重要）
-========================= */
-
 function inferApplication(product, method) {
   const text = (product + " " + method).toLowerCase();
 
@@ -63,35 +54,10 @@ function inferApplication(product, method) {
   return "General Plastic Application";
 }
 
-/* =========================
-   HTML Inject
-========================= */
-
 function injectHtml(template, data) {
   let html = template;
 
-  const rawKeys = [
-    "feasibility_class",
-    "thermal_risk_class",
-    "processing_risk_class",
-    "equipment_risk_class",
-    "score_thermal_class",
-    "score_processing_class",
-    "score_equipment_class",
-    "score_cert_class",
-    "score_eol_class"
-  ];
-
-  rawKeys.forEach(key => {
-    html = html.replace(
-      new RegExp(`{{\\s*${key}\\s*}}`, "g"),
-      data[key] || ""
-    );
-  });
-
   Object.keys(data).forEach(key => {
-    if (rawKeys.includes(key)) return;
-
     html = html.replace(
       new RegExp(`{{\\s*${key}\\s*}}`, "g"),
       escapeHtml(data[key] || "")
@@ -109,6 +75,8 @@ function injectHtml(template, data) {
 ========================= */
 
 app.post("/generate-report", async (req, res) => {
+  let browser;
+
   try {
     const fields = req.body?.data?.fields || [];
 
@@ -117,8 +85,6 @@ app.post("/generate-report", async (req, res) => {
     );
 
     if (!email) return res.status(400).json({ error: "EMAIL NOT FOUND" });
-
-    /* ===== フォーム取得 ===== */
 
     const clientName = getValue(fields, [["name"]]);
     const clientCompany = getValue(fields, [["company"]]);
@@ -129,22 +95,7 @@ app.post("/generate-report", async (req, res) => {
     const bioMaterial = getValue(fields, [["biodegradable"],["target","material"]]);
     const processingMethod = getValue(fields, [["processing","method"]]);
 
-    /* ===== 自動補完 ===== */
-
     const application = inferApplication(product, processingMethod);
-
-    /* ===== Executive Summary（完全整形） ===== */
-
-    const overview =
-      "This report provides an initial technical assessment of biodegradable material compatibility.";
-
-    const findings =
-      "The evaluation indicates moderate compatibility with potential adjustments required in processing and material handling.";
-
-    const conclusion =
-      "A pilot validation is recommended prior to full-scale implementation.";
-
-    /* ===== DATA ===== */
 
     const data = {
       client_name: clientName || "—",
@@ -152,46 +103,19 @@ app.post("/generate-report", async (req, res) => {
       client_country: clientCountry || "—",
 
       application,
-      product,
-      current_material: currentMaterial,
-      bio_material: bioMaterial,
-      processing_method: processingMethod,
-
-      report_id: "FV-" + Date.now(),
-      report_date: new Date().toLocaleDateString(),
-
-      executive_summary_overview: overview,
-      executive_summary_findings: findings,
-      executive_summary_conclusion: conclusion,
+      current_material: currentMaterial || "Not specified",
+      bio_material: bioMaterial || "Not specified",
+      processing_method: processingMethod || "Not specified",
 
       feasibility_level: "MODERATE",
-      feasibility_class: "level-moderate",
-      feasibility_explanation: "Feasible with adjustments.",
 
-      thermal_risk: "Moderate",
-      thermal_risk_class: "risk-moderate",
-
-      processing_risk: "Moderate",
-      processing_risk_class: "risk-moderate",
-
-      equipment_risk: "Low",
-      equipment_risk_class: "risk-low",
-
-      score_thermal_class: "moderate",
-      score_processing_class: "moderate",
-      score_equipment_class: "low",
-
-      obs_1_title: "Material Behavior",
-      obs_1_body: "Material behavior differs from conventional plastics under standard processing conditions.",
-
-      risk_1_title: "Processing Stability",
-      risk_1_body: "Stability may vary depending on processing temperature and residence time.",
-
-      strategic_recommendation: "Conduct pilot-scale validation before full implementation.",
-      disclaimer: "This report is advisory only."
+      executive_summary_overview:
+        "This report provides an initial technical assessment of biodegradable material compatibility."
     };
 
-    /* ===== HTML（あなたのHTML貼る場所） ===== */
+    /* =========================
+       HTML（完全閉じ）
+    ========================= */
 
     const htmlTemplate = `
 <!DOCTYPE html>
@@ -1267,21 +1191,37 @@ body {
 
     const html = injectHtml(htmlTemplate, data);
 
-    /* ===== PDF ===== */
+    /* ===== Puppeteer ===== */
 
-    const browser = await puppeteer.launch({ args: ["--no-sandbox"] });
+    browser = await puppeteer.launch({
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-gpu"
+      ]
+    });
+
     const page = await browser.newPage();
 
-    await page.setContent(html, { waitUntil: "networkidle0" });
+    await page.setContent(html, { waitUntil: "domcontentloaded" });
+    await page.emulateMediaType("screen");
 
     const pdf = await page.pdf({
       format: "A4",
-      printBackground: true
+      printBackground: true,
+      preferCSSPageSize: true,
+      margin: {
+        top: "0mm",
+        bottom: "0mm",
+        left: "0mm",
+        right: "0mm"
+      }
     });
 
     await browser.close();
 
-    /* ===== EMAIL ===== */
+    /* ===== Email ===== */
 
     await resend.emails.send({
       from: "FairVia <info@ilnautico.com>",
@@ -1291,7 +1231,7 @@ body {
       attachments: [
         {
           filename: "report.pdf",
-          content: pdf.toString("base64")
+          content: pdf
         }
       ]
     });
