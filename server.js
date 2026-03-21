@@ -23,68 +23,83 @@ function escapeHtml(str = "") {
     .replace(/>/g, "&gt;");
 }
 
-/* 🔥 最重要修正 */
 function normalizeFieldValue(field) {
   if (!field) return "";
 
-  const v = field.value;
+  try {
+    const v = field.value;
 
-  if (typeof v === "string") return v;
+    if (typeof v === "string") return v;
+    if (typeof v === "number") return String(v);
+    if (typeof v === "boolean") return v ? "yes" : "no";
 
-  if (typeof v === "object" && v !== null) {
-    return Object.values(v).join(" ");
+    if (Array.isArray(v)) {
+      return v.map(x => JSON.stringify(x)).join(" ");
+    }
+
+    if (typeof v === "object" && v !== null) {
+      return JSON.stringify(v);
+    }
+
+    return "";
+  } catch {
+    return "";
   }
-
-  if (Array.isArray(v)) {
-    return v.map(x => Object.values(x || {}).join(" ")).join(" ");
-  }
-
-  if (typeof v === "boolean") return v ? "Yes" : "No";
-
-  return "";
 }
 
 /* =========================
-   抽出ロジック（安定版）
+   🔥 完全意味抽出（最終版）
 ========================= */
 
-function extractSmart(fields) {
-  const raw = fields
-    .map(f => normalizeFieldValue(f))
-    .join(" ")
-    .toLowerCase();
+function extractFromText(text) {
 
-  const pick = (keywords) => {
-    for (const k of keywords) {
-      if (raw.includes(k)) return k;
+  const pick = (patterns, fallback) => {
+    for (const p of patterns) {
+      if (text.includes(p)) return p;
     }
-    return "";
+    return fallback;
   };
 
   return {
-    processingMethod: pick(["blow molding", "blow", "injection", "extrusion"]),
-    currentMaterial: pick(["pet", "pp", "pe", "ps"]),
-    bioMaterial: pick(["starch", "pla", "pha", "biodegradable"]),
-    productionScale: pick(["small-scale", "small", "medium", "large"]),
-    projectStage: pick(["planning", "pilot", "trial"]),
-    equipment: pick(["standard", "equipment", "machine"])
+    processingMethod: pick(
+      ["blow molding", "injection molding", "extrusion"],
+      "Not specified"
+    ),
+
+    currentMaterial: pick(
+      ["pet", "pp", "pe", "ps"],
+      "Not specified"
+    ),
+
+    bioMaterial: pick(
+      ["starch-based", "pla", "pha", "biodegradable"],
+      "Not specified"
+    ),
+
+    productionScale: pick(
+      ["small-scale", "medium-scale", "large-scale"],
+      "Not specified"
+    ),
+
+    projectStage: pick(
+      ["pilot", "planning", "trial"],
+      "Preliminary evaluation stage"
+    ),
+
+    equipment: "Standard processing equipment (assumed)"
   };
 }
 
-function formatText(str, fallback) {
-  if (!str) return fallback;
-  return str.charAt(0).toUpperCase() + str.slice(1);
-}
+/* =========================
+   補助
+========================= */
 
-function inferApplication(product, method) {
-  const text = (product + " " + method).toLowerCase();
-
+function inferApplication(text) {
   if (text.includes("film")) return "Flexible Packaging Film";
   if (text.includes("mulch")) return "Agricultural Film";
   if (text.includes("rigid")) return "Rigid Packaging";
   if (text.includes("injection")) return "Injection Molded Product";
   if (text.includes("blow")) return "Blow Molded Product";
-
   return "General Plastic Application";
 }
 
@@ -92,10 +107,9 @@ function injectHtml(template, data) {
   let html = template;
 
   Object.keys(data).forEach(key => {
-    const value = data[key] ?? "";
     html = html.replace(
       new RegExp(`{{\\s*${key}\\s*}}`, "g"),
-      escapeHtml(String(value))
+      escapeHtml(String(data[key] || ""))
     );
   });
 
@@ -111,46 +125,42 @@ function injectHtml(template, data) {
 
 app.post("/generate-report", async (req, res) => {
   try {
+
     const fields = req.body?.data?.fields || [];
 
-    const email = normalizeFieldValue(
-      fields.find(f => f.type === "INPUT_EMAIL")
-    );
+    const emailField = fields.find(f => f.type === "INPUT_EMAIL");
+    const email = normalizeFieldValue(emailField);
 
     if (!email) return res.status(400).json({ error: "EMAIL NOT FOUND" });
 
-    /* ===== 基本 ===== */
+    /* 🔥 全入力をテキスト化 */
 
-    const rawText = fields.map(f => normalizeFieldValue(f)).join(" ");
+    const rawText = fields
+      .map(f => normalizeFieldValue(f))
+      .join(" ")
+      .toLowerCase();
 
-    const clientName = rawText || "—";
-    const clientCompany = rawText.includes("eco") ? "EcoPack Solutions Inc." : "—";
-    const clientCountry = rawText.includes("japan") ? "Japan" : "—";
+    /* 🔥 意味抽出 */
 
-    const product = rawText;
+    const extracted = extractFromText(rawText);
 
-    /* ===== 抽出 ===== */
-
-    const smart = extractSmart(fields);
-
-    const application = inferApplication(product, smart.processingMethod);
-
-    /* ===== DATA ===== */
+    /* =========================
+       DATA
+    ========================= */
 
     const data = {
-      client_name: clientName,
-      client_company: clientCompany,
-      client_country: clientCountry,
+      client_name: "—",
+      client_company: "—",
+      client_country: "—",
 
-      application,
+      application: inferApplication(rawText),
 
-      current_material: formatText(smart.currentMaterial, "Not specified"),
-      bio_material: formatText(smart.bioMaterial, "Not specified"),
-      processing_method: formatText(smart.processingMethod, "Not specified"),
-      production_scale: formatText(smart.productionScale, "Not specified"),
-      project_stage: formatText(smart.projectStage, "Preliminary evaluation stage"),
-
-      equipment: formatText(smart.equipment, "Standard processing equipment (assumed)"),
+      current_material: extracted.currentMaterial,
+      bio_material: extracted.bioMaterial,
+      processing_method: extracted.processingMethod,
+      production_scale: extracted.productionScale,
+      project_stage: extracted.projectStage,
+      equipment: extracted.equipment,
 
       submission_reference: "Initial screening input",
 
@@ -172,7 +182,7 @@ app.post("/generate-report", async (req, res) => {
 
       thermal_risk: "Moderate",
       thermal_risk_class: "risk-moderate",
-      thermal_note: "Further validation recommended under controlled conditions",
+      thermal_note: "Further validation recommended",
 
       processing_risk: "Moderate",
       processing_risk_class: "risk-moderate",
@@ -194,23 +204,23 @@ app.post("/generate-report", async (req, res) => {
       score_cert_level: "N/A",
       score_eol_level: "N/A",
 
-      score_thermal_assessment: "Preliminary assessment based on available input data",
-      score_processing_assessment: "Initial evaluation under standard processing assumptions",
-      score_equipment_assessment: "Compatibility inferred from typical equipment configuration",
-      score_cert_assessment: "Certification status not yet verified",
-      score_eol_assessment: "End-of-life behaviour requires confirmation",
+      score_thermal_assessment: "Preliminary assessment",
+      score_processing_assessment: "Initial evaluation",
+      score_equipment_assessment: "Compatibility inferred",
+      score_cert_assessment: "Not verified",
+      score_eol_assessment: "Requires confirmation",
 
       score_thermal_note: "Further validation recommended",
-      score_processing_note: "Process optimization may be required",
-      score_equipment_note: "Further equipment-specific validation recommended",
-      score_cert_note: "Regulatory compliance review required",
+      score_processing_note: "Optimization may be required",
+      score_equipment_note: "Equipment validation recommended",
+      score_cert_note: "Compliance review required",
       score_eol_note: "Disposal evaluation required",
 
       obs_1_title: "Material Behaviour",
-      obs_1_body: "Material behaviour differs from conventional plastics.",
+      obs_1_body: "Material differs from conventional plastics.",
 
       obs_2_title: "Processing Adjustment",
-      obs_2_body: "Processing adjustments may be required.",
+      obs_2_body: "Adjustments may be required.",
 
       obs_3_title: "Performance Variability",
       obs_3_body: "Performance may vary.",
@@ -228,7 +238,9 @@ app.post("/generate-report", async (req, res) => {
         "Preliminary advisory only."
     };
 
-    /* ===== HTML ===== */
+    /* =========================
+       HTML
+    ========================= */
 
     const htmlTemplate = `<!DOCTYPE html>
 <html lang="en">
@@ -1302,7 +1314,9 @@ body {
 
     const html = injectHtml(htmlTemplate, data);
 
-    /* ===== PDF ===== */
+    /* =========================
+       PDF
+    ========================= */
 
     const browser = await puppeteer.launch({
       args: [
@@ -1324,7 +1338,9 @@ body {
 
     await browser.close();
 
-    /* ===== EMAIL ===== */
+    /* =========================
+       EMAIL
+    ========================= */
 
     await resend.emails.send({
       from: "FairVia <info@ilnautico.com>",
