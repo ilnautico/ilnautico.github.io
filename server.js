@@ -23,82 +23,100 @@ function escapeHtml(str = "") {
     .replace(/>/g, "&gt;");
 }
 
+/* 🔥 完全normalize */
 function normalizeFieldValue(field) {
   if (!field) return "";
 
-  try {
-    const v = field.value;
+  const v = field.value;
 
-    if (typeof v === "string") return v;
-    if (typeof v === "number") return String(v);
-    if (typeof v === "boolean") return v ? "yes" : "no";
+  if (typeof v === "string") return v.toLowerCase();
 
-    if (Array.isArray(v)) {
-      return v.map(x => JSON.stringify(x)).join(" ");
-    }
-
-    if (typeof v === "object" && v !== null) {
-      return JSON.stringify(v);
-    }
-
-    return "";
-  } catch {
-    return "";
+  if (typeof v === "object" && v !== null) {
+    return [
+      v.label,
+      v.value,
+      JSON.stringify(v)
+    ].join(" ").toLowerCase();
   }
+
+  if (Array.isArray(v)) {
+    return v.map(x =>
+      (x.label || x.value || JSON.stringify(x))
+    ).join(" ").toLowerCase();
+  }
+
+  return "";
 }
 
 /* =========================
-   🔥 キーワード抽出（完全安定版）
+   🔥 同義語辞書（コア）
 ========================= */
 
-function extractFromText(text) {
+const DICT = {
+  processing: {
+    blow: ["blow", "blow molding", "blow_molding"],
+    injection: ["injection", "injection molding"],
+    extrusion: ["extrusion", "extrude"]
+  },
 
-  const pick = (patterns, fallback) => {
-    for (const p of patterns) {
-      if (text.includes(p)) return p;
+  material: {
+    pet: ["pet", "polyethylene terephthalate"],
+    pp: ["pp", "polypropylene"],
+    pe: ["pe", "polyethylene"]
+  },
+
+  bio: {
+    starch: ["starch", "starch-based"],
+    pla: ["pla"],
+    pha: ["pha"]
+  },
+
+  scale: {
+    small: ["small", "small-scale"],
+    medium: ["medium"],
+    large: ["large"]
+  },
+
+  stage: {
+    pilot: ["pilot"],
+    planning: ["planning"],
+    trial: ["trial"]
+  }
+};
+
+/* =========================
+   抽出ロジック
+========================= */
+
+function findMatch(text, dict, fallback) {
+  for (const key in dict) {
+    for (const p of dict[key]) {
+      if (text.includes(p)) return key;
     }
-    return fallback;
-  };
+  }
+  return fallback;
+}
 
+function extractFromText(text) {
   return {
-    processingMethod: pick(
-      ["blow", "injection", "extrusion"],
-      "Not specified"
-    ),
-
-    currentMaterial: pick(
-      ["pet", "pp", "pe", "ps"],
-      "Not specified"
-    ),
-
-    bioMaterial: pick(
-      ["starch", "pla", "pha", "biodegradable"],
-      "Not specified"
-    ),
-
-    productionScale: pick(
-      ["small", "medium", "large"],
-      "Not specified"
-    ),
-
-    projectStage: pick(
-      ["pilot", "planning", "trial"],
-      "Preliminary evaluation stage"
-    ),
-
+    processingMethod: findMatch(text, DICT.processing, "Not specified"),
+    currentMaterial: findMatch(text, DICT.material, "Not specified"),
+    bioMaterial: findMatch(text, DICT.bio, "Not specified"),
+    productionScale: findMatch(text, DICT.scale, "Not specified"),
+    projectStage: findMatch(text, DICT.stage, "Preliminary evaluation stage"),
     equipment: "Standard processing equipment (assumed)"
   };
 }
 
 /* =========================
-   顧客情報取得（復活）
+   顧客情報取得
 ========================= */
 
 function getByKeyword(fields, keyword) {
   const f = fields.find(f =>
     (f.label || "").toLowerCase().includes(keyword)
   );
-  return normalizeFieldValue(f);
+  return f ? String(f.value || "").trim() : "";
 }
 
 /* =========================
@@ -125,8 +143,6 @@ function injectHtml(template, data) {
   });
 
   html = html.replace(/{{.*?}}/g, "");
-  html = html.replace(/undefined/g, "");
-
   return html;
 }
 
@@ -140,16 +156,15 @@ app.post("/generate-report", async (req, res) => {
     const fields = req.body?.data?.fields || [];
 
     const emailField = fields.find(f => f.type === "INPUT_EMAIL");
-    const email = normalizeFieldValue(emailField);
+    const email = emailField?.value;
 
     if (!email) return res.status(400).json({ error: "EMAIL NOT FOUND" });
 
-    /* 🔥 全入力まとめ */
+    /* 🔥 全入力統合 */
 
     const rawText = fields
       .map(f => normalizeFieldValue(f))
-      .join(" ")
-      .toLowerCase();
+      .join(" ");
 
     /* 🔥 顧客情報 */
 
@@ -157,7 +172,7 @@ app.post("/generate-report", async (req, res) => {
     const clientCompany = getByKeyword(fields, "company") || "—";
     const clientCountry = getByKeyword(fields, "country") || "—";
 
-    /* 🔥 意味抽出 */
+    /* 🔥 抽出 */
 
     const extracted = extractFromText(rawText);
 
