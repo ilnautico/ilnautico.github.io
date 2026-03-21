@@ -48,7 +48,7 @@ function normalizeFieldValue(field) {
 }
 
 /* =========================
-   🔥 完全意味抽出（最終版）
+   🔥 キーワード抽出（完全安定版）
 ========================= */
 
 function extractFromText(text) {
@@ -62,7 +62,7 @@ function extractFromText(text) {
 
   return {
     processingMethod: pick(
-      ["blow molding", "injection molding", "extrusion"],
+      ["blow", "injection", "extrusion"],
       "Not specified"
     ),
 
@@ -72,12 +72,12 @@ function extractFromText(text) {
     ),
 
     bioMaterial: pick(
-      ["starch-based", "pla", "pha", "biodegradable"],
+      ["starch", "pla", "pha", "biodegradable"],
       "Not specified"
     ),
 
     productionScale: pick(
-      ["small-scale", "medium-scale", "large-scale"],
+      ["small", "medium", "large"],
       "Not specified"
     ),
 
@@ -88,6 +88,17 @@ function extractFromText(text) {
 
     equipment: "Standard processing equipment (assumed)"
   };
+}
+
+/* =========================
+   顧客情報取得（復活）
+========================= */
+
+function getByKeyword(fields, keyword) {
+  const f = fields.find(f =>
+    (f.label || "").toLowerCase().includes(keyword)
+  );
+  return normalizeFieldValue(f);
 }
 
 /* =========================
@@ -133,12 +144,18 @@ app.post("/generate-report", async (req, res) => {
 
     if (!email) return res.status(400).json({ error: "EMAIL NOT FOUND" });
 
-    /* 🔥 全入力をテキスト化 */
+    /* 🔥 全入力まとめ */
 
     const rawText = fields
       .map(f => normalizeFieldValue(f))
       .join(" ")
       .toLowerCase();
+
+    /* 🔥 顧客情報 */
+
+    const clientName = getByKeyword(fields, "name") || "—";
+    const clientCompany = getByKeyword(fields, "company") || "—";
+    const clientCountry = getByKeyword(fields, "country") || "—";
 
     /* 🔥 意味抽出 */
 
@@ -149,9 +166,9 @@ app.post("/generate-report", async (req, res) => {
     ========================= */
 
     const data = {
-      client_name: "—",
-      client_company: "—",
-      client_country: "—",
+      client_name: clientName,
+      client_company: clientCompany,
+      client_country: clientCountry,
 
       application: inferApplication(rawText),
 
