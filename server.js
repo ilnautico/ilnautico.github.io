@@ -13,7 +13,7 @@ const openai = new OpenAI({
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 /* =========================
-   Utility
+   Utility（完全版）
 ========================= */
 
 function escapeHtml(str = "") {
@@ -23,33 +23,83 @@ function escapeHtml(str = "") {
     .replace(/>/g, "&gt;");
 }
 
+/* 🔥 完全対応 normalize */
 function normalizeFieldValue(field) {
   if (!field) return "";
-  if (typeof field.value === "string") return field.value;
-  if (typeof field.value === "boolean") return field.value ? "Yes" : "No";
+
+  const v = field.value;
+
+  if (typeof v === "string") return v;
+
+  if (typeof v === "number") return String(v);
+
+  if (typeof v === "boolean") return v ? "Yes" : "No";
+
+  if (Array.isArray(v)) {
+    return v.map(x => {
+      if (typeof x === "string") return x;
+      if (x?.label) return x.label;
+      if (x?.value) return x.value;
+      return "";
+    }).join(" ");
+  }
+
+  if (typeof v === "object" && v !== null) {
+    if (v.label) return v.label;
+    if (v.value) return v.value;
+  }
+
   return "";
 }
 
-function fieldLabel(field) {
-  return `${field?.label || ""} ${field?.key || ""}`.toLowerCase();
-}
+/* =========================
+   🔥 最強抽出（完全版）
+========================= */
 
-function findField(fields, keywords) {
-  return fields.find(f =>
-    keywords.some(group =>
-      group.every(k => fieldLabel(f).includes(k))
-    )
-  );
-}
+function extractSmart(fields) {
+  const values = fields
+    .map(f => normalizeFieldValue(f).toLowerCase())
+    .filter(v => v);
 
-function getValue(fields, keywords) {
-  const f = findField(fields, keywords);
-  return normalizeFieldValue(f);
+  const find = (keywords) => {
+    for (const v of values) {
+      if (keywords.some(k => v.includes(k))) {
+        return v;
+      }
+    }
+    return "";
+  };
+
+  return {
+    processingMethod: find([
+      "blow", "injection", "extrusion", "molding"
+    ]),
+    currentMaterial: find([
+      "pet", "pp", "pe", "ps"
+    ]),
+    bioMaterial: find([
+      "starch", "pla", "pha", "biodegradable"
+    ]),
+    productionScale: find([
+      "small", "medium", "large"
+    ]),
+    projectStage: find([
+      "pilot", "planning", "trial"
+    ]),
+    equipment: find([
+      "equipment", "machine", "extruder"
+    ])
+  };
 }
 
 /* =========================
-   Application推測
+   補助
 ========================= */
+
+function formatText(str, fallback) {
+  if (!str) return fallback;
+  return str.charAt(0).toUpperCase() + str.slice(1);
+}
 
 function inferApplication(product, method) {
   const text = (product + " " + method).toLowerCase();
@@ -99,51 +149,38 @@ app.post("/generate-report", async (req, res) => {
     if (!email) return res.status(400).json({ error: "EMAIL NOT FOUND" });
 
     /* =========================
-       🔥 フォーム取得（完全版）
+       基本情報
     ========================= */
 
-    const clientName = getValue(fields, [["name"]]);
-    const clientCompany = getValue(fields, [["company"]]);
-    const clientCountry = getValue(fields, [["country"]]);
+    const getByKeyword = (kw) => {
+      const f = fields.find(f =>
+        (f.label || "").toLowerCase().includes(kw)
+      );
+      return normalizeFieldValue(f);
+    };
 
-    const product = getValue(fields, [["product"]]);
+    const clientName = getByKeyword("name");
+    const clientCompany = getByKeyword("company");
+    const clientCountry = getByKeyword("country");
+    const product = getByKeyword("product");
 
-    const processingMethod = getValue(fields, [
-      ["processing","method"],
-      ["processing"],
-      ["method"]
-    ]);
+    /* =========================
+       🔥 スマート抽出
+    ========================= */
 
-    const currentMaterial = getValue(fields, [
-      ["current","material"],
-      ["current"]
-    ]);
+    const smart = extractSmart(fields);
 
-    const bioMaterial = getValue(fields, [
-      ["biodegradable"],
-      ["target","material"],
-      ["target"]
-    ]);
-
-    const equipment = getValue(fields, [
-      ["equipment"],
-      ["machine"]
-    ]);
-
-    const productionScale = getValue(fields, [
-      ["production","scale"],
-      ["scale"]
-    ]);
-
-    const projectStage = getValue(fields, [
-      ["project","stage"],
-      ["stage"]
-    ]);
+    const processingMethod = smart.processingMethod;
+    const currentMaterial = smart.currentMaterial;
+    const bioMaterial = smart.bioMaterial;
+    const productionScale = smart.productionScale;
+    const projectStage = smart.projectStage;
+    const equipment = smart.equipment;
 
     const application = inferApplication(product, processingMethod);
 
     /* =========================
-       DATA（完全補完）
+       DATA
     ========================= */
 
     const data = {
@@ -151,15 +188,16 @@ app.post("/generate-report", async (req, res) => {
       client_company: clientCompany || "—",
       client_country: clientCountry || "—",
 
-      application: application || "General plastic application",
-      product: product || "Not specified",
-      current_material: currentMaterial || "Not specified",
-      bio_material: bioMaterial || "Not specified",
-      processing_method: processingMethod || "Not specified",
+      application,
 
-      equipment: equipment || "Standard processing equipment (assumed)",
-      production_scale: productionScale || "Not specified",
-      project_stage: projectStage || "Preliminary evaluation stage",
+      current_material: formatText(currentMaterial, "Not specified"),
+      bio_material: formatText(bioMaterial, "Not specified"),
+      processing_method: formatText(processingMethod, "Not specified"),
+      production_scale: formatText(productionScale, "Not specified"),
+      project_stage: formatText(projectStage, "Preliminary evaluation stage"),
+
+      equipment: formatText(equipment, "Standard processing equipment (assumed)"),
+
       submission_reference: "Initial screening input",
 
       report_id: "FV-" + Date.now(),
@@ -238,7 +276,7 @@ app.post("/generate-report", async (req, res) => {
     };
 
     /* =========================
-       HTML（あなたのHTMLをここに）
+       HTML
     ========================= */
 
     const htmlTemplate = `<!DOCTYPE html>
