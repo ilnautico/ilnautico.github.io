@@ -1,9 +1,14 @@
 import express from "express";
+import OpenAI from "openai";
 import { Resend } from "resend";
 import puppeteer from "puppeteer";
 
 const app = express();
 app.use(express.json({ limit: "2mb" }));
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY
+});
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -42,6 +47,10 @@ function getValue(fields, keywords) {
   return normalizeFieldValue(f);
 }
 
+/* =========================
+   Application推測
+========================= */
+
 function inferApplication(product, method) {
   const text = (product + " " + method).toLowerCase();
 
@@ -54,13 +63,18 @@ function inferApplication(product, method) {
   return "General Plastic Application";
 }
 
+/* =========================
+   HTML Inject
+========================= */
+
 function injectHtml(template, data) {
   let html = template;
 
   Object.keys(data).forEach(key => {
+    const value = data[key] ?? "";
     html = html.replace(
       new RegExp(`{{\\s*${key}\\s*}}`, "g"),
-      escapeHtml(data[key] || "")
+      escapeHtml(String(value))
     );
   });
 
@@ -75,8 +89,6 @@ function injectHtml(template, data) {
 ========================= */
 
 app.post("/generate-report", async (req, res) => {
-  let browser;
-
   try {
     const fields = req.body?.data?.fields || [];
 
@@ -86,39 +98,150 @@ app.post("/generate-report", async (req, res) => {
 
     if (!email) return res.status(400).json({ error: "EMAIL NOT FOUND" });
 
+    /* =========================
+       🔥 フォーム取得（完全版）
+    ========================= */
+
     const clientName = getValue(fields, [["name"]]);
     const clientCompany = getValue(fields, [["company"]]);
     const clientCountry = getValue(fields, [["country"]]);
 
     const product = getValue(fields, [["product"]]);
-    const currentMaterial = getValue(fields, [["current","material"]]);
-    const bioMaterial = getValue(fields, [["biodegradable"],["target","material"]]);
-    const processingMethod = getValue(fields, [["processing","method"]]);
+
+    const processingMethod = getValue(fields, [
+      ["processing","method"],
+      ["processing"],
+      ["method"]
+    ]);
+
+    const currentMaterial = getValue(fields, [
+      ["current","material"],
+      ["current"]
+    ]);
+
+    const bioMaterial = getValue(fields, [
+      ["biodegradable"],
+      ["target","material"],
+      ["target"]
+    ]);
+
+    const equipment = getValue(fields, [
+      ["equipment"],
+      ["machine"]
+    ]);
+
+    const productionScale = getValue(fields, [
+      ["production","scale"],
+      ["scale"]
+    ]);
+
+    const projectStage = getValue(fields, [
+      ["project","stage"],
+      ["stage"]
+    ]);
 
     const application = inferApplication(product, processingMethod);
+
+    /* =========================
+       DATA（完全補完）
+    ========================= */
 
     const data = {
       client_name: clientName || "—",
       client_company: clientCompany || "—",
       client_country: clientCountry || "—",
 
-      application,
+      application: application || "General plastic application",
+      product: product || "Not specified",
       current_material: currentMaterial || "Not specified",
       bio_material: bioMaterial || "Not specified",
       processing_method: processingMethod || "Not specified",
 
-      feasibility_level: "MODERATE",
+      equipment: equipment || "Standard processing equipment (assumed)",
+      production_scale: productionScale || "Not specified",
+      project_stage: projectStage || "Preliminary evaluation stage",
+      submission_reference: "Initial screening input",
+
+      report_id: "FV-" + Date.now(),
+      report_date: new Date().toLocaleDateString(),
 
       executive_summary_overview:
-        "This report provides an initial technical assessment of biodegradable material compatibility."
+        "This report provides an initial technical assessment of biodegradable material compatibility.",
+
+      executive_summary_findings:
+        "The evaluation indicates moderate compatibility with potential adjustments required in processing and material handling.",
+
+      executive_summary_conclusion:
+        "A pilot validation is recommended prior to full-scale implementation.",
+
+      feasibility_level: "MODERATE",
+      feasibility_class: "level-moderate",
+      feasibility_explanation: "Feasible with adjustments.",
+
+      thermal_risk: "Moderate",
+      thermal_risk_class: "risk-moderate",
+      thermal_note: "Further validation recommended under controlled conditions",
+
+      processing_risk: "Moderate",
+      processing_risk_class: "risk-moderate",
+      processing_note: "Process optimization may be required",
+
+      equipment_risk: "Low",
+      equipment_risk_class: "risk-low",
+      equipment_note: "Further equipment-specific validation recommended",
+
+      score_thermal_class: "moderate",
+      score_thermal_level: "MODERATE",
+      score_thermal_assessment: "Preliminary assessment based on available input data",
+      score_thermal_note: "Further validation recommended under controlled conditions",
+
+      score_processing_class: "moderate",
+      score_processing_level: "MODERATE",
+      score_processing_assessment: "Initial evaluation under standard processing assumptions",
+      score_processing_note: "Process optimization may be required",
+
+      score_equipment_class: "low",
+      score_equipment_level: "LOW",
+      score_equipment_assessment: "Compatibility inferred from typical equipment configuration",
+      score_equipment_note: "Further equipment-specific validation recommended",
+
+      score_cert_class: "na",
+      score_cert_level: "N/A",
+      score_cert_assessment: "Certification status not yet verified",
+      score_cert_note: "Regulatory compliance review required",
+
+      score_eol_class: "na",
+      score_eol_level: "N/A",
+      score_eol_assessment: "End-of-life behaviour requires confirmation",
+      score_eol_note: "Disposal and degradation pathways should be evaluated",
+
+      obs_1_title: "Material Behaviour",
+      obs_1_body: "Material behaviour differs from conventional plastics under standard processing conditions.",
+
+      obs_2_title: "Processing Adjustment Consideration",
+      obs_2_body: "Material transition may require adjustments to processing parameters and operational conditions.",
+
+      obs_3_title: "Performance Variability",
+      obs_3_body: "Material performance may vary depending on environmental and processing conditions.",
+
+      risk_1_title: "Processing Stability",
+      risk_1_body: "Stability may vary depending on processing temperature and residence time.",
+
+      risk_2_title: "Equipment Interaction Risk",
+      risk_2_body: "Potential compatibility issues may arise between the material and existing equipment components.",
+
+      strategic_recommendation:
+        "It is recommended to conduct pilot-scale validation under controlled conditions prior to full-scale implementation.",
+
+      disclaimer:
+        "This report is based on preliminary information and does not constitute a full technical validation."
     };
 
     /* =========================
-       HTML（完全閉じ）
+       HTML（あなたのHTMLをここに）
     ========================= */
 
-    const htmlTemplate = `
-<!DOCTYPE html>
+    const htmlTemplate = `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -1186,14 +1309,15 @@ body {
 
 
 </body>
-</html>
-`;
+</html>`;
 
     const html = injectHtml(htmlTemplate, data);
 
-    /* ===== Puppeteer ===== */
+    /* =========================
+       PDF
+    ========================= */
 
-    browser = await puppeteer.launch({
+    const browser = await puppeteer.launch({
       args: [
         "--no-sandbox",
         "--disable-setuid-sandbox",
@@ -1204,24 +1328,19 @@ body {
 
     const page = await browser.newPage();
 
-    await page.setContent(html, { waitUntil: "domcontentloaded" });
-    await page.emulateMediaType("screen");
+    await page.setContent(html, { waitUntil: "networkidle0" });
 
     const pdf = await page.pdf({
       format: "A4",
       printBackground: true,
-      preferCSSPageSize: true,
-      margin: {
-        top: "0mm",
-        bottom: "0mm",
-        left: "0mm",
-        right: "0mm"
-      }
+      preferCSSPageSize: true
     });
 
     await browser.close();
 
-    /* ===== Email ===== */
+    /* =========================
+       EMAIL
+    ========================= */
 
     await resend.emails.send({
       from: "FairVia <info@ilnautico.com>",
@@ -1231,7 +1350,7 @@ body {
       attachments: [
         {
           filename: "report.pdf",
-          content: pdf
+          content: pdf.toString("base64")
         }
       ]
     });
