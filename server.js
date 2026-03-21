@@ -13,7 +13,7 @@ const openai = new OpenAI({
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 /* =========================
-   Utility
+   Utility（完全版）
 ========================= */
 
 function escapeHtml(str = "") {
@@ -23,26 +23,29 @@ function escapeHtml(str = "") {
     .replace(/>/g, "&gt;");
 }
 
-/* =========================
-   🔥 フィールド取得（確定版）
-========================= */
-
-function getField(fields, keyword) {
-  return fields.find(f =>
-    (f.label || "").toLowerCase().includes(keyword)
-  );
+/* 🔥 value完全対応（ここが重要） */
+function normalizeValue(v) {
+  if (!v) return "";
+  if (typeof v === "string") return v;
+  if (typeof v === "object") {
+    return v.label || v.value || "";
+  }
+  return "";
 }
 
+/* 🔥 label + key 両対応 */
+function matchField(f, keyword) {
+  const label = (f.label || "").toLowerCase();
+  const key = (f.key || "").toLowerCase();
+
+  return label.includes(keyword) || key.includes(keyword);
+}
+
+/* 🔥 完全取得（最終） */
 function getValue(fields, keyword) {
-  const f = getField(fields, keyword);
+  const f = fields.find(f => matchField(f, keyword));
   if (!f) return "";
-
-  const v = f.value;
-
-  if (typeof v === "string") return v;
-  if (typeof v === "object" && v !== null) return v.label || v.value || "";
-
-  return "";
+  return normalizeValue(f.value).trim();
 }
 
 /* =========================
@@ -85,41 +88,36 @@ app.post("/generate-report", async (req, res) => {
     const fields = req.body?.data?.fields || [];
 
     const emailField = fields.find(f => f.type === "INPUT_EMAIL");
-    const email = emailField?.value;
+    const email = normalizeValue(emailField?.value);
 
     if (!email) {
       return res.status(400).json({ error: "EMAIL NOT FOUND" });
     }
 
-    /* =========================
-       🔥 顧客情報（確実取得）
-    ========================= */
-
+    /* 🔥 顧客情報 */
     const clientName = getValue(fields, "name") || "—";
     const clientCompany = getValue(fields, "company") || "—";
     const clientCountry = getValue(fields, "country") || "—";
 
-    /* =========================
-       🔥 フォーム値（完全一致取得）
-    ========================= */
-
-    const processing = getValue(fields, "processing method");
-    const currentMaterial = getValue(fields, "current material");
-    const bioMaterial = getValue(fields, "target material");
-    const productionScale = getValue(fields, "production scale");
-    const projectStage = getValue(fields, "project stage");
+    /* 🔥 フォーム値（全部拾う） */
+    const processing = getValue(fields, "processing");
+    const currentMaterial = getValue(fields, "material");
+    const bioMaterial = getValue(fields, "target");
+    const productionScale = getValue(fields, "production");
+    const projectStage = getValue(fields, "project");
     const equipment = getValue(fields, "equipment");
 
-    /* =========================
-       DATA
-    ========================= */
+    /* 🔥 全文から補完（保険） */
+    const rawText = fields
+      .map(f => normalizeValue(f.value).toLowerCase())
+      .join(" ");
 
     const data = {
       client_name: clientName,
       client_company: clientCompany,
       client_country: clientCountry,
 
-      application: inferApplication(processing || ""),
+      application: inferApplication(rawText),
 
       current_material: currentMaterial || "Not specified",
       bio_material: bioMaterial || "Not specified",
@@ -205,7 +203,7 @@ app.post("/generate-report", async (req, res) => {
     };
 
     /* =========================
-       HTML
+       HTML（あなたのHTMLそのまま）
     ========================= */
 
     const htmlTemplate = `<!DOCTYPE html>
