@@ -1,4 +1,3 @@
-import express from "express";
 import OpenAI from "openai";
 import { Resend } from "resend";
 import puppeteer from "puppeteer";
@@ -1324,7 +1323,3 @@ body {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err.message });
-  }
-});
-
-app.listen(8080, () => console.log("Server running"));
