@@ -23,55 +23,60 @@ function escapeHtml(str = "") {
     .replace(/>/g, "&gt;");
 }
 
-/* 🔥 シンプル正規化（Tally対応） */
+/* 🔥 シンプル正規化（確定） */
 function normalizeFieldValue(field) {
   if (!field) return "";
   return String(field.value || "").toLowerCase();
 }
 
 /* =========================
-   抽出ロジック（フォーム完全対応）
+   🔥 完全一致抽出（これが最終）
 ========================= */
 
 function extractFromText(text) {
 
-  const pick = (patterns, fallback) => {
-    for (const p of patterns) {
-      if (text.includes(p)) return p;
-    }
-    return fallback;
-  };
-
   return {
-    processingMethod: pick(
-      ["blow molding", "injection molding", "film extrusion", "thermoforming"],
-      "Not specified"
-    ),
+    processingMethod:
+      text.includes("blow molding") ? "Blow molding" :
+      text.includes("injection molding") ? "Injection molding" :
+      text.includes("film extrusion") ? "Film extrusion" :
+      text.includes("thermoforming") ? "Thermoforming" :
+      "Not specified",
 
-    currentMaterial: pick(
-      ["pet", "pp", "pe", "pla", "pbat"],
-      "Not specified"
-    ),
+    currentMaterial:
+      text.includes("pet") ? "PET" :
+      text.includes("pp") ? "PP" :
+      text.includes("pe") ? "PE" :
+      text.includes("pla") ? "PLA" :
+      text.includes("pbat") ? "PBAT" :
+      "Not specified",
 
-    bioMaterial: pick(
-      ["starch-based", "pla-based", "pha-based"],
-      "Not specified"
-    ),
+    bioMaterial:
+      text.includes("starch-based materials") ? "Starch-based materials" :
+      text.includes("pla-based materials") ? "PLA-based materials" :
+      text.includes("pha-based materials") ? "PHA-based materials" :
+      "Not specified",
 
-    productionScale: pick(
-      ["laboratory", "pilot", "small-scale", "commercial"],
-      "Not specified"
-    ),
+    productionScale:
+      text.includes("laboratory evaluation") ? "Laboratory evaluation" :
+      text.includes("pilot trial") ? "Pilot trial" :
+      text.includes("small-scale production") ? "Small-scale production" :
+      text.includes("commercial production") ? "Commercial production" :
+      "Not specified",
 
-    projectStage: pick(
-      ["early research", "evaluating", "planning pilot", "preparing"],
-      "Preliminary evaluation stage"
-    ),
+    projectStage:
+      text.includes("early research") ? "Early research" :
+      text.includes("evaluating materials") ? "Evaluating materials" :
+      text.includes("planning pilot trials") ? "Planning pilot trials" :
+      text.includes("preparing production") ? "Preparing production" :
+      "Preliminary evaluation stage",
 
-    equipment: pick(
-      ["standard plastic processing", "modified", "dedicated", "new equipment"],
+    equipment:
+      text.includes("standard plastic processing equipment") ? "Standard plastic processing equipment" :
+      text.includes("partially modified") ? "Equipment partially modified" :
+      text.includes("dedicated biodegradable line") ? "Dedicated biodegradable line" :
+      text.includes("new equipment planned") ? "New equipment planned" :
       "Standard processing equipment (assumed)"
-    )
   };
 }
 
@@ -127,7 +132,7 @@ app.post("/generate-report", async (req, res) => {
 
     if (!email) return res.status(400).json({ error: "EMAIL NOT FOUND" });
 
-    /* 🔥 全入力統合 */
+    /* 🔥 全入力まとめ */
 
     const rawText = fields
       .map(f => normalizeFieldValue(f))
@@ -241,7 +246,7 @@ app.post("/generate-report", async (req, res) => {
        HTML
     ========================= */
 
-    const htmlTemplate =`<!DOCTYPE html>
+    const htmlTemplate = `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -1309,7 +1314,7 @@ body {
 
 
 </body>
-</html> `;
+</html>`;
 
     const html = injectHtml(htmlTemplate, data);
 
