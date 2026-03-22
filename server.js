@@ -66,7 +66,7 @@ app.post("/generate-report", async (req, res) => {
       return res.status(400).json({ error: "EMAIL NOT FOUND" });
     }
 
-    /* ===== 入力取得（重要）===== */
+    /* ===== 入力 ===== */
 
     const processing = getValue(fields, "processing");
     const currentMaterial = getValue(fields, "material");
@@ -76,7 +76,7 @@ app.post("/generate-report", async (req, res) => {
     const projectStage = getValue(fields, "project");
 
     /* =========================
-       GPT（最終完全版）
+       GPT 完全版
     ========================= */
 
     let parsed = null;
@@ -85,18 +85,39 @@ app.post("/generate-report", async (req, res) => {
 You are a senior polymer processing consultant writing a paid technical screening report.
 
 CRITICAL RULES:
-- You MUST provide a technical judgment
+- You MUST always give a technical judgment
 - NEVER say "insufficient data"
-- If data is missing → give conditional judgment
+- NEVER stop analysis
 
 STRICT DATA RULE:
-- DO NOT assume processing conditions (temperature, viscosity, extrusion, etc.)
+- DO NOT assume temperature, viscosity, extrusion issues
 - ONLY use given inputs
-- If missing → describe material-level behavior only
+- If missing → use material-level reasoning
 
-STYLE:
-- Cause → mechanism → impact
-- No vague language
+MANDATORY DECISION LOGIC:
+If data is incomplete:
+- Assume screening-level behavior
+- Identify most likely constraint
+- Give conditional feasibility
+
+You must write like:
+"At screening level, no fundamental incompatibility is identified, however..."
+
+STRUCTURE:
+
+1. Executive Summary
+- verdict
+- constraint
+- action
+
+2. Observations (3)
+- cause → mechanism → impact
+
+3. Risks (2)
+- cause → mechanism → production impact
+
+4. Feasibility
+- LOW / MODERATE / HIGH
 
 INPUT:
 Processing: ${processing || "unknown"}
@@ -111,7 +132,7 @@ Return JSON:
 "summary":"...",
 "findings":"...",
 "conclusion":"...",
-"feasibility":"LOW / MODERATE / HIGH",
+"feasibility":"...",
 "observations":[
 {"title":"...","body":"..."},
 {"title":"...","body":"..."},
@@ -143,9 +164,12 @@ Return JSON:
 
     if (!parsed) {
       parsed = {
-        summary: "No fundamental incompatibility identified.",
-        findings: "Process validation required.",
-        conclusion: "Proceed to pilot.",
+        summary:
+          "At screening level, no fundamental incompatibility is identified, however validation is required.",
+        findings:
+          "Material behavior must be confirmed through controlled testing.",
+        conclusion:
+          "Proceed to pilot validation.",
         feasibility: "MODERATE",
         observations: [],
         risks: []
@@ -172,20 +196,16 @@ Return JSON:
 
       feasibility_level: parsed.feasibility,
 
-      obs_1_title: obs[0]?.title || "",
       obs_1_body: obs[0]?.body || "",
-      obs_2_title: obs[1]?.title || "",
       obs_2_body: obs[1]?.body || "",
-      obs_3_title: obs[2]?.title || "",
       obs_3_body: obs[2]?.body || "",
 
-      risk_1_title: risks[0]?.title || "",
       risk_1_body: risks[0]?.body || "",
-      risk_2_title: risks[1]?.title || "",
       risk_2_body: risks[1]?.body || ""
     };
-        /* =========================
-       HTML（ネイビー版そのまま）
+
+/* =========================
+       HTML（ネイビー最終版）
     ========================= */
 
     const htmlTemplate = `
@@ -1257,20 +1277,16 @@ body {
 
 
 </body>
-</html>
-`;
+</html>`;
 
     const html = injectHtml(htmlTemplate, data);
-
-    /* =========================
-       PDF生成
-    ========================= */
 
     const browser = await puppeteer.launch({
       args: [
         "--no-sandbox",
         "--disable-setuid-sandbox",
-        "--disable-dev-shm-usage"
+        "--disable-dev-shm-usage",
+        "--disable-gpu"
       ]
     });
 
@@ -1279,19 +1295,16 @@ body {
 
     const pdf = await page.pdf({
       format: "A4",
-      printBackground: true
+      printBackground: true,
+      preferCSSPageSize: true
     });
 
     await browser.close();
 
-    /* =========================
-       メール送信
-    ========================= */
-
     await resend.emails.send({
       from: "FairVia <info@ilnautico.com>",
       to: email,
-      subject: "FairVia™ Technical Screening Report",
+      subject: "FairVia Report",
       html: "<p>Your report is attached.</p>",
       attachments: [
         {
