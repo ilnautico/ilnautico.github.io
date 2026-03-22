@@ -81,8 +81,7 @@ app.post("/generate-report", async (req, res) => {
 
     let parsed = null;
 
-    const prompt = `
-You are a senior polymer processing consultant writing a paid technical screening report.
+    const prompt = `You are a senior polymer processing consultant writing a paid technical screening report.
 
 CRITICAL RULES:
 - You MUST always give a technical judgment
@@ -118,6 +117,7 @@ STRUCTURE:
 
 4. Feasibility
 - LOW / MODERATE / HIGH
+
 
 INPUT:
 Processing: ${processing || "unknown"}
