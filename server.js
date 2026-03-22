@@ -78,7 +78,7 @@ app.post("/generate-report", async (req, res) => {
     const equipment = getValue(fields, "equipment");
 
     /* =========================
-       🔥 最終プロンプト
+       🔥 最終プロンプト（Claude統合）
     ========================= */
 
     let parsed = null;
@@ -86,15 +86,40 @@ app.post("/generate-report", async (req, res) => {
     try {
 
       const prompt = `
-You are a senior polymer processing consultant with direct industrial experience in film extrusion, injection molding, and biodegradable material integration.
+You are a senior polymer processing consultant writing a paid technical screening report.
 
-Your task is to produce a technical screening report for engineering and production decision-makers.
+STRICT RULES:
 
-STRICT REQUIREMENTS:
-- Avoid generic wording
-- Each observation must include cause, mechanism, and production impact
-- Always link to equipment and process
-- Use real engineering terminology
+1. Executive Summary
+- First sentence = verdict
+- Second sentence = primary constraint
+- Third sentence = required action
+- No descriptive intro
+
+2. Observations
+Each must include:
+- phenomenon
+- cause
+- mechanism
+- production impact
+
+3. Risks
+Each must include:
+- cause
+- mechanism
+- production impact
+- max 3 sentences
+- no "may", "could", "might"
+
+4. Feasibility
+- include constraint
+- include upgrade condition
+- NOT production approval
+
+5. Tone
+- assertive
+- technical
+- consultant-level
 
 Return JSON:
 
@@ -113,12 +138,13 @@ Return JSON:
 ]
 }
 
-Processing Method: ${processing}
-Current Material: ${currentMaterial}
-Target Material: ${bioMaterial}
+INPUT:
+Processing: ${processing}
+Material: ${currentMaterial}
+Target: ${bioMaterial}
 Equipment: ${equipment}
-Production Scale: ${productionScale}
-Project Stage: ${projectStage}
+Scale: ${productionScale}
+Stage: ${projectStage}
 `;
 
       const ai = await openai.chat.completions.create({
@@ -138,22 +164,22 @@ Project Stage: ${projectStage}
     }
 
     /* =========================
-       FALLBACK（安全）
+       FALLBACK
     ========================= */
 
     if (!parsed || !parsed.observations || parsed.observations.length < 3) {
       parsed = {
-        summary: "Preliminary technical screening.",
-        findings: "Further validation required.",
-        conclusion: "Proceed to pilot testing.",
+        summary: "Transition is technically achievable, subject to process qualification.",
+        findings: "Thermal processing window is the primary constraint.",
+        conclusion: "Pilot validation is required before production commitment.",
         observations: [
-          { title: "Material Behaviour", body: "Material differences require evaluation." },
-          { title: "Processing Conditions", body: "Process conditions differ from standard plastics." },
-          { title: "Performance Impact", body: "Material performance may change in production." }
+          { title: "Material Behaviour", body: "Material properties differ due to composition, affecting processing stability." },
+          { title: "Thermal Processing", body: "Thermal degradation risk exists due to narrow processing window." },
+          { title: "Equipment Interaction", body: "Standard equipment may not ensure consistent dispersion and stability." }
         ],
         risks: [
-          { title: "Processing Risk", body: "Processing instability may occur." },
-          { title: "Equipment Risk", body: "Equipment compatibility should be verified." }
+          { title: "Thermal Instability", body: "Processing beyond stable temperature leads to degradation and performance loss." },
+          { title: "Processing Variability", body: "Rheological mismatch causes inconsistent flow and product defects." }
         ]
       };
     }
@@ -162,7 +188,7 @@ Project Stage: ${projectStage}
     const risks = parsed.risks || [];
 
     /* =========================
-       DATA
+       🔥 Not処理（完全版）
     ========================= */
 
     const data = {
@@ -170,14 +196,14 @@ Project Stage: ${projectStage}
       client_company: "—",
       client_country: "—",
 
-      application: processing,
+      application: processing || "General polymer application (assumed)",
 
-      current_material: currentMaterial || "Not specified",
-      bio_material: bioMaterial || "Not specified",
-      processing_method: processing || "Not specified",
-      production_scale: productionScale || "Not specified",
-      project_stage: projectStage || "Preliminary",
-      equipment: equipment || "Standard",
+      current_material: currentMaterial || "Not specified (assumed conventional polymer baseline)",
+      bio_material: bioMaterial || "Not specified (assumed biodegradable compound)",
+      processing_method: processing || "Not specified (assumed standard extrusion or molding process)",
+      production_scale: productionScale || "Not specified (assumed pilot or small-scale evaluation)",
+      project_stage: projectStage || "Preliminary evaluation stage",
+      equipment: equipment || "Standard processing equipment (single-screw or general-purpose system assumed)",
 
       report_id: "FV-" + Date.now(),
       report_date: new Date().toLocaleDateString(),
@@ -201,12 +227,12 @@ Project Stage: ${projectStage}
       risk_2_title: risks[1]?.title || "",
       risk_2_body: risks[1]?.body || "",
 
-      strategic_recommendation: "Proceed to pilot validation.",
-      disclaimer: "Preliminary advisory only."
+      strategic_recommendation: "Proceed to controlled pilot validation.",
+      disclaimer: "This assessment is based on submitted information and assumed conditions. No physical testing performed."
     };
 
     /* =========================
-       HTML（ここだけ自分の入れる）
+       HTML
     ========================= */
 
     const htmlTemplate = `<!DOCTYPE html>
