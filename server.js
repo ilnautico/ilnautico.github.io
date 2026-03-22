@@ -78,7 +78,7 @@ app.post("/generate-report", async (req, res) => {
     const equipment = getValue(fields, "equipment");
 
     /* =========================
-       🔥 最終プロンプト（Claude統合）
+       GPT（捏造防止版）
     ========================= */
 
     let parsed = null;
@@ -86,40 +86,40 @@ app.post("/generate-report", async (req, res) => {
     try {
 
       const prompt = `
-You are a senior polymer processing consultant writing a paid technical screening report.
+You are a senior polymer processing consultant writing a paid preliminary screening report.
 
-STRICT RULES:
+You are NOT allowed to invent equipment defects or plant problems.
 
-1. Executive Summary
-- First sentence = verdict
-- Second sentence = primary constraint
-- Third sentence = required action
-- No descriptive intro
+INPUT:
+Processing: ${processing || "Not specified"}
+Material: ${currentMaterial || "Not specified"}
+Target: ${bioMaterial || "Not specified"}
+Equipment: ${equipment || "Not specified"}
+Scale: ${productionScale || "Not specified"}
+Stage: ${projectStage || "Not specified"}
 
-2. Observations
-Each must include:
+RULES:
+- If data is missing → state conditional assessment
+- Do NOT fabricate problems
+- Only infer what is technically reasonable
+- No generic wording
+
+Executive Summary:
+- sentence 1: verdict
+- sentence 2: main constraint
+- sentence 3: action
+
+Observations:
 - phenomenon
 - cause
 - mechanism
-- production impact
+- impact
 
-3. Risks
-Each must include:
+Risks:
 - cause
 - mechanism
 - production impact
 - max 3 sentences
-- no "may", "could", "might"
-
-4. Feasibility
-- include constraint
-- include upgrade condition
-- NOT production approval
-
-5. Tone
-- assertive
-- technical
-- consultant-level
 
 Return JSON:
 
@@ -137,14 +137,6 @@ Return JSON:
 {"title":"...","body":"..."}
 ]
 }
-
-INPUT:
-Processing: ${processing}
-Material: ${currentMaterial}
-Target: ${bioMaterial}
-Equipment: ${equipment}
-Scale: ${productionScale}
-Stage: ${projectStage}
 `;
 
       const ai = await openai.chat.completions.create({
@@ -164,22 +156,40 @@ Stage: ${projectStage}
     }
 
     /* =========================
-       FALLBACK
+       FALLBACK（安全・捏造なし）
     ========================= */
 
     if (!parsed || !parsed.observations || parsed.observations.length < 3) {
       parsed = {
-        summary: "Transition is technically achievable, subject to process qualification.",
-        findings: "Thermal processing window is the primary constraint.",
-        conclusion: "Pilot validation is required before production commitment.",
+        summary:
+          "A preliminary assessment is possible, but the current input is insufficient for a production-level decision. The primary limitation is missing operating and equipment-specific conditions. A controlled pilot validation is required.",
+        findings:
+          "The available data supports only a conditional screening-level judgment. Equipment-specific conclusions cannot be established without defined operating conditions.",
+        conclusion:
+          "Remain at screening stage. Confirm process, equipment, and material baseline before pilot execution.",
         observations: [
-          { title: "Material Behaviour", body: "Material properties differ due to composition, affecting processing stability." },
-          { title: "Thermal Processing", body: "Thermal degradation risk exists due to narrow processing window." },
-          { title: "Equipment Interaction", body: "Standard equipment may not ensure consistent dispersion and stability." }
+          {
+            title: "Conditional Assessment",
+            body: "The absence of defined operating parameters limits the analysis to general material and process tendencies. Machine-specific behavior cannot be confirmed. This restricts the reliability of production planning."
+          },
+          {
+            title: "Process Sensitivity",
+            body: "Biodegradable materials typically exhibit narrower processing tolerance compared to conventional polymers. Without defined process conditions, this sensitivity cannot be quantified. This may impact initial pilot stability."
+          },
+          {
+            title: "Equipment Uncertainty",
+            body: "No specific equipment configuration has been provided, preventing detailed evaluation of screw behavior or thermal control. This limits the ability to predict processing stability. Pilot verification is required."
+          }
         ],
         risks: [
-          { title: "Thermal Instability", body: "Processing beyond stable temperature leads to degradation and performance loss." },
-          { title: "Processing Variability", body: "Rheological mismatch causes inconsistent flow and product defects." }
+          {
+            title: "Misinterpretation Risk",
+            body: "Using screening-level analysis as production guidance may lead to incorrect assumptions. The mechanism is applying general material behavior to undefined conditions. This can result in failed trials."
+          },
+          {
+            title: "Undefined Process Window",
+            body: "The absence of defined operating conditions prevents validation of a stable process window. This may cause instability during initial trials. Production efficiency may be impacted."
+          }
         ]
       };
     }
@@ -188,7 +198,7 @@ Stage: ${projectStage}
     const risks = parsed.risks || [];
 
     /* =========================
-       🔥 Not処理（完全版）
+       DATA（Not完全処理）
     ========================= */
 
     const data = {
@@ -198,12 +208,18 @@ Stage: ${projectStage}
 
       application: processing || "General polymer application (assumed)",
 
-      current_material: currentMaterial || "Not specified (assumed conventional polymer baseline)",
-      bio_material: bioMaterial || "Not specified (assumed biodegradable compound)",
-      processing_method: processing || "Not specified (assumed standard extrusion or molding process)",
-      production_scale: productionScale || "Not specified (assumed pilot or small-scale evaluation)",
-      project_stage: projectStage || "Preliminary evaluation stage",
-      equipment: equipment || "Standard processing equipment (single-screw or general-purpose system assumed)",
+      current_material:
+        currentMaterial || "Not specified (no baseline material submitted)",
+      bio_material:
+        bioMaterial || "Not specified (target material not defined)",
+      processing_method:
+        processing || "Not specified (process route not defined; conditional assessment)",
+      production_scale:
+        productionScale || "Not specified (scale assumption not confirmed)",
+      project_stage:
+        projectStage || "Preliminary evaluation stage",
+      equipment:
+        equipment || "Not specified (general-purpose equipment assumed for screening only)",
 
       report_id: "FV-" + Date.now(),
       report_date: new Date().toLocaleDateString(),
@@ -227,12 +243,14 @@ Stage: ${projectStage}
       risk_2_title: risks[1]?.title || "",
       risk_2_body: risks[1]?.body || "",
 
-      strategic_recommendation: "Proceed to controlled pilot validation.",
-      disclaimer: "This assessment is based on submitted information and assumed conditions. No physical testing performed."
+      strategic_recommendation:
+        "Proceed to pilot validation after confirming process and equipment conditions.",
+      disclaimer:
+        "This assessment is based on submitted information only. No physical testing or equipment verification has been conducted."
     };
 
     /* =========================
-       HTML
+       HTML（ここだけ貼る）
     ========================= */
 
     const htmlTemplate = `<!DOCTYPE html>
