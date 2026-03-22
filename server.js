@@ -114,12 +114,18 @@ app.post("/generate-report", async (req, res) => {
 
     /* フォーム値 */
     const processing = getValue(fields, "processing");
-    const currentMaterial = getValue(fields, "material");
-    const bioMaterial = getValue(fields, "target");
-    const productionScale = getValue(fields, "production");
-    const projectStage = getValue(fields, "project");
-    const equipment = getValue(fields, "equipment");
+const currentMaterial = getValue(fields, "material");
 
+/* 🔥 この1行だけ修正 */
+const bioMaterial =
+  getValue(fields, "biodegradable") ||
+  getValue(fields, "target material") ||
+  getValue(fields, "bio") ||
+  "Not specified";
+
+const productionScale = getValue(fields, "production");
+const projectStage = getValue(fields, "project");
+const equipment = getValue(fields, "equipment");
     /* 保険テキスト */
     const rawText = fields
       .map(f => normalizeValue(f).toLowerCase())
