@@ -137,9 +137,21 @@ Return JSON:
 "risks":[
 {"title":"...","body":"..."},
 {"title":"...","body":"..."}
+CRITICAL:
+
+You MUST provide a technical judgment even if data is incomplete.
+
+At minimum:
+- State whether there is NO fundamental material incompatibility at screening level
+- Or state that transition is NOT feasible at this stage
+
+You are NOT allowed to return "insufficient data" as the main conclusion.
+
+If data is missing:
+→ give a CONDITIONAL decision, not a refusal
+
 ]
-}
-`;
+}`;
 
       const ai = await openai.chat.completions.create({
         model: "gpt-4o-mini",
