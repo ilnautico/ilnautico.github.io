@@ -23,27 +23,63 @@ function escapeHtml(str = "") {
     .replace(/>/g, "&gt;");
 }
 
-function normalizeValue(v) {
-  if (!v) return "";
+/**
+ * Tally / form value normalization
+ * - string
+ * - object { label, value }
+ * - array of ids + field.options -> text
+ */
+function normalizeValue(fieldOrValue, fieldMaybe) {
+  const field =
+    fieldMaybe !== undefined
+      ? fieldMaybe
+      : typeof fieldOrValue === "object" &&
+        fieldOrValue !== null &&
+        "value" in fieldOrValue
+      ? fieldOrValue
+      : null;
+
+  const v = field ? field.value : fieldOrValue;
+
+  if (v == null) return "";
+
   if (typeof v === "string") return v;
-  if (typeof v === "object") return v.label || v.value || "";
+  if (typeof v === "number") return String(v);
+  if (typeof v === "boolean") return v ? "Yes" : "No";
+
+  if (Array.isArray(v)) {
+    return v
+      .map((id) => {
+        const opt = field?.options?.find((o) => o.id === id);
+        return opt?.text || "";
+      })
+      .filter(Boolean)
+      .join(", ");
+  }
+
+  if (typeof v === "object") {
+    return v.label || v.value || "";
+  }
+
   return "";
 }
 
-function matchField(f, keyword) {
-  const label = (f.label || "").toLowerCase();
-  const key = (f.key || "").toLowerCase();
-  return label.includes(keyword) || key.includes(keyword);
+function matchField(field, keyword) {
+  const k = String(keyword || "").toLowerCase();
+  const label = String(field?.label || "").toLowerCase();
+  const key = String(field?.key || "").toLowerCase();
+
+  return label.includes(k) || key.includes(k);
 }
 
 function getValue(fields, keyword) {
-  const f = fields.find(f => matchField(f, keyword));
+  const f = fields.find((field) => matchField(field, keyword));
   if (!f) return "";
-  return normalizeValue(f.value).trim();
+  return normalizeValue(f).trim();
 }
 
 function inferApplication(text) {
-  const t = text.toLowerCase();
+  const t = String(text || "").toLowerCase();
 
   if (t.includes("film")) return "Flexible Packaging Film";
   if (t.includes("mulch")) return "Agricultural Film";
@@ -57,15 +93,156 @@ function inferApplication(text) {
 function injectHtml(template, data) {
   let html = template;
 
-  Object.keys(data).forEach(key => {
+  Object.keys(data).forEach((key) => {
     html = html.replace(
       new RegExp(`{{\\s*${key}\\s*}}`, "g"),
-      escapeHtml(String(data[key] || ""))
+      escapeHtml(String(data[key] ?? ""))
     );
   });
 
   html = html.replace(/{{.*?}}/g, "");
+  html = html.replace(/undefined/g, "");
+
   return html;
+}
+
+/* =========================
+   AI helpers
+========================= */
+
+function hasMeaningfulTechnicalInput(data) {
+  const required = [
+    data.application,
+    data.current_material,
+    data.bio_material,
+    data.processing_method
+  ];
+
+  return required.every(
+    (v) =>
+      typeof v === "string" &&
+      v.trim() !== "" &&
+      v.trim().toLowerCase() !== "not specified"
+  );
+}
+
+function buildFallbackContent(data) {
+  const hasInput = hasMeaningfulTechnicalInput(data);
+
+  if (!hasInput) {
+    return {
+      summary:
+        "The submitted information is insufficient for a reliable technical compatibility judgment. A directional screening can be provided, but any feasibility decision remains conditional until the core material and process inputs are clarified.",
+      findings:
+        "Key decision variables such as material system, processing route, or production context are incomplete. In this situation, only conditional observations can be made, and risk interpretation should be treated as preliminary.",
+      conclusion:
+        "Additional input is required before a dependable technical screening outcome can be established. A clarified material-process profile should be submitted prior to any pilot or commercial decision.",
+      observations: [
+        "Where material and process inputs are incomplete, compatibility cannot be assessed against a defined processing window or equipment interaction profile.",
+        "Biodegradable polymers commonly exhibit narrower thermal and rheological tolerances than conventional plastics, but the actual relevance depends on the undeclared resin and process conditions.",
+        "Without a defined application-material-processing combination, this screening should be interpreted as an early directional review rather than a basis for implementation."
+      ],
+      risks: [
+        "A premature transition decision based on incomplete data may lead to trial failure, misinterpretation of material behavior, or avoidable equipment downtime.",
+        "Technical risk cannot be prioritized with confidence until the missing material and process inputs are defined, which limits the usefulness of generalized screening outcomes."
+      ]
+    };
+  }
+
+  return {
+    summary:
+      "This report provides an initial technical assessment of biodegradable material compatibility with existing processing systems.",
+    findings:
+      "The evaluation indicates moderate compatibility; however, process stability and equipment interaction require confirmation during early trials.",
+    conclusion:
+      "A pilot validation is recommended prior to full-scale implementation.",
+    observations: [
+      "Biodegradable materials generally exhibit lower thermal stability compared to conventional polymers, which may affect processing consistency under standard conditions.",
+      "Material flow behavior may differ due to variations in viscosity and shear sensitivity, potentially requiring operational adjustment during early trials.",
+      "Performance characteristics may vary depending on processing conditions, product geometry, and environmental exposure."
+    ],
+    risks: [
+      "Processing instability may occur if temperature control is not adequately maintained, potentially leading to material degradation or inconsistent output quality.",
+      "Equipment interaction risk may arise where material behavior differs significantly from the current resin, especially during startup, transition, or extended runs."
+    ]
+  };
+}
+
+async function generateAiContent(data) {
+  const fallback = buildFallbackContent(data);
+
+  try {
+    const ai = await openai.chat.completions.create({
+      model: "gpt-5",
+      temperature: 0.2,
+      response_format: { type: "json_object" },
+      messages: [
+        {
+          role: "system",
+          content: `
+You are a senior polymer processing consultant specializing in biodegradable plastics.
+
+Write concise, technically credible screening-level content for a paid preliminary feasibility report.
+
+Rules:
+- Be specific enough for a technical decision-maker.
+- Explain WHY and WHAT may happen.
+- Do NOT provide exact processing conditions, setpoints, recipes, formulation ratios, or supplier recommendations.
+- Avoid generic phrases unless limitations are explicitly stated.
+- If input is missing, clearly state limitations and provide only conditional technical insight.
+- Keep the tone professional, direct, and commercially usable.
+
+Return valid JSON only in this exact structure:
+{
+  "summary": "string",
+  "findings": "string",
+  "conclusion": "string",
+  "observations": ["string", "string", "string"],
+  "risks": ["string", "string"]
+}
+`
+        },
+        {
+          role: "user",
+          content: `
+Application: ${data.application}
+Current Material: ${data.current_material}
+Target Material: ${data.bio_material}
+Processing Method: ${data.processing_method}
+Equipment: ${data.equipment}
+Production Scale: ${data.production_scale}
+Project Stage: ${data.project_stage}
+`
+        }
+      ]
+    });
+
+    const parsed = JSON.parse(ai.choices[0].message.content);
+
+    if (
+      !parsed ||
+      typeof parsed.summary !== "string" ||
+      typeof parsed.findings !== "string" ||
+      typeof parsed.conclusion !== "string" ||
+      !Array.isArray(parsed.observations) ||
+      parsed.observations.length < 3 ||
+      !Array.isArray(parsed.risks) ||
+      parsed.risks.length < 2
+    ) {
+      return fallback;
+    }
+
+    return {
+      summary: parsed.summary,
+      findings: parsed.findings,
+      conclusion: parsed.conclusion,
+      observations: parsed.observations,
+      risks: parsed.risks
+    };
+  } catch (e) {
+    console.error("AI fallback used:", e);
+    return fallback;
+  }
 }
 
 /* =========================
@@ -74,18 +251,17 @@ function injectHtml(template, data) {
 
 app.post("/generate-report", async (req, res) => {
   try {
-
     const fields = req.body?.data?.fields || [];
 
-    const emailField = fields.find(f => f.type === "INPUT_EMAIL");
-    const email = normalizeValue(emailField?.value);
+    const emailField = fields.find((f) => f.type === "INPUT_EMAIL");
+    const email = normalizeValue(emailField);
 
     if (!email) {
       return res.status(400).json({ error: "EMAIL NOT FOUND" });
     }
 
     /* =========================
-       顧客情報
+       Client info
     ========================= */
 
     const clientName = getValue(fields, "name") || "—";
@@ -93,22 +269,29 @@ app.post("/generate-report", async (req, res) => {
     const clientCountry = getValue(fields, "country") || "—";
 
     /* =========================
-       フォーム値
+       Form values
     ========================= */
 
     const processing = getValue(fields, "processing");
     const currentMaterial = getValue(fields, "material");
-    const bioMaterial = getValue(fields, "target");
+
+    const bioMaterial =
+      getValue(fields, "biodegradable") ||
+      getValue(fields, "target material") ||
+      getValue(fields, "target") ||
+      getValue(fields, "bio") ||
+      "Not specified";
+
     const productionScale = getValue(fields, "production");
     const projectStage = getValue(fields, "project");
     const equipment = getValue(fields, "equipment");
 
     const rawText = fields
-      .map(f => normalizeValue(f.value).toLowerCase())
+      .map((f) => normalizeValue(f).toLowerCase())
       .join(" ");
 
     /* =========================
-       DATA（初期値）
+       Base data
     ========================= */
 
     const data = {
@@ -116,7 +299,9 @@ app.post("/generate-report", async (req, res) => {
       client_company: clientCompany,
       client_country: clientCountry,
 
-      application: inferApplication(rawText),
+      application: inferApplication(
+        [rawText, processing, currentMaterial, bioMaterial].join(" ")
+      ),
 
       current_material: currentMaterial || "Not specified",
       bio_material: bioMaterial || "Not specified",
@@ -130,88 +315,101 @@ app.post("/generate-report", async (req, res) => {
       report_id: "FV-" + Date.now(),
       report_date: new Date().toLocaleDateString(),
 
-      /* fallback（AI失敗時に使う） */
       executive_summary_overview:
         "This report provides an initial technical assessment of biodegradable material compatibility with existing processing systems.",
-
-      obs_1_body:
-        "Biodegradable materials generally exhibit lower thermal stability compared to conventional polymers, which may affect processing consistency under standard conditions.",
-
-      obs_2_body:
-        "Material flow behavior may differ due to variations in viscosity and shear sensitivity, potentially requiring operational adjustment during early trials.",
-
-      obs_3_body:
-        "Performance characteristics may vary depending on processing conditions, product geometry, and environmental exposure.",
-
-      risk_1_body:
-        "Processing instability may occur if temperature control is not adequately maintained, potentially leading to material degradation or inconsistent output quality.",
-
-      risk_2_body:
-        "Equipment interaction risk may arise where material behavior differs significantly from the current resin, especially during startup, transition, or extended runs.",
+      executive_summary_findings:
+        "The evaluation indicates moderate compatibility; however, process stability and equipment interaction require confirmation during early trials.",
+      executive_summary_conclusion:
+        "A pilot validation is recommended prior to full-scale implementation.",
 
       feasibility_level: "MODERATE",
       feasibility_class: "level-moderate",
-      feasibility_explanation: "Feasible with adjustments."
+      feasibility_explanation: "Feasible with adjustments.",
+
+      thermal_risk: "Moderate",
+      thermal_risk_class: "risk-moderate",
+      thermal_note: "Further validation recommended",
+
+      processing_risk: "Moderate",
+      processing_risk_class: "risk-moderate",
+      processing_note: "Process optimization may be required",
+
+      equipment_risk: "Low",
+      equipment_risk_class: "risk-low",
+      equipment_note: "Further equipment-specific validation recommended",
+
+      score_thermal_class: "moderate",
+      score_processing_class: "moderate",
+      score_equipment_class: "low",
+      score_cert_class: "na",
+      score_eol_class: "na",
+
+      score_thermal_level: "MODERATE",
+      score_processing_level: "MODERATE",
+      score_equipment_level: "LOW",
+      score_cert_level: "N/A",
+      score_eol_level: "N/A",
+
+      score_thermal_assessment: "Preliminary assessment",
+      score_processing_assessment: "Initial evaluation",
+      score_equipment_assessment: "Compatibility inferred",
+      score_cert_assessment: "Not verified",
+      score_eol_assessment: "Requires confirmation",
+
+      score_thermal_note: "Further validation recommended",
+      score_processing_note: "Optimization may be required",
+      score_equipment_note: "Equipment validation recommended",
+      score_cert_note: "Compliance review required",
+      score_eol_note: "Disposal evaluation required",
+
+      obs_1_title: "Material Behaviour",
+      obs_1_body:
+        "Biodegradable materials generally exhibit lower thermal stability compared to conventional polymers, which may affect processing consistency under standard conditions.",
+
+      obs_2_title: "Processing Adjustment",
+      obs_2_body:
+        "Material flow behavior may differ due to variations in viscosity and shear sensitivity, potentially requiring operational adjustment during early trials.",
+
+      obs_3_title: "Performance Variability",
+      obs_3_body:
+        "Performance characteristics may vary depending on processing conditions, product geometry, and environmental exposure.",
+
+      risk_1_title: "Processing Stability",
+      risk_1_body:
+        "Processing instability may occur if temperature control is not adequately maintained, potentially leading to material degradation or inconsistent output quality.",
+
+      risk_2_title: "Equipment Interaction",
+      risk_2_body:
+        "Equipment interaction risk may arise where material behavior differs significantly from the current resin, especially during startup, transition, or extended runs.",
+
+      strategic_recommendation:
+        "Conduct pilot validation before implementation.",
+
+      disclaimer:
+        "This report is based on early-stage screening logic and declared input parameters only. Findings are conditional on the accuracy of provided equipment and material data. Full validation requires physical sample testing and equipment-specific characterization."
     };
 
     /* =========================
-       🔥 AI生成（ここだけ追加）
+       AI content override
     ========================= */
 
-    try {
-      const ai = await openai.chat.completions.create({
-        model: "gpt-5",
-        temperature: 0.2,
-        response_format: { type: "json_object" },
-        messages: [
-          {
-            role: "system",
-            content: `
-You are a senior polymer processing consultant.
+    const aiText = await generateAiContent(data);
 
-Write concise, professional, technical screening-level content.
+    data.executive_summary_overview = aiText.summary;
+    data.executive_summary_findings = aiText.findings;
+    data.executive_summary_conclusion = aiText.conclusion;
 
-Rules:
-- Explain WHY and WHAT happens
-- No exact processing conditions
-- No formulation details
-- No supplier recommendations
+    data.obs_1_body = aiText.observations[0] || data.obs_1_body;
+    data.obs_2_body = aiText.observations[1] || data.obs_2_body;
+    data.obs_3_body = aiText.observations[2] || data.obs_3_body;
 
-Return JSON:
-{
-  "summary": "...",
-  "observations": ["...", "...", "..."],
-  "risks": ["...", "..."]
-}
-`
-          },
-          {
-            role: "user",
-            content: `
-Application: ${data.application}
-Material: ${data.current_material}
-Bio Material: ${data.bio_material}
-Processing: ${data.processing_method}
-`
-          }
-        ]
-      });
-
-      const parsed = JSON.parse(ai.choices[0].message.content);
-
-      data.executive_summary_overview = parsed.summary;
-      data.obs_1_body = parsed.observations[0];
-      data.obs_2_body = parsed.observations[1];
-      data.obs_3_body = parsed.observations[2];
-      data.risk_1_body = parsed.risks[0];
-      data.risk_2_body = parsed.risks[1];
-
-    } catch (e) {
-      console.error("AI fallback used:", e);
-    }
+    data.risk_1_body = aiText.risks[0] || data.risk_1_body;
+    data.risk_2_body = aiText.risks[1] || data.risk_2_body;
 
     /* =========================
-       HTML（あなたの既存そのまま貼る）
+       HTML
+       Keep your current htmlTemplate
+       block EXACTLY as-is below.
     ========================= */
 
     const htmlTemplate = `<!DOCTYPE html>
@@ -1328,7 +1526,6 @@ body {
     });
 
     res.send("OK");
-
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err.message });
