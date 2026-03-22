@@ -114,7 +114,7 @@ Stage: ${projectStage}
 `;
 
       const ai = await openai.chat.completions.create({
-        model: "gpt-5",
+        model: "gpt-4o-mini",
         temperature: 0.2,
         response_format: { type: "json_object" },
         messages: [
