@@ -77,7 +77,15 @@ app.post("/generate-report", async (req, res) => {
     const projectStage = getValue(fields, "project");
     const equipment = getValue(fields, "equipment");
 
-    const prompt = `
+    /* =========================
+       🔥 GPT
+    ========================= */
+
+    let parsed = null;
+
+    try {
+
+      const prompt = `
 You are a senior polymer processing consultant.
 
 Return JSON only:
@@ -103,32 +111,33 @@ Target: ${bioMaterial}
 Equipment: ${equipment}
 Scale: ${productionScale}
 Stage: ${projectStage}
-
-Rules:
-- Professional
-- Technical explanation required
-- No vague wording
 `;
 
-    const ai = await openai.chat.completions.create({
-      model: "gpt-5",
-      temperature: 0.2,
-      response_format: { type: "json_object" },
-      messages: [
-        { role: "system", content: "You are a polymer expert." },
-        { role: "user", content: prompt }
-      ]
-    });
+      const ai = await openai.chat.completions.create({
+        model: "gpt-5",
+        temperature: 0.2,
+        response_format: { type: "json_object" },
+        messages: [
+          { role: "system", content: "You are a polymer expert." },
+          { role: "user", content: prompt }
+        ]
+      });
 
-    let parsed;
+      console.log("AI RAW:", ai.choices[0].message.content);
 
-    try {
       parsed = JSON.parse(ai.choices[0].message.content);
+
     } catch (e) {
-      parsed = null;
+      console.error("AI ERROR:", e);
     }
 
-    if (!parsed || !parsed.observations) {
+    /* =========================
+       🔥 FALLBACK（絶対落ちない）
+    ========================= */
+
+    if (!parsed || !parsed.observations || parsed.observations.length < 3) {
+      console.log("FALLBACK USED");
+
       parsed = {
         summary: "Preliminary technical screening.",
         findings: "Further validation required.",
@@ -144,6 +153,13 @@ Rules:
         ]
       };
     }
+
+    const obs = parsed.observations || [];
+    const risks = parsed.risks || [];
+
+    /* =========================
+       DATA（絶対落ちない）
+    ========================= */
 
     const data = {
       client_name: "Client",
@@ -162,28 +178,32 @@ Rules:
       report_id: "FV-" + Date.now(),
       report_date: new Date().toLocaleDateString(),
 
-      executive_summary_overview: parsed.summary,
-      executive_summary_findings: parsed.findings,
-      executive_summary_conclusion: parsed.conclusion,
+      executive_summary_overview: parsed.summary || "",
+      executive_summary_findings: parsed.findings || "",
+      executive_summary_conclusion: parsed.conclusion || "",
 
-      obs_1_title: parsed.observations[0].title,
-      obs_1_body: parsed.observations[0].body,
+      obs_1_title: obs[0]?.title || "",
+      obs_1_body: obs[0]?.body || "",
 
-      obs_2_title: parsed.observations[1].title,
-      obs_2_body: parsed.observations[1].body,
+      obs_2_title: obs[1]?.title || "",
+      obs_2_body: obs[1]?.body || "",
 
-      obs_3_title: parsed.observations[2].title,
-      obs_3_body: parsed.observations[2].body,
+      obs_3_title: obs[2]?.title || "",
+      obs_3_body: obs[2]?.body || "",
 
-      risk_1_title: parsed.risks[0].title,
-      risk_1_body: parsed.risks[0].body,
+      risk_1_title: risks[0]?.title || "",
+      risk_1_body: risks[0]?.body || "",
 
-      risk_2_title: parsed.risks[1].title,
-      risk_2_body: parsed.risks[1].body,
+      risk_2_title: risks[1]?.title || "",
+      risk_2_body: risks[1]?.body || "",
 
       strategic_recommendation: "Proceed to pilot validation.",
       disclaimer: "Preliminary advisory only."
     };
+
+    /* =========================
+       HTML（そのまま使う）
+    ========================= */
 
     const htmlTemplate = `<!DOCTYPE html>
 <html lang="en">
@@ -1257,6 +1277,10 @@ body {
 
     const html = injectHtml(htmlTemplate, data);
 
+    /* =========================
+       PDF
+    ========================= */
+
     const browser = await puppeteer.launch({
       args: [
         "--no-sandbox",
@@ -1275,6 +1299,10 @@ body {
 
     await browser.close();
 
+    /* =========================
+       EMAIL（ここは必ず通る）
+    ========================= */
+
     await resend.emails.send({
       from: "FairVia <info@ilnautico.com>",
       to: email,
@@ -1291,7 +1319,7 @@ body {
     res.send("OK");
 
   } catch (err) {
-    console.error(err);
+    console.error("SERVER ERROR:", err);
     res.status(500).json({ error: err.message });
   }
 });
