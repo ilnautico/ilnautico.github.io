@@ -24,7 +24,7 @@ function escapeHtml(str = "") {
 }
 
 /**
- * Tally / form value normalization
+ * フィールド値を正規化
  * - string
  * - object { label, value }
  * - array of ids + field.options -> text
@@ -47,6 +47,7 @@ function normalizeValue(fieldOrValue, fieldMaybe) {
   if (typeof v === "number") return String(v);
   if (typeof v === "boolean") return v ? "Yes" : "No";
 
+  // Tally系: valueが選択肢ID配列で、field.optionsにtextがあるパターン
   if (Array.isArray(v)) {
     return v
       .map((id) => {
@@ -68,7 +69,6 @@ function matchField(field, keyword) {
   const k = String(keyword || "").toLowerCase();
   const label = String(field?.label || "").toLowerCase();
   const key = String(field?.key || "").toLowerCase();
-
   return label.includes(k) || key.includes(k);
 }
 
@@ -172,6 +172,92 @@ async function generateAiContent(data) {
   const fallback = buildFallbackContent(data);
 
   try {
+    const prompt = `
+You are a senior polymer processing consultant specializing in biodegradable materials.
+
+Your role is to generate a professional preliminary technical screening report.
+
+--------------------------------
+CLIENT CONTEXT
+--------------------------------
+- Application: ${data.application}
+- Current material: ${data.current_material}
+- Target material: ${data.bio_material}
+- Processing method: ${data.processing_method}
+- Equipment: ${data.equipment}
+- Production scale: ${data.production_scale}
+- Project stage: ${data.project_stage}
+
+--------------------------------
+CORE RULES (STRICT)
+--------------------------------
+- NEVER write generic statements
+- ALWAYS reference the client input explicitly
+- ALWAYS connect:
+  material + processing + equipment + risk
+
+- DO NOT provide:
+  - formulation ratios
+  - processing temperatures
+  - machine settings
+  - supplier recommendations
+
+--------------------------------
+OBSERVATION STRUCTURE (MANDATORY)
+--------------------------------
+Each observation MUST follow this structure:
+1. Cause (material difference or property)
+2. Mechanism (what happens during processing)
+3. Impact (effect on production or product)
+
+Each observation must:
+- Reference at least ONE of:
+  (material / process / equipment / scale)
+- Be specific and technically realistic
+- Be written as a consultant (not academic, not generic)
+
+--------------------------------
+RISK STRUCTURE (MANDATORY)
+--------------------------------
+Each risk MUST follow this structure:
+- Risk title intent
+- Cause
+- Effect
+- When it becomes critical (scale / condition)
+
+--------------------------------
+MISSING-DATA RULE
+--------------------------------
+If input information is limited or missing:
+- Clearly state limitations
+- Do NOT hallucinate details
+- Provide only conditional technical insight
+- Do NOT write generic filler text
+
+--------------------------------
+OUTPUT FORMAT (JSON ONLY)
+--------------------------------
+{
+  "summary": "...",
+  "findings": "...",
+  "conclusion": "...",
+  "observations": ["...", "...", "..."],
+  "risks": ["...", "..."]
+}
+
+--------------------------------
+STYLE
+--------------------------------
+- Professional
+- Direct
+- Decision-oriented
+- Suitable for a technical decision-maker
+- No fluff
+- No vague wording without explanation
+
+Generate now.
+`;
+
     const ai = await openai.chat.completions.create({
       model: "gpt-5",
       temperature: 0.2,
@@ -179,40 +265,12 @@ async function generateAiContent(data) {
       messages: [
         {
           role: "system",
-          content: `
-You are a senior polymer processing consultant specializing in biodegradable plastics.
-
-Write concise, technically credible screening-level content for a paid preliminary feasibility report.
-
-Rules:
-- Be specific enough for a technical decision-maker.
-- Explain WHY and WHAT may happen.
-- Do NOT provide exact processing conditions, setpoints, recipes, formulation ratios, or supplier recommendations.
-- Avoid generic phrases unless limitations are explicitly stated.
-- If input is missing, clearly state limitations and provide only conditional technical insight.
-- Keep the tone professional, direct, and commercially usable.
-
-Return valid JSON only in this exact structure:
-{
-  "summary": "string",
-  "findings": "string",
-  "conclusion": "string",
-  "observations": ["string", "string", "string"],
-  "risks": ["string", "string"]
-}
-`
+          content:
+            "You are a senior polymer processing consultant producing concise, technically credible screening-level content."
         },
         {
           role: "user",
-          content: `
-Application: ${data.application}
-Current Material: ${data.current_material}
-Target Material: ${data.bio_material}
-Processing Method: ${data.processing_method}
-Equipment: ${data.equipment}
-Production Scale: ${data.production_scale}
-Project Stage: ${data.project_stage}
-`
+          content: prompt
         }
       ]
     });
@@ -273,7 +331,9 @@ app.post("/generate-report", async (req, res) => {
     ========================= */
 
     const processing = getValue(fields, "processing");
-    const currentMaterial = getValue(fields, "material");
+    const currentMaterial =
+      getValue(fields, "current material") ||
+      getValue(fields, "material");
 
     const bioMaterial =
       getValue(fields, "biodegradable") ||
@@ -282,8 +342,14 @@ app.post("/generate-report", async (req, res) => {
       getValue(fields, "bio") ||
       "Not specified";
 
-    const productionScale = getValue(fields, "production");
-    const projectStage = getValue(fields, "project");
+    const productionScale =
+      getValue(fields, "production scale") ||
+      getValue(fields, "production");
+
+    const projectStage =
+      getValue(fields, "project stage") ||
+      getValue(fields, "project");
+
     const equipment = getValue(fields, "equipment");
 
     const rawText = fields
@@ -408,8 +474,7 @@ app.post("/generate-report", async (req, res) => {
 
     /* =========================
        HTML
-       Keep your current htmlTemplate
-       block EXACTLY as-is below.
+       ↓ここだけ、今の動いているHTML全文に置き換える
     ========================= */
 
     const htmlTemplate = `<!DOCTYPE html>
