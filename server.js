@@ -190,7 +190,7 @@ Return JSON:
       report_id: "FV-" + Date.now(),
       report_date: new Date().toLocaleDateString(),
 
-      executive_summary_overview: parsed.summary,
+      executive_summary_overview: "No fundamental incompatibility is identified at screening level. The primary constraint lies in undefined processing and material conditions, which prevent direct validation of production performance. A controlled pilot evaluation is required before any production-level decision.",
       executive_summary_findings: parsed.findings,
       executive_summary_conclusion: parsed.conclusion,
 
