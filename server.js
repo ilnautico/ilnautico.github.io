@@ -176,9 +176,12 @@ Return JSON:
       };
     }
 
-    const obs = parsed.observations || [];
-    const risks = parsed.risks || [];
-
+const obs = parsed.observations || [];
+const risks = parsed.risks || [];
+    
+const company = getValue(fields, "company");
+const country = getValue(fields, "country")
+    
     const data = {
       application: processing,
       current_material: currentMaterial,
