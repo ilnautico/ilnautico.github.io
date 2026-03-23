@@ -191,8 +191,8 @@ Return JSON:
       report_date: new Date().toLocaleDateString(),
 
 　　　　executive_summary_overview: "No fundamental incompatibility is identified at screening level. The primary constraint lies in undefined processing and material conditions, which prevent direct validation of production performance. A controlled pilot evaluation is required before any production-level decision.",
-      executive_summary_findings: parsed.findings,
-      executive_summary_conclusion: parsed.conclusion,
+      executive_summary_findings: "Technical feasibility cannot be validated under current conditions due to undefined processing parameters and material specifications. The limitation is operational, not material-related. Compatibility must be confirmed under controlled processing conditions.",
+　　　　executive_summary_conclusion: "Transition should not proceed to production at this stage. A structured pilot validation under defined processing conditions is required to confirm compatibility and performance. Production commitment is contingent on successful pilot results.",
 
       feasibility_level: parsed.feasibility,
 
