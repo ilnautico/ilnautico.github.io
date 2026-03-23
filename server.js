@@ -100,20 +100,24 @@ const riskKeywords = [
   currentMaterial,
   bioMaterial,
   projectStage
-].join(" ").toLowerCase();
-
+].join(" "). 
+  
   if (
   riskKeywords.includes("injection") &&
-  riskKeywords.includes("pp") &&
-  riskKeywords.includes("pla") &&
   (
-    riskKeywords.includes("production") ||
-    riskKeywords.includes("preparing") ||
-    riskKeywords.includes("commercial")
+    riskKeywords.includes("pp") ||
+    riskKeywords.includes("polypropylene")
+  ) &&
+  (
+    riskKeywords.includes("pla") ||
+    riskKeywords.includes("pla-based") ||
+    riskKeywords.includes("biodegradable")
   )
 ) {
   finalFeasibility = "LOW";
 }
+
+  
 
 const isHighRisk = finalFeasibility === "LOW";
  if (isHighRisk) {
