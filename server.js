@@ -102,14 +102,19 @@ const riskKeywords = [
   projectStage
 ].join(" ").toLowerCase();
 
-if (
+  if (
   riskKeywords.includes("injection") &&
   riskKeywords.includes("pp") &&
   riskKeywords.includes("pla") &&
-  riskKeywords.includes("production")
+  (
+    riskKeywords.includes("production") ||
+    riskKeywords.includes("preparing") ||
+    riskKeywords.includes("commercial")
+  )
 ) {
   finalFeasibility = "LOW";
 }
+
 const isHighRisk = finalFeasibility === "LOW";
  if (isHighRisk) {
   parsed.summary =
