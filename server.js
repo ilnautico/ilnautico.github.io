@@ -93,7 +93,6 @@ app.post("/generate-report", async (req, res) => {
     const risks = [];
 /* 🔥 判定ロジック追加 */
 let finalFeasibility = parsed.feasibility || "MODERATE";
-
 if (
   processing.toLowerCase().includes("injection") &&
   currentMaterial.toLowerCase().includes("pp") &&
@@ -102,6 +101,17 @@ if (
 ) {
   finalFeasibility = "LOW";
 }
+const isHighRisk = finalFeasibility === "LOW";
+ if (isHighRisk) {
+  parsed.summary =
+    "At screening level, a significant compatibility risk is identified. The combination of material and processing conditions presents a high likelihood of unstable production behavior under current setup.";
+
+  parsed.findings =
+    "The transition from conventional polyolefin materials to biodegradable alternatives under high-speed processing introduces structural instability risks, particularly in thermal handling and process consistency.";
+
+  parsed.conclusion =
+    "Transition to production is not recommended under current conditions. Immediate pilot validation with controlled processing adjustments is required before any scale-up decision.";
+}   
     const data = {
       application: processing,
       current_material: currentMaterial,
