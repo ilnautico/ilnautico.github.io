@@ -30,10 +30,15 @@ function normalizeValue(v) {
   return "";
 }
 
+/* 🔥 追加：完全一致取得 */
+function getExactValue(fields, labelName) {
+  const f = fields.find(f => (f.label || "").trim() === labelName);
+  return normalizeValue(f?.value).trim();
+}
+
 function getValue(fields, keyword) {
   const f = fields.find(f =>
-    (f.label || "").toLowerCase().includes(keyword) ||
-    (f.key || "").toLowerCase().includes(keyword)
+    (f.label || "").toLowerCase().includes(keyword)
   );
   return normalizeValue(f?.value).trim();
 }
@@ -75,113 +80,18 @@ app.post("/generate-report", async (req, res) => {
     const productionScale = getValue(fields, "production");
     const projectStage = getValue(fields, "project");
 
-    /* =========================
-       GPT 完全版
-    ========================= */
+    /* 🔥 修正：顧客情報 */
+    const clientName = getExactValue(fields, "Client Name");
+    const company = getExactValue(fields, "Company Name");
+    const country = getExactValue(fields, "Country");
 
-    let parsed = null;
+    let parsed = {
+      feasibility: "MODERATE"
+    };
 
-    const prompt = `You are a senior polymer processing consultant writing a paid technical screening report.
+    const obs = [];
+    const risks = [];
 
-CRITICAL RULES:
-- You MUST always give a technical judgment
-- NEVER say "insufficient data"
-- NEVER stop analysis
-
-STRICT DATA RULE:
-- DO NOT assume temperature, viscosity, extrusion issues
-- ONLY use given inputs
-- If missing → use material-level reasoning
-
-MANDATORY DECISION LOGIC:
-If data is incomplete:
-- Assume screening-level behavior
-- Identify most likely constraint
-- Give conditional feasibility
-
-You must write like:
-"At screening level, no fundamental incompatibility is identified, however..."
-
-STRUCTURE:
-
-1. Executive Summary
-- verdict
-- constraint
-- action
-
-2. Observations (3)
-- cause → mechanism → impact
-
-3. Risks (2)
-- cause → mechanism → production impact
-
-4. Feasibility
-- LOW / MODERATE / HIGH
-
-
-INPUT:
-Processing: ${processing || "unknown"}
-Material: ${currentMaterial || "unknown"}
-Target: ${bioMaterial || "unknown"}
-Equipment: ${equipment || "unknown"}
-Scale: ${productionScale || "unknown"}
-Stage: ${projectStage || "unknown"}
-
-Return JSON:
-{
-"summary":"...",
-"findings":"...",
-"conclusion":"...",
-"feasibility":"...",
-"observations":[
-{"title":"...","body":"..."},
-{"title":"...","body":"..."},
-{"title":"...","body":"..."}
-],
-"risks":[
-{"title":"...","body":"..."},
-{"title":"...","body":"..."}
-]
-}
-`;
-
-    try {
-      const ai = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
-        temperature: 0.2,
-        response_format: { type: "json_object" },
-        messages: [
-          { role: "system", content: "polymer expert" },
-          { role: "user", content: prompt }
-        ]
-      });
-
-      parsed = JSON.parse(ai.choices[0].message.content);
-
-    } catch (e) {
-      console.error("AI ERROR:", e);
-    }
-
-    if (!parsed) {
-      parsed = {
-        summary:
-          "At screening level, no fundamental incompatibility is identified, however validation is required.",
-        findings:
-          "Material behavior must be confirmed through controlled testing.",
-        conclusion:
-          "Proceed to pilot validation.",
-        feasibility: "MODERATE",
-        observations: [],
-        risks: []
-      };
-    }
-
-const obs = parsed.observations || [];
-const risks = parsed.risks || [];
-    
-const company = getValue(fields, "company");
-const country = getValue(fields, "country")
-    
     const data = {
       application: processing,
       current_material: currentMaterial,
@@ -190,29 +100,49 @@ const country = getValue(fields, "country")
       production_scale: productionScale,
       project_stage: projectStage,
 
+      /* 🔥 カバー修正 */
+      client_name: clientName,
+      client_company: company,
+      client_country: country,
+
       report_id: "FV-" + Date.now(),
       report_date: new Date().toLocaleDateString(),
 
-　　　　executive_summary_overview: "No fundamental incompatibility is identified at screening level. The primary constraint lies in undefined processing and material conditions, which prevent direct validation of production performance. A controlled pilot evaluation is required before any production-level decision.",
-      executive_summary_findings: "Technical feasibility cannot be validated under current conditions due to undefined processing parameters and material specifications. The limitation is operational, not material-related. Compatibility must be confirmed under controlled processing conditions.",
-　　　　executive_summary_conclusion: "Transition should not proceed to production at this stage. A structured pilot validation under defined processing conditions is required to confirm compatibility and performance. Production commitment is contingent on successful pilot results.",
+      executive_summary_overview:
+        "No fundamental incompatibility is identified at screening level. The primary constraint lies in undefined processing and material conditions.",
+
+      executive_summary_findings:
+        "Technical feasibility cannot be validated under current conditions due to undefined parameters.",
+
+      executive_summary_conclusion:
+        "Transition should not proceed without pilot validation.",
 
       feasibility_level: parsed.feasibility,
 
-      obs_1_body: "Undefined processing conditions introduce variability in material behavior during processing, affecting product consistency and performance.",
-      obs_2_body: obs[1]?.body || "",
-      obs_3_body: obs[2]?.body || "",
+      /* 🔥 Observation修正 */
+      obs_1_title: "Processing Condition Uncertainty",
+      obs_1_body:
+        "Undefined processing conditions introduce variability in material behavior during processing, affecting product consistency and performance.",
 
-      risk_1_body: risks[0]?.body || "",
-      risk_2_body: risks[1]?.body || ""
+      obs_2_title: "Operational Stability Risk",
+      obs_2_body:
+        "Unverified process settings increase the risk of unstable conversion behavior during early production runs, potentially reducing consistency and increasing adjustment requirements.",
+
+      obs_3_title: "Application Requirement Gap",
+      obs_3_body:
+        "Undefined end-use requirements prevent confirmation that the selected material and process combination will meet performance expectations under real application conditions.",
+
+      risk_1_title: "Performance Instability",
+      risk_1_body:
+        "Material mismatch may lead to unstable product performance.",
+
+      risk_2_title: "Operational Inefficiency",
+      risk_2_body:
+        "Unverified conditions may reduce operational efficiency."
     };
 
-/* =========================
-       HTML（ネイビー最終版）
-    ========================= */
-
-    const htmlTemplate = `
-<!DOCTYPE html>
+    /* 🔥 HTMLそのまま（あなたの既存使う） */
+    const htmlTemplate = `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
