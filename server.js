@@ -93,11 +93,20 @@ app.post("/generate-report", async (req, res) => {
     const risks = [];
 /* 🔥 判定ロジック追加 */
 let finalFeasibility = parsed.feasibility || "MODERATE";
+
+/* 🔥 判定強化（ここが重要） */
+const riskKeywords = [
+  processing,
+  currentMaterial,
+  bioMaterial,
+  projectStage
+].join(" ").toLowerCase();
+
 if (
-  processing.toLowerCase().includes("injection") &&
-  currentMaterial.toLowerCase().includes("pp") &&
-  bioMaterial.toLowerCase().includes("pla") &&
-  projectStage.toLowerCase().includes("production")
+  riskKeywords.includes("injection") &&
+  riskKeywords.includes("pp") &&
+  riskKeywords.includes("pla") &&
+  riskKeywords.includes("production")
 ) {
   finalFeasibility = "LOW";
 }
