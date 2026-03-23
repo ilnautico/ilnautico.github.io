@@ -91,7 +91,17 @@ app.post("/generate-report", async (req, res) => {
 
     const obs = [];
     const risks = [];
+/* 🔥 判定ロジック追加 */
+let finalFeasibility = parsed.feasibility || "MODERATE";
 
+if (
+  processing.toLowerCase().includes("injection") &&
+  currentMaterial.toLowerCase().includes("pp") &&
+  bioMaterial.toLowerCase().includes("pla") &&
+  projectStage.toLowerCase().includes("production")
+) {
+  finalFeasibility = "LOW";
+}
     const data = {
       application: processing,
       current_material: currentMaterial,
@@ -119,7 +129,7 @@ app.post("/generate-report", async (req, res) => {
       executive_summary_conclusion:
         "Transition should not proceed without pilot validation.",
 
-      feasibility_level: parsed.feasibility,
+      feasibility_level: finalFeasibility,
       feasibility_explanation:
 　　　　"This assessment reflects screening-level evaluation based on available inputs. Validation under controlled conditions is required.",
 
