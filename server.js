@@ -99,6 +99,8 @@ app.post("/generate-report", async (req, res) => {
       equipment: equipment,
       production_scale: productionScale,
       project_stage: projectStage,
+      processing_method: processing,
+　　　　submission_reference: "Auto-generated",
 
       /* 🔥 カバー修正 */
       client_name: clientName,
@@ -118,6 +120,8 @@ app.post("/generate-report", async (req, res) => {
         "Transition should not proceed without pilot validation.",
 
       feasibility_level: parsed.feasibility,
+      feasibility_explanation:
+　　　　"This assessment reflects screening-level evaluation based on available inputs. Validation under controlled conditions is required.",
 
       /* 🔥 Observation修正 */
       obs_1_title: "Processing Condition Uncertainty",
