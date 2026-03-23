@@ -196,7 +196,7 @@ Return JSON:
 
       feasibility_level: parsed.feasibility,
 
-      obs_1_body: obs[0]?.body || "",
+      obs_1_body: "Undefined processing conditions introduce variability in material behavior during processing, affecting product consistency and performance.",
       obs_2_body: obs[1]?.body || "",
       obs_3_body: obs[2]?.body || "",
 
