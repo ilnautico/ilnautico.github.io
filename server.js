@@ -30,15 +30,10 @@ function normalizeValue(v) {
   return "";
 }
 
-/* 🔥 追加：完全一致取得 */
-function getExactValue(fields, labelName) {
-  const f = fields.find(f => (f.label || "").trim() === labelName);
-  return normalizeValue(f?.value).trim();
-}
-
 function getValue(fields, keyword) {
   const f = fields.find(f =>
-    (f.label || "").toLowerCase().includes(keyword)
+    (f.label || "").toLowerCase().includes(keyword) ||
+    (f.key || "").toLowerCase().includes(keyword)
   );
   return normalizeValue(f?.value).trim();
 }
@@ -80,111 +75,151 @@ app.post("/generate-report", async (req, res) => {
     const productionScale = getValue(fields, "production");
     const projectStage = getValue(fields, "project");
 
-    /* 🔥 修正：顧客情報 */
-    const clientName = getExactValue(fields, "Client Name");
-    const company = getExactValue(fields, "Company Name");
-    const country = getExactValue(fields, "Country");
+    const clientName = getValue(fields, "client");
+    const company = getValue(fields, "company");
+    const country = getValue(fields, "country");
 
-    let parsed = {
-      feasibility: "MODERATE"
-    };
+    /* =========================
+       GPT
+    ========================= */
 
-    const obs = [];
-    const risks = [];
-/* 🔥 判定ロジック追加 */
-let finalFeasibility = parsed.feasibility || "MODERATE";
+    let parsed = null;
 
-/* 🔥 判定強化（ここが重要） */
-const riskKeywords = [
-  processing,
-  currentMaterial,
-  bioMaterial,
-  projectStage
-].join(" "). 
-  
-  if (
-  riskKeywords.includes("injection") &&
-  (
-    riskKeywords.includes("pp") ||
-    riskKeywords.includes("polypropylene")
-  ) &&
-  (
-    riskKeywords.includes("pla") ||
-    riskKeywords.includes("pla-based") ||
-    riskKeywords.includes("biodegradable")
-  )
-) {
-  finalFeasibility = "LOW";
+    const prompt = `
+You are a senior polymer processing consultant.
+
+INPUT:
+Processing: ${processing || "unknown"}
+Material: ${currentMaterial || "unknown"}
+Target: ${bioMaterial || "unknown"}
+Equipment: ${equipment || "unknown"}
+Scale: ${productionScale || "unknown"}
+Stage: ${projectStage || "unknown"}
+
+Return JSON:
+{
+"summary":"...",
+"findings":"...",
+"conclusion":"...",
+"feasibility":"LOW/MODERATE/HIGH",
+"observations":[
+{"title":"...","body":"..."},
+{"title":"...","body":"..."},
+{"title":"...","body":"..."}
+],
+"risks":[
+{"title":"...","body":"..."},
+{"title":"...","body":"..."}
+]
 }
+`;
 
-  
+    try {
+      const ai = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        temperature: 0.2,
+        response_format: { type: "json_object" },
+        messages: [
+          { role: "system", content: "polymer expert" },
+          { role: "user", content: prompt }
+        ]
+      });
 
-const isHighRisk = finalFeasibility === "LOW";
- if (isHighRisk) {
-  parsed.summary =
-    "At screening level, a significant compatibility risk is identified. The combination of material and processing conditions presents a high likelihood of unstable production behavior under current setup.";
+      parsed = JSON.parse(ai.choices[0].message.content);
 
-  parsed.findings =
-    "The transition from conventional polyolefin materials to biodegradable alternatives under high-speed processing introduces structural instability risks, particularly in thermal handling and process consistency.";
+    } catch (e) {
+      console.error("AI ERROR:", e);
+    }
 
-  parsed.conclusion =
-    "Transition to production is not recommended under current conditions. Immediate pilot validation with controlled processing adjustments is required before any scale-up decision.";
-}   
+    if (!parsed) {
+      parsed = {
+        summary: "Screening level evaluation completed.",
+        findings: "Further validation required.",
+        conclusion: "Proceed to pilot.",
+        feasibility: "MODERATE",
+        observations: [],
+        risks: []
+      };
+    }
+
+    /* =========================
+       🔥 判定ロジック（完成版）
+    ========================= */
+
+    let finalFeasibility = parsed.feasibility || "MODERATE";
+
+    const riskKeywords = [
+      processing,
+      currentMaterial,
+      bioMaterial,
+      projectStage
+    ].join(" ").toLowerCase();
+
+    if (
+      riskKeywords.includes("injection") &&
+      (
+        riskKeywords.includes("pp") ||
+        riskKeywords.includes("polypropylene")
+      ) &&
+      (
+        riskKeywords.includes("pla") ||
+        riskKeywords.includes("biodegradable")
+      )
+    ) {
+      finalFeasibility = "LOW";
+    }
+
+    const isHighRisk = finalFeasibility === "LOW";
+
+    if (isHighRisk) {
+      parsed.summary =
+        "At screening level, a significant compatibility risk is identified.";
+
+      parsed.findings =
+        "Material transition introduces high instability risk in production.";
+
+      parsed.conclusion =
+        "Production transition is not recommended without pilot validation.";
+    }
+
+    const obs = parsed.observations || [];
+    const risks = parsed.risks || [];
+
     const data = {
+      client_name: clientName,
+      client_company: company,
+      client_country: country,
+
       application: processing,
       current_material: currentMaterial,
       bio_material: bioMaterial,
       equipment: equipment,
       production_scale: productionScale,
       project_stage: projectStage,
-      processing_method: processing,
-　　　　submission_reference: "Auto-generated",
-
-      /* 🔥 カバー修正 */
-      client_name: clientName,
-      client_company: company,
-      client_country: country,
 
       report_id: "FV-" + Date.now(),
       report_date: new Date().toLocaleDateString(),
 
-      executive_summary_overview:
-        "No fundamental incompatibility is identified at screening level. The primary constraint lies in undefined processing and material conditions.",
-
-      executive_summary_findings:
-        "Technical feasibility cannot be validated under current conditions due to undefined parameters.",
-
-      executive_summary_conclusion:
-        "Transition should not proceed without pilot validation.",
-
       feasibility_level: finalFeasibility,
-      feasibility_explanation:
-　　　　"This assessment reflects screening-level evaluation based on available inputs. Validation under controlled conditions is required.",
 
-      /* 🔥 Observation修正 */
-      obs_1_title: "Processing Condition Uncertainty",
-      obs_1_body:
-        "Undefined processing conditions introduce variability in material behavior during processing, affecting product consistency and performance.",
+      obs_1_title: obs[0]?.title || "",
+      obs_1_body: obs[0]?.body || "",
+      obs_2_title: obs[1]?.title || "",
+      obs_2_body: obs[1]?.body || "",
+      obs_3_title: obs[2]?.title || "",
+      obs_3_body: obs[2]?.body || "",
 
-      obs_2_title: "Operational Stability Risk",
-      obs_2_body:
-        "Unverified process settings increase the risk of unstable conversion behavior during early production runs, potentially reducing consistency and increasing adjustment requirements.",
-
-      obs_3_title: "Application Requirement Gap",
-      obs_3_body:
-        "Undefined end-use requirements prevent confirmation that the selected material and process combination will meet performance expectations under real application conditions.",
-
-      risk_1_title: "Performance Instability",
-      risk_1_body:
-        "Material mismatch may lead to unstable product performance.",
-
-      risk_2_title: "Operational Inefficiency",
-      risk_2_body:
-        "Unverified conditions may reduce operational efficiency."
+      risk_1_title: risks[0]?.title || "",
+      risk_1_body: risks[0]?.body || "",
+      risk_2_title: risks[1]?.title || "",
+      risk_2_body: risks[1]?.body || ""
     };
+        /* =========================
+       HTML
+    ========================= */
 
-    /* 🔥 HTMLそのまま（あなたの既存使う） */
-    const htmlTemplate = `<!DOCTYPE html>
+    const htmlTemplate = `
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -1252,9 +1287,14 @@ body {
 
 
 </body>
-</html>`;
+</html>
+`;
 
     const html = injectHtml(htmlTemplate, data);
+
+    /* =========================
+       PDF生成
+    ========================= */
 
     const browser = await puppeteer.launch({
       args: [
@@ -1270,16 +1310,19 @@ body {
 
     const pdf = await page.pdf({
       format: "A4",
-      printBackground: true,
-      preferCSSPageSize: true
+      printBackground: true
     });
 
     await browser.close();
 
+    /* =========================
+       メール送信
+    ========================= */
+
     await resend.emails.send({
       from: "FairVia <info@ilnautico.com>",
       to: email,
-      subject: "FairVia Report",
+      subject: "Your Screening Report",
       html: "<p>Your report is attached.</p>",
       attachments: [
         {
