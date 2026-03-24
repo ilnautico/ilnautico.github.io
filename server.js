@@ -159,19 +159,31 @@ Return JSON:
       projectStage
     ].join(" ").toLowerCase();
 
-    const isInjection = riskKeywords.includes("injection");
+  const text = [
+  processing,
+  currentMaterial,
+  bioMaterial,
+  projectStage
+].join(" ").toLowerCase();
 
-    const isPP =
-      riskKeywords.includes("pp") ||
-      riskKeywords.includes("polypropylene");
+/* 強化版判定 */
 
-    const isBio =
-      riskKeywords.includes("pla") ||
-      riskKeywords.includes("biodegradable");
+const isInjection =
+  text.includes("injection") ||
+  text.includes("molding");
 
-    if (isInjection && isPP && isBio) {
-      finalFeasibility = "LOW";
-    }
+const isPP =
+  text.includes("pp") ||
+  text.includes("polypropylene");
+
+const isBio =
+  text.includes("pla") ||
+  text.includes("biodegradable");
+
+/* 最終ロック */
+if (isInjection && isPP && isBio) {
+  finalFeasibility = "LOW";
+}
 
     const isHighRisk = finalFeasibility === "LOW";
 
