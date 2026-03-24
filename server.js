@@ -8,7 +8,7 @@ app.use(express.json());
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 // =========================
-// getValue（ID→text変換対応）
+// 安定版 getValue（完全対応）
 // =========================
 function getValue(fields, keyword) {
   const field = fields.find(f =>
@@ -17,14 +17,19 @@ function getValue(fields, keyword) {
 
   if (!field) return "";
 
-  if (Array.isArray(field.value) && field.options) {
+  // 🔥 ID → text変換
+  if (Array.isArray(field.value) && Array.isArray(field.options)) {
     const selected = field.options.find(opt =>
       field.value.includes(opt.id)
     );
-    return (selected?.text || "").toLowerCase();
+    if (selected?.text) return selected.text.toLowerCase();
   }
 
-  return (field.value || "").toLowerCase();
+  if (typeof field.value === "string") {
+    return field.value.toLowerCase();
+  }
+
+  return "";
 }
 
 // =========================
@@ -35,7 +40,6 @@ app.post("/generate-report", async (req, res) => {
 
   try {
     const fields = req.body?.data?.fields || [];
-    console.log("FIELDS RAW:", JSON.stringify(fields, null, 2));
 
     const email =
       fields.find(f => f.type === "INPUT_EMAIL")?.value || "";
@@ -44,11 +48,7 @@ app.post("/generate-report", async (req, res) => {
     const currentMaterial = getValue(fields, "material");
     const bioMaterial = getValue(fields, "biodegradable");
 
-    console.log("VALUES:", {
-      processing,
-      currentMaterial,
-      bioMaterial
-    });
+    console.log({ processing, currentMaterial, bioMaterial });
 
     const text = [
       processing,
@@ -56,17 +56,9 @@ app.post("/generate-report", async (req, res) => {
       bioMaterial
     ].join(" ").toLowerCase();
 
-    const isInjection =
-      text.includes("injection") ||
-      text.includes("molding");
-
-    const isPP =
-      text.includes("pp") ||
-      text.includes("polypropylene");
-
-    const isBio =
-      text.includes("pla") ||
-      text.includes("biodegradable");
+    const isInjection = text.includes("injection");
+    const isPP = text.includes("pp");
+    const isBio = text.includes("pla") || text.includes("bio");
 
     let finalFeasibility = "MODERATE";
 
@@ -74,10 +66,10 @@ app.post("/generate-report", async (req, res) => {
       finalFeasibility = "LOW";
     }
 
-    console.log("✅ LOGIC DONE:", finalFeasibility);
+    console.log("RESULT:", finalFeasibility);
 
     // =========================
-    // HTML（最小）
+    // HTML（安定版）
     // =========================
     const html = `
     <!DOCTYPE html>
@@ -1151,10 +1143,10 @@ body {
 </html>
     `;
 
-    console.log("⏳ BEFORE PDF");
-
+    // =========================
+    // PDF（Railway安定）
+    // =========================
     const browser = await puppeteer.launch({
-      executablePath: "/usr/bin/chromium-browser",
       args: [
         "--no-sandbox",
         "--disable-setuid-sandbox",
@@ -1172,15 +1164,14 @@ body {
 
     await browser.close();
 
-    console.log("✅ PDF DONE");
-
-    console.log("⏳ BEFORE MAIL");
-
+    // =========================
+    // メール（確実送信）
+    // =========================
     await resend.emails.send({
       from: "FairVia <info@ilnautico.com>",
       to: email,
       subject: "FairVia Report",
-      html: "<p>Your report is attached.</p>",
+      html: `<p>Your report result: <b>${finalFeasibility}</b></p>`,
       attachments: [
         {
           filename: "report.pdf",
@@ -1195,14 +1186,11 @@ body {
     res.json({ success: true });
 
   } catch (err) {
-    console.error("❌ SERVER ERROR:", err);
-    res.status(500).json({ error: "Internal Server Error" });
+    console.error("❌ ERROR:", err);
+    res.status(500).json({ error: "Server Error" });
   }
 });
 
-// =========================
-// 起動
-// =========================
 app.listen(8080, () => {
-  console.log("🚀 Server running on port 8080");
+  console.log("🚀 Server running");
 });
