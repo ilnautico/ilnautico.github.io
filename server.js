@@ -34,17 +34,45 @@ function safe(v, fallback) {
   return v && String(v).trim() !== "" ? v : fallback;
 }
 
-/* ★ ラベルズレ完全対応 */
-function findValue(fields, keywords) {
-  const keys = keywords.map(k => k.toLowerCase());
+/* =========================
+   完全マッピング
+========================= */
 
-  const f = fields.find(field => {
-    const label = (field.label || "").toLowerCase();
-    const key = (field.key || "").toLowerCase();
-    return keys.some(k => label.includes(k) || key.includes(k));
+function mapFields(fields) {
+  const map = {};
+
+  fields.forEach(f => {
+    const key = (f.label || f.key || "").toLowerCase();
+    const value = normalizeValue(f.value);
+
+    if (!value) return;
+
+    if (key.includes("email")) map.email = value;
+
+    if (key.includes("name") && !map.clientName) map.clientName = value;
+    if (key.includes("company")) map.company = value;
+    if (key.includes("country")) map.country = value;
+
+    if (key.includes("processing") || key.includes("method"))
+      map.processing = value;
+
+    if (key.includes("material") && !map.currentMaterial)
+      map.currentMaterial = value;
+
+    if (key.includes("target") || key.includes("bio"))
+      map.bioMaterial = value;
+
+    if (key.includes("equipment") || key.includes("machine"))
+      map.equipment = value;
+
+    if (key.includes("production") || key.includes("scale"))
+      map.productionScale = value;
+
+    if (key.includes("project") || key.includes("stage"))
+      map.projectStage = value;
   });
 
-  return normalizeValue(f?.value).trim();
+  return map;
 }
 
 function injectHtml(template, data) {
@@ -67,26 +95,23 @@ app.post("/generate-report", async (req, res) => {
 
     const fields = req.body?.data?.fields || [];
 
-    const email = normalizeValue(
-      fields.find(f => f.type === "INPUT_EMAIL")?.value
-    );
+    const mapped = mapFields(fields);
 
+    const email = mapped.email;
     if (!email) {
       return res.status(400).json({ error: "EMAIL NOT FOUND" });
     }
 
-    /* ===== 入力 ===== */
+    const processing      = mapped.processing || "";
+    const currentMaterial = mapped.currentMaterial || "";
+    const bioMaterial     = mapped.bioMaterial || "";
+    const equipment       = mapped.equipment || "";
+    const productionScale = mapped.productionScale || "";
+    const projectStage    = mapped.projectStage || "";
 
-    const processing      = findValue(fields, ["processing", "method"]);
-    const currentMaterial = findValue(fields, ["material"]);
-    const bioMaterial     = findValue(fields, ["target", "bio"]);
-    const equipment       = findValue(fields, ["equipment", "machine"]);
-    const productionScale = findValue(fields, ["production", "scale"]);
-    const projectStage    = findValue(fields, ["project", "stage"]);
-
-    const clientName = findValue(fields, ["client", "name"]);
-    const company    = findValue(fields, ["company"]);
-    const country    = findValue(fields, ["country"]);
+    const clientName = mapped.clientName || "";
+    const company    = mapped.company || "";
+    const country    = mapped.country || "";
 
     /* =========================
        GPT
@@ -153,7 +178,7 @@ Return JSON:
     }
 
     /* =========================
-       判定ロジック（最終固定）
+       判定ロジック
     ========================= */
 
     let finalFeasibility = parsed.feasibility;
@@ -166,8 +191,12 @@ Return JSON:
     ].join(" ").toLowerCase();
 
     const isInjection = riskKeywords.includes("injection");
-    const isPP = riskKeywords.includes("pp") || riskKeywords.includes("polypropylene");
-    const isBio = riskKeywords.includes("pla") || riskKeywords.includes("biodegradable");
+    const isPP =
+      riskKeywords.includes("pp") ||
+      riskKeywords.includes("polypropylene");
+    const isBio =
+      riskKeywords.includes("pla") ||
+      riskKeywords.includes("biodegradable");
 
     if (isInjection && isPP && isBio) {
       finalFeasibility = "LOW";
@@ -1316,4 +1345,3 @@ body {
 });
 
 app.listen(8080, () => console.log("RUNNING"));
-
