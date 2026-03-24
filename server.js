@@ -66,6 +66,7 @@ function injectHtml(template, data) {
 ========================= */
 
 app.post("/generate-report", async (req, res) => {
+    console.log("🔥 REQUEST HIT");
   try {
 
     const fields = req.body?.data?.fields || [];
