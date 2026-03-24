@@ -53,23 +53,96 @@ function mapFields(fields) {
     if (key.includes("company")) map.company = value;
     if (key.includes("country")) map.country = value;
 
-    if (key.includes("processing") || key.includes("method"))
+    function mapFields(fields) {
+  const map = {};
+
+  fields.forEach((f) => {
+    const key = String(f.key || "").toLowerCase();
+    const label = String(f.label || "").toLowerCase();
+    const type = String(f.type || "").toLowerCase();
+    const value = normalizeValue(f.value);
+
+    if (!value) return;
+
+    const text = `${key} ${label} ${type}`;
+
+    // email
+    if (!map.email && (type.includes("email") || text.includes("email"))) {
+      map.email = value;
+      return;
+    }
+
+    // client info
+    if (!map.clientName && (text.includes("client") || text.includes("name"))) {
+      map.clientName = value;
+    }
+
+    if (!map.company && text.includes("company")) {
+      map.company = value;
+    }
+
+    if (!map.country && text.includes("country")) {
+      map.country = value;
+    }
+
+    // processing / method
+    if (
+      !map.processing &&
+      (text.includes("processing") ||
+        text.includes("method") ||
+        text.includes("injection") ||
+        text.includes("extrusion") ||
+        text.includes("blow"))
+    ) {
       map.processing = value;
+    }
 
-    if (key.includes("material") && !map.currentMaterial)
+    // current material
+    if (
+      !map.currentMaterial &&
+      text.includes("material") &&
+      !text.includes("target") &&
+      !text.includes("bio")
+    ) {
       map.currentMaterial = value;
+    }
 
-    if (key.includes("target") || key.includes("bio"))
+    // target / bio material
+    if (
+      !map.bioMaterial &&
+      (text.includes("target") ||
+        text.includes("bio") ||
+        text.includes("biodegradable") ||
+        text.includes("pla"))
+    ) {
       map.bioMaterial = value;
+    }
 
-    if (key.includes("equipment") || key.includes("machine"))
+    // equipment
+    if (
+      !map.equipment &&
+      (text.includes("equipment") || text.includes("machine"))
+    ) {
       map.equipment = value;
+    }
 
-    if (key.includes("production") || key.includes("scale"))
+    // production scale
+    if (
+      !map.productionScale &&
+      (text.includes("production") ||
+        text.includes("scale") ||
+        text.includes("volume"))
+    ) {
       map.productionScale = value;
+    }
 
-    if (key.includes("project") || key.includes("stage"))
+    // project stage
+    if (
+      !map.projectStage &&
+      (text.includes("project") || text.includes("stage"))
+    ) {
       map.projectStage = value;
+    }
   });
 
   return map;
