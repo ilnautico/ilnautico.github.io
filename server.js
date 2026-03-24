@@ -1,43 +1,22 @@
 import express from "express";
-import OpenAI from "openai";
-import { Resend } from "resend";
 import puppeteer from "puppeteer";
+import { Resend } from "resend";
 
 const app = express();
-app.use(express.json({ limit: "2mb" }));
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
-});
+app.use(express.json());
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-/* =========================
-   Utility
-========================= */
-
-function escapeHtml(str = "") {
-  return String(str)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
-}
-
-function normalizeValue(v) {
-  if (!v) return "";
-  if (typeof v === "string") return v;
-  if (typeof v === "object") return v.label || v.value || "";
-  return "";
-}
-
+// =========================
+// getValue（ID→text変換対応）
+// =========================
 function getValue(fields, keyword) {
   const field = fields.find(f =>
-    (f.label || "").toLowerCase().includes(keyword)
+    (f.label || "").toLowerCase().includes(keyword.toLowerCase())
   );
 
   if (!field) return "";
 
-  // 🔥 ここが重要（ID → text変換）
   if (Array.isArray(field.value) && field.options) {
     const selected = field.options.find(opt =>
       field.value.includes(opt.id)
@@ -48,211 +27,60 @@ function getValue(fields, keyword) {
   return (field.value || "").toLowerCase();
 }
 
-
-/* 🔥 これが今回の修正（safe関数） */
-function safe(v, fallback) {
-  if (v === undefined || v === null || v === "") return fallback;
-  return v;
-}
-
-function injectHtml(template, data) {
-  let html = template;
-  Object.keys(data).forEach(key => {
-    html = html.replace(
-      new RegExp(`{{\\s*${key}\\s*}}`, "g"),
-      escapeHtml(String(data[key] ?? ""))
-    );
-  });
-  return html.replace(/{{.*?}}/g, "");
-}
-
-/* =========================
-   MAIN
-========================= */
-
+// =========================
+// メイン処理
+// =========================
 app.post("/generate-report", async (req, res) => {
   console.log("🔥 REQUEST HIT");
 
   try {
-
     const fields = req.body?.data?.fields || [];
-
     console.log("FIELDS RAW:", JSON.stringify(fields, null, 2));
 
-    const email = normalizeValue(
-      fields.find(f => f.type === "INPUT_EMAIL")?.value
-    );
-    if (!email) {
-      return res.status(400).json({ error: "EMAIL NOT FOUND" });
-    }
-
-    /* ===== 入力 ===== */
+    const email =
+      fields.find(f => f.type === "INPUT_EMAIL")?.value || "";
 
     const processing = getValue(fields, "processing");
-　　 const currentMaterial = getValue(fields, "material");
-　　 const bioMaterial = getValue(fields, "target");
-    const equipment = getValue(fields, "equipment");
-    const productionScale = getValue(fields, "production");
-    const projectStage = getValue(fields, "project");
+    const currentMaterial = getValue(fields, "material");
+    const bioMaterial = getValue(fields, "biodegradable");
 
-    const clientName = getExactValue(fields, "Client Name");
-    const company = getExactValue(fields, "Company Name");
-    const country = getExactValue(fields, "Country");
-
-    /* =========================
-       GPT
-    ========================= */
-
-    let parsed = null;
-
-    const prompt = `
-You are a senior polymer processing consultant.
-
-Return JSON:
-{
-"summary":"...",
-"findings":"...",
-"conclusion":"...",
-"feasibility":"LOW/MODERATE/HIGH",
-"observations":[
-{"title":"...","body":"..."},
-{"title":"...","body":"..."},
-{"title":"...","body":"..."}
-],
-"risks":[
-{"title":"...","body":"..."},
-{"title":"...","body":"..."}
-]
-}
-`;
-
-    try {
-      const ai = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
-        temperature: 0.2,
-        response_format: { type: "json_object" },
-        messages: [
-          { role: "system", content: "polymer expert" },
-          { role: "user", content: prompt }
-        ]
-      });
-
-      parsed = JSON.parse(ai.choices[0].message.content);
-
-    } catch (e) {
-      console.error(e);
-    }
-
-    if (!parsed) {
-      parsed = {
-        summary: "Screening level evaluation completed.",
-        findings: "Further validation required.",
-        conclusion: "Proceed to pilot.",
-        feasibility: "MODERATE",
-        observations: [],
-        risks: []
-      };
-    }
-
-    /* =========================
-       判定ロジック（固定）
-    ========================= */
-
-    let finalFeasibility = parsed.feasibility || "MODERATE";
-
-    const riskKeywords = [
+    console.log("VALUES:", {
       processing,
       currentMaterial,
-      bioMaterial,
-      projectStage
+      bioMaterial
+    });
+
+    const text = [
+      processing,
+      currentMaterial,
+      bioMaterial
     ].join(" ").toLowerCase();
 
-  const text = [
-  processing,
-  currentMaterial,
-  bioMaterial,
-  projectStage
-].join(" ").toLowerCase();
+    const isInjection =
+      text.includes("injection") ||
+      text.includes("molding");
 
-/* 強化版判定 */
+    const isPP =
+      text.includes("pp") ||
+      text.includes("polypropylene");
 
-const isInjection =
-  text.includes("injection") ||
-  text.includes("molding");
+    const isBio =
+      text.includes("pla") ||
+      text.includes("biodegradable");
 
-const isPP =
-  text.includes("polypropylene") ||
-  text.includes("pp resin") ||
-  text.includes(" pp ");
+    let finalFeasibility = "MODERATE";
 
-const isBio =
-  text.includes("pla") ||
-  text.includes("biodegradable") ||
-  text.includes("bio");
-/* 最終ロック */
-if (isInjection && isPP && isBio) {
-  finalFeasibility = "LOW";
-}
-
-    const isHighRisk = finalFeasibility === "LOW";
-
-    if (isHighRisk) {
-      parsed.summary =
-        "At screening level, a significant compatibility risk is identified between the current processing system and the proposed biodegradable material transition.";
-
-      parsed.findings =
-        "Material substitution introduces high instability risk in production.";
-
-      parsed.conclusion =
-        "Production transition is not recommended without pilot validation.";
+    if (isInjection && isPP && isBio) {
+      finalFeasibility = "LOW";
     }
 
-    const obs = parsed.observations || [];
-    const risks = parsed.risks || [];
+    console.log("✅ LOGIC DONE:", finalFeasibility);
 
-    const data = {
-
-      client_name: clientName,
-      client_company: company,
-      client_country: country,
-
-      application: processing,
-      current_material: currentMaterial,
-      bio_material: bioMaterial,
-      equipment: equipment,
-      production_scale: productionScale,
-      project_stage: projectStage,
-
-      report_id: "FV-" + Date.now(),
-      report_date: new Date().toLocaleDateString(),
-
-      executive_summary_overview: parsed.summary,
-      executive_summary_findings: parsed.findings,
-      executive_summary_conclusion: parsed.conclusion,
-
-      feasibility_level: finalFeasibility,
-
-      obs_1_title: safe(obs[0]?.title, "Processing Stability"),
-      obs_1_body: safe(obs[0]?.body, "Processing stability must be validated under controlled conditions."),
-
-      obs_2_title: safe(obs[1]?.title, "Material Compatibility"),
-      obs_2_body: safe(obs[1]?.body, "Material compatibility requires controlled validation."),
-
-      obs_3_title: safe(obs[2]?.title, "Operational Risk"),
-      obs_3_body: safe(obs[2]?.body, "Operational risks must be assessed before scaling."),
-
-      risk_1_title: safe(risks[0]?.title, "Production Instability"),
-      risk_1_body: safe(risks[0]?.body, "Production instability may occur under current conditions."),
-
-      risk_2_title: safe(risks[1]?.title, "Performance Risk"),
-      risk_2_body: safe(risks[1]?.body, "Performance may not meet expected criteria.")
-    };
-    /* =========================
-   HTML（ここに入れる）
-========================= */
-
-const htmlTemplate = `
-<!DOCTYPE html>
+    // =========================
+    // HTML（最小）
+    // =========================
+    const html = `
+    <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -1321,57 +1149,60 @@ body {
 
 </body>
 </html>
-`;
+    `;
 
-/* =========================
-   ここから下は固定
-========================= */
+    console.log("⏳ BEFORE PDF");
 
-const html = injectHtml(htmlTemplate, data);
+    const browser = await puppeteer.launch({
+      executablePath: "/usr/bin/chromium-browser",
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage"
+      ]
+    });
 
-/* Puppeteer */
-const browser = await puppeteer.launch({
-  args: [
-    "--no-sandbox",
-    "--disable-setuid-sandbox",
-    "--disable-dev-shm-usage"
-  ]
+    const page = await browser.newPage();
+    await page.setContent(html);
+
+    const pdf = await page.pdf({
+      format: "A4",
+      printBackground: true
+    });
+
+    await browser.close();
+
+    console.log("✅ PDF DONE");
+
+    console.log("⏳ BEFORE MAIL");
+
+    await resend.emails.send({
+      from: "FairVia <info@ilnautico.com>",
+      to: email,
+      subject: "FairVia Report",
+      html: "<p>Your report is attached.</p>",
+      attachments: [
+        {
+          filename: "report.pdf",
+          content: pdf.toString("base64"),
+          encoding: "base64"
+        }
+      ]
+    });
+
+    console.log("✅ MAIL SENT");
+
+    res.json({ success: true });
+
+  } catch (err) {
+    console.error("❌ SERVER ERROR:", err);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
 });
 
-const page = await browser.newPage();
-await page.setContent(html, { waitUntil: "networkidle0" });
-
-const pdf = await page.pdf({
-  format: "A4",
-  printBackground: true
+// =========================
+// 起動
+// =========================
+app.listen(8080, () => {
+  console.log("🚀 Server running on port 8080");
 });
-
-await browser.close();
-
-/* =========================
-   MAIL
-========================= */
-
-await resend.emails.send({
-  from: "FairVia <info@ilnautico.com>",
-  to: email,
-  subject: "FairVia Report",
-  html: "<p>Your report is attached.</p>",
-  attachments: [
-    {
-      filename: "report.pdf",
-      content: pdf.toString("base64"),
-      encoding: "base64"
-    }
-  ]
-});
-
-res.send("OK");
-
-} catch (err) {
-  console.error("SERVER ERROR:", err);
-  res.status(500).json({ error: err.message });
-}
-});
-
-app.listen(8080, () => console.log("RUNNING"));
