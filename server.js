@@ -141,33 +141,33 @@ Return JSON:
     }
 
     /* =========================
-       判定ロジック
+       判定ロジック（最終FIX）
     ========================= */
 
     let finalFeasibility = parsed.feasibility || "MODERATE";
-const riskKeywords = [
-  processing,
-  currentMaterial,
-  bioMaterial,
-  projectStage
-].join(" ").toLowerCase();
 
-const isInjection = riskKeywords.includes("injection");
+    const riskKeywords = [
+      processing,
+      currentMaterial,
+      bioMaterial,
+      projectStage
+    ].join(" ").toLowerCase();
 
-const isPP =
-  riskKeywords.includes("pp") ||
-  riskKeywords.includes("polypropylene");
+    const isInjection = riskKeywords.includes("injection");
 
-const isBio =
-  riskKeywords.includes("pla") ||
-  riskKeywords.includes("biodegradable");
+    const isPP =
+      riskKeywords.includes("pp") ||
+      riskKeywords.includes("polypropylene");
 
-/* ★ 最終ロック */
-if (isInjection && isPP && isBio) {
-  finalFeasibility = "LOW";
-} else {
-  finalFeasibility = parsed.feasibility || "MODERATE";
-}
+    const isBio =
+      riskKeywords.includes("pla") ||
+      riskKeywords.includes("biodegradable");
+
+    /* ★ 完全固定ロジック */
+    if (isInjection && isPP && isBio) {
+      finalFeasibility = "LOW";
+    }
+
     const isHighRisk = finalFeasibility === "LOW";
 
     if (isHighRisk) {
@@ -181,8 +181,21 @@ if (isInjection && isPP && isBio) {
         "Production transition is not recommended without pilot validation.";
     }
 
+    /* =========================
+       安全処理
+    ========================= */
+
+    const safe = (v, fallback) => (v && v !== "" ? v : fallback);
+
     const obs = parsed.observations || [];
     const risks = parsed.risks || [];
+
+    const feasibilityClass =
+      finalFeasibility === "LOW"
+        ? "level-high"
+        : finalFeasibility === "MODERATE"
+        ? "level-moderate"
+        : "level-low";
 
     const data = {
 
@@ -197,6 +210,9 @@ if (isInjection && isPP && isBio) {
       production_scale: productionScale,
       project_stage: projectStage,
 
+      processing_method: processing,
+      submission_reference: "Auto Generated",
+
       report_id: "FV-" + Date.now(),
       report_date: new Date().toLocaleDateString(),
 
@@ -205,23 +221,25 @@ if (isInjection && isPP && isBio) {
       executive_summary_conclusion: parsed.conclusion,
 
       feasibility_level: finalFeasibility,
+      feasibility_class: feasibilityClass,
 
-obs_1_title: safe(obs[0]?.title, "Processing Stability"),
-obs_1_body: safe(obs[0]?.body, "Processing stability must be validated under controlled conditions."),
+      obs_1_title: safe(obs[0]?.title, "Processing Stability"),
+      obs_1_body: safe(obs[0]?.body, "Processing stability must be validated under controlled conditions."),
 
-obs_2_title: safe(obs[1]?.title, "Material Compatibility"),
-obs_2_body: safe(obs[1]?.body, "Material compatibility requires controlled validation."),
+      obs_2_title: safe(obs[1]?.title, "Material Compatibility"),
+      obs_2_body: safe(obs[1]?.body, "Material compatibility requires controlled validation."),
 
-obs_3_title: safe(obs[2]?.title, "Operational Risk"),
-obs_3_body: safe(obs[2]?.body, "Operational risks must be assessed before scaling."),
+      obs_3_title: safe(obs[2]?.title, "Operational Risk"),
+      obs_3_body: safe(obs[2]?.body, "Operational risks must be assessed before scaling."),
 
-risk_1_title: safe(risks[0]?.title, "Production Instability"),
-risk_1_body: safe(risks[0]?.body, "Production instability may occur under current conditions."),
+      risk_1_title: safe(risks[0]?.title, "Production Instability"),
+      risk_1_body: safe(risks[0]?.body, "Production instability may occur under current conditions."),
 
-risk_2_title: safe(risks[1]?.title, "Performance Risk"),
-risk_2_body: safe(risks[1]?.body, "Performance may not meet expected criteria.")};
+      risk_2_title: safe(risks[1]?.title, "Performance Risk"),
+      risk_2_body: safe(risks[1]?.body, "Performance may not meet expected criteria.")
+    };
         /* =========================
-       HTML（ここに入れる）
+       HTML（ここにそのまま貼る）
     ========================= */
 
     const htmlTemplate = `
@@ -1294,10 +1312,11 @@ body {
 
 </body>
 </html>
-`;
+
+    `;
 
     /* =========================
-       ここから下は固定（触らない）
+       実行（変更なし）
     ========================= */
 
     const html = injectHtml(htmlTemplate, data);
