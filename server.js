@@ -30,13 +30,23 @@ function normalizeValue(v) {
   return "";
 }
 
-function getExactValue(fields, labelName) {
-  const f = fields.find(
-    f => (f.label || "").toLowerCase() === labelName.toLowerCase()
+function getValue(fields, keyword) {
+  const field = fields.find(f =>
+    (f.label || "").toLowerCase().includes(keyword)
   );
-  return normalizeValue(f?.value).trim();
-}
 
+  if (!field) return "";
+
+  // 🔥 ここが重要（ID → text変換）
+  if (Array.isArray(field.value) && field.options) {
+    const selected = field.options.find(opt =>
+      field.value.includes(opt.id)
+    );
+    return (selected?.text || "").toLowerCase();
+  }
+
+  return (field.value || "").toLowerCase();
+}
 function getValue(fields, keyword) {
   const f = fields.find(f =>
     (f.label || "").toLowerCase().includes(keyword.toLowerCase())
