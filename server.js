@@ -81,8 +81,8 @@ app.post("/generate-report", async (req, res) => {
     /* ===== 入力 ===== */
 
     const processing = getValue(fields, "processing");
-    const currentMaterial = getValue(fields, "material");
-    const bioMaterial = getValue(fields, "target");
+　　 const currentMaterial = getValue(fields, "material");
+　　 const bioMaterial = getValue(fields, "target");
     const equipment = getValue(fields, "equipment");
     const productionScale = getValue(fields, "production");
     const projectStage = getValue(fields, "project");
