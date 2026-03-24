@@ -150,19 +150,23 @@ const riskKeywords = [
   currentMaterial,
   bioMaterial,
   projectStage
-].join(" ");
-const text = (riskKeywords || "").toLowerCase();
-const isInjection = text.includes("injection");
+].join(" ").toLowerCase();
+
+const isInjection = riskKeywords.includes("injection");
+
 const isPP =
-  text.includes("pp") ||
-  text.includes("polypropylene");
+  riskKeywords.includes("pp") ||
+  riskKeywords.includes("polypropylene");
 
 const isBio =
-  text.includes("pla") ||
-  text.includes("biodegradable");
+  riskKeywords.includes("pla") ||
+  riskKeywords.includes("biodegradable");
 
+/* ★ 最終ロック */
 if (isInjection && isPP && isBio) {
   finalFeasibility = "LOW";
+} else {
+  finalFeasibility = parsed.feasibility || "MODERATE";
 }
     const isHighRisk = finalFeasibility === "LOW";
 
@@ -202,18 +206,20 @@ if (isInjection && isPP && isBio) {
 
       feasibility_level: finalFeasibility,
 
-      obs_1_title: obs[0]?.title || "",
-      obs_1_body: obs[0]?.body || "",
-      obs_2_title: obs[1]?.title || "",
-      obs_2_body: obs[1]?.body || "",
-      obs_3_title: obs[2]?.title || "",
-      obs_3_body: obs[2]?.body || "",
+obs_1_title: safe(obs[0]?.title, "Processing Stability"),
+obs_1_body: safe(obs[0]?.body, "Processing stability must be validated under controlled conditions."),
 
-      risk_1_title: risks[0]?.title || "",
-      risk_1_body: risks[0]?.body || "",
-      risk_2_title: risks[1]?.title || "",
-      risk_2_body: risks[1]?.body || ""
-    };
+obs_2_title: safe(obs[1]?.title, "Material Compatibility"),
+obs_2_body: safe(obs[1]?.body, "Material compatibility requires controlled validation."),
+
+obs_3_title: safe(obs[2]?.title, "Operational Risk"),
+obs_3_body: safe(obs[2]?.body, "Operational risks must be assessed before scaling."),
+
+risk_1_title: safe(risks[0]?.title, "Production Instability"),
+risk_1_body: safe(risks[0]?.body, "Production instability may occur under current conditions."),
+
+risk_2_title: safe(risks[1]?.title, "Performance Risk"),
+risk_2_body: safe(risks[1]?.body, "Performance may not meet expected criteria.")};
         /* =========================
        HTML（ここに入れる）
     ========================= */
