@@ -1,7 +1,7 @@
 import express from "express";
 import OpenAI from "openai";
 import { Resend } from "resend";
-import puppeteer from "puppeteer-core";
+import puppeteer from "puppeteer";
 
 const app = express();
 app.use(express.json({ limit: "2mb" }));
@@ -30,59 +30,24 @@ function normalizeValue(v) {
   return "";
 }
 
-function safe(v, fallback) {
-  return v && String(v).trim() !== "" ? v : fallback;
+function getExactValue(fields, labelName) {
+  const f = fields.find(
+    f => (f.label || "").toLowerCase() === labelName.toLowerCase()
+  );
+  return normalizeValue(f?.value).trim();
 }
 
-/* =========================
-   完全マッピング（最終）
-========================= */
+function getValue(fields, keyword) {
+  const f = fields.find(f =>
+    (f.label || "").toLowerCase().includes(keyword.toLowerCase())
+  );
+  return normalizeValue(f?.value).trim();
+}
 
-function mapFields(fields) {
-  const map = {};
-
-  fields.forEach(f => {
-    const key = String(f.key || "").toLowerCase();
-    const label = String(f.label || "").toLowerCase();
-    const type = String(f.type || "").toLowerCase();
-    const value = normalizeValue(f.value);
-
-    if (!value) return;
-
-    const text = key + " " + label + " " + type;
-
-    if (!map.email && (type.includes("email") || text.includes("email")))
-      map.email = value;
-
-    if (!map.clientName && (text.includes("name") || text.includes("client")))
-      map.clientName = value;
-
-    if (!map.company && text.includes("company"))
-      map.company = value;
-
-    if (!map.country && text.includes("country"))
-      map.country = value;
-
-    if (!map.processing && (text.includes("processing") || text.includes("method")))
-      map.processing = value;
-
-    if (!map.currentMaterial && text.includes("material") && !text.includes("target"))
-      map.currentMaterial = value;
-
-    if (!map.bioMaterial && (text.includes("target") || text.includes("bio")))
-      map.bioMaterial = value;
-
-    if (!map.equipment && text.includes("equipment"))
-      map.equipment = value;
-
-    if (!map.productionScale && text.includes("production"))
-      map.productionScale = value;
-
-    if (!map.projectStage && text.includes("project"))
-      map.projectStage = value;
-  });
-
-  return map;
+/* 🔥 これが今回の修正（safe関数） */
+function safe(v, fallback) {
+  if (v === undefined || v === null || v === "") return fallback;
+  return v;
 }
 
 function injectHtml(template, data) {
@@ -105,23 +70,26 @@ app.post("/generate-report", async (req, res) => {
 
     const fields = req.body?.data?.fields || [];
 
-    const mapped = mapFields(fields);
+    const email = normalizeValue(
+      fields.find(f => f.type === "INPUT_EMAIL")?.value
+    );
 
-    const email = mapped.email;
     if (!email) {
       return res.status(400).json({ error: "EMAIL NOT FOUND" });
     }
 
-    const processing      = mapped.processing || "";
-    const currentMaterial = mapped.currentMaterial || "";
-    const bioMaterial     = mapped.bioMaterial || "";
-    const equipment       = mapped.equipment || "";
-    const productionScale = mapped.productionScale || "";
-    const projectStage    = mapped.projectStage || "";
+    /* ===== 入力 ===== */
 
-    const clientName = mapped.clientName || "";
-    const company    = mapped.company || "";
-    const country    = mapped.country || "";
+    const processing = getValue(fields, "processing");
+    const currentMaterial = getValue(fields, "material");
+    const bioMaterial = getValue(fields, "target");
+    const equipment = getValue(fields, "equipment");
+    const productionScale = getValue(fields, "production");
+    const projectStage = getValue(fields, "project");
+
+    const clientName = getExactValue(fields, "Client Name");
+    const company = getExactValue(fields, "Company Name");
+    const country = getExactValue(fields, "Country");
 
     /* =========================
        GPT
@@ -129,25 +97,8 @@ app.post("/generate-report", async (req, res) => {
 
     let parsed = null;
 
-    try {
-      const ai = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
-        temperature: 0.2,
-        response_format: { type: "json_object" },
-        messages: [
-          {
-            role: "system",
-            content: "You are a senior polymer processing consultant."
-          },
-          {
-            role: "user",
-            content: `
-Application: ${processing}
-Material: ${currentMaterial}
-Target: ${bioMaterial}
-Equipment: ${equipment}
-Production: ${productionScale}
-Project: ${projectStage}
+    const prompt = `
+You are a senior polymer processing consultant.
 
 Return JSON:
 {
@@ -165,22 +116,30 @@ Return JSON:
 {"title":"...","body":"..."}
 ]
 }
-`
-          }
+`;
+
+    try {
+      const ai = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        temperature: 0.2,
+        response_format: { type: "json_object" },
+        messages: [
+          { role: "system", content: "polymer expert" },
+          { role: "user", content: prompt }
         ]
       });
 
       parsed = JSON.parse(ai.choices[0].message.content);
 
     } catch (e) {
-      console.error("GPT ERROR:", e);
+      console.error(e);
     }
 
     if (!parsed) {
       parsed = {
-        summary: "Screening completed.",
+        summary: "Screening level evaluation completed.",
         findings: "Further validation required.",
-        conclusion: "Proceed carefully.",
+        conclusion: "Proceed to pilot.",
         feasibility: "MODERATE",
         observations: [],
         risks: []
@@ -188,10 +147,10 @@ Return JSON:
     }
 
     /* =========================
-       判定ロジック
+       判定ロジック（固定）
     ========================= */
 
-    let finalFeasibility = parsed.feasibility;
+    let finalFeasibility = parsed.feasibility || "MODERATE";
 
     const riskKeywords = [
       processing,
@@ -201,9 +160,11 @@ Return JSON:
     ].join(" ").toLowerCase();
 
     const isInjection = riskKeywords.includes("injection");
+
     const isPP =
       riskKeywords.includes("pp") ||
       riskKeywords.includes("polypropylene");
+
     const isBio =
       riskKeywords.includes("pla") ||
       riskKeywords.includes("biodegradable");
@@ -212,23 +173,34 @@ Return JSON:
       finalFeasibility = "LOW";
     }
 
-    if (finalFeasibility === "LOW") {
-      parsed.summary = "High compatibility risk.";
-      parsed.findings = "Instability expected.";
-      parsed.conclusion = "Pilot required before production.";
+    const isHighRisk = finalFeasibility === "LOW";
+
+    if (isHighRisk) {
+      parsed.summary =
+        "At screening level, a significant compatibility risk is identified between the current processing system and the proposed biodegradable material transition.";
+
+      parsed.findings =
+        "Material substitution introduces high instability risk in production.";
+
+      parsed.conclusion =
+        "Production transition is not recommended without pilot validation.";
     }
 
-    const data = {
-      client_name: safe(clientName, "Client"),
-      client_company: safe(company, "Not specified"),
-      client_country: safe(country, "Not specified"),
+    const obs = parsed.observations || [];
+    const risks = parsed.risks || [];
 
-      application: safe(processing, "Not specified"),
-      current_material: safe(currentMaterial, "Not specified"),
-      bio_material: safe(bioMaterial, "Not specified"),
-      equipment: safe(equipment, "Not specified"),
-      production_scale: safe(productionScale, "Not specified"),
-      project_stage: safe(projectStage, "Not specified"),
+    const data = {
+
+      client_name: clientName,
+      client_company: company,
+      client_country: country,
+
+      application: processing,
+      current_material: currentMaterial,
+      bio_material: bioMaterial,
+      equipment: equipment,
+      production_scale: productionScale,
+      project_stage: projectStage,
 
       report_id: "FV-" + Date.now(),
       report_date: new Date().toLocaleDateString(),
@@ -237,9 +209,28 @@ Return JSON:
       executive_summary_findings: parsed.findings,
       executive_summary_conclusion: parsed.conclusion,
 
-      feasibility_level: finalFeasibility
+      feasibility_level: finalFeasibility,
+
+      obs_1_title: safe(obs[0]?.title, "Processing Stability"),
+      obs_1_body: safe(obs[0]?.body, "Processing stability must be validated under controlled conditions."),
+
+      obs_2_title: safe(obs[1]?.title, "Material Compatibility"),
+      obs_2_body: safe(obs[1]?.body, "Material compatibility requires controlled validation."),
+
+      obs_3_title: safe(obs[2]?.title, "Operational Risk"),
+      obs_3_body: safe(obs[2]?.body, "Operational risks must be assessed before scaling."),
+
+      risk_1_title: safe(risks[0]?.title, "Production Instability"),
+      risk_1_body: safe(risks[0]?.body, "Production instability may occur under current conditions."),
+
+      risk_2_title: safe(risks[1]?.title, "Performance Risk"),
+      risk_2_body: safe(risks[1]?.body, "Performance may not meet expected criteria.")
     };
-        const htmlTemplate = `
+    /* =========================
+   HTML（ここに入れる）
+========================= */
+
+const htmlTemplate = `
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1311,55 +1302,56 @@ body {
 </html>
 `;
 
-    const html = injectHtml(htmlTemplate, data);
+/* =========================
+   ここから下は固定
+========================= */
 
-    /* =========================
-       Puppeteer-core（Railway対応）
-    ========================= */
+const html = injectHtml(htmlTemplate, data);
 
-    const browser = await puppeteer.launch({
-      executablePath: "/usr/bin/chromium-browser",
-      args: [
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--disable-dev-shm-usage"
-      ]
-    });
+/* Puppeteer */
+const browser = await puppeteer.launch({
+  executablePath: "/usr/bin/chromium-browser",
+  args: [
+    "--no-sandbox",
+    "--disable-setuid-sandbox",
+    "--disable-dev-shm-usage"
+  ]
+});
 
-    const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: "networkidle0" });
+const page = await browser.newPage();
+await page.setContent(html, { waitUntil: "networkidle0" });
 
-    const pdf = await page.pdf({
-      format: "A4",
-      printBackground: true
-    });
+const pdf = await page.pdf({
+  format: "A4",
+  printBackground: true
+});
 
-    await browser.close();
+await browser.close();
 
-    /* =========================
-       MAIL
-    ========================= */
+/* =========================
+   MAIL
+========================= */
 
-    await resend.emails.send({
-      from: "FairVia <info@ilnautico.com>",
-      to: email,
-      subject: "FairVia Report",
-      html: "<p>Your report is attached.</p>",
-      attachments: [
-        {
-          filename: "report.pdf",
-          content: pdf.toString("base64"),
-          encoding: "base64"
-        }
-      ]
-    });
+await resend.emails.send({
+  from: "FairVia <info@ilnautico.com>",
+  to: email,
+  subject: "FairVia Report",
+  html: "<p>Your report is attached.</p>",
+  attachments: [
+    {
+      filename: "report.pdf",
+      content: pdf.toString("base64"),
+      encoding: "base64"
+    }
+  ]
+});
 
-    res.send("OK");
+res.send("OK");
 
-  } catch (err) {
-    console.error("SERVER ERROR:", err);
-    res.status(500).json({ error: err.message });
-  }
+} catch (err) {
+  console.error("SERVER ERROR:", err);
+  res.status(500).json({ error: err.message });
+}
 });
 
 app.listen(8080, () => console.log("RUNNING"));
