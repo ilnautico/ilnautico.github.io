@@ -173,13 +173,14 @@ const isInjection =
   text.includes("molding");
 
 const isPP =
-  text.includes("pp") ||
-  text.includes("polypropylene");
+  text.includes("polypropylene") ||
+  text.includes("pp resin") ||
+  text.includes(" pp ");
 
 const isBio =
   text.includes("pla") ||
-  text.includes("biodegradable");
-
+  text.includes("biodegradable") ||
+  text.includes("bio");
 /* 最終ロック */
 if (isInjection && isPP && isBio) {
   finalFeasibility = "LOW";
