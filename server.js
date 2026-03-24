@@ -1,7 +1,7 @@
 import express from "express";
 import OpenAI from "openai";
 import { Resend } from "resend";
-import puppeteer from "puppeteer";
+import puppeteer from "puppeteer-core";
 
 const app = express();
 app.use(express.json({ limit: "2mb" }));
@@ -72,8 +72,6 @@ app.post("/generate-report", async (req, res) => {
       return res.status(400).json({ error: "EMAIL NOT FOUND" });
     }
 
-    /* ===== 入力 ===== */
-
     const processing = getValue(fields, "processing");
     const currentMaterial = getValue(fields, "material");
     const bioMaterial = getValue(fields, "target");
@@ -86,31 +84,10 @@ app.post("/generate-report", async (req, res) => {
     const country = getExactValue(fields, "Country");
 
     /* =========================
-       GPT
+       GPT（fallbackあり）
     ========================= */
 
     let parsed = null;
-
-    const prompt = `
-You are a senior polymer processing consultant.
-
-Return JSON:
-{
-"summary":"...",
-"findings":"...",
-"conclusion":"...",
-"feasibility":"LOW/MODERATE/HIGH",
-"observations":[
-{"title":"...","body":"..."},
-{"title":"...","body":"..."},
-{"title":"...","body":"..."}
-],
-"risks":[
-{"title":"...","body":"..."},
-{"title":"...","body":"..."}
-]
-}
-`;
 
     try {
       const ai = await openai.chat.completions.create({
@@ -119,14 +96,14 @@ Return JSON:
         response_format: { type: "json_object" },
         messages: [
           { role: "system", content: "polymer expert" },
-          { role: "user", content: prompt }
+          { role: "user", content: "Generate feasibility JSON" }
         ]
       });
 
       parsed = JSON.parse(ai.choices[0].message.content);
 
     } catch (e) {
-      console.error(e);
+      console.error("GPT ERROR:", e);
     }
 
     if (!parsed) {
@@ -141,7 +118,7 @@ Return JSON:
     }
 
     /* =========================
-       判定ロジック（最終FIX）
+       判定ロジック（完成）
     ========================= */
 
     let finalFeasibility = parsed.feasibility || "MODERATE";
@@ -163,7 +140,6 @@ Return JSON:
       riskKeywords.includes("pla") ||
       riskKeywords.includes("biodegradable");
 
-    /* ★ 完全固定ロジック */
     if (isInjection && isPP && isBio) {
       finalFeasibility = "LOW";
     }
@@ -182,7 +158,7 @@ Return JSON:
     }
 
     /* =========================
-       安全処理
+       ★ここ重要（欠けてた）
     ========================= */
 
     const safe = (v, fallback) => (v && v !== "" ? v : fallback);
@@ -1312,22 +1288,13 @@ body {
 
 </body>
 </html>
-
-    `;
-
-    /* =========================
-       実行（変更なし）
-    ========================= */
+`;
 
     const html = injectHtml(htmlTemplate, data);
 
     const browser = await puppeteer.launch({
-      args: [
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--disable-dev-shm-usage",
-        "--disable-gpu"
-      ]
+      executablePath: "/usr/bin/chromium-browser",
+      args: ["--no-sandbox", "--disable-setuid-sandbox"]
     });
 
     const page = await browser.newPage();
@@ -1335,8 +1302,7 @@ body {
 
     const pdf = await page.pdf({
       format: "A4",
-      printBackground: true,
-      preferCSSPageSize: true
+      printBackground: true
     });
 
     await browser.close();
