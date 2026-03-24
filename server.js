@@ -30,20 +30,20 @@ function normalizeValue(v) {
   return "";
 }
 
-function getExactValue(fields, labelName) {
-  const target = labelName.trim().toLowerCase();
-  const f = fields.find(
-    f => (f.label || "").trim().toLowerCase() === target
-  );
-  return normalizeValue(f?.value).trim();
+function safe(v, fallback) {
+  return v && String(v).trim() !== "" ? v : fallback;
 }
 
-function getValue(fields, keyword) {
-  const target = keyword.trim().toLowerCase();
-  const f = fields.find(f =>
-    (f.label || "").toLowerCase().includes(target) ||
-    (f.key || "").toLowerCase().includes(target)
-  );
+/* ★ ラベルズレ完全対応 */
+function findValue(fields, keywords) {
+  const keys = keywords.map(k => k.toLowerCase());
+
+  const f = fields.find(field => {
+    const label = (field.label || "").toLowerCase();
+    const key = (field.key || "").toLowerCase();
+    return keys.some(k => label.includes(k) || key.includes(k));
+  });
+
   return normalizeValue(f?.value).trim();
 }
 
@@ -58,16 +58,13 @@ function injectHtml(template, data) {
   return html.replace(/{{.*?}}/g, "");
 }
 
-function safe(v, fallback) {
-  return v && String(v).trim() !== "" ? v : fallback;
-}
-
 /* =========================
    MAIN
 ========================= */
 
 app.post("/generate-report", async (req, res) => {
   try {
+
     const fields = req.body?.data?.fields || [];
 
     const email = normalizeValue(
@@ -78,31 +75,88 @@ app.post("/generate-report", async (req, res) => {
       return res.status(400).json({ error: "EMAIL NOT FOUND" });
     }
 
-    const processing = getValue(fields, "processing");
-    const currentMaterial = getValue(fields, "material");
-    const bioMaterial = getValue(fields, "target");
-    const equipment = getValue(fields, "equipment");
-    const productionScale = getValue(fields, "production");
-    const projectStage = getValue(fields, "project");
+    /* ===== 入力 ===== */
 
-    const clientName = getExactValue(fields, "Client Name");
-    const company = getExactValue(fields, "Company Name");
-    const country = getExactValue(fields, "Country");
+    const processing      = findValue(fields, ["processing", "method"]);
+    const currentMaterial = findValue(fields, ["material"]);
+    const bioMaterial     = findValue(fields, ["target", "bio"]);
+    const equipment       = findValue(fields, ["equipment", "machine"]);
+    const productionScale = findValue(fields, ["production", "scale"]);
+    const projectStage    = findValue(fields, ["project", "stage"]);
 
-    let parsed = {
-      summary: "Screening level evaluation completed.",
-      findings: "Further validation required.",
-      conclusion: "Proceed to pilot.",
-      feasibility: "MODERATE",
-      observations: [],
-      risks: []
-    };
+    const clientName = findValue(fields, ["client", "name"]);
+    const company    = findValue(fields, ["company"]);
+    const country    = findValue(fields, ["country"]);
 
     /* =========================
-       判定ロジック
+       GPT
     ========================= */
 
-    let finalFeasibility = parsed.feasibility || "MODERATE";
+    let parsed = null;
+
+    try {
+      const ai = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        temperature: 0.2,
+        response_format: { type: "json_object" },
+        messages: [
+          {
+            role: "system",
+            content: "You are a senior polymer processing consultant."
+          },
+          {
+            role: "user",
+            content: `
+Application: ${processing}
+Material: ${currentMaterial}
+Target: ${bioMaterial}
+Equipment: ${equipment}
+Production: ${productionScale}
+Project: ${projectStage}
+
+Return JSON:
+{
+"summary":"...",
+"findings":"...",
+"conclusion":"...",
+"feasibility":"LOW/MODERATE/HIGH",
+"observations":[
+{"title":"...","body":"..."},
+{"title":"...","body":"..."},
+{"title":"...","body":"..."}
+],
+"risks":[
+{"title":"...","body":"..."},
+{"title":"...","body":"..."}
+]
+}
+`
+          }
+        ]
+      });
+
+      parsed = JSON.parse(ai.choices[0].message.content);
+
+    } catch (e) {
+      console.error("GPT ERROR:", e);
+    }
+
+    if (!parsed) {
+      parsed = {
+        summary: "Screening completed.",
+        findings: "Further validation required.",
+        conclusion: "Proceed carefully.",
+        feasibility: "MODERATE",
+        observations: [],
+        risks: []
+      };
+    }
+
+    /* =========================
+       判定ロジック（最終固定）
+    ========================= */
+
+    let finalFeasibility = parsed.feasibility;
 
     const riskKeywords = [
       processing,
@@ -112,41 +166,18 @@ app.post("/generate-report", async (req, res) => {
     ].join(" ").toLowerCase();
 
     const isInjection = riskKeywords.includes("injection");
-
-    const isPP =
-      riskKeywords.includes("pp") ||
-      riskKeywords.includes("polypropylene");
-
-    const isBio =
-      riskKeywords.includes("pla") ||
-      riskKeywords.includes("biodegradable");
+    const isPP = riskKeywords.includes("pp") || riskKeywords.includes("polypropylene");
+    const isBio = riskKeywords.includes("pla") || riskKeywords.includes("biodegradable");
 
     if (isInjection && isPP && isBio) {
       finalFeasibility = "LOW";
     }
 
-    const isHighRisk = finalFeasibility === "LOW";
-
-    if (isHighRisk) {
-      parsed.summary =
-        "At screening level, a significant compatibility risk is identified.";
-
-      parsed.findings =
-        "Material substitution introduces high instability risk.";
-
-      parsed.conclusion =
-        "Production transition is not recommended.";
+    if (finalFeasibility === "LOW") {
+      parsed.summary = "High compatibility risk.";
+      parsed.findings = "Instability expected.";
+      parsed.conclusion = "Pilot required before production.";
     }
-
-    const obs = parsed.observations || [];
-    const risks = parsed.risks || [];
-
-    const feasibilityClass =
-      finalFeasibility === "LOW"
-        ? "level-high"
-        : finalFeasibility === "MODERATE"
-        ? "level-moderate"
-        : "level-low";
 
     const data = {
       client_name: safe(clientName, "Client"),
@@ -160,9 +191,6 @@ app.post("/generate-report", async (req, res) => {
       production_scale: safe(productionScale, "Not specified"),
       project_stage: safe(projectStage, "Not specified"),
 
-      processing_method: processing,
-      submission_reference: "Auto Generated",
-
       report_id: "FV-" + Date.now(),
       report_date: new Date().toLocaleDateString(),
 
@@ -170,30 +198,10 @@ app.post("/generate-report", async (req, res) => {
       executive_summary_findings: parsed.findings,
       executive_summary_conclusion: parsed.conclusion,
 
-      feasibility_level: finalFeasibility,
-      feasibility_class: feasibilityClass,
-
-      obs_1_title: safe(obs[0]?.title, "Processing Stability"),
-      obs_1_body: safe(obs[0]?.body, "Check processing stability"),
-
-      obs_2_title: safe(obs[1]?.title, "Material Compatibility"),
-      obs_2_body: safe(obs[1]?.body, "Check compatibility"),
-
-      obs_3_title: safe(obs[2]?.title, "Operational Risk"),
-      obs_3_body: safe(obs[2]?.body, "Check operational risk"),
-
-      risk_1_title: safe(risks[0]?.title, "Production Risk"),
-      risk_1_body: safe(risks[0]?.body, "Risk may occur"),
-
-      risk_2_title: safe(risks[1]?.title, "Performance Risk"),
-      risk_2_body: safe(risks[1]?.body, "Performance may drop")
+      feasibility_level: finalFeasibility
     };
-        /* =========================
-       HTML（ここにあなたのHTML全文を貼る）
-    ========================= */
-
-    const htmlTemplate = `
- <!DOCTYPE html>
+        const htmlTemplate = `
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -1266,7 +1274,6 @@ body {
 
     const html = injectHtml(htmlTemplate, data);
 
-/* ★ ここが最重要（確実に動く設定） */
     const browser = await puppeteer.launch({
       args: [
         "--no-sandbox",
@@ -1286,7 +1293,6 @@ body {
 
     await browser.close();
 
-/* ★ メール（完全版） */
     await resend.emails.send({
       from: "FairVia <info@ilnautico.com>",
       to: email,
@@ -1310,3 +1316,4 @@ body {
 });
 
 app.listen(8080, () => console.log("RUNNING"));
+
