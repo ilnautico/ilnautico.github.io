@@ -146,21 +146,19 @@ Return JSON:
 
     let finalFeasibility = parsed.feasibility || "MODERATE";
 
-    const riskKeywords = [
-      processing,
-      currentMaterial,
-      bioMaterial,
-      projectStage
-    ].join(" ").toLowerCase();
+const text = (riskKeywords || "").toLowerCase();
+const isInjection = text.includes("injection");
+const isPP =
+  text.includes("pp") ||
+  text.includes("polypropylene");
 
-    if (
-      riskKeywords.includes("injection") &&
-      (riskKeywords.includes("pp") || riskKeywords.includes("polypropylene")) &&
-      (riskKeywords.includes("pla") || riskKeywords.includes("biodegradable"))
-    ) {
-      finalFeasibility = "LOW";
-    }
+const isBio =
+  text.includes("pla") ||
+  text.includes("biodegradable");
 
+if (isInjection && isPP && isBio) {
+  finalFeasibility = "LOW";
+}
     const isHighRisk = finalFeasibility === "LOW";
 
     if (isHighRisk) {
