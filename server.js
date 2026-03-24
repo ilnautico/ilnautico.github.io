@@ -14,7 +14,7 @@ function injectHtml(template, data) {
   let html = template;
 
   Object.keys(data).forEach(key => {
-    const regex = new RegExp(`{{\\s*${key}\\s*}}`, "g");
+    const regex = new RegExp("\\{\\{\\s*" + key + "\\s*\\}\\}", "g");
     html = html.replace(regex, data[key] || "");
   });
 
