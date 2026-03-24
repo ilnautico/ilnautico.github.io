@@ -66,15 +66,17 @@ function injectHtml(template, data) {
 ========================= */
 
 app.post("/generate-report", async (req, res) => {
-    console.log("🔥 REQUEST HIT");
+  console.log("🔥 REQUEST HIT");
+
   try {
 
     const fields = req.body?.data?.fields || [];
 
+    console.log("FIELDS RAW:", JSON.stringify(fields, null, 2));
+
     const email = normalizeValue(
       fields.find(f => f.type === "INPUT_EMAIL")?.value
     );
-
     if (!email) {
       return res.status(400).json({ error: "EMAIL NOT FOUND" });
     }
