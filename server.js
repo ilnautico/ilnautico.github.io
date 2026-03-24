@@ -22,7 +22,7 @@ function injectHtml(template, data) {
 }
 
 // =========================
-// 値取得（ID→text完全対応）
+// 値取得（ID対応済み）
 // =========================
 function getValue(fields, keyword) {
   const field = fields.find(f =>
@@ -46,7 +46,40 @@ function getValue(fields, keyword) {
 }
 
 // =========================
-// あなたのHTMLテンプレそのまま貼る
+// 🔥 コメント（完全固定：無難版復元）
+// =========================
+
+const SUMMARY_OVERVIEW =
+  "No fundamental incompatibility is identified at screening level. The primary constraint lies in undefined processing and material conditions.";
+
+const SUMMARY_FINDINGS =
+  "Technical feasibility cannot be validated under current conditions due to undefined parameters.";
+
+const SUMMARY_CONCLUSION =
+  "Transition should not proceed without pilot validation.";
+
+const OBS_1_TITLE = "Processing Condition Uncertainty";
+const OBS_1_BODY =
+  "Undefined processing conditions introduce variability in material behavior during processing, affecting product consistency and performance.";
+
+const OBS_2_TITLE = "Operational Stability Risk";
+const OBS_2_BODY =
+  "Unverified process settings increase the risk of unstable conversion behavior during early production runs, potentially reducing consistency and increasing adjustment requirements.";
+
+const OBS_3_TITLE = "Application Requirement Gap";
+const OBS_3_BODY =
+  "Undefined end-use requirements prevent confirmation that the selected material and process combination will meet performance expectations under real application conditions.";
+
+const RISK_1_TITLE = "Performance Instability";
+const RISK_1_BODY =
+  "Material mismatch may lead to unstable product performance.";
+
+const RISK_2_TITLE = "Operational Inefficiency";
+const RISK_2_BODY =
+  "Unverified conditions may reduce operational efficiency.";
+
+// =========================
+// HTMLテンプレ（あなたの本番HTML）
 // =========================
 const htmlTemplate = `
 <!DOCTYPE html>
@@ -87,7 +120,7 @@ body {
   margin: 0;
 }
 
-/* ── Page container── */
+/* ── Page container ── */
 .page {
   display: flex;
   flex-direction: column;
@@ -1127,10 +1160,16 @@ app.post("/generate-report", async (req, res) => {
   console.log("🔥 REQUEST HIT");
 
   try {
-    const fields = req.body?.data?.fields || [];
+    const fields = Array.isArray(req.body)
+      ? req.body
+      : req.body?.fields ||
+        req.body?.data?.fields ||
+        [];
 
     const email =
-      fields.find(f => f.type === "INPUT_EMAIL")?.value || "";
+      fields.find(f => f.type === "INPUT_EMAIL")?.value ||
+      req.body?.email ||
+      "";
 
     const processing = getValue(fields, "processing");
     const currentMaterial = getValue(fields, "material");
@@ -1142,6 +1181,9 @@ app.post("/generate-report", async (req, res) => {
       bioMaterial
     ].join(" ").toLowerCase();
 
+    // =========================
+    // 判定（最新ロジック）
+    // =========================
     const isInjection = text.includes("injection");
     const isPP = text.includes("pp");
     const isBio =
@@ -1157,85 +1199,40 @@ app.post("/generate-report", async (req, res) => {
     console.log("RESULT:", finalFeasibility);
 
     // =========================
-    // 🔥 テンプレ差し込み（完全版）
+    // HTML差し込み
     // =========================
     const html = injectHtml(htmlTemplate, {
-      // 基本
       application: processing,
       current_material: currentMaterial,
       processing_method: processing,
       bio_material: bioMaterial,
 
-      // 判定（両対応）
       feasibility_level: finalFeasibility,
       FEASIBILITY_LEVEL: finalFeasibility,
 
-      // メタ
       report_date: new Date().toISOString().split("T")[0],
       report_id: "FV-" + Date.now(),
 
-      // クライアント（空でOK）
-      client_name: "",
-      client_company: "",
-      client_country: "",
+      // 🔥 固定コメント
+      executive_summary_overview: SUMMARY_OVERVIEW,
+      executive_summary_findings: SUMMARY_FINDINGS,
+      executive_summary_conclusion: SUMMARY_CONCLUSION,
 
-      // その他（空でOK：テンプレ崩れ防止）
-      equipment: "",
-      production_scale: "",
-      project_stage: "",
-      submission_reference: "",
+      obs_1_title: OBS_1_TITLE,
+      obs_1_body: OBS_1_BODY,
+      obs_2_title: OBS_2_TITLE,
+      obs_2_body: OBS_2_BODY,
+      obs_3_title: OBS_3_TITLE,
+      obs_3_body: OBS_3_BODY,
 
-      executive_summary_overview: "",
-      executive_summary_findings: "",
-      executive_summary_conclusion: "",
-
-      feasibility_explanation: "",
-
-      thermal_risk: "",
-      thermal_note: "",
-      processing_risk: "",
-      processing_note: "",
-      equipment_risk: "",
-      equipment_note: "",
-
-      score_thermal_assessment: "",
-      score_thermal_level: "",
-      score_thermal_note: "",
-
-      score_processing_assessment: "",
-      score_processing_level: "",
-      score_processing_note: "",
-
-      score_equipment_assessment: "",
-      score_equipment_level: "",
-      score_equipment_note: "",
-
-      score_cert_assessment: "",
-      score_cert_level: "",
-      score_cert_note: "",
-
-      score_eol_assessment: "",
-      score_eol_level: "",
-      score_eol_note: "",
-
-      obs_1_title: "",
-      obs_1_body: "",
-      obs_2_title: "",
-      obs_2_body: "",
-      obs_3_title: "",
-      obs_3_body: "",
-
-      risk_1_title: "",
-      risk_1_body: "",
-      risk_2_title: "",
-      risk_2_body: "",
-
-      strategic_recommendation: "",
-      disclaimer: ""
+      risk_1_title: RISK_1_TITLE,
+      risk_1_body: RISK_1_BODY,
+      risk_2_title: RISK_2_TITLE,
+      risk_2_body: RISK_2_BODY
     });
 
     // =========================
-    // PDF
+    // PDF生成
     // =========================
     const browser = await puppeteer.launch({
       args: [
@@ -1256,8 +1253,13 @@ app.post("/generate-report", async (req, res) => {
     await browser.close();
 
     // =========================
-    // メール
+    // メール送信
     // =========================
+    if (!email) {
+      console.log("⚠️ NO EMAIL");
+      return res.json({ success: false });
+    }
+
     await resend.emails.send({
       from: "FairVia <info@ilnautico.com>",
       to: email,
