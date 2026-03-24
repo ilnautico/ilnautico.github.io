@@ -30,10 +30,16 @@ function normalizeValue(v) {
   return "";
 }
 
+function getExactValue(fields, labelName) {
+  const f = fields.find(
+    f => (f.label || "").toLowerCase() === labelName.toLowerCase()
+  );
+  return normalizeValue(f?.value).trim();
+}
+
 function getValue(fields, keyword) {
   const f = fields.find(f =>
-    (f.label || "").toLowerCase().includes(keyword) ||
-    (f.key || "").toLowerCase().includes(keyword)
+    (f.label || "").toLowerCase().includes(keyword.toLowerCase())
   );
   return normalizeValue(f?.value).trim();
 }
@@ -43,7 +49,7 @@ function injectHtml(template, data) {
   Object.keys(data).forEach(key => {
     html = html.replace(
       new RegExp(`{{\\s*${key}\\s*}}`, "g"),
-      escapeHtml(String(data[key] || ""))
+      escapeHtml(String(data[key] ?? ""))
     );
   });
   return html.replace(/{{.*?}}/g, "");
@@ -75,9 +81,9 @@ app.post("/generate-report", async (req, res) => {
     const productionScale = getValue(fields, "production");
     const projectStage = getValue(fields, "project");
 
-    const clientName = getValue(fields, "client");
-    const company = getValue(fields, "company");
-    const country = getValue(fields, "country");
+    const clientName = getExactValue(fields, "Client Name");
+    const company = getExactValue(fields, "Company Name");
+    const country = getExactValue(fields, "Country");
 
     /* =========================
        GPT
@@ -87,14 +93,6 @@ app.post("/generate-report", async (req, res) => {
 
     const prompt = `
 You are a senior polymer processing consultant.
-
-INPUT:
-Processing: ${processing || "unknown"}
-Material: ${currentMaterial || "unknown"}
-Target: ${bioMaterial || "unknown"}
-Equipment: ${equipment || "unknown"}
-Scale: ${productionScale || "unknown"}
-Stage: ${projectStage || "unknown"}
 
 Return JSON:
 {
@@ -128,7 +126,7 @@ Return JSON:
       parsed = JSON.parse(ai.choices[0].message.content);
 
     } catch (e) {
-      console.error("AI ERROR:", e);
+      console.error(e);
     }
 
     if (!parsed) {
@@ -143,7 +141,7 @@ Return JSON:
     }
 
     /* =========================
-       🔥 判定ロジック（完成版）
+       判定ロジック
     ========================= */
 
     let finalFeasibility = parsed.feasibility || "MODERATE";
@@ -157,14 +155,8 @@ Return JSON:
 
     if (
       riskKeywords.includes("injection") &&
-      (
-        riskKeywords.includes("pp") ||
-        riskKeywords.includes("polypropylene")
-      ) &&
-      (
-        riskKeywords.includes("pla") ||
-        riskKeywords.includes("biodegradable")
-      )
+      (riskKeywords.includes("pp") || riskKeywords.includes("polypropylene")) &&
+      (riskKeywords.includes("pla") || riskKeywords.includes("biodegradable"))
     ) {
       finalFeasibility = "LOW";
     }
@@ -173,10 +165,10 @@ Return JSON:
 
     if (isHighRisk) {
       parsed.summary =
-        "At screening level, a significant compatibility risk is identified.";
+        "At screening level, a significant compatibility risk is identified between the current processing system and the proposed biodegradable material transition.";
 
       parsed.findings =
-        "Material transition introduces high instability risk in production.";
+        "Material substitution introduces high instability risk in production.";
 
       parsed.conclusion =
         "Production transition is not recommended without pilot validation.";
@@ -186,6 +178,7 @@ Return JSON:
     const risks = parsed.risks || [];
 
     const data = {
+
       client_name: clientName,
       client_company: company,
       client_country: country,
@@ -199,6 +192,10 @@ Return JSON:
 
       report_id: "FV-" + Date.now(),
       report_date: new Date().toLocaleDateString(),
+
+      executive_summary_overview: parsed.summary,
+      executive_summary_findings: parsed.findings,
+      executive_summary_conclusion: parsed.conclusion,
 
       feasibility_level: finalFeasibility,
 
@@ -215,7 +212,7 @@ Return JSON:
       risk_2_body: risks[1]?.body || ""
     };
         /* =========================
-       HTML
+       HTML（ここに入れる）
     ========================= */
 
     const htmlTemplate = `
@@ -1290,11 +1287,11 @@ body {
 </html>
 `;
 
-    const html = injectHtml(htmlTemplate, data);
-
     /* =========================
-       PDF生成
+       ここから下は固定（触らない）
     ========================= */
+
+    const html = injectHtml(htmlTemplate, data);
 
     const browser = await puppeteer.launch({
       args: [
@@ -1310,19 +1307,16 @@ body {
 
     const pdf = await page.pdf({
       format: "A4",
-      printBackground: true
+      printBackground: true,
+      preferCSSPageSize: true
     });
 
     await browser.close();
 
-    /* =========================
-       メール送信
-    ========================= */
-
     await resend.emails.send({
       from: "FairVia <info@ilnautico.com>",
       to: email,
-      subject: "Your Screening Report",
+      subject: "FairVia Report",
       html: "<p>Your report is attached.</p>",
       attachments: [
         {
