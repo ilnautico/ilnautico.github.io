@@ -8,7 +8,21 @@ app.use(express.json());
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 // =========================
-// 安定版 getValue（完全対応）
+// テンプレ差し込み関数
+// =========================
+function injectHtml(template, data) {
+  let html = template;
+
+  Object.keys(data).forEach(key => {
+    const regex = new RegExp(`{{${key}}}`, "g");
+    html = html.replace(regex, data[key] || "");
+  });
+
+  return html;
+}
+
+// =========================
+// getValue（ID対応済み）
 // =========================
 function getValue(fields, keyword) {
   const field = fields.find(f =>
@@ -17,7 +31,6 @@ function getValue(fields, keyword) {
 
   if (!field) return "";
 
-  // 🔥 ID → text変換
   if (Array.isArray(field.value) && Array.isArray(field.options)) {
     const selected = field.options.find(opt =>
       field.value.includes(opt.id)
@@ -33,46 +46,10 @@ function getValue(fields, keyword) {
 }
 
 // =========================
-// メイン処理
+// HTMLテンプレ（あなたの元HTML貼る）
 // =========================
-app.post("/generate-report", async (req, res) => {
-  console.log("🔥 REQUEST HIT");
-
-  try {
-    const fields = req.body?.data?.fields || [];
-
-    const email =
-      fields.find(f => f.type === "INPUT_EMAIL")?.value || "";
-
-    const processing = getValue(fields, "processing");
-    const currentMaterial = getValue(fields, "material");
-    const bioMaterial = getValue(fields, "biodegradable");
-
-    console.log({ processing, currentMaterial, bioMaterial });
-
-    const text = [
-      processing,
-      currentMaterial,
-      bioMaterial
-    ].join(" ").toLowerCase();
-
-    const isInjection = text.includes("injection");
-    const isPP = text.includes("pp");
-    const isBio = text.includes("pla") || text.includes("bio");
-
-    let finalFeasibility = "MODERATE";
-
-    if (isInjection && isPP && isBio) {
-      finalFeasibility = "LOW";
-    }
-
-    console.log("RESULT:", finalFeasibility);
-
-    // =========================
-    // HTML（安定版）
-    // =========================
-    const html = `
-    <!DOCTYPE html>
+const htmlTemplate = `
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -1141,10 +1118,56 @@ body {
 
 </body>
 </html>
-    `;
+`;
+
+// =========================
+// メイン処理
+// =========================
+app.post("/generate-report", async (req, res) => {
+  console.log("🔥 REQUEST HIT");
+
+  try {
+    const fields = req.body?.data?.fields || [];
+
+    const email =
+      fields.find(f => f.type === "INPUT_EMAIL")?.value || "";
+
+    const processing = getValue(fields, "processing");
+    const currentMaterial = getValue(fields, "material");
+    const bioMaterial = getValue(fields, "biodegradable");
+
+    const text = [
+      processing,
+      currentMaterial,
+      bioMaterial
+    ].join(" ").toLowerCase();
+
+    const isInjection = text.includes("injection");
+    const isPP = text.includes("pp");
+    const isBio = text.includes("pla") || text.includes("bio");
+
+    let finalFeasibility = "MODERATE";
+
+    if (isInjection && isPP && isBio) {
+      finalFeasibility = "LOW";
+    }
+
+    console.log("RESULT:", finalFeasibility);
 
     // =========================
-    // PDF（Railway安定）
+    // テンプレ差し込み
+    // =========================
+    const html = injectHtml(htmlTemplate, {
+      application: processing,
+      current_material: currentMaterial,
+      processing_method: processing,
+      bio_material: bioMaterial,
+      feasibility_level: finalFeasibility,
+      report_date: new Date().toISOString().split("T")[0]
+    });
+
+    // =========================
+    // PDF生成
     // =========================
     const browser = await puppeteer.launch({
       args: [
@@ -1165,7 +1188,7 @@ body {
     await browser.close();
 
     // =========================
-    // メール（確実送信）
+    // メール送信
     // =========================
     await resend.emails.send({
       from: "FairVia <info@ilnautico.com>",
@@ -1191,6 +1214,9 @@ body {
   }
 });
 
+// =========================
+// 起動
+// =========================
 app.listen(8080, () => {
-  console.log("🚀 Server running");
+  console.log("🚀 Server running on port 8080");
 });
