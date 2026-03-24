@@ -47,12 +47,7 @@ function getValue(fields, keyword) {
 
   return (field.value || "").toLowerCase();
 }
-function getValue(fields, keyword) {
-  const f = fields.find(f =>
-    (f.label || "").toLowerCase().includes(keyword.toLowerCase())
-  );
-  return normalizeValue(f?.value).trim();
-}
+
 
 /* 🔥 これが今回の修正（safe関数） */
 function safe(v, fallback) {
