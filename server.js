@@ -145,7 +145,12 @@ Return JSON:
     ========================= */
 
     let finalFeasibility = parsed.feasibility || "MODERATE";
-
+const riskKeywords = [
+  processing,
+  currentMaterial,
+  bioMaterial,
+  projectStage
+].join(" ");
 const text = (riskKeywords || "").toLowerCase();
 const isInjection = text.includes("injection");
 const isPP =
