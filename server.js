@@ -1,7 +1,7 @@
 import express from "express";
 import OpenAI from "openai";
 import { Resend } from "resend";
-import puppeteer from "puppeteer-core";
+import puppeteer from "puppeteer";
 
 const app = express();
 app.use(express.json({ limit: "2mb" }));
@@ -78,124 +78,31 @@ app.post("/generate-report", async (req, res) => {
       return res.status(400).json({ error: "EMAIL NOT FOUND" });
     }
 
-    /* ===== 入力 ===== */
+    const processing = getValue(fields, "processing");
+    const currentMaterial = getValue(fields, "material");
+    const bioMaterial = getValue(fields, "target");
+    const equipment = getValue(fields, "equipment");
+    const productionScale = getValue(fields, "production");
+    const projectStage = getValue(fields, "project");
 
-    const processing =
-      getValue(fields, "processing") ||
-      getValue(fields, "method") ||
-      getValue(fields, "process");
+    const clientName = getExactValue(fields, "Client Name");
+    const company = getExactValue(fields, "Company Name");
+    const country = getExactValue(fields, "Country");
 
-    const currentMaterial =
-      getValue(fields, "current material") ||
-      getValue(fields, "material");
-
-    const bioMaterial =
-      getValue(fields, "target") ||
-      getValue(fields, "biodegradable") ||
-      getValue(fields, "bio");
-
-    const equipment =
-      getValue(fields, "equipment") ||
-      getValue(fields, "machine");
-
-    const productionScale =
-      getValue(fields, "production scale") ||
-      getValue(fields, "production") ||
-      getValue(fields, "scale");
-
-    const projectStage =
-      getValue(fields, "project currently in") ||
-      getValue(fields, "project stage") ||
-      getValue(fields, "stage");
-
-    const clientName =
-      getExactValue(fields, "Client Name") ||
-      getValue(fields, "client");
-
-    const company =
-      getExactValue(fields, "Company Name") ||
-      getValue(fields, "company");
-
-    const country =
-      getExactValue(fields, "Country") ||
-      getValue(fields, "country");
-
-    /* =========================
-       GPT
-    ========================= */
-
-    let parsed = null;
-
-    const prompt = `
-You are a senior polymer processing consultant writing a short paid technical screening report.
-
-Input:
-Processing: ${processing || "unknown"}
-Current material: ${currentMaterial || "unknown"}
-Target biodegradable material: ${bioMaterial || "unknown"}
-Equipment: ${equipment || "unknown"}
-Production scale: ${productionScale || "unknown"}
-Project stage: ${projectStage || "unknown"}
-
-Rules:
-- Always provide a judgment.
-- Never say "insufficient data".
-- Keep the wording concise and professional.
-- Return valid JSON only.
-
-Return JSON:
-{
-  "summary":"...",
-  "findings":"...",
-  "conclusion":"...",
-  "feasibility":"LOW/MODERATE/HIGH",
-  "observations":[
-    {"title":"...","body":"..."},
-    {"title":"...","body":"..."},
-    {"title":"...","body":"..."}
-  ],
-  "risks":[
-    {"title":"...","body":"..."},
-    {"title":"...","body":"..."}
-  ]
-}
-`;
-
-    try {
-      const ai = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
-        temperature: 0.2,
-        response_format: { type: "json_object" },
-        messages: [
-          { role: "system", content: "You are a polymer processing expert." },
-          { role: "user", content: prompt }
-        ]
-      });
-
-      parsed = JSON.parse(ai.choices[0].message.content);
-    } catch (e) {
-      console.error("GPT ERROR:", e);
-    }
-
-    if (!parsed) {
-      parsed = {
-        summary:
-          "No fundamental incompatibility is identified at screening level. The primary constraint lies in incomplete process definition under current submission conditions.",
-        findings:
-          "Technical feasibility cannot be fully validated until material, equipment, and processing conditions are confirmed under controlled evaluation.",
-        conclusion:
-          "A controlled pilot validation is required before any production-level decision.",
-        feasibility: "MODERATE",
-        observations: [],
-        risks: []
-      };
-    }
+    let parsed = {
+      summary: "Screening level evaluation completed.",
+      findings: "Further validation required.",
+      conclusion: "Proceed to pilot.",
+      feasibility: "MODERATE",
+      observations: [],
+      risks: []
+    };
 
     /* =========================
        判定ロジック
     ========================= */
 
-    let finalFeasibility = (parsed.feasibility || "MODERATE").toUpperCase();
+    let finalFeasibility = parsed.feasibility || "MODERATE";
 
     const riskKeywords = [
       processing,
@@ -205,12 +112,13 @@ Return JSON:
     ].join(" ").toLowerCase();
 
     const isInjection = riskKeywords.includes("injection");
+
     const isPP =
       riskKeywords.includes("pp") ||
       riskKeywords.includes("polypropylene");
+
     const isBio =
       riskKeywords.includes("pla") ||
-      riskKeywords.includes("pla-based") ||
       riskKeywords.includes("biodegradable");
 
     if (isInjection && isPP && isBio) {
@@ -221,13 +129,13 @@ Return JSON:
 
     if (isHighRisk) {
       parsed.summary =
-        "At screening level, a significant compatibility risk is identified between the current processing system and the proposed biodegradable material transition.";
+        "At screening level, a significant compatibility risk is identified.";
 
       parsed.findings =
-        "Material substitution introduces high instability risk in production, particularly in thermal behaviour, flow consistency, and process reliability under existing conversion conditions.";
+        "Material substitution introduces high instability risk.";
 
       parsed.conclusion =
-        "Production transition is not recommended without pilot validation and controlled process adjustment.";
+        "Production transition is not recommended.";
     }
 
     const obs = parsed.observations || [];
@@ -240,27 +148,6 @@ Return JSON:
         ? "level-moderate"
         : "level-low";
 
-    const riskCardClass =
-      finalFeasibility === "LOW"
-        ? "risk-high"
-        : finalFeasibility === "MODERATE"
-        ? "risk-moderate"
-        : "risk-low";
-
-    const scoreClass =
-      finalFeasibility === "LOW"
-        ? "high"
-        : finalFeasibility === "MODERATE"
-        ? "moderate"
-        : "low";
-
-    const riskLabel =
-      finalFeasibility === "LOW"
-        ? "HIGH RISK"
-        : finalFeasibility === "MODERATE"
-        ? "MODERATE"
-        : "LOW RISK";
-
     const data = {
       client_name: safe(clientName, "Client"),
       client_company: safe(company, "Not specified"),
@@ -268,156 +155,1119 @@ Return JSON:
 
       application: safe(processing, "Not specified"),
       current_material: safe(currentMaterial, "Not specified"),
-      processing_method: safe(processing, "Not specified"),
       bio_material: safe(bioMaterial, "Not specified"),
       equipment: safe(equipment, "Not specified"),
       production_scale: safe(productionScale, "Not specified"),
       project_stage: safe(projectStage, "Not specified"),
+
+      processing_method: processing,
       submission_reference: "Auto Generated",
 
       report_id: "FV-" + Date.now(),
       report_date: new Date().toLocaleDateString(),
 
-      executive_summary_overview: safe(
-        parsed.summary,
-        "No fundamental incompatibility is identified at screening level. The primary constraint lies in incomplete process definition under current submission conditions."
-      ),
-      executive_summary_findings: safe(
-        parsed.findings,
-        "Technical feasibility cannot be fully validated until material, equipment, and processing conditions are confirmed under controlled evaluation."
-      ),
-      executive_summary_conclusion: safe(
-        parsed.conclusion,
-        "A controlled pilot validation is required before any production-level decision."
-      ),
+      executive_summary_overview: parsed.summary,
+      executive_summary_findings: parsed.findings,
+      executive_summary_conclusion: parsed.conclusion,
 
       feasibility_level: finalFeasibility,
       feasibility_class: feasibilityClass,
-      feasibility_explanation:
-        "This assessment reflects screening-level evaluation based on available inputs. Validation under controlled conditions is required.",
-
-      thermal_risk_class: riskCardClass,
-      thermal_risk: riskLabel,
-      thermal_note:
-        finalFeasibility === "LOW"
-          ? "Thermal mismatch risk is elevated under the proposed transition scenario."
-          : "Thermal behaviour remains subject to confirmation under controlled validation.",
-
-      processing_risk_class: riskCardClass,
-      processing_risk: riskLabel,
-      processing_note:
-        finalFeasibility === "LOW"
-          ? "Process stability is likely to deteriorate under existing production settings."
-          : "Processing behaviour requires confirmation under pilot conditions.",
-
-      equipment_risk_class: riskCardClass,
-      equipment_risk: riskLabel,
-      equipment_note:
-        finalFeasibility === "LOW"
-          ? "Existing equipment may not support stable biodegradable conversion without adjustment."
-          : "Equipment suitability should be verified before production commitment.",
-
-      score_thermal_assessment:
-        finalFeasibility === "LOW" ? "Critical review required" : "Conditional review required",
-      score_thermal_class: scoreClass,
-      score_thermal_level: riskLabel,
-      score_thermal_note:
-        finalFeasibility === "LOW"
-          ? "Thermal behaviour may diverge materially from existing polyolefin processing norms."
-          : "Thermal evaluation remains dependent on defined process conditions.",
-
-      score_processing_assessment:
-        finalFeasibility === "LOW" ? "High transition sensitivity" : "Moderate transition sensitivity",
-      score_processing_class: scoreClass,
-      score_processing_level: riskLabel,
-      score_processing_note:
-        finalFeasibility === "LOW"
-          ? "Processing behaviour may become unstable under current assumptions."
-          : "Process consistency remains unverified at screening stage.",
-
-      score_equipment_assessment:
-        finalFeasibility === "LOW" ? "Compatibility gap likely" : "Compatibility to be confirmed",
-      score_equipment_class: scoreClass,
-      score_equipment_level: riskLabel,
-      score_equipment_note:
-        finalFeasibility === "LOW"
-          ? "Equipment setup may require adjustment before safe transition."
-          : "Existing equipment capability has not yet been validated.",
-
-      score_cert_assessment: "Not assessed",
-      score_cert_class: "na",
-      score_cert_level: "N/A",
-      score_cert_note:
-        "Certification status was not part of the submitted screening inputs.",
-
-      score_eol_assessment: "Not assessed",
-      score_eol_class: "na",
-      score_eol_level: "N/A",
-      score_eol_note:
-        "End-of-life requirements were not defined in the submitted inputs.",
 
       obs_1_title: safe(obs[0]?.title, "Processing Stability"),
-      obs_1_body: safe(
-        obs[0]?.body,
-        "Processing stability must be validated under controlled conditions."
-      ),
+      obs_1_body: safe(obs[0]?.body, "Check processing stability"),
 
       obs_2_title: safe(obs[1]?.title, "Material Compatibility"),
-      obs_2_body: safe(
-        obs[1]?.body,
-        "Material compatibility requires controlled validation."
-      ),
+      obs_2_body: safe(obs[1]?.body, "Check compatibility"),
 
       obs_3_title: safe(obs[2]?.title, "Operational Risk"),
-      obs_3_body: safe(
-        obs[2]?.body,
-        "Operational risks must be assessed before scaling."
-      ),
+      obs_3_body: safe(obs[2]?.body, "Check operational risk"),
 
-      risk_1_title: safe(risks[0]?.title, "Production Instability"),
-      risk_1_body: safe(
-        risks[0]?.body,
-        "Production instability may occur under current conditions."
-      ),
+      risk_1_title: safe(risks[0]?.title, "Production Risk"),
+      risk_1_body: safe(risks[0]?.body, "Risk may occur"),
 
       risk_2_title: safe(risks[1]?.title, "Performance Risk"),
-      risk_2_body: safe(
-        risks[1]?.body,
-        "Performance may not meet expected criteria."
-      ),
-
-      strategic_recommendation:
-        finalFeasibility === "LOW"
-          ? "Do not proceed to production under the current configuration. Conduct a structured pilot validation with controlled processing adjustments before any production commitment."
-          : "Proceed to controlled pilot validation after confirming material behaviour, processing conditions, and equipment compatibility.",
-
-      disclaimer:
-        "This assessment is based on submitted inputs and screening-level technical interpretation only. No physical testing, rheology analysis, or on-site equipment review has been performed."
+      risk_2_body: safe(risks[1]?.body, "Performance may drop")
     };
         /* =========================
-       HTML（ここにあなたのHTML全文をそのまま貼る）
+       HTML（ここにあなたのHTML全文を貼る）
     ========================= */
 
     const htmlTemplate = `
-    /* =========================
-       HTML（ここにあなたのHTML全文をそのまま貼る）
-    ========================= */
+ <!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FairVia™ Technical Screening Report</title>
+<style>
 
-    const htmlTemplate = `
-ここにあなたのHTML全文をそのまま貼る
+/* ── Reset ── */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+/* ── Page setup ── */
+@page {
+  size: A4;
+  margin: 0;
+}
+
+html {
+  width: 210mm;
+  background: #ffffff;
+}
+
+body {
+  width: 210mm;
+  background: #ffffff;
+  font-family: Georgia, "Times New Roman", serif;
+  color: #2c2c2c;
+  font-size: 10pt;
+  line-height: 1.6;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+  margin: 0;
+}
+
+/* ── Page container ── */
+.page {
+  display: flex;
+  flex-direction: column;
+  width: 210mm;
+  height: 297mm;
+  box-sizing: border-box;
+  page-break-after: always;
+  background: #ffffff;
+  position: relative;
+}
+
+.page:last-child {
+  page-break-after: auto;
+}
+
+/* ── Page body grows to push footer down ── */
+.page-body {
+  flex: 1;
+  min-height: 0;
+  padding: 8mm 14mm 14mm;
+}
+
+/* ── Page footer: always at bottom ── */
+.page-footer {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  background: #17263c;
+}
+
+.page-footer-gold {
+  height: 1px;
+  background: #b4965a;
+  opacity: 0.6;
+}
+
+.page-footer-inner {
+  padding: 3mm 14mm;
+  display: flex;
+  justify-content: space-between;
+}
+
+.page-footer-left {
+  font-size: 6.5pt;
+  color: rgba(255,255,255,0.45);
+  letter-spacing: 0.06em;
+}
+
+.page-footer-right {
+  font-size: 6.5pt;
+  color: #b4965a;
+}
+
+/* ═══════════════════════════════════════════
+   COVER PAGE
+═══════════════════════════════════════════ */
+
+.cover {
+  background: #17263c;
+}
+
+.cover-inner {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+}
+
+.cover-header {
+  padding: 10mm 14mm 0;
+  display: block;
+}
+
+.cover-brand {
+  font-family: Georgia, serif;
+  font-size: 8pt;
+  color: #b4965a;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  display: block;
+  margin-bottom: 1mm;
+}
+
+.cover-service {
+  font-size: 7pt;
+  color: rgba(255,255,255,0.5);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  display: block;
+}
+
+.cover-gold-rule {
+  margin: 8mm 14mm 0;
+  height: 1px;
+  background: #b4965a;
+  opacity: 0.4;
+}
+
+.cover-main {
+  padding: 16mm 14mm 0;
+  display: block;
+  flex: 1;
+}
+
+.cover-report-type {
+  font-size: 7.5pt;
+  color: #b4965a;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  display: block;
+  margin-bottom: 5mm;
+}
+
+.cover-title {
+  font-family: Georgia, serif;
+  font-size: 28pt;
+  font-weight: normal;
+  color: #ffffff;
+  line-height: 1.15;
+  display: block;
+  margin-bottom: 3mm;
+}
+
+.cover-subtitle {
+  font-family: Georgia, serif;
+  font-size: 13pt;
+  font-weight: normal;
+  color: #b4965a;
+  letter-spacing: 0.03em;
+  display: block;
+  margin-bottom: 12mm;
+}
+
+.cover-divider {
+  width: 20mm;
+  height: 2px;
+  background: #b4965a;
+  display: block;
+  margin-bottom: 10mm;
+}
+
+.cover-client-box {
+  background: rgba(180, 150, 90, 0.12);
+  border-left: 3px solid #b4965a;
+  padding: 6mm 8mm;
+  display: block;
+  margin-bottom: 12mm;
+}
+
+.cover-client-label {
+  font-size: 7pt;
+  color: #b4965a;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  display: block;
+  margin-bottom: 2mm;
+}
+
+.cover-client-name {
+  font-size: 13pt;
+  color: #ffffff;
+  font-weight: normal;
+  display: block;
+  margin-bottom: 1.5mm;
+}
+
+.cover-client-detail {
+  font-size: 8.5pt;
+  color: rgba(255,255,255,0.6);
+  display: block;
+  margin-bottom: 0.8mm;
+}
+
+.cover-meta-grid {
+  display: block;
+}
+
+.cover-meta-row {
+  padding: 2.5mm 0;
+  border-top: 1px solid rgba(180,150,90,0.25);
+  display: block;
+  overflow: hidden;
+}
+
+.cover-meta-row:last-child {
+  border-bottom: 1px solid rgba(180,150,90,0.25);
+}
+
+.cover-meta-label {
+  font-size: 7pt;
+  color: rgba(255,255,255,0.45);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  float: left;
+  width: 38mm;
+  display: inline-block;
+}
+
+.cover-meta-value {
+  font-size: 8.5pt;
+  color: rgba(255,255,255,0.85);
+  display: inline-block;
+}
+
+.cover-badge-area {
+  padding: 10mm 14mm 0;
+  display: block;
+}
+
+.cover-badge-label {
+  font-size: 7pt;
+  color: rgba(255,255,255,0.45);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  display: block;
+  margin-bottom: 3mm;
+}
+
+.cover-badge {
+  display: inline-block;
+  padding: 3mm 8mm;
+  border: 1.5px solid #b4965a;
+  font-size: 11pt;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.cover-badge.level-low      { color: #6db07a; border-color: #6db07a; }
+.cover-badge.level-moderate { color: #c4963e; border-color: #c4963e; }
+.cover-badge.level-high     { color: #c0614a; border-color: #c0614a; }
+
+/* Cover footer */
+.cover-footer {
+  background: #17263c;
+  border-top: 1px solid rgba(180,150,90,0.25);
+  padding: 5mm 14mm;
+  display: flex;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+
+.cover-footer-left {
+  font-size: 7pt;
+  color: rgba(255,255,255,0.35);
+  letter-spacing: 0.08em;
+}
+
+.cover-footer-right {
+  font-size: 7pt;
+  color: rgba(255,255,255,0.35);
+  letter-spacing: 0.08em;
+}
+
+/* ═══════════════════════════════════════════
+   CONTENT PAGES — header strip
+═══════════════════════════════════════════ */
+
+.page-header {
+  background: #17263c;
+  padding: 4mm 14mm;
+  flex-shrink: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  overflow: hidden;
+}
+
+.page-header-left {
+  font-size: 6.5pt;
+  color: rgba(255,255,255,0.55);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  line-height: 1.4;
+}
+
+.page-header-right {
+  font-size: 6.5pt;
+  color: #b4965a;
+  letter-spacing: 0.08em;
+  line-height: 1.4;
+}
+
+.page-header-gold {
+  height: 1.5px;
+  background: #b4965a;
+  flex-shrink: 0;
+}
+
+/* ── Section elements ── */
+
+.section {
+  break-inside: avoid;
+  page-break-inside: avoid;
+  margin-bottom: 7mm;
+  display: block;
+}
+
+.section-label {
+  font-size: 6.5pt;
+  color: #b4965a;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  display: block;
+  margin-bottom: 1mm;
+}
+
+.section-title {
+  font-family: Georgia, serif;
+  font-size: 14pt;
+  font-weight: normal;
+  color: #17263c;
+  display: block;
+  margin-bottom: 1.5mm;
+}
+
+.section-rule-full {
+  height: 1px;
+  background: #b4965a;
+  display: block;
+  margin-bottom: 5mm;
+}
+
+/* ── Body text ── */
+.body-text {
+  font-size: 9.5pt;
+  color: #2c2c2c;
+  line-height: 1.65;
+  text-align: justify;
+  display: block;
+  margin-bottom: 3mm;
+}
+
+/* ── Info table ── */
+.info-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 9pt;
+  margin-bottom: 4mm;
+}
+
+.info-table tr:nth-child(odd) td  { background: #f5f3ee; }
+.info-table tr:nth-child(even) td { background: #ffffff; }
+
+.info-table td {
+  padding: 2.5mm 4mm;
+  vertical-align: top;
+  border-bottom: 0.5px solid #ddd6c8;
+}
+
+.info-table td:first-child {
+  width: 44mm;
+  font-size: 8pt;
+  font-weight: bold;
+  color: #17263c;
+  white-space: nowrap;
+}
+
+.info-table td:last-child { color: #2c2c2c; }
+
+.info-table tr:last-child td { border-bottom: 1.5px solid #b4965a; }
+
+/* ── Executive Summary blocks ── */
+.summary-block {
+  border-left: 3px solid #b4965a;
+  padding-left: 4mm;
+  margin-bottom: 4mm;
+}
+
+.summary-heading {
+  display: block;
+  font-size: 8pt;
+  font-weight: bold;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #b4965a;
+  margin-bottom: 1.5mm;
+}
+
+/* ── Feasibility scale ── */
+.feasibility-scale {
+  display: block;
+  margin-bottom: 4mm;
+}
+
+.feasibility-scale-label {
+  font-size: 7pt;
+  color: #b4965a;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  display: block;
+  margin-bottom: 2mm;
+}
+
+.feasibility-row {
+  display: block;
+  width: 72mm;
+  padding: 2mm 4mm;
+  margin-bottom: 1.2mm;
+  border-radius: 2px;
+  font-size: 9pt;
+  overflow: hidden;
+}
+
+.feasibility-row.inactive {
+  background: #f5f3ee;
+  border: 0.5px solid #ddd6c8;
+  color: #9a9088;
+}
+
+.feasibility-row.active {
+  background: #17263c;
+  border: 1px solid #b4965a;
+  color: #ffffff;
+}
+
+.feasibility-dot {
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  margin-right: 3mm;
+  vertical-align: middle;
+  position: relative;
+  top: -1px;
+}
+
+.feasibility-row.active   .feasibility-dot { background: #b4965a; }
+.feasibility-row.inactive .feasibility-dot { background: transparent; border: 1px solid #c8bfb0; }
+
+.feasibility-text {
+  font-size: 8.5pt;
+  letter-spacing: 0.06em;
+  vertical-align: middle;
+}
+
+.feasibility-row.active   .feasibility-text { font-weight: bold; }
+.feasibility-row.inactive .feasibility-text { font-weight: normal; }
+
+/* ── Risk indicator cards ── */
+.risk-grid {
+  display: block;
+  overflow: hidden;
+  margin-bottom: 4mm;
+  clear: both;
+}
+
+.risk-card {
+  float: left;
+  width: 58mm;
+  margin-right: 3mm;
+  border-radius: 2px;
+  overflow: hidden;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+.risk-card:last-child { margin-right: 0; }
+
+.risk-card-accent { height: 3px; display: block; }
+
+.risk-card-body { padding: 3mm 3.5mm; }
+
+.risk-card-aspect {
+  font-size: 6.5pt;
+  font-weight: bold;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  display: block;
+  margin-bottom: 2mm;
+}
+
+.risk-badge {
+  display: inline-block;
+  padding: 1mm 3mm;
+  border-radius: 2px;
+  font-size: 7pt;
+  font-weight: bold;
+  color: #ffffff;
+  letter-spacing: 0.06em;
+  margin-bottom: 2mm;
+}
+
+.risk-note { font-size: 7pt; line-height: 1.45; display: block; }
+
+.risk-high .risk-card-accent  { background: #8b2500; }
+.risk-high .risk-card-body    { background: #fff3f0; }
+.risk-high .risk-card-aspect  { color: #8b2500; }
+.risk-high .risk-badge        { background: #8b2500; }
+.risk-high .risk-note         { color: #6b3028; }
+
+.risk-moderate .risk-card-accent { background: #8a6800; }
+.risk-moderate .risk-card-body   { background: #fffbee; }
+.risk-moderate .risk-card-aspect { color: #8a6800; }
+.risk-moderate .risk-badge       { background: #8a6800; }
+.risk-moderate .risk-note        { color: #6b5420; }
+
+.risk-low .risk-card-accent  { background: #2e7d52; }
+.risk-low .risk-card-body    { background: #f2faf5; }
+.risk-low .risk-card-aspect  { color: #2e7d52; }
+.risk-low .risk-badge        { background: #2e7d52; }
+.risk-low .risk-note         { color: #245c3c; }
+
+/* ── Score table ── */
+.score-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 9pt;
+  margin-bottom: 4mm;
+}
+
+.score-table th {
+  background: #17263c;
+  color: #b4965a;
+  font-size: 7pt;
+  font-weight: bold;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 2.5mm 4mm;
+  text-align: left;
+}
+
+.score-table td {
+  padding: 2.5mm 4mm;
+  border-bottom: 0.5px solid #ddd6c8;
+  vertical-align: top;
+}
+
+.score-table tr:nth-child(odd) td  { background: #f5f3ee; }
+.score-table tr:nth-child(even) td { background: #ffffff; }
+.score-table tr:last-child td      { border-bottom: 1.5px solid #b4965a; }
+
+.score-pill {
+  display: inline-block;
+  padding: 0.5mm 3mm;
+  border-radius: 2px;
+  font-size: 7.5pt;
+  font-weight: bold;
+  color: #ffffff;
+}
+
+.score-pill.high     { background: #8b2500; }
+.score-pill.moderate { background: #8a6800; }
+.score-pill.low      { background: #2e7d52; }
+.score-pill.na       { background: #7a8a9a; }
+
+/* ── Considerations ── */
+.consideration {
+  break-inside: avoid;
+  page-break-inside: avoid;
+  margin-bottom: 4mm;
+  padding-bottom: 4mm;
+  border-bottom: 0.5px solid #ddd6c8;
+  display: block;
+}
+
+.consideration:last-child { border-bottom: none; margin-bottom: 0; }
+
+.consideration-number {
+  font-size: 7pt;
+  color: #b4965a;
+  letter-spacing: 0.1em;
+  font-weight: bold;
+  display: block;
+  margin-bottom: 0.5mm;
+}
+
+.consideration-title {
+  font-size: 10pt;
+  font-weight: bold;
+  color: #17263c;
+  display: block;
+  margin-bottom: 1.5mm;
+}
+
+.consideration-body {
+  font-size: 9pt;
+  color: #2c2c2c;
+  line-height: 1.6;
+  text-align: justify;
+  display: block;
+}
+
+/* ── Recommendation box ── */
+.recommendation-box {
+  background: #f5f3ee;
+  border-left: 3px solid #b4965a;
+  padding: 5mm 6mm;
+  display: block;
+  margin-bottom: 4mm;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+.recommendation-text {
+  font-size: 9.5pt;
+  color: #2c2c2c;
+  line-height: 1.65;
+  text-align: justify;
+  display: block;
+}
+
+/* ── Disclaimer ── */
+.disclaimer-box {
+  background: #f5f3ee;
+  border: 0.5px solid #ddd6c8;
+  padding: 4mm 5mm;
+  display: block;
+}
+
+.disclaimer-text {
+  font-size: 7.5pt;
+  color: #7a8070;
+  line-height: 1.55;
+  font-style: italic;
+  text-align: justify;
+  display: block;
+}
+
+/* ── Signature block ── */
+.sig-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 5mm;
+}
+
+.sig-table td {
+  width: 33.33%;
+  padding: 2.5mm 4mm;
+  border: 0.5px solid #ddd6c8;
+}
+
+.sig-table .sig-header td {
+  background: #f5f3ee;
+  font-size: 6.5pt;
+  color: #9a9088;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  border-bottom: 1px solid #b4965a;
+}
+
+.sig-table .sig-values td {
+  background: #ffffff;
+  font-size: 8.5pt;
+  font-weight: bold;
+  color: #17263c;
+}
+
+.sig-table .sig-values .gold-text { color: #b4965a; }
+
+/* ── Utility ── */
+.clearfix::after { content: ''; display: table; clear: both; }
+.gold-text  { color: #b4965a; }
+.navy-text  { color: #17263c; }
+.muted-text { color: #9a9088; }
+
+</style>
+</head>
+<body>
+
+
+<!-- ═══════════════════════════════════════════════════════
+     PAGE 1 — COVER
+═══════════════════════════════════════════════════════ -->
+<div class="page cover">
+
+  <div class="cover-inner">
+    <div class="cover-header">
+      <span class="cover-brand">FairVia™</span>
+      <span class="cover-service">Technical Advisory Services &nbsp;|&nbsp; Il Nautico Co., Ltd.</span>
+    </div>
+    <div class="cover-gold-rule"></div>
+
+    <div class="cover-main">
+      <span class="cover-report-type">Material Feasibility Screening Report</span>
+      <span class="cover-title">Material &amp; Processing<br>Feasibility Screening</span>
+      <span class="cover-subtitle">Material Transition Decision Brief</span>
+      <span class="cover-divider"></span>
+
+      <div class="cover-client-box">
+        <span class="cover-client-label">Prepared for</span>
+        <span class="cover-client-name">{{client_name}}</span>
+        <span class="cover-client-detail"><strong>Company:</strong> {{client_company}}</span>
+        <span class="cover-client-detail"><strong>Country:</strong> {{client_country}}</span>
+      </div>
+
+      <div class="cover-meta-grid">
+        <div class="cover-meta-row">
+          <span class="cover-meta-label">Report No.</span>
+          <span class="cover-meta-value">{{report_id}}</span>
+        </div>
+        <div class="cover-meta-row">
+          <span class="cover-meta-label">Date Issued</span>
+          <span class="cover-meta-value">{{report_date}}</span>
+        </div>
+        <div class="cover-meta-row">
+          <span class="cover-meta-label">Document Type</span>
+          <span class="cover-meta-value">Preliminary Screening — Strategic Advisory</span>
+        </div>
+        <div class="cover-meta-row">
+          <span class="cover-meta-label">Classification</span>
+          <span class="cover-meta-value">Strictly Confidential</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="cover-badge-area">
+      <span class="cover-badge-label">Overall Feasibility Assessment</span>
+      <span class="cover-badge {{feasibility_class}}">&#11044;&nbsp; {{feasibility_level}}</span>
+    </div>
+  </div><!-- /cover-inner -->
+
+  <div class="cover-footer">
+    <span class="cover-footer-left">© Il Nautico Co., Ltd. — FairVia™ Technical Advisory</span>
+    <span class="cover-footer-right">Page 1</span>
+  </div>
+
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════
+     PAGE 2 — CLIENT INFORMATION + EXECUTIVE SUMMARY
+═══════════════════════════════════════════════════════ -->
+<div class="page content">
+
+    <div class="page-header">
+      <span class="page-header-left">FairVia™ &nbsp;|&nbsp; Technical Advisory Services</span>
+      <span class="page-header-right">Strictly Confidential</span>
+    </div>
+    <div class="page-header-gold"></div>
+
+    <div class="page-body">
+
+      <div class="section">
+        <span class="section-label">Section 1</span>
+        <span class="section-title">Client Information &amp; Application Overview</span>
+        <div class="section-rule-full"></div>
+        <table class="info-table">
+          <tr><td>Application</td>          <td>{{application}}</td></tr>
+          <tr><td>Current Material</td>     <td>{{current_material}}</td></tr>
+          <tr><td>Processing Method</td>    <td>{{processing_method}}</td></tr>
+          <tr><td>Target Material</td>      <td>{{bio_material}}</td></tr>
+          <tr><td>Processing Equipment</td> <td>{{equipment}}</td></tr>
+          <tr><td>Production Scale</td>     <td>{{production_scale}}</td></tr>
+          <tr><td>Project Objective</td>    <td>{{project_stage}}</td></tr>
+          <tr><td>Submission Reference</td> <td>{{submission_reference}}</td></tr>
+        </table>
+      </div>
+
+      <div class="section">
+        <span class="section-label">Section 2</span>
+        <span class="section-title">Executive Summary</span>
+        <div class="section-rule-full"></div>
+        <div class="summary-block">
+          <span class="summary-heading">Overview</span>
+          <p class="body-text">{{executive_summary_overview}}</p>
+        </div>
+        <div class="summary-block">
+          <span class="summary-heading">Key Findings</span>
+          <p class="body-text">{{executive_summary_findings}}</p>
+        </div>
+        <div class="summary-block">
+          <span class="summary-heading">Assessment Conclusion</span>
+          <p class="body-text">{{executive_summary_conclusion}}</p>
+        </div>
+      </div>
+
+      <div class="section">
+        <span class="section-label">Section 3</span>
+        <span class="section-title">Feasibility Level</span>
+        <div class="section-rule-full"></div>
+        <div class="feasibility-scale">
+          <span class="feasibility-scale-label">Feasibility Level</span>
+          <div class="feasibility-row inactive">
+            <span class="feasibility-dot"></span>
+            <span class="feasibility-text">LOW</span>
+          </div>
+          <div class="feasibility-row active">
+            <span class="feasibility-dot"></span>
+            <span class="feasibility-text">{{feasibility_level}}</span>
+          </div>
+          <div class="feasibility-row inactive">
+            <span class="feasibility-dot"></span>
+            <span class="feasibility-text">HIGH</span>
+          </div>
+        </div>
+        <p class="body-text">{{feasibility_explanation}}</p>
+      </div>
+
+    </div><!-- /page-body -->
+
+  <div class="page-footer">
+    <div class="page-footer-gold"></div>
+    <div class="page-footer-inner">
+      <span class="page-footer-left">© Il Nautico Co., Ltd. — FairVia™ Technical Advisory &nbsp;|&nbsp; {{report_id}}</span>
+      <span class="page-footer-right">Page 2</span>
+    </div>
+  </div>
+
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════
+     PAGE 3 — RISK INDICATOR + SCORE TABLE
+═══════════════════════════════════════════════════════ -->
+<div class="page content">
+
+    <div class="page-header">
+      <span class="page-header-left">FairVia™ &nbsp;|&nbsp; Technical Advisory Services</span>
+      <span class="page-header-right">Strictly Confidential</span>
+    </div>
+    <div class="page-header-gold"></div>
+
+    <div class="page-body">
+
+      <div class="section">
+        <span class="section-label">Technical Risk Indicator</span>
+        <span class="section-title">Risk Profile Summary</span>
+        <div class="section-rule-full"></div>
+        <div class="risk-grid clearfix">
+          <div class="risk-card {{thermal_risk_class}}">
+            <span class="risk-card-accent"></span>
+            <div class="risk-card-body">
+              <span class="risk-card-aspect">Thermal Stability</span>
+              <span class="risk-badge">{{thermal_risk}}</span>
+              <span class="risk-note">{{thermal_note}}</span>
+            </div>
+          </div>
+          <div class="risk-card {{processing_risk_class}}">
+            <span class="risk-card-accent"></span>
+            <div class="risk-card-body">
+              <span class="risk-card-aspect">Processing Behaviour</span>
+              <span class="risk-badge">{{processing_risk}}</span>
+              <span class="risk-note">{{processing_note}}</span>
+            </div>
+          </div>
+          <div class="risk-card {{equipment_risk_class}}">
+            <span class="risk-card-accent"></span>
+            <div class="risk-card-body">
+              <span class="risk-card-aspect">Equipment Compatibility</span>
+              <span class="risk-badge">{{equipment_risk}}</span>
+              <span class="risk-note">{{equipment_note}}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <span class="section-label">Section 4</span>
+        <span class="section-title">Risk Band &amp; Score Summary</span>
+        <div class="section-rule-full"></div>
+        <table class="score-table">
+          <thead>
+            <tr>
+              <th>Evaluation Area</th>
+              <th>Assessment</th>
+              <th>Risk Level</th>
+              <th>Notes</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Thermal Stability</td>
+              <td>{{score_thermal_assessment}}</td>
+              <td><span class="score-pill {{score_thermal_class}}">{{score_thermal_level}}</span></td>
+              <td>{{score_thermal_note}}</td>
+            </tr>
+            <tr>
+              <td>Processing Behaviour</td>
+              <td>{{score_processing_assessment}}</td>
+              <td><span class="score-pill {{score_processing_class}}">{{score_processing_level}}</span></td>
+              <td>{{score_processing_note}}</td>
+            </tr>
+            <tr>
+              <td>Equipment Compatibility</td>
+              <td>{{score_equipment_assessment}}</td>
+              <td><span class="score-pill {{score_equipment_class}}">{{score_equipment_level}}</span></td>
+              <td>{{score_equipment_note}}</td>
+            </tr>
+            <tr>
+              <td>Material Certification</td>
+              <td>{{score_cert_assessment}}</td>
+              <td><span class="score-pill {{score_cert_class}}">{{score_cert_level}}</span></td>
+              <td>{{score_cert_note}}</td>
+            </tr>
+            <tr>
+              <td>End-of-Life Compliance</td>
+              <td>{{score_eol_assessment}}</td>
+              <td><span class="score-pill {{score_eol_class}}">{{score_eol_level}}</span></td>
+              <td>{{score_eol_note}}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+    </div><!-- /page-body -->
+
+  <div class="page-footer">
+    <div class="page-footer-gold"></div>
+    <div class="page-footer-inner">
+      <span class="page-footer-left">© Il Nautico Co., Ltd. — FairVia™ Technical Advisory &nbsp;|&nbsp; {{report_id}}</span>
+      <span class="page-footer-right">Page 3</span>
+    </div>
+  </div>
+
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════
+     PAGE 4 — TECHNICAL OBSERVATIONS + POTENTIAL RISKS
+═══════════════════════════════════════════════════════ -->
+<div class="page content">
+
+    <div class="page-header">
+      <span class="page-header-left">FairVia™ &nbsp;|&nbsp; Technical Advisory Services</span>
+      <span class="page-header-right">Strictly Confidential</span>
+    </div>
+    <div class="page-header-gold"></div>
+
+    <div class="page-body">
+
+      <div class="section">
+        <span class="section-label">Section 5</span>
+        <span class="section-title">Key Technical Observations</span>
+        <div class="section-rule-full"></div>
+        <div class="consideration">
+          <span class="consideration-number">01</span>
+          <span class="consideration-title">{{obs_1_title}}</span>
+          <span class="consideration-body">{{obs_1_body}}</span>
+        </div>
+        <div class="consideration">
+          <span class="consideration-number">02</span>
+          <span class="consideration-title">{{obs_2_title}}</span>
+          <span class="consideration-body">{{obs_2_body}}</span>
+        </div>
+        <div class="consideration">
+          <span class="consideration-number">03</span>
+          <span class="consideration-title">{{obs_3_title}}</span>
+          <span class="consideration-body">{{obs_3_body}}</span>
+        </div>
+      </div>
+
+      <div class="section">
+        <span class="section-label">Section 6</span>
+        <span class="section-title">Potential Risks</span>
+        <div class="section-rule-full"></div>
+        <div class="consideration">
+          <span class="consideration-number">Risk 01</span>
+          <span class="consideration-title">{{risk_1_title}}</span>
+          <span class="consideration-body">{{risk_1_body}}</span>
+        </div>
+        <div class="consideration">
+          <span class="consideration-number">Risk 02</span>
+          <span class="consideration-title">{{risk_2_title}}</span>
+          <span class="consideration-body">{{risk_2_body}}</span>
+        </div>
+      </div>
+
+    </div><!-- /page-body -->
+
+  <div class="page-footer">
+    <div class="page-footer-gold"></div>
+    <div class="page-footer-inner">
+      <span class="page-footer-left">© Il Nautico Co., Ltd. — FairVia™ Technical Advisory &nbsp;|&nbsp; {{report_id}}</span>
+      <span class="page-footer-right">Page 4</span>
+    </div>
+  </div>
+
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════
+     PAGE 5 — RECOMMENDATION + DISCLAIMER
+═══════════════════════════════════════════════════════ -->
+<div class="page content">
+
+    <div class="page-header">
+      <span class="page-header-left">FairVia™ &nbsp;|&nbsp; Technical Advisory Services</span>
+      <span class="page-header-right">Strictly Confidential</span>
+    </div>
+    <div class="page-header-gold"></div>
+
+    <div class="page-body">
+
+      <div class="section">
+        <span class="section-label">Section 7</span>
+        <span class="section-title">Suggested Next Step</span>
+        <div class="section-rule-full"></div>
+        <div class="recommendation-box">
+          <p class="recommendation-text">{{strategic_recommendation}}</p>
+        </div>
+      </div>
+
+      <div class="section">
+        <span class="section-label">Section 8</span>
+        <span class="section-title">Professional Disclaimer</span>
+        <div class="section-rule-full"></div>
+        <div class="disclaimer-box">
+          <p class="disclaimer-text">{{disclaimer}}</p>
+        </div>
+      </div>
+
+      <table class="sig-table">
+        <tr class="sig-header">
+          <td>Prepared by</td>
+          <td>Report Status</td>
+          <td>Date Issued</td>
+        </tr>
+        <tr class="sig-values">
+          <td>FairVia™ Technical Advisory</td>
+          <td class="gold-text">Preliminary — For Client Review</td>
+          <td>{{report_date}}</td>
+        </tr>
+      </table>
+
+    </div><!-- /page-body -->
+
+  <div class="page-footer">
+    <div class="page-footer-gold"></div>
+    <div class="page-footer-inner">
+      <span class="page-footer-left">© Il Nautico Co., Ltd. — FairVia™ Technical Advisory &nbsp;|&nbsp; {{report_id}}</span>
+      <span class="page-footer-right">Page 5</span>
+    </div>
+  </div>
+
+</div>
+
+
+</body>
+</html>
 `;
-
-    /* =========================
-       実行
-    ========================= */
 
     const html = injectHtml(htmlTemplate, data);
 
+/* ★ ここが最重要（確実に動く設定） */
     const browser = await puppeteer.launch({
-      executablePath:
-        process.env.PUPPETEER_EXECUTABLE_PATH ||
-        process.env.CHROME_PATH ||
-        "/usr/bin/chromium-browser",
       args: [
         "--no-sandbox",
         "--disable-setuid-sandbox",
@@ -431,67 +1281,12 @@ Return JSON:
 
     const pdf = await page.pdf({
       format: "A4",
-      printBackground: true,
-      preferCSSPageSize: true
+      printBackground: true
     });
 
     await browser.close();
 
-    await resend.emails.send({
-      from: "FairVia <info@ilnautico.com>",
-      to: email,
-      subject: "FairVia Report",
-      html: "<p>Your report is attached.</p>",
-      attachments: [
-        {
-          filename: "report.pdf",
-          content: pdf.toString("base64"),
-          encoding: "base64"
-        }
-      ]
-    });
-
-    res.send("OK");
-
-  } catch (err) {
-    console.error("SERVER ERROR:", err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.listen(8080, () => console.log("RUNNING"));
-`;
-
-    /* =========================
-       実行
-    ========================= */
-
-    const html = injectHtml(htmlTemplate, data);
-
-    const browser = await puppeteer.launch({
-      executablePath:
-        process.env.PUPPETEER_EXECUTABLE_PATH ||
-        process.env.CHROME_PATH ||
-        "/usr/bin/chromium-browser",
-      args: [
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--disable-dev-shm-usage",
-        "--disable-gpu"
-      ]
-    });
-
-    const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: "networkidle0" });
-
-    const pdf = await page.pdf({
-      format: "A4",
-      printBackground: true,
-      preferCSSPageSize: true
-    });
-
-    await browser.close();
-
+/* ★ メール（完全版） */
     await resend.emails.send({
       from: "FairVia <info@ilnautico.com>",
       to: email,
