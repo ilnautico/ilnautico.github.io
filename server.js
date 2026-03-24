@@ -1,7 +1,7 @@
 import express from "express";
 import OpenAI from "openai";
 import { Resend } from "resend";
-import puppeteer from "puppeteer";
+import puppeteer from "puppeteer-core";
 
 const app = express();
 app.use(express.json({ limit: "2mb" }));
@@ -35,28 +35,13 @@ function safe(v, fallback) {
 }
 
 /* =========================
-   完全マッピング
+   完全マッピング（最終）
 ========================= */
 
 function mapFields(fields) {
   const map = {};
 
   fields.forEach(f => {
-    const key = (f.label || f.key || "").toLowerCase();
-    const value = normalizeValue(f.value);
-
-    if (!value) return;
-
-    if (key.includes("email")) map.email = value;
-
-    if (key.includes("name") && !map.clientName) map.clientName = value;
-    if (key.includes("company")) map.company = value;
-    if (key.includes("country")) map.country = value;
-
-    function mapFields(fields) {
-  const map = {};
-
-  fields.forEach((f) => {
     const key = String(f.key || "").toLowerCase();
     const label = String(f.label || "").toLowerCase();
     const type = String(f.type || "").toLowerCase();
@@ -64,85 +49,37 @@ function mapFields(fields) {
 
     if (!value) return;
 
-    const text = `${key} ${label} ${type}`;
+    const text = key + " " + label + " " + type;
 
-    // email
-    if (!map.email && (type.includes("email") || text.includes("email"))) {
+    if (!map.email && (type.includes("email") || text.includes("email")))
       map.email = value;
-      return;
-    }
 
-    // client info
-    if (!map.clientName && (text.includes("client") || text.includes("name"))) {
+    if (!map.clientName && (text.includes("name") || text.includes("client")))
       map.clientName = value;
-    }
 
-    if (!map.company && text.includes("company")) {
+    if (!map.company && text.includes("company"))
       map.company = value;
-    }
 
-    if (!map.country && text.includes("country")) {
+    if (!map.country && text.includes("country"))
       map.country = value;
-    }
 
-    // processing / method
-    if (
-      !map.processing &&
-      (text.includes("processing") ||
-        text.includes("method") ||
-        text.includes("injection") ||
-        text.includes("extrusion") ||
-        text.includes("blow"))
-    ) {
+    if (!map.processing && (text.includes("processing") || text.includes("method")))
       map.processing = value;
-    }
 
-    // current material
-    if (
-      !map.currentMaterial &&
-      text.includes("material") &&
-      !text.includes("target") &&
-      !text.includes("bio")
-    ) {
+    if (!map.currentMaterial && text.includes("material") && !text.includes("target"))
       map.currentMaterial = value;
-    }
 
-    // target / bio material
-    if (
-      !map.bioMaterial &&
-      (text.includes("target") ||
-        text.includes("bio") ||
-        text.includes("biodegradable") ||
-        text.includes("pla"))
-    ) {
+    if (!map.bioMaterial && (text.includes("target") || text.includes("bio")))
       map.bioMaterial = value;
-    }
 
-    // equipment
-    if (
-      !map.equipment &&
-      (text.includes("equipment") || text.includes("machine"))
-    ) {
+    if (!map.equipment && text.includes("equipment"))
       map.equipment = value;
-    }
 
-    // production scale
-    if (
-      !map.productionScale &&
-      (text.includes("production") ||
-        text.includes("scale") ||
-        text.includes("volume"))
-    ) {
+    if (!map.productionScale && text.includes("production"))
       map.productionScale = value;
-    }
 
-    // project stage
-    if (
-      !map.projectStage &&
-      (text.includes("project") || text.includes("stage"))
-    ) {
+    if (!map.projectStage && text.includes("project"))
       map.projectStage = value;
-    }
   });
 
   return map;
@@ -1376,12 +1313,16 @@ body {
 
     const html = injectHtml(htmlTemplate, data);
 
+    /* =========================
+       Puppeteer-core（Railway対応）
+    ========================= */
+
     const browser = await puppeteer.launch({
+      executablePath: "/usr/bin/chromium-browser",
       args: [
         "--no-sandbox",
         "--disable-setuid-sandbox",
-        "--disable-dev-shm-usage",
-        "--disable-gpu"
+        "--disable-dev-shm-usage"
       ]
     });
 
@@ -1394,6 +1335,10 @@ body {
     });
 
     await browser.close();
+
+    /* =========================
+       MAIL
+    ========================= */
 
     await resend.emails.send({
       from: "FairVia <info@ilnautico.com>",
