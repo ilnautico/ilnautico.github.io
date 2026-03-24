@@ -87,7 +87,7 @@ body {
   margin: 0;
 }
 
-/* ── Page container ── */
+/* ── Page container── */
 .page {
   display: flex;
   flex-direction: column;
