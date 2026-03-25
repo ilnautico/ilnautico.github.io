@@ -7,6 +7,9 @@ app.use(express.json());
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
+// =========================
+// HTML差し込み
+// =========================
 function injectHtml(template, data) {
   let html = template;
 
@@ -18,6 +21,9 @@ function injectHtml(template, data) {
   return html;
 }
 
+// =========================
+// 値取得（ID→text対応）
+// =========================
 function getValue(fields, keyword) {
   const field = fields.find((f) =>
     (f.label || "").toLowerCase().includes(keyword.toLowerCase())
@@ -39,19 +45,21 @@ function getValue(fields, keyword) {
   return "";
 }
 
-/* ===== 最初のOK版コメントを固定 ===== */
+// =========================
+// 🔥 コメント（微調整版）
+// =========================
 
 const SUMMARY_OVERVIEW =
-  "No fundamental incompatibility is identified at screening level. The primary constraint lies in undefined processing and material conditions.";
+  "No fundamental incompatibility is identified at this screening stage. The primary constraint lies in undefined processing and material conditions.";
 
 const SUMMARY_FINDINGS =
-  "Technical feasibility cannot be validated under current conditions due to undefined parameters.";
+  "Technical feasibility cannot be validated under the current conditions due to undefined parameters.";
 
 const SUMMARY_CONCLUSION =
-  "Transition should not proceed without pilot validation.";
+  "Transition should not proceed without prior pilot validation.";
 
 const FEASIBILITY_EXPLANATION =
-  "This assessment reflects screening-level evaluation based on available inputs. Validation under controlled conditions is required.";
+  "This assessment reflects a screening-level evaluation based on the available inputs. Validation under controlled conditions is required before any transition decision.";
 
 const OBS_1_TITLE = "Processing Condition Uncertainty";
 const OBS_1_BODY =
@@ -79,7 +87,9 @@ const STRATEGIC_RECOMMENDATION =
 const DISCLAIMER =
   "This report is a preliminary screening-level technical assessment based solely on submitted information. It does not replace pilot testing, detailed engineering review, or commercial qualification.";
 
-/* ===== あなたの本番HTMLをここに貼る ===== */
+// =========================
+// HTMLテンプレ（あなたの本番HTML）
+// =========================
 const htmlTemplate = `
 <!DOCTYPE html>
 <html lang="en">
@@ -1152,6 +1162,9 @@ body {
 </html>
 `;
 
+// =========================
+// メイン
+// =========================
 app.post("/generate-report", async (req, res) => {
   console.log("🔥 REQUEST HIT");
 
@@ -1184,7 +1197,9 @@ app.post("/generate-report", async (req, res) => {
       projectStage
     ].join(" ").toLowerCase();
 
-    /* ===== 判定だけ最新確定版 ===== */
+    // =========================
+    // 判定（確定ロジック）
+    // =========================
     const isInjection = text.includes("injection");
     const isPP = text.includes("pp");
     const isBio = text.includes("pla") || text.includes("bio");
@@ -1197,58 +1212,52 @@ app.post("/generate-report", async (req, res) => {
 
     console.log("RESULT:", finalFeasibility);
 
-    /* ===== 表示用のリスク欄は空にしない ===== */
-    const thermalRisk = finalFeasibility === "LOW" ? "HIGH RISK" : "MODERATE";
-    const thermalNote =
-      finalFeasibility === "LOW"
-        ? "Thermal behaviour requires careful validation under controlled conditions."
-        : "Thermal behaviour should be validated under controlled conditions.";
+    // =========================
+    // Riskロジック
+    // =========================
+    const isLow = finalFeasibility === "LOW";
 
-    const processingRisk = finalFeasibility === "LOW" ? "HIGH RISK" : "MODERATE";
-    const processingNote =
-      finalFeasibility === "LOW"
-        ? "Processing stability risk is elevated under the proposed transition scenario."
-        : "Processing stability remains subject to confirmation in pilot evaluation.";
+    const thermalRisk = isLow ? "HIGH RISK" : "MODERATE";
+    const thermalNote = isLow
+      ? "Thermal behaviour requires careful validation under controlled conditions prior to implementation."
+      : "Thermal behaviour should be validated under controlled conditions prior to implementation.";
 
-    const equipmentRisk = finalFeasibility === "LOW" ? "HIGH RISK" : "MODERATE";
-    const equipmentNote =
-      finalFeasibility === "LOW"
-        ? "Existing equipment may require adjustment before stable conversion can be achieved."
-        : "Equipment suitability should be confirmed before production commitment.";
+    const processingRisk = isLow ? "HIGH RISK" : "MODERATE";
+    const processingNote = isLow
+      ? "Processing stability risk is elevated under the proposed transition scenario and should be carefully validated."
+      : "Processing stability remains subject to confirmation through pilot evaluation.";
 
-    const scoreThermalAssessment =
-      finalFeasibility === "LOW" ? "Critical review required" : "Conditional review required";
-    const scoreThermalLevel = finalFeasibility === "LOW" ? "HIGH RISK" : "MODERATE";
-    const scoreThermalNote =
-      finalFeasibility === "LOW"
-        ? "Thermal mismatch may materially affect process stability."
-        : "Thermal response remains dependent on confirmed process conditions.";
+    const equipmentRisk = isLow ? "HIGH RISK" : "MODERATE";
+    const equipmentNote = isLow
+      ? "Existing equipment may require adjustment before stable conversion can be reliably achieved."
+      : "Equipment suitability should be confirmed prior to any production commitment.";
 
-    const scoreProcessingAssessment =
-      finalFeasibility === "LOW" ? "High transition sensitivity" : "Moderate transition sensitivity";
-    const scoreProcessingLevel = finalFeasibility === "LOW" ? "HIGH RISK" : "MODERATE";
-    const scoreProcessingNote =
-      finalFeasibility === "LOW"
-        ? "Process consistency may deteriorate under current assumptions."
-        : "Process consistency remains to be confirmed in controlled validation.";
+    // =========================
+    // Score
+    // =========================
+    const scoreThermalAssessment = isLow
+      ? "Critical review required"
+      : "Conditional review required";
+    const scoreThermalLevel = isLow ? "HIGH RISK" : "MODERATE";
+    const scoreThermalNote = isLow
+      ? "Thermal mismatch may materially affect process stability."
+      : "Thermal response remains dependent on confirmed process conditions.";
 
-    const scoreEquipmentAssessment =
-      finalFeasibility === "LOW" ? "Compatibility gap likely" : "Compatibility to be confirmed";
-    const scoreEquipmentLevel = finalFeasibility === "LOW" ? "HIGH RISK" : "MODERATE";
-    const scoreEquipmentNote =
-      finalFeasibility === "LOW"
-        ? "Equipment readiness may be insufficient without adjustment."
-        : "Equipment capability should be reviewed before scale-up.";
+    const scoreProcessingAssessment = isLow
+      ? "High transition sensitivity"
+      : "Moderate transition sensitivity";
+    const scoreProcessingLevel = isLow ? "HIGH RISK" : "MODERATE";
+    const scoreProcessingNote = isLow
+      ? "Process consistency may deteriorate under current assumptions."
+      : "Process consistency remains to be confirmed in controlled validation.";
 
-    const scoreCertAssessment = "Not assessed";
-    const scoreCertLevel = "N/A";
-    const scoreCertNote =
-      "Certification status was not part of the submitted screening inputs.";
-
-    const scoreEolAssessment = "Not assessed";
-    const scoreEolLevel = "N/A";
-    const scoreEolNote =
-      "End-of-life requirements were not defined in the submitted inputs.";
+    const scoreEquipmentAssessment = isLow
+      ? "Compatibility gap likely"
+      : "Compatibility to be confirmed";
+    const scoreEquipmentLevel = isLow ? "HIGH RISK" : "MODERATE";
+    const scoreEquipmentNote = isLow
+      ? "Equipment readiness may be insufficient without adjustment."
+      : "Equipment capability should be reviewed before scale-up.";
 
     const html = injectHtml(htmlTemplate, {
       client_name: clientName || "",
@@ -1294,14 +1303,6 @@ app.post("/generate-report", async (req, res) => {
       score_equipment_assessment: scoreEquipmentAssessment,
       score_equipment_level: scoreEquipmentLevel,
       score_equipment_note: scoreEquipmentNote,
-
-      score_cert_assessment: scoreCertAssessment,
-      score_cert_level: scoreCertLevel,
-      score_cert_note: scoreCertNote,
-
-      score_eol_assessment: scoreEolAssessment,
-      score_eol_level: scoreEolLevel,
-      score_eol_note: scoreEolNote,
 
       obs_1_title: OBS_1_TITLE,
       obs_1_body: OBS_1_BODY,
@@ -1359,6 +1360,7 @@ app.post("/generate-report", async (req, res) => {
     console.log("✅ MAIL SENT");
 
     res.json({ success: true });
+
   } catch (err) {
     console.error("❌ ERROR:", err);
     res.status(500).json({ error: "Server Error" });
