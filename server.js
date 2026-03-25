@@ -55,7 +55,7 @@ const SUMMARY_FINDINGS =
   "Technical feasibility cannot be validated under the current conditions due to undefined parameters.";
 
 const SUMMARY_CONCLUSION =
-  "Transition should not proceed without prior pilot validation.";
+  "Transition should not should not proceed without prior pilot validation under controlled conditions.";
 
 
 const FEASIBILITY_EXPLANATION =
