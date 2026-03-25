@@ -48,7 +48,6 @@ function getValue(fields, keyword) {
 // =========================
 // 🔥 コメント（微調整版）
 // =========================
-
 const SUMMARY_OVERVIEW =
   "No fundamental incompatibility is identified at this screening stage. The primary constraint lies in undefined processing and material conditions.";
 
@@ -57,6 +56,7 @@ const SUMMARY_FINDINGS =
 
 const SUMMARY_CONCLUSION =
   "Transition should not proceed without prior pilot validation.";
+
 
 const FEASIBILITY_EXPLANATION =
   "This assessment reflects a screening-level evaluation based on the available inputs. Validation under controlled conditions is required before any transition decision.";
