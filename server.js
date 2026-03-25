@@ -49,14 +49,16 @@ function getValue(fields, keyword) {
 // 🔥 コメント（微調整版）
 // =========================
 const SUMMARY_OVERVIEW =
-  "No fundamental incompatibility is identified at this screening stage. The primary constraint lies in undefined processing and material conditions.";
+  "No immediate incompatibility is identified at this screening stage. The primary constraint lies in undefined processing and material conditions.";
 
 const SUMMARY_FINDINGS =
-  "Technical feasibility cannot be validated under the current conditions due to undefined parameters.";
+  "Technical feasibility cannot be confirmed under the current conditions due to undefined processing parameters.";
 
 const SUMMARY_CONCLUSION =
-  "Transition should not should not proceed without prior pilot validation under controlled conditions.";
+  "Transition should not proceed without prior pilot validation under controlled conditions.";
 
+const FEASIBILITY_EXPLANATION =
+  "This assessment reflects a screening-level evaluation based on the available inputs. Validation under controlled conditions is required before any transition decision.";
 
 const FEASIBILITY_EXPLANATION =
   "This assessment reflects a screening-level evaluation based on the available inputs. Validation under controlled conditions is required before any transition decision.";
