@@ -60,9 +60,6 @@ const SUMMARY_CONCLUSION =
 const FEASIBILITY_EXPLANATION =
   "This assessment reflects a screening-level evaluation based on the available inputs. Validation under controlled conditions is required before any transition decision.";
 
-const FEASIBILITY_EXPLANATION =
-  "This assessment reflects a screening-level evaluation based on the available inputs. Validation under controlled conditions is required before any transition decision.";
-
 const OBS_1_TITLE = "Processing Condition Uncertainty";
 const OBS_1_BODY =
   "Undefined processing conditions introduce variability in material behavior during processing, affecting product consistency and performance.";
