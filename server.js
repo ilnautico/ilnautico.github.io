@@ -21,7 +21,11 @@ async function generateClaudeHypothesis(prompt) {
       ]
     })
   });
-
+if (!response.ok) {
+  const errorText = await response.text();
+  console.error("❌ Claude API ERROR:", errorText);
+  throw new Error("Claude API failed");
+}
   const data = await response.json();
 
   return data.content?.[0]?.text || "No response from Claude";
