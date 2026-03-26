@@ -1400,7 +1400,9 @@ app.post("/generate-tier2", async (req, res) => {
   try {
     console.log("🔥 TIER2 REQUEST HIT");
 
-    const fields = req.body.data?.fields || [];
+    const fields =req.body.answers
+    ? mapTallyToFields(req.body.answers)
+    : req.body.data?.fields || [];
 
     const application = getValue(fields, "application");
     const currentMaterial = getValue(fields, "material");
