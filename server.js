@@ -2,6 +2,30 @@ import express from "express";
 import puppeteer from "puppeteer";
 import { Resend } from "resend";
 
+async function generateClaudeHypothesis(prompt) {
+  const response = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": process.env.ANTHROPIC_API_KEY,
+      "anthropic-version": "2023-06-01"
+    },
+    body: JSON.stringify({
+      model: "claude-3-5-sonnet-20241022",
+      max_tokens: 2000,
+      messages: [
+        {
+          role: "user",
+          content: prompt
+        }
+      ]
+    })
+  });
+
+  const data = await response.json();
+
+  return data.content?.[0]?.text || "No response from Claude";
+}
 const app = express();
 app.use(express.json());
 
