@@ -1372,6 +1372,44 @@ score_eol_note: "End-of-life compliance should be evaluated based on regional re
   }
 });
 
+app.post("/generate-tier2", async (req, res) => {
+  try {
+    console.log("🔥 TIER2 REQUEST HIT");
+
+    const fields = req.body.data?.fields || [];
+
+    const application = getValue(fields, "application");
+    const currentMaterial = getValue(fields, "material");
+    const bioMaterial = getValue(fields, "biodegradable");
+    const processing = getValue(fields, "processing");
+    const equipment = getValue(fields, "equipment");
+    const productionScale = getValue(fields, "production");
+    const projectStage = getValue(fields, "project");
+    const technicalConcern = getValue(fields, "concern");
+
+    const claudeReport = await generateClaudeHypothesis({
+      application,
+      material: currentMaterial,
+      bioMaterial,
+      processing,
+      equipment,
+      scale: productionScale,
+      stage: projectStage,
+      concern: technicalConcern
+    });
+
+    console.log("✅ CLAUDE GENERATED");
+
+    res.json({
+      success: true,
+      report: claudeReport
+    });
+
+  } catch (err) {
+    console.error("❌ TIER2 ERROR:", err);
+    res.status(500).json({ error: "Tier2 generation failed" });
+  }
+});
 app.listen(8080, () => {
   console.log("🚀 Server running");
 });
