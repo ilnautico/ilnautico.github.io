@@ -1274,7 +1274,13 @@ app.post("/generate-report", async (req, res) => {
 
       feasibility_level: finalFeasibility,
       FEASIBILITY_LEVEL: finalFeasibility,
+　　　　score_cert_assessment: "To be confirmed",
+　　　　score_cert_level: "MODERATE",
+　　　　score_cert_note: "Material certification status should be verified prior to implementation.",
 
+score_eol_assessment: "To be confirmed",
+score_eol_level: "MODERATE",
+score_eol_note: "End-of-life compliance should be evaluated based on regional regulatory requirements.",
       report_date: new Date().toISOString().split("T")[0],
       report_id: "FV-" + Date.now(),
 
