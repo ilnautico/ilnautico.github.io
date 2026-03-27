@@ -1512,6 +1512,13 @@ app.post("/generate-tier2", async (req, res) => {
     res.status(500).json({ error: "Tier2 generation failed" });
   }
 });
+app.get("/generate-pdf", async (req, res) => {
+  try {
+    res.send("PDF route working");
+  } catch (err) {
+    res.status(500).send("error");
+  }
+});
 app.listen(8080, () => {
   console.log("🚀 Server running");
 });
