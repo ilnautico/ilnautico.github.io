@@ -2,6 +2,11 @@ import express from "express";
 import puppeteer from "puppeteer";
 import { Resend } from "resend";
 
+/* ====== 追加（ここだけ）====== */
+import fs from "fs";
+import path from "path";
+/* ============================ */
+
 async function generateClaudeHypothesis(prompt) {
   const response = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -21,19 +26,26 @@ async function generateClaudeHypothesis(prompt) {
       ]
     })
   });
-if (!response.ok) {
-  const errorText = await response.text();
-  console.error("❌ Claude API ERROR:", errorText);
-  throw new Error("Claude API failed");
-}
-  const data = await response.json();
 
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error("❌ Claude API ERROR:", errorText);
+    throw new Error("Claude API failed");
+  }
+
+  const data = await response.json();
   return data.content?.[0]?.text || "No response from Claude";
 }
+
 const app = express();
 app.use(express.json());
 
 const resend = new Resend(process.env.RESEND_API_KEY);
+
+/* ====== 追加（HTMLパス）====== */
+const __dirname = path.resolve();
+const templatePath = path.join(__dirname, "template.html");
+/* ============================ */
 
 // =========================
 // HTML差し込み
@@ -114,6 +126,76 @@ const STRATEGIC_RECOMMENDATION =
 const DISCLAIMER =
   "This report is a preliminary screening-level technical assessment based solely on submitted information. It does not replace pilot testing, detailed engineering review, or commercial qualification.";
 
+
+// =========================
+// 🔥 テスト用エンドポイント（PDF生成）
+/* ★ここだけ追加してる（既存には影響なし） */
+// =========================
+app.post("/generate-pdf", async (req, res) => {
+  try {
+    // HTML読み込み
+    const htmlTemplate = fs.readFileSync(templatePath, "utf8");
+
+    // データ差し込み
+    const finalHtml = injectHtml(htmlTemplate, {
+      compatibility_level: "Moderate",
+      application: "Flexible Food Packaging Film",
+      material_transition: "CPP → PHBV",
+      assessment_type: "Tier 2 – Pre-Commercial Feasibility",
+      report_date: "March 2025",
+
+      executive_summary: SUMMARY_OVERVIEW,
+      key_risk: SUMMARY_FINDINGS,
+
+      obs1_title: OBS_1_TITLE,
+      obs1_body: OBS_1_BODY,
+      obs2_title: OBS_2_TITLE,
+      obs2_body: OBS_2_BODY,
+      obs3_title: OBS_3_TITLE,
+      obs3_body: OBS_3_BODY,
+
+      risk1_title: RISK_1_TITLE,
+      risk1_body: RISK_1_BODY,
+      risk2_title: RISK_2_TITLE,
+      risk2_body: RISK_2_BODY,
+
+      recommendation: STRATEGIC_RECOMMENDATION,
+      disclaimer: DISCLAIMER
+    });
+
+    const browser = await puppeteer.launch({
+      args: ["--no-sandbox", "--disable-setuid-sandbox"]
+    });
+
+    const page = await browser.newPage();
+
+    await page.setContent(finalHtml, {
+      waitUntil: "networkidle0"
+    });
+
+    const pdf = await page.pdf({
+      format: "A4",
+      printBackground: true
+    });
+
+    await browser.close();
+
+    res.set({
+      "Content-Type": "application/pdf",
+      "Content-Disposition": "inline; filename=report.pdf"
+    });
+
+    res.send(pdf);
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("PDF generation failed");
+  }
+});
+
+app.listen(3000, () => {
+  console.log("Server running on port 3000");
+});
 // =========================
 // HTMLテンプレ（あなたの本番HTML）
 // =========================
