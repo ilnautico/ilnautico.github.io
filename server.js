@@ -16,6 +16,7 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 // Claude生成
 // =========================
 async function generateClaudeHypothesis(prompt) {
+    console.log("API KEY:", process.env.ANTHROPIC_API_KEY);
   const response = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
