@@ -180,8 +180,44 @@ app.get("/generate-pdf", async (req, res) => {
     res.status(500).send("PDF generation failed");
   }
 });
+app.post("/tally", async (req, res) => {
+  console.log("🔥 TIER2 REQUEST HIT");
 
-// =========================
+  try {
+    const fields = req.body.data.fields;
+
+    const application = getValue(fields, "application");
+    const currentMaterial = getValue(fields, "current material");
+    const bioMaterial = getValue(fields, "target material");
+    const processing = getValue(fields, "processing");
+    const equipment = getValue(fields, "equipment");
+    const productionScale = getValue(fields, "production scale");
+    const projectStage = getValue(fields, "project");
+    const technicalConcern = getValue(fields, "concern");
+
+    const claudeReport = await generateClaudeHypothesis({
+      application,
+      material: currentMaterial,
+      bioMaterial,
+      processing,
+      equipment,
+      scale: productionScale,
+      stage: projectStage,
+      concern: technicalConcern
+    });
+
+    console.log("✅ CLAUDE GENERATED");
+
+    res.json({
+      success: true,
+      report: claudeReport
+    });
+
+  } catch (err) {
+    console.error("❌ TIER2 ERROR:", err);
+    res.status(500).json({ error: "Tier2 generation failed" });
+  }
+});// =========================
 // サーバー起動（ここは最後）
 // =========================
 app.listen(3000, () => {
