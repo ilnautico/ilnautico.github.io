@@ -2,11 +2,19 @@ import express from "express";
 import puppeteer from "puppeteer";
 import { Resend } from "resend";
 
-/* ====== 追加（ここだけ）====== */
+/* ===== 追加（PDF用）===== */
 import fs from "fs";
 import path from "path";
-/* ============================ */
+/* ======================= */
 
+const app = express();
+app.use(express.json());
+
+const resend = new Resend(process.env.RESEND_API_KEY);
+
+// =========================
+// Claude生成
+// =========================
 async function generateClaudeHypothesis(prompt) {
   const response = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -18,12 +26,7 @@ async function generateClaudeHypothesis(prompt) {
     body: JSON.stringify({
       model: "claude-3-5-sonnet-20241022",
       max_tokens: 2000,
-      messages: [
-        {
-          role: "user",
-          content: prompt
-        }
-      ]
+      messages: [{ role: "user", content: prompt }]
     })
   });
 
@@ -36,16 +39,6 @@ async function generateClaudeHypothesis(prompt) {
   const data = await response.json();
   return data.content?.[0]?.text || "No response from Claude";
 }
-
-const app = express();
-app.use(express.json());
-
-const resend = new Resend(process.env.RESEND_API_KEY);
-
-/* ====== 追加（HTMLパス）====== */
-const __dirname = path.resolve();
-const templatePath = path.join(__dirname, "template.html");
-/* ============================ */
 
 // =========================
 // HTML差し込み
@@ -62,7 +55,7 @@ function injectHtml(template, data) {
 }
 
 // =========================
-// 値取得（ID→text対応）
+// 値取得
 // =========================
 function getValue(fields, keyword) {
   const field = fields.find((f) =>
@@ -86,7 +79,7 @@ function getValue(fields, keyword) {
 }
 
 // =========================
-// 🔥 コメント（微調整版）
+// 固定コメント（そのまま維持）
 // =========================
 const SUMMARY_OVERVIEW =
   "No immediate incompatibility is identified at this screening stage. The primary constraint lies in undefined processing and material conditions.";
@@ -126,17 +119,14 @@ const STRATEGIC_RECOMMENDATION =
 const DISCLAIMER =
   "This report is a preliminary screening-level technical assessment based solely on submitted information. It does not replace pilot testing, detailed engineering review, or commercial qualification.";
 
-
 // =========================
-// 🔥 テスト用エンドポイント（PDF生成）
-/* ★ここだけ追加してる（既存には影響なし） */
+// 🔥 PDF確認ルート（追加だけ）
 // =========================
-app.post("/generate-pdf", async (req, res) => {
+app.get("/generate-pdf", async (req, res) => {
   try {
-    // HTML読み込み
+    const templatePath = path.join(process.cwd(), "template.html");
     const htmlTemplate = fs.readFileSync(templatePath, "utf8");
 
-    // データ差し込み
     const finalHtml = injectHtml(htmlTemplate, {
       compatibility_level: "Moderate",
       application: "Flexible Food Packaging Film",
@@ -168,10 +158,7 @@ app.post("/generate-pdf", async (req, res) => {
     });
 
     const page = await browser.newPage();
-
-    await page.setContent(finalHtml, {
-      waitUntil: "networkidle0"
-    });
+    await page.setContent(finalHtml, { waitUntil: "networkidle0" });
 
     const pdf = await page.pdf({
       format: "A4",
@@ -193,6 +180,9 @@ app.post("/generate-pdf", async (req, res) => {
   }
 });
 
+// =========================
+// サーバー起動（ここは最後）
+// =========================
 app.listen(3000, () => {
   console.log("Server running on port 3000");
 });
