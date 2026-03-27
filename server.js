@@ -1,3 +1,4 @@
+
 import express from "express";
 import puppeteer from "puppeteer";
 import { Resend } from "resend";
@@ -19,38 +20,44 @@ console.log("ANTH KEY LEN:", process.env.ANTHROPIC_API_KEY ? process.env.ANTHROP
 // Claude生成
 // =========================
 async function generateClaudeHypothesis(prompt) {
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": process.env.ANTHROPIC_API_KEY,
-      "anthropic-version": "2023-06-01"
-    },
-    body: JSON.stringify({
-      model: "claude-3-5-sonnet-20241022",
-      max_tokens: 2000,
-      messages: [
-        {
-          role: "user",
-          content: [
-            {
-              type: "text",
-              text: prompt
-            }
-          ]
-        }
-      ]
-    })
-  });
+  try {
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": process.env.ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01"
+      },
+      body: JSON.stringify({
+        model: "claude-3-5-sonnet-20241022",
+        max_tokens: 2000,
+        messages: [
+          {
+            role: "user",
+            content: [
+              {
+                type: "text",
+                text: prompt
+              }
+            ]
+          }
+        ]
+      })
+    });
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error("❌ Claude API ERROR:", errorText);
-    throw new Error("Claude API failed");
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("❌ Claude API ERROR:", errorText);
+      throw new Error("Claude API failed");
+    }
+
+    const data = await response.json();
+    return data.content?.[0]?.text || "No response from Claude";
+
+  } catch (err) {
+    console.error("❌ Claude Exception:", err);
+    throw err;
   }
-
-  const data = await response.json();
-  return data.content?.[0]?.text || "No response from Claude";
 }
 
 // =========================
