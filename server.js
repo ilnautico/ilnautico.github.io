@@ -19,7 +19,6 @@ console.log("ANTH KEY LEN:", process.env.ANTHROPIC_API_KEY ? process.env.ANTHROP
 // Claude生成
 // =========================
 async function generateClaudeHypothesis(prompt) {
-    console.log("API KEY:", process.env.ANTHROPIC_API_KEY);
   const response = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -28,20 +27,21 @@ async function generateClaudeHypothesis(prompt) {
       "anthropic-version": "2023-06-01"
     },
     body: JSON.stringify({
-  model: "claude-3-5-sonnet-20241022",
-  max_tokens: 2000,
-  messages: [
-    {
-      role: "user",
-      content: [
+      model: "claude-3-5-sonnet-20241022",
+      max_tokens: 2000,
+      messages: [
         {
-          type: "text",
-          text: prompt
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: prompt
+            }
+          ]
         }
       ]
-    }
-  ]
-})
+    })
+  });
 
   if (!response.ok) {
     const errorText = await response.text();
