@@ -1,8 +1,7 @@
 import express from "express";
 import puppeteer from "puppeteer";
 import { Resend } from "resend";
-import dotenv from "dotenv";
-dotenv.config();
+
 
 /* ===== 追加（PDF用）===== */
 import fs from "fs";
