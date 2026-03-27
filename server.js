@@ -12,6 +12,8 @@ const app = express();
 app.use(express.json());
 
 const resend = new Resend(process.env.RESEND_API_KEY);
+console.log("ENV KEYS:", Object.keys(process.env).filter(k => k.includes("ANTH")));
+console.log("ANTH KEY LEN:", process.env.ANTHROPIC_API_KEY ? process.env.ANTHROPIC_API_KEY.length : 0);
 
 // =========================
 // Claude生成
