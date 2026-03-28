@@ -203,7 +203,7 @@ app.get("/test-pdf", async (req, res) => {
   });
 
   const page = await browser.newPage();
-  await page.setContent(html);
+  await page.setContent(html);{ waitUntil: "networkidle0" });
 
   const pdf = await page.pdf({ format: "A4" });
 
