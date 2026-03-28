@@ -3,7 +3,7 @@ import puppeteer from "puppeteer";
 import fs from "fs";
 import path from "path";
 import fetch from "node-fetch";
-import cors from "cors";
+
 
 const app = express();
 
@@ -12,7 +12,6 @@ const app = express();
 /**
  * ここでTallyのPOSTを受け取れるようにする
  */
-app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
