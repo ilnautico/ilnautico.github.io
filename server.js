@@ -1,4 +1,4 @@
-
+import fetch from "node-fetch";
 import express from "express";
 import puppeteer from "puppeteer";
 import { Resend } from "resend";
