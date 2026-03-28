@@ -100,42 +100,61 @@ function getValue(fields, keyword) {
 // =========================
 // メインAPI（ここだけ変更）
 // =========================
-app.post("/tally", async (req, res) => {
-  console.log("🔥 TIER2 REQUEST HIT");
-
+app.get("/generate-pdf", async (req, res) => {
   try {
-    const fields = req.body.data.fields;
+    const templatePath = path.join(process.cwd(), "template.html");
+    const htmlTemplate = fs.readFileSync(templatePath, "utf8");
 
-    const application = getValue(fields, "application");
-    const currentMaterial = getValue(fields, "current material");
-    const bioMaterial = getValue(fields, "target material");
-    const processing = getValue(fields, "processing");
-    const equipment = getValue(fields, "equipment");
-    const productionScale = getValue(fields, "production scale");
-    const projectStage = getValue(fields, "project");
-    const technicalConcern = getValue(fields, "concern");
+    const finalHtml = injectHtml(htmlTemplate, {
+      compatibility_level: "Moderate",
+      application: "Flexible food packaging film",
+      material_transition: "CPP → PHBV",
+      assessment_type: "Tier 2 – Pre-Commercial Feasibility",
+      report_date: new Date().toLocaleDateString(),
 
-    const prompt = JSON.stringify({
-      application,
-      material: currentMaterial,
-      bioMaterial,
-      processing,
-      equipment,
-      scale: productionScale,
-      stage: projectStage,
-      concern: technicalConcern
+      executive_summary: "Test summary",
+      key_risk: "Test risk",
+
+      obs1_title: "Test 1",
+      obs1_body: "Test body",
+      obs2_title: "Test 2",
+      obs2_body: "Test body",
+      obs3_title: "Test 3",
+      obs3_body: "Test body",
+
+      risk1_title: "Risk 1",
+      risk1_body: "Risk body",
+      risk2_title: "Risk 2",
+      risk2_body: "Risk body",
+
+      recommendation: "Test recommendation",
+      disclaimer: "Test disclaimer"
     });
 
-    const claudeReport = await generateClaudeHypothesis(prompt);
+    const browser = await puppeteer.launch({
+      args: ["--no-sandbox", "--disable-setuid-sandbox"]
+    });
 
-    console.log("✅ CLAUDE GENERATED");
+    const page = await browser.newPage();
+    await page.setContent(finalHtml, { waitUntil: "networkidle0" });
 
-    // 👇ここが変更点
-    return res.send(claudeReport);
+    const pdf = await page.pdf({
+      format: "A4",
+      printBackground: true
+    });
+
+    await browser.close();
+
+    res.set({
+      "Content-Type": "application/pdf",
+      "Content-Disposition": "inline; filename=report.pdf"
+    });
+
+    res.send(pdf);
 
   } catch (err) {
-    console.error("❌ TIER2 ERROR:", err);
-    res.status(500).send("Error generating report");
+    console.error(err);
+    res.status(500).send("PDF generation failed");
   }
 });
 
