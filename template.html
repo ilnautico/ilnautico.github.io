@@ -2,156 +2,240 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Technical Screening Report</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FairVia™ Technical Hypothesis Report</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600&family=IBM+Plex+Mono:wght@300;400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
 
 <style>
-@page { size: A4; margin: 0; }
-
-body {
-  font-family: "Helvetica Neue", Arial, sans-serif;
-  color: #1a1a1a;
-  background: #ffffff;
-  padding: 60px;
+:root {
+  --navy:        #0C1C2E;
+  --navy-soft:   #2C4A6E;
+  --block-light: #F9FCFF;
+  --block-mid:   #E6EFF8;
+  --block-deep:  #DDE8F2;
+  --sep:         #E6EDF3;
+  --text-body:   #374151;
+  --text-muted:  #6B7A8E;
+  --text-label:  #9AA5B4;
+  --accent-warn: #CFAE5D;
+  --accent-low:  #7A6EB0;
+  --accent-ok:   #3B82A0;
 }
-
-/* ===== HEADER ===== */
-.header {
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  background: #F4F7FA;
+  font-family: 'IBM Plex Sans', sans-serif;
+  color: var(--text-body);
+  font-size: 13px;
+  line-height: 1.68;
+  -webkit-font-smoothing: antialiased;
+}
+.page {
+  width: 210mm;
+  margin: 20mm auto;
+  background: white;
+  border: 1px solid #E0E8EF;
+  overflow: hidden;
+}
+.page-top-bar {
+  height: 4px;
+  background: linear-gradient(90deg, #0C1C2E 0%, #2C4A6E 60%, #DDE8F2 100%);
+}
+.cover {
+  padding: 52px 50px 44px;
+  border-bottom: 1px solid var(--sep);
+}
+.cover-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  margin-bottom: 40px;
+  align-items: flex-start;
+  margin-bottom: 34px;
 }
-
-.title {
-  font-size: 28px;
-  font-weight: 600;
-  letter-spacing: 1px;
+.brand-mark { display: flex; align-items: center; gap: 10px; }
+.brand-icon {
+  width: 30px; height: 30px;
+  background: var(--navy);
+  border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
 }
-
-.subtitle {
-  font-size: 12px;
-  color: #777;
+.brand-name {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 12.5px; font-weight: 600;
+  letter-spacing: 0.05em; text-transform: uppercase; color: var(--navy);
 }
-
-/* ===== SECTION ===== */
-.section {
-  margin-bottom: 30px;
+.doc-id {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9.5px; color: var(--text-label); letter-spacing: 0.06em; padding-top: 5px;
 }
+.cover-eyebrow {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9.5px; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--accent-ok); margin-bottom: 12px;
+}
+.cover-title {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 29px; font-weight: 600; color: var(--navy);
+  line-height: 1.2; letter-spacing: -0.5px; margin-bottom: 8px;
+}
+.cover-title span { font-weight: 300; color: var(--navy-soft); }
+.cover-subtitle {
+  font-size: 12px; color: var(--text-muted); font-weight: 300; margin-bottom: 34px;
+}
+.cover-meta-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 1px;
+  background: var(--sep); border: 1px solid var(--sep); border-radius: 8px; overflow: hidden;
+}
+.meta-cell { background: white; padding: 13px 18px; }
+.meta-cell:nth-child(1), .meta-cell:nth-child(2) { background: #F4F8FC; }
+.meta-label {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--text-label); margin-bottom: 3px;
+}
+.meta-value { font-size: 12px; font-weight: 500; color: var(--navy); }
 
+.body-wrap { padding: 38px 50px 32px; }
+.section { margin-bottom: 42px; }
+.section + .section { padding-top: 38px; border-top: 1px solid var(--sep); }
+.section-header { display: flex; align-items: baseline; gap: 12px; margin-bottom: 16px; }
+.section-num {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9.5px; color: var(--text-label); letter-spacing: 0.1em; min-width: 22px;
+}
 .section-title {
-  font-size: 14px;
-  font-weight: 600;
-  border-bottom: 1px solid #ddd;
-  padding-bottom: 6px;
-  margin-bottom: 12px;
-  letter-spacing: 0.5px;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 11px; font-weight: 600; color: var(--navy); letter-spacing: 0.08em; text-transform: uppercase;
 }
+.exec-card {
+  background: linear-gradient(160deg, #F7FBFF 0%, #EEF6FD 100%);
+  border-radius: 10px; padding: 22px 24px; border: 1px solid #D6E4F0;
+}
+.compat-row {
+  display: flex; align-items: center; gap: 10px;
+  margin-bottom: 14px; padding-bottom: 13px; border-bottom: 1px solid #D6E4F0;
+}
+.compat-label {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--navy-soft);
+}
+.compat-badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: white; border: 1px solid #B0C8DE; border-radius: 4px;
+  padding: 3px 10px 3px 8px; font-size: 11px; font-weight: 500; color: var(--navy);
+}
+.exec-body { font-size: 12.5px; line-height: 1.72; color: var(--text-body); margin-bottom: 14px; }
 
-.section-body {
-  font-size: 13px;
-  line-height: 1.7;
-  color: #333;
+.risk-inline {
+  display: flex; gap: 10px;
+  background: white; border-radius: 6px; padding: 10px 14px;
+  border-left: 3px solid var(--accent-warn);
 }
+.risk-tag {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--accent-warn);
+}
+.risk-text { font-size: 12px; }
 
-/* ===== BOX ===== */
-.box {
-  border: 1px solid #eee;
-  padding: 16px;
-  margin-bottom: 16px;
-  background: #fafafa;
-}
+/* ================= BODY ================= */
 
-/* ===== FOOTER ===== */
-.footer {
-  position: absolute;
-  bottom: 40px;
-  left: 60px;
-  right: 60px;
-  font-size: 10px;
-  color: #888;
-  line-height: 1.5;
-  border-top: 1px solid #eee;
-  padding-top: 10px;
-}
 </style>
 </head>
 
 <body>
+<div class="page">
 
-<!-- HEADER -->
-<div class="header">
-  <div>
-    <div class="title">Technical Screening Report</div>
-    <div class="subtitle">FairVia™ Material Transition Evaluation</div>
-  </div>
-  <div class="subtitle">
-    {{report_date}}
-  </div>
+<div class="page-top-bar"></div>
+
+<!-- COVER -->
+<div class="cover">
+
+<div class="cover-header">
+<div class="brand-mark">
+<div class="brand-icon"></div>
+<span class="brand-name">FairVia™</span>
+</div>
+<span class="doc-id">FV-THR-2025-001 · CONFIDENTIAL</span>
 </div>
 
-<!-- EXECUTIVE SUMMARY -->
+<div class="cover-eyebrow">Technical Assessment Document</div>
+
+<div class="cover-title">
+FairVia™ <span>Technical<br>Hypothesis Report</span>
+</div>
+
+<div class="cover-subtitle">
+Material feasibility assessment for pre-commercial transition planning
+</div>
+
+<div class="cover-meta-grid">
+
+<!-- ★差し込み -->
+<div class="meta-cell">
+<div class="meta-label">Application</div>
+<div class="meta-value">{{application}}</div>
+</div>
+
+<div class="meta-cell">
+<div class="meta-label">Material Transition</div>
+<div class="meta-value">{{material_transition}}</div>
+</div>
+
+<div class="meta-cell">
+<div class="meta-label">Assessment Type</div>
+<div class="meta-value">{{assessment_type}}</div>
+</div>
+
+<div class="meta-cell">
+<div class="meta-label">Date</div>
+<div class="meta-value">{{report_date}}</div>
+</div>
+
+</div>
+</div>
+
+<!-- BODY -->
+<div class="body-wrap">
+
+<!-- 01 Executive Summary -->
 <div class="section">
-  <div class="section-title">Executive Summary</div>
-  <div class="section-body">
-    {{executive_summary}}
-  </div>
+
+<div class="section-header">
+<span class="section-num">01</span>
+<span class="section-title">Executive Summary</span>
 </div>
 
-<!-- KEY FINDINGS -->
-<div class="section">
-  <div class="section-title">Key Findings</div>
-  <div class="box">
-    {{key_risk}}
-  </div>
+<div class="exec-card">
+
+<div class="compat-row">
+<span class="compat-label">Compatibility Level</span>
+<span class="compat-badge">Moderate</span>
 </div>
 
-<!-- OBSERVATIONS -->
-<div class="section">
-  <div class="section-title">Technical Observations</div>
+<!-- ★ここ最重要 -->
+<p class="exec-body">
+{{executive_summary}}
+</p>
 
-  <div class="box">
-    <strong>{{obs1_title}}</strong><br/>
-    {{obs1_body}}
-  </div>
-
-  <div class="box">
-    <strong>{{obs2_title}}</strong><br/>
-    {{obs2_body}}
-  </div>
-
-  <div class="box">
-    <strong>{{obs3_title}}</strong><br/>
-    {{obs3_body}}
-  </div>
+<!-- ★追加 -->
+<div class="risk-inline">
+<span class="risk-tag">Key Risk</span>
+<span class="risk-text">
+{{key_risk}}
+</span>
 </div>
 
-<!-- RISKS -->
-<div class="section">
-  <div class="section-title">Potential Risks</div>
-
-  <div class="box">
-    <strong>{{risk1_title}}</strong><br/>
-    {{risk1_body}}
-  </div>
-
-  <div class="box">
-    <strong>{{risk2_title}}</strong><br/>
-    {{risk2_body}}
-  </div>
+</div>
 </div>
 
-<!-- RECOMMENDATION -->
-<div class="section">
-  <div class="section-title">Recommendation</div>
-  <div class="section-body">
-    {{recommendation}}
-  </div>
 </div>
 
-<!-- DISCLAIMER -->
-<div class="footer">
-  {{disclaimer}}
+<!-- FOOTER -->
+<div class="page-footer">
+<span class="footer-brand">FairVia™ · Il Nautico Co., Ltd.</span>
+<span class="footer-note">Hypothesis Report · Pre-Commercial Assessment · Not for Distribution</span>
 </div>
 
+</div>
 </body>
-</html>
+</html>  
