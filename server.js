@@ -16,7 +16,7 @@ console.log("ENV KEYS:", Object.keys(process.env).filter(k => k.includes("ANTH")
 console.log("ANTH KEY LEN:", process.env.ANTHROPIC_API_KEY ? process.env.ANTHROPIC_API_KEY.length : 0);
 
 // =========================
-// Claude生成（安全修正版）
+// Claude生成
 // =========================
 async function generateClaudeHypothesis(prompt) {
   try {
@@ -28,7 +28,7 @@ async function generateClaudeHypothesis(prompt) {
         "anthropic-version": "2023-06-01"
       },
       body: JSON.stringify({
-        model:"claude-sonnet-4-6",
+        model: "claude-sonnet-4-6",
         max_tokens: 2000,
         messages: [
           {
@@ -60,7 +60,7 @@ async function generateClaudeHypothesis(prompt) {
 }
 
 // =========================
-// HTML差し込み（そのまま）
+// HTML差し込み
 // =========================
 function injectHtml(template, data) {
   let html = template;
@@ -74,7 +74,7 @@ function injectHtml(template, data) {
 }
 
 // =========================
-// 値取得（そのまま）
+// 値取得
 // =========================
 function getValue(fields, keyword) {
   const field = fields.find((f) =>
@@ -98,109 +98,7 @@ function getValue(fields, keyword) {
 }
 
 // =========================
-// 固定コメント（元維持）
-// =========================
-const SUMMARY_OVERVIEW =
-  "No immediate incompatibility is identified at this screening stage. The primary constraint lies in undefined processing and material conditions.";
-
-const SUMMARY_FINDINGS =
-  "Technical feasibility cannot be confirmed under the current conditions due to undefined processing parameters.";
-
-const SUMMARY_CONCLUSION =
-  "Transition should not proceed without prior pilot validation under controlled conditions.";
-
-const FEASIBILITY_EXPLANATION =
-  "This assessment reflects a screening-level evaluation based on the available inputs. Validation under controlled conditions is required before any transition decision.";
-
-const OBS_1_TITLE = "Processing Condition Uncertainty";
-const OBS_1_BODY =
-  "Undefined processing conditions introduce variability in material behavior during processing, affecting product consistency and performance.";
-
-const OBS_2_TITLE = "Operational Stability Risk";
-const OBS_2_BODY =
-  "Unverified process settings increase the risk of unstable conversion behavior during early production runs, potentially reducing consistency and increasing adjustment requirements.";
-
-const OBS_3_TITLE = "Application Requirement Gap";
-const OBS_3_BODY =
-  "Undefined end-use requirements prevent confirmation that the selected material and process combination will meet performance expectations under real application conditions.";
-
-const RISK_1_TITLE = "Performance Instability";
-const RISK_1_BODY =
-  "Material mismatch may lead to unstable product performance.";
-
-const RISK_2_TITLE = "Operational Inefficiency";
-const RISK_2_BODY =
-  "Unverified conditions may reduce operational efficiency.";
-
-const STRATEGIC_RECOMMENDATION =
-  "A controlled pilot validation is recommended before any production-scale transition decision is made.";
-
-const DISCLAIMER =
-  "This report is a preliminary screening-level technical assessment based solely on submitted information. It does not replace pilot testing, detailed engineering review, or commercial qualification.";
-
-// =========================
-// PDFルート（そのまま）
-// =========================
-app.get("/generate-pdf", async (req, res) => {
-  try {
-    const templatePath = path.join(process.cwd(), "template.html");
-    const htmlTemplate = fs.readFileSync(templatePath, "utf8");
-
-    const finalHtml = injectHtml(htmlTemplate, {
-      compatibility_level: "Moderate",
-      application: "Flexible Food Packaging Film",
-      material_transition: "CPP → PHBV",
-      assessment_type: "Tier 2 – Pre-Commercial Feasibility",
-      report_date: "March 2025",
-
-      executive_summary: SUMMARY_OVERVIEW,
-      key_risk: SUMMARY_FINDINGS,
-
-      obs1_title: OBS_1_TITLE,
-      obs1_body: OBS_1_BODY,
-      obs2_title: OBS_2_TITLE,
-      obs2_body: OBS_2_BODY,
-      obs3_title: OBS_3_TITLE,
-      obs3_body: OBS_3_BODY,
-
-      risk1_title: RISK_1_TITLE,
-      risk1_body: RISK_1_BODY,
-      risk2_title: RISK_2_TITLE,
-      risk2_body: RISK_2_BODY,
-
-      recommendation: STRATEGIC_RECOMMENDATION,
-      disclaimer: DISCLAIMER
-    });
-
-    const browser = await puppeteer.launch({
-      args: ["--no-sandbox", "--disable-setuid-sandbox"]
-    });
-
-    const page = await browser.newPage();
-    await page.setContent(finalHtml, { waitUntil: "networkidle0" });
-
-    const pdf = await page.pdf({
-      format: "A4",
-      printBackground: true
-    });
-
-    await browser.close();
-
-    res.set({
-      "Content-Type": "application/pdf",
-      "Content-Disposition": "inline; filename=report.pdf"
-    });
-
-    res.send(pdf);
-
-  } catch (err) {
-    console.error(err);
-    res.status(500).send("PDF generation failed");
-  }
-});
-
-// =========================
-// メインAPI（ここだけ最小修正）
+// メインAPI（ここだけ変更）
 // =========================
 app.post("/tally", async (req, res) => {
   console.log("🔥 TIER2 REQUEST HIT");
@@ -217,7 +115,6 @@ app.post("/tally", async (req, res) => {
     const projectStage = getValue(fields, "project");
     const technicalConcern = getValue(fields, "concern");
 
-    // 🔥 安全修正（string化）
     const prompt = JSON.stringify({
       application,
       material: currentMaterial,
@@ -233,140 +130,15 @@ app.post("/tally", async (req, res) => {
 
     console.log("✅ CLAUDE GENERATED");
 
-    res.json({
-      success: true,
-      report: claudeReport
-    });
+    // 👇ここが変更点
+    return res.send(claudeReport);
 
   } catch (err) {
     console.error("❌ TIER2 ERROR:", err);
-    res.status(500).json({ error: "Tier2 generation failed" });
+    res.status(500).send("Error generating report");
   }
 });
-app.post("/tally-pdf", async (req, res) => {
-  console.log("🔥 TIER2 PDF REQUEST HIT");
 
-  try {
-    const fields = req.body.data.fields;
-
-    const application = getValue(fields, "application");
-    const currentMaterial = getValue(fields, "current material");
-    const bioMaterial = getValue(fields, "target material");
-    const processing = getValue(fields, "processing");
-    const equipment = getValue(fields, "equipment");
-    const productionScale = getValue(fields, "production scale");
-    const projectStage = getValue(fields, "project");
-    const technicalConcern = getValue(fields, "concern");
-
-    // Claude生成
-    const claudeReport = await generateClaudeHypothesis(JSON.stringify({
-      application,
-      material: currentMaterial,
-      bioMaterial,
-      processing,
-      equipment,
-      scale: productionScale,
-      stage: projectStage,
-      concern: technicalConcern
-    }));
-
-    console.log("✅ CLAUDE GENERATED (PDF)");
-
-    // ===== PDF生成 =====
-    const templatePath = path.join(process.cwd(), "template.html");
-    const htmlTemplate = fs.readFileSync(templatePath, "utf8");
-
-    const finalHtml = injectHtml(htmlTemplate, {
-      executive_summary: claudeReport,
-    });
-
-    const browser = await puppeteer.launch({
-      args: ["--no-sandbox", "--disable-setuid-sandbox"]
-    });
-
-    const page = await browser.newPage();
-    await page.setContent(finalHtml, { waitUntil: "networkidle0" });
-
-    const pdf = await page.pdf({
-      format: "A4",
-      printBackground: true
-    });
-
-    await browser.close();
-
-    res.set({
-      "Content-Type": "application/pdf",
-      "Content-Disposition": "inline; filename=report.pdf"
-    });
-
-    return res.send(pdf);
-
-  } catch (err) {
-    console.error("❌ TIER2 PDF ERROR:", err);
-    res.status(500).send("PDF generation failed");
-  }
-});
-app.post("/tally-view", async (req, res) => {
-  console.log("🔥 TIER2 VIEW REQUEST HIT");
-
-  try {
-    const fields = req.body.data.fields;
-
-    const application = getValue(fields, "application");
-    const currentMaterial = getValue(fields, "current material");
-    const bioMaterial = getValue(fields, "target material");
-    const processing = getValue(fields, "processing");
-    const equipment = getValue(fields, "equipment");
-    const productionScale = getValue(fields, "production scale");
-    const projectStage = getValue(fields, "project");
-    const technicalConcern = getValue(fields, "concern");
-
-    const claudeReport = await generateClaudeHypothesis(JSON.stringify({
-      application,
-      material: currentMaterial,
-      bioMaterial,
-      processing,
-      equipment,
-      scale: productionScale,
-      stage: projectStage,
-      concern: technicalConcern
-    }));
-
-    console.log("✅ CLAUDE GENERATED (VIEW)");
-
-    const templatePath = path.join(process.cwd(), "template.html");
-    const htmlTemplate = fs.readFileSync(templatePath, "utf8");
-
-    const finalHtml = injectHtml(htmlTemplate, {
-      executive_summary: claudeReport,
-    });
-
-    const browser = await puppeteer.launch({
-      args: ["--no-sandbox", "--disable-setuid-sandbox"]
-    });
-
-    const page = await browser.newPage();
-    await page.setContent(finalHtml, { waitUntil: "networkidle0" });
-
-    const pdf = await page.pdf({
-      format: "A4",
-      printBackground: true
-    });
-
-    await browser.close();
-
-    res.set({
-      "Content-Type": "application/pdf",
-      "Content-Disposition": "inline; filename=report.pdf"
-    });
-
-    return res.send(pdf);
-
-  } catch (err) {
-    console.error("❌ TIER2 VIEW ERROR:", err);
-    res.status(500).send("PDF generation failed");
-  }
-});
 // =========================
 // 起動
 // =========================
