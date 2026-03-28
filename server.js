@@ -214,7 +214,7 @@ app.post("/tally", async (req, res) => {
     const projectStage = getValue(fields, "project");
     const technicalConcern = getValue(fields, "concern");
 
-    const claudeReport = await generateClaudeHypothesis({
+    const claudeReport = await generateClaudeHypothesis(JSON.stringify({
       application,
       material: currentMaterial,
       bioMaterial,
