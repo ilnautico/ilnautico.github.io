@@ -1,19 +1,20 @@
-import fetch from "node-fetch";
 import express from "express";
 import puppeteer from "puppeteer";
-import { Resend } from "resend";
-
 import fs from "fs";
 import path from "path";
+import fetch from "node-fetch";
+import cors from "cors";
 
 const app = express();
+
+// =========================
+// 受信設定（←今回の核心修正）
+/**
+ * ここでTallyのPOSTを受け取れるようにする
+ */
+app.use(cors());
 app.use(express.json());
-
-console.log("TEST ENV:", process.env.TEST_ENV_CHECK);
-const resend = new Resend(process.env.RESEND_API_KEY);
-
-console.log("ENV KEYS:", Object.keys(process.env).filter(k => k.includes("ANTH")));
-console.log("ANTH KEY LEN:", process.env.ANTHROPIC_API_KEY ? process.env.ANTHROPIC_API_KEY.length : 0);
+app.use(express.urlencoded({ extended: true }));
 
 // =========================
 // Claude生成
@@ -87,50 +88,74 @@ function getValue(fields, keyword) {
     const selected = field.options.find((opt) =>
       field.value.includes(opt.id)
     );
-    if (selected?.text) return selected.text.toLowerCase();
+    if (selected?.text) return selected.text;
   }
 
   if (typeof field.value === "string") {
-    return field.value.toLowerCase();
+    return field.value;
   }
 
   return "";
 }
 
 // =========================
-// メインAPI（ここだけ変更）
-// =========================
-app.get("/generate-pdf", async (req, res) => {
+// PDF生成（メイン）
+/**
+ * TallyからここにPOSTされる
+ */
+app.post("/tally-pdf", async (req, res) => {
+
+  console.log("🔥 HIT");
+  console.log("BODY:", JSON.stringify(req.body, null, 2));
+
   try {
+
+    const fields = req.body?.data?.fields || [];
+
+    console.log("🔥 TIER2 PDF REQUEST HIT");
+
+    // ===== フル取得 =====
+    const application = getValue(fields, "application");
+    const currentMaterial = getValue(fields, "current material");
+    const bioMaterial = getValue(fields, "target material");
+    const processing = getValue(fields, "processing");
+    const equipment = getValue(fields, "equipment");
+    const productionScale = getValue(fields, "production scale");
+    const projectStage = getValue(fields, "project");
+    const technicalConcern = getValue(fields, "concern");
+
+    // ===== Claude入力 =====
+    const prompt = JSON.stringify({
+      application,
+      material: currentMaterial,
+      bioMaterial,
+      processing,
+      equipment,
+      scale: productionScale,
+      stage: projectStage,
+      concern: technicalConcern
+    });
+
+    const claudeReport = await generateClaudeHypothesis(prompt);
+
+    console.log("✅ CLAUDE GENERATED");
+
+    // ===== HTML読み込み =====
     const templatePath = path.join(process.cwd(), "template.html");
     const htmlTemplate = fs.readFileSync(templatePath, "utf8");
 
+    // ===== 差し込み =====
     const finalHtml = injectHtml(htmlTemplate, {
-      compatibility_level: "Moderate",
-      application: "Flexible food packaging film",
-      material_transition: "CPP → PHBV",
+      application: application,
+      material_transition: `${currentMaterial} → ${bioMaterial}`,
       assessment_type: "Tier 2 – Pre-Commercial Feasibility",
       report_date: new Date().toLocaleDateString(),
 
-      executive_summary: "Test summary",
-      key_risk: "Test risk",
-
-      obs1_title: "Test 1",
-      obs1_body: "Test body",
-      obs2_title: "Test 2",
-      obs2_body: "Test body",
-      obs3_title: "Test 3",
-      obs3_body: "Test body",
-
-      risk1_title: "Risk 1",
-      risk1_body: "Risk body",
-      risk2_title: "Risk 2",
-      risk2_body: "Risk body",
-
-      recommendation: "Test recommendation",
-      disclaimer: "Test disclaimer"
+      executive_summary: claudeReport,
+      key_risk: claudeReport
     });
 
+    // ===== PDF生成 =====
     const browser = await puppeteer.launch({
       args: ["--no-sandbox", "--disable-setuid-sandbox"]
     });
@@ -147,22 +172,57 @@ app.get("/generate-pdf", async (req, res) => {
 
     res.set({
       "Content-Type": "application/pdf",
-      "Content-Disposition": "inline; filename=report.pdf"
+      "Content-Disposition": "inline"
     });
 
-    res.send(pdf);
+    return res.send(pdf);
 
   } catch (err) {
-    console.error(err);
+    console.error("❌ ERROR:", err);
     res.status(500).send("PDF generation failed");
   }
 });
 
 // =========================
-// 起動
+// テスト用（ブラウザ確認用）
 // =========================
-app.listen(3000, () => {
-  console.log("🚀 Server running on port 3000");
+app.get("/test-pdf", async (req, res) => {
+
+  const template = fs.readFileSync("template.html", "utf8");
+
+  const html = injectHtml(template, {
+    application: "TEST",
+    material_transition: "CPP → PHBV",
+    assessment_type: "TEST",
+    report_date: "NOW",
+    executive_summary: "THIS IS TEST",
+    key_risk: "TEST RISK"
+  });
+
+  const browser = await puppeteer.launch({
+    args: ["--no-sandbox"]
+  });
+
+  const page = await browser.newPage();
+  await page.setContent(html);
+
+  const pdf = await page.pdf({ format: "A4" });
+
+  await browser.close();
+
+  res.set({
+    "Content-Type": "application/pdf",
+    "Content-Disposition": "inline"
+  });
+
+  res.send(pdf);
+});
+
+// =========================
+// 起動（Railway対応）
+// =========================
+app.listen(process.env.PORT || 3000, () => {
+  console.log("🚀 Server running");
 });
 // =========================
 // HTMLテンプレ（あなたの本番HTML）
