@@ -3,21 +3,20 @@ import express from "express";
 import puppeteer from "puppeteer";
 import { Resend } from "resend";
 
-
-/* ===== 追加（PDF用）===== */
 import fs from "fs";
 import path from "path";
-/* ======================= */
 
 const app = express();
 app.use(express.json());
+
 console.log("TEST ENV:", process.env.TEST_ENV_CHECK);
 const resend = new Resend(process.env.RESEND_API_KEY);
+
 console.log("ENV KEYS:", Object.keys(process.env).filter(k => k.includes("ANTH")));
 console.log("ANTH KEY LEN:", process.env.ANTHROPIC_API_KEY ? process.env.ANTHROPIC_API_KEY.length : 0);
 
 // =========================
-// Claude生成
+// Claude生成（安全修正版）
 // =========================
 async function generateClaudeHypothesis(prompt) {
   try {
@@ -29,7 +28,7 @@ async function generateClaudeHypothesis(prompt) {
         "anthropic-version": "2023-06-01"
       },
       body: JSON.stringify({
-        model: "claude-3-5-sonnet-latest"
+        model: "claude-3-5-sonnet-latest",
         max_tokens: 2000,
         messages: [
           {
@@ -61,7 +60,7 @@ async function generateClaudeHypothesis(prompt) {
 }
 
 // =========================
-// HTML差し込み
+// HTML差し込み（そのまま）
 // =========================
 function injectHtml(template, data) {
   let html = template;
@@ -75,7 +74,7 @@ function injectHtml(template, data) {
 }
 
 // =========================
-// 値取得
+// 値取得（そのまま）
 // =========================
 function getValue(fields, keyword) {
   const field = fields.find((f) =>
@@ -99,7 +98,7 @@ function getValue(fields, keyword) {
 }
 
 // =========================
-// 固定コメント（そのまま維持）
+// 固定コメント（元維持）
 // =========================
 const SUMMARY_OVERVIEW =
   "No immediate incompatibility is identified at this screening stage. The primary constraint lies in undefined processing and material conditions.";
@@ -140,7 +139,7 @@ const DISCLAIMER =
   "This report is a preliminary screening-level technical assessment based solely on submitted information. It does not replace pilot testing, detailed engineering review, or commercial qualification.";
 
 // =========================
-// 🔥 PDF確認ルート（追加だけ）
+// PDFルート（そのまま）
 // =========================
 app.get("/generate-pdf", async (req, res) => {
   try {
@@ -199,6 +198,10 @@ app.get("/generate-pdf", async (req, res) => {
     res.status(500).send("PDF generation failed");
   }
 });
+
+// =========================
+// メインAPI（ここだけ最小修正）
+// =========================
 app.post("/tally", async (req, res) => {
   console.log("🔥 TIER2 REQUEST HIT");
 
@@ -214,18 +217,19 @@ app.post("/tally", async (req, res) => {
     const projectStage = getValue(fields, "project");
     const technicalConcern = getValue(fields, "concern");
 
-    const claudeReport = await generateClaudeHypothesis(
-  JSON.stringify({
-    application,
-    material: currentMaterial,
-    bioMaterial,
-    processing,
-    equipment,
-    scale: productionScale,
-    stage: projectStage,
-    concern: technicalConcern
-  })
-);
+    // 🔥 安全修正（string化）
+    const prompt = JSON.stringify({
+      application,
+      material: currentMaterial,
+      bioMaterial,
+      processing,
+      equipment,
+      scale: productionScale,
+      stage: projectStage,
+      concern: technicalConcern
+    });
+
+    const claudeReport = await generateClaudeHypothesis(prompt);
 
     console.log("✅ CLAUDE GENERATED");
 
@@ -238,11 +242,13 @@ app.post("/tally", async (req, res) => {
     console.error("❌ TIER2 ERROR:", err);
     res.status(500).json({ error: "Tier2 generation failed" });
   }
-});// =========================
-// サーバー起動（ここは最後）
+});
+
+// =========================
+// 起動
 // =========================
 app.listen(3000, () => {
-  console.log("Server running on port 3000");
+  console.log("🚀 Server running on port 3000");
 });
 // =========================
 // HTMLテンプレ（あなたの本番HTML）
