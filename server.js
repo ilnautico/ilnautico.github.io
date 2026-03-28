@@ -36,7 +36,7 @@ async function generateClaudeHypothesis(prompt) {
             content: [
               {
                 type: "text",
-                text: prompt
+                text: String(prompt)
               }
             ]
           }
@@ -51,7 +51,7 @@ async function generateClaudeHypothesis(prompt) {
     }
 
     const data = await response.json();
-    return data.content?.[0]?.text || "No response from Claude";
+    return data.content?.[0]?.text || "No response";
 
   } catch (err) {
     console.error("❌ Claude Exception:", err);
