@@ -243,7 +243,69 @@ app.post("/tally", async (req, res) => {
     res.status(500).json({ error: "Tier2 generation failed" });
   }
 });
+app.post("/tally-pdf", async (req, res) => {
+  console.log("🔥 TIER2 PDF REQUEST HIT");
 
+  try {
+    const fields = req.body.data.fields;
+
+    const application = getValue(fields, "application");
+    const currentMaterial = getValue(fields, "current material");
+    const bioMaterial = getValue(fields, "target material");
+    const processing = getValue(fields, "processing");
+    const equipment = getValue(fields, "equipment");
+    const productionScale = getValue(fields, "production scale");
+    const projectStage = getValue(fields, "project");
+    const technicalConcern = getValue(fields, "concern");
+
+    // Claude生成
+    const claudeReport = await generateClaudeHypothesis(JSON.stringify({
+      application,
+      material: currentMaterial,
+      bioMaterial,
+      processing,
+      equipment,
+      scale: productionScale,
+      stage: projectStage,
+      concern: technicalConcern
+    }));
+
+    console.log("✅ CLAUDE GENERATED (PDF)");
+
+    // ===== PDF生成 =====
+    const templatePath = path.join(process.cwd(), "template.html");
+    const htmlTemplate = fs.readFileSync(templatePath, "utf8");
+
+    const finalHtml = injectHtml(htmlTemplate, {
+      executive_summary: claudeReport,
+    });
+
+    const browser = await puppeteer.launch({
+      args: ["--no-sandbox", "--disable-setuid-sandbox"]
+    });
+
+    const page = await browser.newPage();
+    await page.setContent(finalHtml, { waitUntil: "networkidle0" });
+
+    const pdf = await page.pdf({
+      format: "A4",
+      printBackground: true
+    });
+
+    await browser.close();
+
+    res.set({
+      "Content-Type": "application/pdf",
+      "Content-Disposition": "inline; filename=report.pdf"
+    });
+
+    return res.send(pdf);
+
+  } catch (err) {
+    console.error("❌ TIER2 PDF ERROR:", err);
+    res.status(500).send("PDF generation failed");
+  }
+});
 // =========================
 // 起動
 // =========================
