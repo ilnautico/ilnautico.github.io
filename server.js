@@ -156,8 +156,13 @@ app.post("/tally-pdf", async (req, res) => {
 
     // ===== PDF生成 =====
     const browser = await puppeteer.launch({
-      args: ["--no-sandbox", "--disable-setuid-sandbox"]
-    });
+  args: [
+    "--no-sandbox",
+    "--disable-setuid-sandbox",
+    "--disable-dev-shm-usage",
+    "--disable-gpu"
+  ]
+});
 
     const page = await browser.newPage();
     await page.setContent(finalHtml, { waitUntil: "networkidle0" });
@@ -198,7 +203,7 @@ app.get("/test-pdf", async (req, res) => {
     key_risk: "TEST RISK"
   });
 
-  const browser = await puppeteer.launch({
+  await　const browser = await puppeteer.launch({
     args: ["--no-sandbox"]
   });
 
