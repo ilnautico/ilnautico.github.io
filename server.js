@@ -1,17 +1,14 @@
-import express from "express";
+　import express from "express";
 import puppeteer from "puppeteer";
 import fs from "fs";
 import path from "path";
 import fetch from "node-fetch";
 
-
 const app = express();
 
 // =========================
-// 受信設定（←今回の核心修正）
-/**
- * ここでTallyのPOSTを受け取れるようにする
- */
+// 受信設定
+// =========================
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -33,28 +30,17 @@ async function generateClaudeHypothesis(prompt) {
         messages: [
           {
             role: "user",
-            content: [
-              {
-                type: "text",
-                text: String(prompt)
-              }
-            ]
+            content: [{ type: "text", text: String(prompt) }]
           }
         ]
       })
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("❌ Claude API ERROR:", errorText);
-      throw new Error("Claude API failed");
-    }
-
     const data = await response.json();
     return data.content?.[0]?.text || "No response";
 
   } catch (err) {
-    console.error("❌ Claude Exception:", err);
+    console.error("❌ Claude ERROR:", err);
     throw err;
   }
 }
@@ -99,145 +85,70 @@ function getValue(fields, keyword) {
 
 // =========================
 // PDF生成（メイン）
-/**
- * TallyからここにPOSTされる
- */
+// =========================
 app.post("/tally-pdf", async (req, res) => {
 
   console.log("🔥 HIT");
-  console.log("BODY:", JSON.stringify(req.body, null, 2));
 
   try {
-
     const fields = req.body?.data?.fields || [];
 
-    console.log("🔥 TIER2 PDF REQUEST HIT");
-
-    // ===== フル取得 =====
     const application = getValue(fields, "application");
     const currentMaterial = getValue(fields, "current material");
     const bioMaterial = getValue(fields, "target material");
-    const processing = getValue(fields, "processing");
-    const equipment = getValue(fields, "equipment");
-    const productionScale = getValue(fields, "production scale");
-    const projectStage = getValue(fields, "project");
-    const technicalConcern = getValue(fields, "concern");
 
-    // ===== Claude入力 =====
     const prompt = JSON.stringify({
       application,
-      material: currentMaterial,
-      bioMaterial,
-      processing,
-      equipment,
-      scale: productionScale,
-      stage: projectStage,
-      concern: technicalConcern
+      currentMaterial,
+      bioMaterial
     });
 
     const claudeReport = await generateClaudeHypothesis(prompt);
 
     console.log("✅ CLAUDE GENERATED");
 
-    // ===== HTML読み込み =====
-    const templatePath = path.join(process.cwd(), "template.html");
-const htmlTemplate = fs.readFileSync(templatePath, "utf8");
-
-const finalHtml = injectHtml(htmlTemplate, {
-  application: application,
-  material_transition: `${currentMaterial} → ${bioMaterial}`,
-  assessment_type: "Tier 2 – Pre-Commercial Feasibility",
-  report_date: new Date().toLocaleDateString(),
-
-  executive_summary: claudeReport,
-  key_risk: claudeReport
-});
+    // ===== HTML =====
     const templatePath = path.join(process.cwd(), "template.html");
     const htmlTemplate = fs.readFileSync(templatePath, "utf8");
-　　　const finalHtml = injectHtml(htmlTemplate, {
-  application: application,
-  material_transition: `${currentMaterial} → ${bioMaterial}`,
-  assessment_type: "Tier 2 – Pre-Commercial Feasibility",
-  report_date: new Date().toLocaleDateString(),
 
-  executive_summary: claudeReport,
-  key_risk: claudeReport
-});
-    // ===== 差し込み =====
-    
-
-    // ===== PDF生成 =====
-    const browser = await puppeteer.launch({
-  args: [
-    "--no-sandbox",
-    "--disable-setuid-sandbox",
-    "--disable-dev-shm-usage",
-    "--disable-gpu"
-  ]
-    // ===== 差し込み =====
     const finalHtml = injectHtml(htmlTemplate, {
       application: application,
       material_transition: `${currentMaterial} → ${bioMaterial}`,
-      assessment_type: "Tier 2 – Pre-Commercial Feasibility",
+      assessment_type: "Tier 2",
       report_date: new Date().toLocaleDateString(),
-
       executive_summary: claudeReport,
       key_risk: claudeReport
     });
 
-    // ===== PDF生成 =====
+    // ===== PDF =====
     const browser = await puppeteer.launch({
-  args: [
-    "--no-sandbox",
-    "--disable-setuid-sandbox",
-    "--disable-dev-shm-usage",
-    "--disable-gpu"
-  ]
-});
-
-    
-    const pdf = await page.pdf({
-  format: "A4",
-  printBackground: true,
-  preferCSSPageSize: true
-});
-
-await browser.close();
-
-// ここで最新PDFとして保存
-const latestPdfPath = path.join(process.cwd(), "latest-report.pdf");
-fs.writeFileSync(latestPdfPath, pdf);
-
-res.set({
-  "Content-Type": "application/pdf",
-  "Content-Disposition": "inline"
-});
-
-return res.send(pdf);
-
-  } catch (err) {
-    console.error("❌ ERROR:", err);
-    res.status(500).send("PDF generation failed");
-  }
-});
-
-// =========================
-// テスト用（ブラウザ確認用）
-// =========================
-app.get("/test-pdf", async (req, res) => {
-  try {
-    const template = fs.readFileSync("template.html", "utf8");
-
-    const html = injectHtml(template, {
-      application: "TEST",
-      material_transition: "CPP → PHBV",
-      assessment_type: "TEST",
-      report_date: "NOW",
-      executive_summary: "THIS IS TEST",
-      key_risk: "TEST RISK"
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-gpu",
+        "--single-process",
+        "--no-zygote"
+      ]
     });
 
-    
+    const page = await browser.newPage();
+
+    await page.setContent(finalHtml, {
+      waitUntil: "domcontentloaded"
+    });
+
+    const pdf = await page.pdf({
+      format: "A4",
+      printBackground: true
+    });
+
+    await browser.close();
+
+    // ===== 保存 =====
+    const latestPdfPath = path.join(process.cwd(), "latest-report.pdf");
+    fs.writeFileSync(latestPdfPath, pdf);
+
     res.set({
       "Content-Type": "application/pdf",
       "Content-Disposition": "inline"
@@ -246,61 +157,32 @@ app.get("/test-pdf", async (req, res) => {
     return res.send(pdf);
 
   } catch (err) {
-    console.error("PDF ERROR:", err);
+    console.error("❌ ERROR:", err);
     return res.status(500).send("PDF failed");
   }
 });
-const browser = await puppeteer.launch({
-  args: [
-    "--no-sandbox",
-    "--disable-setuid-sandbox",
-    "--disable-dev-shm-usage",
-    "--disable-gpu",
-    "--single-process",
-    "--no-zygote"
-  ]
-});
 
-const page = await browser.newPage();
-
-await page.setContent(finalHtml, {
-  waitUntil: "domcontentloaded"
-});
-
-const pdf = await page.pdf({
-  format: "A4",
-  printBackground: true,
-  preferCSSPageSize: true
-});
-
-// PDF保存（これが確認用）
-const latestPdfPath = path.join(process.cwd(), "latest-report.pdf");
-fs.writeFileSync(latestPdfPath, pdf);
-
-await browser.close();
 // =========================
-// 起動（Railway対応）
+// 確認URL
 // =========================
 app.get("/latest-pdf", (req, res) => {
-  try {
-    const latestPdfPath = path.join(process.cwd(), "latest-report.pdf");
+  const latestPdfPath = path.join(process.cwd(), "latest-report.pdf");
 
-    if (!fs.existsSync(latestPdfPath)) {
-      return res.status(404).send("No generated PDF found yet.");
-    }
-
-    res.set({
-      "Content-Type": "application/pdf",
-      "Content-Disposition": "inline"
-    });
-
-    return res.sendFile(latestPdfPath);
-
-  } catch (err) {
-    console.error("LATEST PDF ERROR:", err);
-    return res.status(500).send("Failed to load latest PDF.");
+  if (!fs.existsSync(latestPdfPath)) {
+    return res.status(404).send("No generated PDF found yet.");
   }
+
+  res.set({
+    "Content-Type": "application/pdf",
+    "Content-Disposition": "inline"
+  });
+
+  return res.sendFile(latestPdfPath);
 });
+
+// =========================
+// 起動
+// =========================
 app.listen(process.env.PORT || 3000, () => {
   console.log("🚀 Server running");
 });
