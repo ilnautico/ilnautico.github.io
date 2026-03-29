@@ -141,8 +141,39 @@ app.post("/tally-pdf", async (req, res) => {
 
     // ===== HTML読み込み =====
     const templatePath = path.join(process.cwd(), "template.html");
-    const htmlTemplate = fs.readFileSync(templatePath, "utf8");
+const htmlTemplate = fs.readFileSync(templatePath, "utf8");
 
+const finalHtml = injectHtml(htmlTemplate, {
+  application: application,
+  material_transition: `${currentMaterial} → ${bioMaterial}`,
+  assessment_type: "Tier 2 – Pre-Commercial Feasibility",
+  report_date: new Date().toLocaleDateString(),
+
+  executive_summary: claudeReport,
+  key_risk: claudeReport
+});
+    const templatePath = path.join(process.cwd(), "template.html");
+    const htmlTemplate = fs.readFileSync(templatePath, "utf8");
+　　　const finalHtml = injectHtml(htmlTemplate, {
+  application: application,
+  material_transition: `${currentMaterial} → ${bioMaterial}`,
+  assessment_type: "Tier 2 – Pre-Commercial Feasibility",
+  report_date: new Date().toLocaleDateString(),
+
+  executive_summary: claudeReport,
+  key_risk: claudeReport
+});
+    // ===== 差し込み =====
+    
+
+    // ===== PDF生成 =====
+    const browser = await puppeteer.launch({
+  args: [
+    "--no-sandbox",
+    "--disable-setuid-sandbox",
+    "--disable-dev-shm-usage",
+    "--disable-gpu"
+  ]
     // ===== 差し込み =====
     const finalHtml = injectHtml(htmlTemplate, {
       application: application,
