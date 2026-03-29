@@ -208,9 +208,25 @@ app.get("/test-pdf", async (req, res) => {
     "--no-sandbox",
     "--disable-setuid-sandbox",
     "--disable-dev-shm-usage",
-    "--disable-gpu"
+    "--disable-gpu",
+    "--single-process",
+    "--no-zygote"
   ]
 });
+
+const page = await browser.newPage();
+
+await page.setContent(finalHtml, {
+  waitUntil: "domcontentloaded"
+});
+
+const pdf = await page.pdf({
+  format: "A4",
+  printBackground: true,
+  preferCSSPageSize: true
+});
+
+await browser.close();
   const page = await browser.newPage();
   page.setContent(finalHtml, { waitUntil: "networkidle0" });
 
