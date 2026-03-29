@@ -203,10 +203,14 @@ app.get("/test-pdf", async (req, res) => {
     key_risk: "TEST RISK"
   });
 
-  await　const browser = await puppeteer.launch({
-    args: ["--no-sandbox"]
-  });
-
+  const browser = await puppeteer.launch({
+  args: [
+    "--no-sandbox",
+    "--disable-setuid-sandbox",
+    "--disable-dev-shm-usage",
+    "--disable-gpu"
+  ]
+});
   const page = await browser.newPage();
   page.setContent(finalHtml, { waitUntil: "networkidle0" });
 
