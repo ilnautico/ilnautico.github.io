@@ -189,53 +189,53 @@ app.post("/tally-pdf", async (req, res) => {
 // テスト用（ブラウザ確認用）
 // =========================
 app.get("/test-pdf", async (req, res) => {
+  try {
+    const template = fs.readFileSync("template.html", "utf8");
 
-  const template = fs.readFileSync("template.html", "utf8");
+    const html = injectHtml(template, {
+      application: "TEST",
+      material_transition: "CPP → PHBV",
+      assessment_type: "TEST",
+      report_date: "NOW",
+      executive_summary: "THIS IS TEST",
+      key_risk: "TEST RISK"
+    });
 
-  const html = injectHtml(template, {
-    application: "TEST",
-    material_transition: "CPP → PHBV",
-    assessment_type: "TEST",
-    report_date: "NOW",
-    executive_summary: "THIS IS TEST",
-    key_risk: "TEST RISK"
-  });
+    const browser = await puppeteer.launch({
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-gpu",
+        "--single-process",
+        "--no-zygote"
+      ]
+    });
 
-  const browser = await puppeteer.launch({
-  args: [
-    "--no-sandbox",
-    "--disable-setuid-sandbox",
-    "--disable-dev-shm-usage",
-    "--disable-gpu",
-    "--single-process",
-    "--no-zygote"
-  ]
-});
+    const page = await browser.newPage();
 
+    await page.setContent(html, {
+      waitUntil: "domcontentloaded"
+    });
 
-await page.setContent(finalHtml, {
-  waitUntil: "domcontentloaded"
-});
+    const pdf = await page.pdf({
+      format: "A4",
+      printBackground: true
+    });
 
-const pdf = await page.pdf({
-  format: "A4",
-  printBackground: true,
-  preferCSSPageSize: true
-});
+    await browser.close();
 
-await browser.close();
+    res.set({
+      "Content-Type": "application/pdf",
+      "Content-Disposition": "inline"
+    });
 
-  
-  page.setContent(finalHtml, { waitUntil: "networkidle0" });
+    return res.send(pdf);
 
-  await browser.close();
-
-  res.set({
-    "Content-Type": "application/pdf",
-    "Content-Disposition": "inline"
-  });
-
-  res.send(pdf);
+  } catch (err) {
+    console.error("PDF ERROR:", err);
+    return res.status(500).send("PDF failed");
+  }
 });
 
 // =========================
