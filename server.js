@@ -207,29 +207,33 @@ app.get("/test-pdf", async (req, res) => {
     });
 
     const browser = await puppeteer.launch({
-      args: [
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--disable-dev-shm-usage",
-        "--disable-gpu",
-        "--single-process",
-        "--no-zygote"
-      ]
-    });
+  args: [
+    "--no-sandbox",
+    "--disable-setuid-sandbox",
+    "--disable-dev-shm-usage",
+    "--disable-gpu",
+    "--single-process",
+    "--no-zygote"
+  ]
+});
 
-    const page = await browser.newPage();
+const page = await browser.newPage();
 
-    await page.setContent(html, {
-      waitUntil: "domcontentloaded"
-    });
+await page.setContent(finalHtml, {
+  waitUntil: "domcontentloaded"
+});
 
-    const pdf = await page.pdf({
-      format: "A4",
-      printBackground: true
-    });
+const pdf = await page.pdf({
+  format: "A4",
+  printBackground: true,
+  preferCSSPageSize: true
+});
 
-    await browser.close();
+// 👇これが今回の核心（保存）
+const latestPdfPath = path.join(process.cwd(), "latest-report.pdf");
+fs.writeFileSync(latestPdfPath, pdf);
 
+await browser.close();
     res.set({
       "Content-Type": "application/pdf",
       "Content-Disposition": "inline"
