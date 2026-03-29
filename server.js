@@ -166,18 +166,23 @@ app.post("/tally-pdf", async (req, res) => {
 
     
     const pdf = await page.pdf({
-      format: "A4",
-      printBackground: true
-    });
+  format: "A4",
+  printBackground: true,
+  preferCSSPageSize: true
+});
 
-    await browser.close();
+await browser.close();
 
-    res.set({
-      "Content-Type": "application/pdf",
-      "Content-Disposition": "inline"
-    });
+// ここで最新PDFとして保存
+const latestPdfPath = path.join(process.cwd(), "latest-report.pdf");
+fs.writeFileSync(latestPdfPath, pdf);
 
-    return res.send(pdf);
+res.set({
+  "Content-Type": "application/pdf",
+  "Content-Disposition": "inline"
+});
+
+return res.send(pdf);
 
   } catch (err) {
     console.error("❌ ERROR:", err);
