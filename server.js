@@ -1492,7 +1492,7 @@ score_eol_note: "End-of-life compliance should be evaluated based on regional re
       ]
     });
 
-    const page = await browser.newPage();
+    
     await page.setContent(html, { waitUntil: "networkidle0" });
 
     const pdf = await page.pdf({
