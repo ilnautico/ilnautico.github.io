@@ -212,7 +212,6 @@ app.get("/test-pdf", async (req, res) => {
   ]
 });
 
-const page = await browser.newPage();
 
 await page.setContent(finalHtml, {
   waitUntil: "domcontentloaded"
