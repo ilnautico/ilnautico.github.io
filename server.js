@@ -206,7 +206,20 @@ app.get("/test-pdf", async (req, res) => {
       key_risk: "TEST RISK"
     });
 
-    const browser = await puppeteer.launch({
+    
+    res.set({
+      "Content-Type": "application/pdf",
+      "Content-Disposition": "inline"
+    });
+
+    return res.send(pdf);
+
+  } catch (err) {
+    console.error("PDF ERROR:", err);
+    return res.status(500).send("PDF failed");
+  }
+});
+const browser = await puppeteer.launch({
   args: [
     "--no-sandbox",
     "--disable-setuid-sandbox",
@@ -229,24 +242,11 @@ const pdf = await page.pdf({
   preferCSSPageSize: true
 });
 
-// 👇これが今回の核心（保存）
+// PDF保存（これが確認用）
 const latestPdfPath = path.join(process.cwd(), "latest-report.pdf");
 fs.writeFileSync(latestPdfPath, pdf);
 
 await browser.close();
-    res.set({
-      "Content-Type": "application/pdf",
-      "Content-Disposition": "inline"
-    });
-
-    return res.send(pdf);
-
-  } catch (err) {
-    console.error("PDF ERROR:", err);
-    return res.status(500).send("PDF failed");
-  }
-});
-
 // =========================
 // 起動（Railway対応）
 // =========================
