@@ -164,9 +164,7 @@ app.post("/tally-pdf", async (req, res) => {
   ]
 });
 
-    const page = await browser.newPage();
-    await page.setContent(finalHtml, { waitUntil: "networkidle0" });
-
+    
     const pdf = await page.pdf({
       format: "A4",
       printBackground: true
