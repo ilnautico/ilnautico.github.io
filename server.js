@@ -224,7 +224,8 @@ const pdf = await page.pdf({
 });
 
 await browser.close();
-  const page = await browser.newPage();
+
+  
   page.setContent(finalHtml, { waitUntil: "networkidle0" });
 
   const pdf = await page.pdf({ format: "A4" });
