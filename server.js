@@ -246,6 +246,26 @@ app.get("/test-pdf", async (req, res) => {
 // =========================
 // 起動（Railway対応）
 // =========================
+app.get("/latest-pdf", (req, res) => {
+  try {
+    const latestPdfPath = path.join(process.cwd(), "latest-report.pdf");
+
+    if (!fs.existsSync(latestPdfPath)) {
+      return res.status(404).send("No generated PDF found yet.");
+    }
+
+    res.set({
+      "Content-Type": "application/pdf",
+      "Content-Disposition": "inline"
+    });
+
+    return res.sendFile(latestPdfPath);
+
+  } catch (err) {
+    console.error("LATEST PDF ERROR:", err);
+    return res.status(500).send("Failed to load latest PDF.");
+  }
+});
 app.listen(process.env.PORT || 3000, () => {
   console.log("🚀 Server running");
 });
