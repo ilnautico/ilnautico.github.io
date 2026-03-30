@@ -166,7 +166,6 @@ Use EXACTLY this structure:
   "next_step": ""
 }
 `;
-const parsed = JSON.parse(claudeReport);
     const claudeReport = await generateClaudeHypothesis(prompt);
 
     console.log("✅ CLAUDE GENERATED");
