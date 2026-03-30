@@ -94,20 +94,77 @@ app.post("/tally-pdf", async (req, res) => {
     const scale = getValue(fields, "production scale");
     const concern = getValue(fields, "concern");
 
-    const prompt = `
-You are a professional materials engineer.
+   const prompt = `
+You are a professional materials engineer specializing in polymer processing and biodegradable materials.
 
-Generate a technical feasibility report.
+Your task is to generate a structured technical feasibility report for material transition.
+
+Do NOT provide:
+- formulation details
+- blending ratios
+- exact processing parameters
+- supplier recommendations
+
+Focus on:
+- engineering feasibility
+- processing behavior
+- risks and limitations
+- practical implementation considerations
+
+---
+
+INPUT DATA:
 
 Application: ${application}
 Current Material: ${currentMaterial}
 Target Material: ${bioMaterial}
-Processing: ${processing}
+Processing Method: ${processing}
 Equipment: ${equipment}
 Production Scale: ${scale}
 Technical Concern: ${concern}
 
-Write a structured professional report.
+---
+
+INSTRUCTIONS:
+
+Write a professional technical feasibility report.
+
+Ensure:
+- concise engineering language
+- no marketing tone
+- realistic industrial assumptions
+- highlight limitations clearly
+
+---
+
+IMPORTANT:
+
+Return the result ONLY in valid JSON format.
+Do NOT include any explanation outside JSON.
+
+Use EXACTLY this structure:
+
+{
+  "executive_summary": "",
+  "processing_window": "",
+  "thermal_behavior": "",
+  "flow_characteristics": "",
+  "mechanical_behavior": "",
+  "surface_quality": "",
+  "structural_consistency": "",
+  "application_implication": "",
+  "primary_risk_title": "",
+  "primary_risk": "",
+  "secondary_risk_title": "",
+  "secondary_risk": "",
+  "mechanism": "",
+  "stability": "",
+  "stability_note": "",
+  "consistency": "",
+  "consistency_note": "",
+  "visual_description": "",
+  "next_step": ""
+}
 `;
 
     const claudeReport = await generateClaudeHypothesis(prompt);
