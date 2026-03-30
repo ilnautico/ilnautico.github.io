@@ -166,7 +166,7 @@ Use EXACTLY this structure:
   "next_step": ""
 }
 `;
-
+const parsed = JSON.parse(claudeReport);
     const claudeReport = await generateClaudeHypothesis(prompt);
 
     console.log("✅ CLAUDE GENERATED");
@@ -180,8 +180,7 @@ Use EXACTLY this structure:
       material_transition: `${currentMaterial} → ${bioMaterial}`,
       assessment_type: "Tier 2 – Pre-Commercial Feasibility",
       report_date: new Date().toLocaleDateString(),
-      executive_summary: claudeReport,
-      key_risk: claudeReport
+     
     });
 
     // PDF生成
