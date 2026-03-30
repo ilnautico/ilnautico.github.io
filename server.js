@@ -176,13 +176,14 @@ const parsed = JSON.parse(claudeReport);
     const htmlTemplate = fs.readFileSync(templatePath, "utf8");
 
     const finalHtml = injectHtml(htmlTemplate, {
-      application: application,
-      material_transition: `${currentMaterial} → ${bioMaterial}`,
-      assessment_type: "Tier 2 – Pre-Commercial Feasibility",
-      report_date: new Date().toLocaleDateString(),
-     
-    });
+  application: application,
+  material_transition: `${currentMaterial} → ${bioMaterial}`,
+  assessment_type: "Tier 2 – Pre-Commercial Feasibility",
+  report_date: new Date().toLocaleDateString(),
 
+  executive_summary: claudeReport,
+  key_risk: claudeReport
+});
     // PDF生成
     const browser = await puppeteer.launch({
       args: [
