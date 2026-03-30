@@ -63,11 +63,15 @@ function injectHtml(template, data) {
 // 値取得
 // =========================
 function getValue(fields, keyword) {
-  const field = fields.find((f) =>
-    (f.label || "").toLowerCase().includes(keyword.toLowerCase())
-  );
+  for (const f of fields) {
+    const label = (f.label || "").toLowerCase().replace("*", "").trim();
 
-  if (!field) return "";
+    if (label.includes(keyword.toLowerCase())) {
+      return f.value || "";
+    }
+  }
+  return "";
+}
 
   if (Array.isArray(field.value) && Array.isArray(field.options)) {
     const selected = field.options.find((opt) =>
