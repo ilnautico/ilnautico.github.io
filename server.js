@@ -120,40 +120,43 @@ const finalHtml = injectHtml(htmlTemplate, {
   key_risk: claudeReport
 });
     // ===== PDF =====
-    const browser = await puppeteer.launch({
-      args: [
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--disable-dev-shm-usage",
-        "--disable-gpu",
-        "--single-process",
-        "--no-zygote"
-      ]
-    });
+  // ===== PDF =====
+const browser = await puppeteer.launch({
+  args: [
+    "--no-sandbox",
+    "--disable-setuid-sandbox",
+    "--disable-dev-shm-usage",
+    "--disable-gpu",
+    "--single-process",
+    "--no-zygote"
+  ]
+});
 
-    const page = await browser.newPage();
+const page = await browser.newPage();
 
-    await page.setContent(finalHtml, {
-      waitUntil: "domcontentloaded"
-    });
+await page.setContent(finalHtml, {
+  waitUntil: "domcontentloaded"
+});
 
-    const pdf = await page.pdf({
-      format: "A4",
-      printBackground: true
-    });
+const pdf = await page.pdf({
+  format: "A4",
+  printBackground: true
+});
 
-    await browser.close();
+await browser.close();
 
-    // ===== 保存 =====
-    const latestPdfPath = path.join(process.cwd(), "latest-report.pdf");
-    fs.writeFileSync(latestPdfPath, pdf);
+// ===== 保存 =====
+const latestPdfPath = path.join(process.cwd(), "latest-report.pdf");
+fs.writeFileSync(latestPdfPath, pdf);
 
-    res.set({
-      "Content-Type": "application/pdf",
-      "Content-Disposition": "inline"
-    });
+console.log("✅ PDF SAVED");
 
-    return res.send(pdf);
+res.set({
+  "Content-Type": "application/pdf",
+  "Content-Disposition": "inline"
+});
+
+return res.send(pdf);
 
   } catch (err) {
     console.error("❌ ERROR:", err);
