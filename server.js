@@ -111,8 +111,6 @@ app.post("/tally-pdf", async (req, res) => {
     const templatePath = path.join(process.cwd(), "template.html");
     const htmlTemplate = fs.readFileSync(templatePath, "utf8");
 
- const htmlTemplate = fs.readFileSync(templatePath, "utf8");
-
 const parsed = parseClaudeReport(claudeReport);
 
 const finalHtml = injectHtml(htmlTemplate, {
