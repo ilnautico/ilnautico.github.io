@@ -97,11 +97,18 @@ app.post("/tally-pdf", async (req, res) => {
     const currentMaterial = getValue(fields, "current material");
     const bioMaterial = getValue(fields, "target material");
 
-    const prompt = JSON.stringify({
-      application,
-      currentMaterial,
-      bioMaterial
-    });
+const prompt = `
+You are a professional materials engineer.
+
+Write a technical feasibility report.
+
+Application: ${application}
+Current Material: ${currentMaterial}
+Target Material: ${bioMaterial}
+
+Output a structured professional analysis.
+Do NOT explain JSON.
+`;
 
     const claudeReport = await generateClaudeHypothesis(prompt);
 
