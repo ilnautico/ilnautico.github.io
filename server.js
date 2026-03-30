@@ -48,6 +48,20 @@ async function generateClaudeHypothesis(prompt) {
 // =========================
 // HTML差し込み
 // =========================
+function injectHtml(template, data) {
+  let html = template;
+
+  Object.keys(data).forEach((key) => {
+    const regex = new RegExp(`{{\\s*${key}\\s*}}`, "g");
+    html = html.replace(regex, data[key] || "");
+  });
+
+  return html;
+}
+
+// =========================
+// 値取得（完全版・これ1つだけ）
+// =========================
 function getValue(fields, keyword) {
   for (const f of fields) {
     const label = (f.label || "").toLowerCase().replace("*", "").trim();
@@ -63,29 +77,7 @@ function getValue(fields, keyword) {
 }
 
 // =========================
-// 値取得
-// =========================
-function getValue(fields, keyword) {
-  for (const f of fields) {
-    const label = (f.label || "").toLowerCase().replace("*", "").trim();
-
-    if (label.includes(keyword.toLowerCase())) {
-      return f.value || "";
-    }
-  }
-  return "";
-}
-
-
-  if (typeof field.value === "string") {
-    return field.value;
-  }
-
-  return "";
-}
-
-// =========================
-// PDF生成（メイン）
+// PDF生成
 // =========================
 app.post("/tally-pdf", async (req, res) => {
 
@@ -98,11 +90,11 @@ app.post("/tally-pdf", async (req, res) => {
     const currentMaterial = getValue(fields, "current material");
     const bioMaterial = getValue(fields, "target material");
     const processing = getValue(fields, "processing");
-　　const equipment = getValue(fields, "equipment");
-　　const scale = getValue(fields, "production scale");
-　　const concern = getValue(fields, "concern");
+    const equipment = getValue(fields, "equipment");
+    const scale = getValue(fields, "production scale");
+    const concern = getValue(fields, "concern");
 
-const prompt = `
+    const prompt = `
 You are a professional materials engineer.
 
 Generate a technical feasibility report.
@@ -122,56 +114,56 @@ Write a structured professional report.
 
     console.log("✅ CLAUDE GENERATED");
 
-    // ===== HTML =====
+    // HTML
     const templatePath = path.join(process.cwd(), "template.html");
     const htmlTemplate = fs.readFileSync(templatePath, "utf8");
 
-const finalHtml = injectHtml(htmlTemplate, {
-  application: application,
-  material_transition: `${currentMaterial} → ${bioMaterial}`,
-  assessment_type: "Tier 2 – Pre-Commercial Feasibility",
-  report_date: new Date().toLocaleDateString(),
-  executive_summary: claudeReport,
-  key_risk: claudeReport
-});
-    // ===== PDF =====
-  // ===== PDF =====
-const browser = await puppeteer.launch({
-  args: [
-    "--no-sandbox",
-    "--disable-setuid-sandbox",
-    "--disable-dev-shm-usage",
-    "--disable-gpu",
-    "--single-process",
-    "--no-zygote"
-  ]
-});
+    const finalHtml = injectHtml(htmlTemplate, {
+      application: application,
+      material_transition: `${currentMaterial} → ${bioMaterial}`,
+      assessment_type: "Tier 2 – Pre-Commercial Feasibility",
+      report_date: new Date().toLocaleDateString(),
+      executive_summary: claudeReport,
+      key_risk: claudeReport
+    });
 
-const page = await browser.newPage();
+    // PDF生成
+    const browser = await puppeteer.launch({
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-gpu",
+        "--single-process",
+        "--no-zygote"
+      ]
+    });
 
-await page.setContent(finalHtml, {
-  waitUntil: "domcontentloaded"
-});
+    const page = await browser.newPage();
 
-const pdf = await page.pdf({
-  format: "A4",
-  printBackground: true
-});
+    await page.setContent(finalHtml, {
+      waitUntil: "domcontentloaded"
+    });
 
-await browser.close();
+    const pdf = await page.pdf({
+      format: "A4",
+      printBackground: true
+    });
 
-// ===== 保存 =====
-const latestPdfPath = path.join("/tmp", "latest-report.pdf");
-  fs.writeFileSync(latestPdfPath, pdf);
+    await browser.close();
 
-console.log("✅ PDF SAVED");
+    // 保存（Railway対応）
+    const latestPdfPath = path.join("/tmp", "latest-report.pdf");
+    fs.writeFileSync(latestPdfPath, pdf);
 
-res.set({
-  "Content-Type": "application/pdf",
-  "Content-Disposition": "inline"
-});
+    console.log("✅ PDF SAVED");
 
-return res.send(pdf);
+    res.set({
+      "Content-Type": "application/pdf",
+      "Content-Disposition": "inline"
+    });
+
+    return res.send(pdf);
 
   } catch (err) {
     console.error("❌ ERROR:", err);
@@ -183,7 +175,8 @@ return res.send(pdf);
 // 確認URL
 // =========================
 app.get("/latest-pdf", (req, res) => {
-const latestPdfPath = path.join("/tmp", "latest-report.pdf");
+  const latestPdfPath = path.join("/tmp", "latest-report.pdf");
+
   if (!fs.existsSync(latestPdfPath)) {
     return res.status(404).send("No generated PDF found yet.");
   }
