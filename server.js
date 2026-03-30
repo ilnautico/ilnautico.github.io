@@ -76,12 +76,6 @@ function getValue(fields, keyword) {
   return "";
 }
 
-  if (Array.isArray(field.value) && Array.isArray(field.options)) {
-    const selected = field.options.find((opt) =>
-      field.value.includes(opt.id)
-    );
-    if (selected?.text) return selected.text;
-  }
 
   if (typeof field.value === "string") {
     return field.value;
