@@ -177,14 +177,7 @@ Use EXACTLY this structure:
 }
 `;
     const claudeReport = await generateClaudeHypothesis(prompt);
-　　let parsed;
-
-try {
-  parsed = JSON.parse(claudeReport);
-} catch (e) {
-  console.error("❌ JSON PARSE ERROR:", claudeReport);
-  parsed = {};
-}
+　
     console.log("✅ CLAUDE GENERATED");
 
     // HTML
