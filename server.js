@@ -146,8 +146,8 @@ const pdf = await page.pdf({
 await browser.close();
 
 // ===== 保存 =====
-const latestPdfPath = path.join(process.cwd(), "latest-report.pdf");
-fs.writeFileSync(latestPdfPath, pdf);
+const latestPdfPath = path.join("/tmp", "latest-report.pdf");
+  fs.writeFileSync(latestPdfPath, pdf);
 
 console.log("✅ PDF SAVED");
 
@@ -168,8 +168,7 @@ return res.send(pdf);
 // 確認URL
 // =========================
 app.get("/latest-pdf", (req, res) => {
-  const latestPdfPath = path.join(process.cwd(), "latest-report.pdf");
-
+const latestPdfPath = path.join("/tmp", "latest-report.pdf");
   if (!fs.existsSync(latestPdfPath)) {
     return res.status(404).send("No generated PDF found yet.");
   }
