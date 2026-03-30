@@ -48,15 +48,18 @@ async function generateClaudeHypothesis(prompt) {
 // =========================
 // HTML差し込み
 // =========================
-function injectHtml(template, data) {
-  let html = template;
+function getValue(fields, keyword) {
+  for (const f of fields) {
+    const label = (f.label || "").toLowerCase().replace("*", "").trim();
 
-  Object.keys(data).forEach((key) => {
-    const regex = new RegExp("\\{\\{\\s*" + key + "\\s*\\}\\}", "g");
-    html = html.replace(regex, data[key] || "");
-  });
-
-  return html;
+    if (label.includes(keyword.toLowerCase())) {
+      if (Array.isArray(f.value)) {
+        return f.value.join(", ");
+      }
+      return f.value || "";
+    }
+  }
+  return "";
 }
 
 // =========================
