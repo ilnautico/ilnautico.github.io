@@ -36,15 +36,25 @@ async function generateClaudeHypothesis(prompt) {
       })
     });
 
+    if (!response.ok) {
+      const text = await response.text();
+      console.error("❌ CLAUDE API ERROR:", text);
+      throw new Error("Claude API failed");
+    }
+
     const data = await response.json();
-    return data.content?.[0]?.text || "No response";
+
+    if (!data.content || !data.content[0]?.text) {
+      throw new Error("Claude returned empty response");
+    }
+
+    return data.content[0].text;
 
   } catch (err) {
     console.error("❌ Claude ERROR:", err);
     throw err;
   }
 }
-
 // =========================
 // HTML差し込み
 // =========================
