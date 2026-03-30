@@ -111,16 +111,14 @@ app.post("/tally-pdf", async (req, res) => {
     const templatePath = path.join(process.cwd(), "template.html");
     const htmlTemplate = fs.readFileSync(templatePath, "utf8");
 
-const parsed = parseClaudeReport(claudeReport);
-
 const finalHtml = injectHtml(htmlTemplate, {
   application: application,
   material_transition: `${currentMaterial} → ${bioMaterial}`,
   assessment_type: "Tier 2 – Pre-Commercial Feasibility",
   report_date: new Date().toLocaleDateString(),
-      
-    });
-
+  executive_summary: claudeReport,
+  key_risk: claudeReport
+});
     // ===== PDF =====
     const browser = await puppeteer.launch({
       args: [
