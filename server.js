@@ -183,15 +183,36 @@ Use EXACTLY this structure:
     // HTML
     const templatePath = path.join(process.cwd(), "template.html");
     const htmlTemplate = fs.readFileSync(templatePath, "utf8");
-
+　　
+    const parsed = JSON.parse(claudeReport);
     const finalHtml = injectHtml(htmlTemplate, {
   application: application,
   material_transition: `${currentMaterial} → ${bioMaterial}`,
   assessment_type: "Tier 2 – Pre-Commercial Feasibility",
   report_date: new Date().toLocaleDateString(),
 
-  executive_summary: claudeReport,
-  key_risk: claudeReport
+  executive_summary: parsed.executive_summary,
+  processing_window: parsed.processing_window,
+  thermal_behavior: parsed.thermal_behavior,
+  flow_characteristics: parsed.flow_characteristics,
+  mechanical_behavior: parsed.mechanical_behavior,
+  surface_quality: parsed.surface_quality,
+  structural_consistency: parsed.structural_consistency,
+  application_implication: parsed.application_implication,
+
+  primary_risk_title: parsed.primary_risk_title,
+  primary_risk: parsed.primary_risk,
+  secondary_risk_title: parsed.secondary_risk_title,
+  secondary_risk: parsed.secondary_risk,
+  mechanism: parsed.mechanism,
+
+  stability: parsed.stability,
+  stability_note: parsed.stability_note,
+  consistency: parsed.consistency,
+  consistency_note: parsed.consistency_note,
+
+  visual_description: parsed.visual_description,
+  next_step: parsed.next_step
 });
     // PDF生成
     const browser = await puppeteer.launch({
