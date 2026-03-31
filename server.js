@@ -148,22 +148,7 @@ Technical Concern: ${concern}
     // =========================
     // JSON安全パース（1回だけ）
     // =========================
-    let parsed;
-    try {
-      parsed = JSON.parse(claudeReport);
-    } catch (e) {
-      console.error("❌ JSON PARSE ERROR:", claudeReport);
-      parsed = {};
-    }
-
-    // =========================
-    // HTML
-    // =========================
-    // =========================
-// HTML生成
-// =========================
-// =========================
-// HTML生成
+   
 // =========================
 const templatePath = path.join(process.cwd(), "template.html");
 const htmlTemplate = fs.readFileSync(templatePath, "utf8");
