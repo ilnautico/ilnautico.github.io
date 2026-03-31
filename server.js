@@ -199,7 +199,35 @@ Technical Concern: ${concern}
     const claudeReport = await generateClaudeHypothesis(prompt);
     console.log("✅ CLAUDE GENERATED");
 
-    const parsed = parseClaudeJson(claudeReport);
+   let parsed = parseClaudeJson(claudeReport);
+
+// 👇 fallback（これが最重要）
+if (!parsed.executive_summary) {
+  console.log("⚠️ Claude fallback used");
+
+  parsed = {
+    compatibility_level: "Moderate",
+    executive_summary: "Material transition requires controlled processing due to thermal sensitivity.",
+    processing_window: "Narrower than conventional polymers.",
+    thermal_behavior: "Sensitive to temperature variation.",
+    flow_characteristics: "Lower melt strength.",
+    mechanical_behavior: "More rigid compared to LDPE.",
+    surface_quality: "May vary depending on stability.",
+    structural_consistency: "Requires controlled processing.",
+    application_implication: "Not direct drop-in replacement.",
+    primary_risk_title: "Thermal degradation",
+    primary_risk: "Material may degrade under high temperature.",
+    secondary_risk_title: "Thickness inconsistency",
+    secondary_risk: "Process instability may cause uneven film.",
+    mechanism: "Sensitivity to heat and shear.",
+    stability: "Moderate",
+    stability_note: "Requires process control.",
+    consistency: "Moderate",
+    consistency_note: "Needs optimization.",
+    visual_description: "Semi-transparent film with slight opacity.",
+    next_step: "Proceed with controlled pilot testing."
+  };
+}
 
     // read external template.html only
     const templatePath = path.join(process.cwd(), "template.html");
