@@ -196,29 +196,32 @@ Technical Concern: ${concern}
     // PDF生成（ここ重要）
     // =========================
     const finalHtml = injectHtml(htmlTemplate, {
-    const browser = await puppeteer.launch({
-      args: [
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--disable-dev-shm-usage",
-        "--disable-gpu",
-        "--single-process",
-        "--no-zygote"
-      ]
-    });
+  // =========================
+// PDF生成（ここ重要）
+// =========================
+const browser = await puppeteer.launch({
+  args: [
+    "--no-sandbox",
+    "--disable-setuid-sandbox",
+    "--disable-dev-shm-usage",
+    "--disable-gpu",
+    "--single-process",
+    "--no-zygote"
+  ]
+});
 
-    const page = await browser.newPage();
+const page = await browser.newPage();
 
-    await page.setContent(finalHtml, {
-      waitUntil: "domcontentloaded"
-    });
+await page.setContent(finalHtml, {
+  waitUntil: "domcontentloaded"
+});
 
-    const pdf = await page.pdf({
-      format: "A4",
-      printBackground: true
-    });
+const pdf = await page.pdf({
+  format: "A4",
+  printBackground: true
+});
 
-    await browser.close();
+await browser.close();
 
     // =========================
     // 保存
