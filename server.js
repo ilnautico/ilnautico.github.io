@@ -6,15 +6,9 @@ import fetch from "node-fetch";
 
 const app = express();
 
-// =========================
-// 受信設定
-// =========================
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// =========================
-// Claude生成
-// =========================
 async function generateClaudeHypothesis(prompt) {
   for (let i = 0; i < 3; i++) {
     try {
@@ -69,14 +63,10 @@ async function generateClaudeHypothesis(prompt) {
     }
   }
 
-  // 最後までダメでも処理を止めない
-  console.error("❌ Claude failed after retries. Using empty JSON fallback.");
+  console.error("❌ Claude failed after retries. Using fallback JSON.");
   return "{}";
 }
 
-// =========================
-// HTML差し込み
-// =========================
 function injectHtml(template, data) {
   let html = template;
 
@@ -88,9 +78,6 @@ function injectHtml(template, data) {
   return html;
 }
 
-// =========================
-// 値取得
-// =========================
 function getValue(fields, keyword) {
   for (const f of fields) {
     const label = (f.label || "").toLowerCase().replace("*", "").trim();
@@ -105,16 +92,10 @@ function getValue(fields, keyword) {
   return "";
 }
 
-// =========================
-// 空値ガード
-// =========================
 function safe(val, fallback = "") {
   return val && String(val).trim() !== "" ? String(val) : fallback;
 }
 
-// =========================
-// JSON整形
-// =========================
 function parseClaudeJson(rawText) {
   try {
     if (!rawText || rawText === "undefined") {
@@ -126,7 +107,6 @@ function parseClaudeJson(rawText) {
       .replace(/```/g, "")
       .trim();
 
-    // JSONっぽい最初の { から最後の } までを抽出
     const start = cleaned.indexOf("{");
     const end = cleaned.lastIndexOf("}");
 
@@ -143,9 +123,6 @@ function parseClaudeJson(rawText) {
   }
 }
 
-// =========================
-// PDF生成
-// =========================
 app.post("/tally-pdf", async (req, res) => {
   console.log("🔥 HIT");
 
@@ -254,7 +231,10 @@ Technical Concern: ${concern}
 
     const page = await browser.newPage();
 
-    await page.setContent(finalHtml);
+    await page.setContent(finalHtml, {
+      waitUntil: "domcontentloaded"
+    });
+
     const pdf = await page.pdf({
       format: "A4",
       printBackground: true
@@ -279,9 +259,6 @@ Technical Concern: ${concern}
   }
 });
 
-// =========================
-// 確認URL
-// =========================
 app.get("/latest-pdf", (req, res) => {
   const latestPdfPath = path.join("/tmp", "latest-report.pdf");
 
@@ -297,12 +274,10 @@ app.get("/latest-pdf", (req, res) => {
   return res.sendFile(latestPdfPath);
 });
 
-// =========================
-// 起動
-// =========================
 app.listen(process.env.PORT || 3000, () => {
   console.log("🚀 Server running");
 });
+
 // HTMLテンプレ（あなたの本番HTML）
 // =========================
 const htmlTemplate = `
