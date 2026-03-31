@@ -161,7 +161,8 @@ Technical Concern: ${concern}
       assessment_type: "Tier 2 – Pre-Commercial Feasibility",
       report_date: new Date().toLocaleDateString(),
 
-      executive_summary: parsed.executive_summary || "",
+      executive_summary: (parsed.executive_summary || "") + 
+　　　　"\n\nFeasibility Verdict: Conditionally Feasible under controlled pilot conditions",
       processing_window: parsed.processing_window || "",
       thermal_behavior: parsed.thermal_behavior || "",
       flow_characteristics: parsed.flow_characteristics || "",
