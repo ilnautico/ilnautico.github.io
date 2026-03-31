@@ -42,25 +42,36 @@ async function generateClaudeHypothesis(prompt) {
 
         if (text.includes("overloaded")) {
           console.log("⚠️ Claude overloaded, retrying...");
-          await new Promise(r => setTimeout(r, 1500));
+          await new Promise((r) => setTimeout(r, 1500));
           continue;
         }
 
-        throw new Error("Claude API failed");
+        console.error("❌ CLAUDE API ERROR:", text);
+        await new Promise((r) => setTimeout(r, 1000));
+        continue;
       }
 
       const data = await response.json();
+      const text = data?.content?.[0]?.text || "";
 
-      if (!data.content || !data.content[0]?.text) {
-        throw new Error("Claude returned empty response");
+      if (!text) {
+        console.error("❌ Claude returned empty response");
+        await new Promise((r) => setTimeout(r, 1000));
+        continue;
       }
 
-      return data.content[0].text;
-
+      return text;
     } catch (err) {
-      if (i === 2) throw err;
+      console.error("❌ Claude ERROR:", err);
+      if (i < 2) {
+        await new Promise((r) => setTimeout(r, 1000));
+      }
     }
   }
+
+  // 最後までダメでも処理を止めない
+  console.error("❌ Claude failed after retries. Using empty JSON fallback.");
+  return "{}";
 }
 
 // =========================
@@ -95,10 +106,47 @@ function getValue(fields, keyword) {
 }
 
 // =========================
+// 空値ガード
+// =========================
+function safe(val, fallback = "") {
+  return val && String(val).trim() !== "" ? String(val) : fallback;
+}
+
+// =========================
+// JSON整形
+// =========================
+function parseClaudeJson(rawText) {
+  try {
+    if (!rawText || rawText === "undefined") {
+      return {};
+    }
+
+    const cleaned = String(rawText)
+      .replace(/```json/gi, "")
+      .replace(/```/g, "")
+      .trim();
+
+    // JSONっぽい最初の { から最後の } までを抽出
+    const start = cleaned.indexOf("{");
+    const end = cleaned.lastIndexOf("}");
+
+    if (start === -1 || end === -1 || end <= start) {
+      console.error("❌ JSON PARSE ERROR:", rawText);
+      return {};
+    }
+
+    const jsonText = cleaned.slice(start, end + 1);
+    return JSON.parse(jsonText);
+  } catch (e) {
+    console.error("❌ JSON PARSE ERROR:", rawText);
+    return {};
+  }
+}
+
+// =========================
 // PDF生成
 // =========================
 app.post("/tally-pdf", async (req, res) => {
-
   console.log("🔥 HIT");
 
   try {
@@ -150,81 +198,51 @@ Technical Concern: ${concern}
 `;
 
     const claudeReport = await generateClaudeHypothesis(prompt);
-
     console.log("✅ CLAUDE GENERATED");
 
-    // =========================
-    // JSONパース（完全安定版）
-    // =========================
-    let parsed = {};
+    const parsed = parseClaudeJson(claudeReport);
 
-    try {
-      if (!claudeReport || claudeReport === "undefined") {
-        throw new Error("Claude empty");
-      }
-
-      const clean = String(claudeReport)
-        .replace(/```json/g, "")
-        .replace(/```/g, "")
-        .trim();
-
-      parsed = JSON.parse(clean);
-
-    } catch (e) {
-      console.error("❌ JSON PARSE ERROR:", claudeReport);
-      parsed = {};
-    }
-
-    // =========================
-    // HTML読み込み
-    // =========================
     const templatePath = path.join(process.cwd(), "template.html");
     const htmlTemplate = fs.readFileSync(templatePath, "utf8");
 
-    // =========================
-    // HTML生成
-    // =========================
     const finalHtml = injectHtml(htmlTemplate, {
-      application,
-      material_transition: `${currentMaterial} → ${bioMaterial}`,
+      application: safe(application),
+      material_transition: safe(`${currentMaterial} → ${bioMaterial}`),
       assessment_type: "Tier 2 – Pre-Commercial Feasibility",
       report_date: new Date().toLocaleDateString(),
 
-      compatibility_level: "Moderate",
-      key_risk: parsed.primary_risk || "",
+      compatibility_level: safe(parsed.compatibility_level, "Moderate"),
+      key_risk: safe(parsed.primary_risk),
 
-      executive_summary: parsed.executive_summary || "",
+      executive_summary: safe(parsed.executive_summary),
 
-      processing_window: parsed.processing_window || "",
-      thermal_behavior: parsed.thermal_behavior || "",
-      flow_characteristics: parsed.flow_characteristics || "",
+      processing_window: safe(parsed.processing_window),
+      thermal_behavior: safe(parsed.thermal_behavior),
+      flow_characteristics: safe(parsed.flow_characteristics),
 
-      mechanical_behavior: parsed.mechanical_behavior || "",
-      surface_quality: parsed.surface_quality || "",
-      structural_consistency: parsed.structural_consistency || "",
-      application_implication: parsed.application_implication || "",
+      mechanical_behavior: safe(parsed.mechanical_behavior),
+      surface_quality: safe(parsed.surface_quality),
+      structural_consistency: safe(parsed.structural_consistency),
+      application_implication: safe(parsed.application_implication),
 
-      primary_risk_title: parsed.primary_risk_title || "",
-      primary_risk: parsed.primary_risk || "",
+      primary_risk_title: safe(parsed.primary_risk_title),
+      primary_risk: safe(parsed.primary_risk),
 
-      secondary_risk_title: parsed.secondary_risk_title || "",
-      secondary_risk: parsed.secondary_risk || "",
+      secondary_risk_title: safe(parsed.secondary_risk_title),
+      secondary_risk: safe(parsed.secondary_risk),
 
-      mechanism: parsed.mechanism || "",
+      mechanism: safe(parsed.mechanism),
 
-      stability: parsed.stability || "",
-      stability_note: parsed.stability_note || "",
+      stability: safe(parsed.stability),
+      stability_note: safe(parsed.stability_note),
 
-      consistency: parsed.consistency || "",
-      consistency_note: parsed.consistency_note || "",
+      consistency: safe(parsed.consistency),
+      consistency_note: safe(parsed.consistency_note),
 
-      visual_description: parsed.visual_description || "",
-      next_step: parsed.next_step || ""
+      visual_description: safe(parsed.visual_description),
+      next_step: safe(parsed.next_step)
     });
 
-    // =========================
-    // PDF生成
-    // =========================
     const browser = await puppeteer.launch({
       args: [
         "--no-sandbox",
@@ -236,10 +254,7 @@ Technical Concern: ${concern}
 
     const page = await browser.newPage();
 
-    await page.setContent(finalHtml, {
-      waitUntil: "domcontentloaded"
-    });
-
+    await page.setContent(finalHtml);
     const pdf = await page.pdf({
       format: "A4",
       printBackground: true
@@ -247,9 +262,6 @@ Technical Concern: ${concern}
 
     await browser.close();
 
-    // =========================
-    // 保存
-    // =========================
     const latestPdfPath = path.join("/tmp", "latest-report.pdf");
     fs.writeFileSync(latestPdfPath, pdf);
 
@@ -261,7 +273,6 @@ Technical Concern: ${concern}
     });
 
     return res.send(pdf);
-
   } catch (err) {
     console.error("❌ ERROR:", err);
     return res.status(500).send("PDF failed");
