@@ -179,40 +179,35 @@ Technical Concern: ${concern}
     // HTML生成（※これ1回だけ）
     // =========================
     const finalHtml = injectHtml(htmlTemplate, {
+  application,
+  material_transition: `${currentMaterial} → ${bioMaterial}`,
+  assessment_type: "Tier 2 – Pre-Commercial Feasibility",
+  report_date: new Date().toLocaleDateString(),
 
-      application: safe(application),
-      material_transition: `${currentMaterial} → ${bioMaterial}`,
-      assessment_type: "Tier 2 – Pre-Commercial Feasibility",
-      report_date: new Date().toLocaleDateString(),
+  compatibility_level: parsed.compatibility_level || "Moderate",
+  key_risk: parsed.primary_risk || "",
 
-      compatibility_level: safe(parsed.compatibility_level, "Moderate"),
-      key_risk: safe(parsed.primary_risk),
-      executive_summary: safe(parsed.executive_summary),
+  executive_summary: parsed.executive_summary || "",
 
-      processing_window: safe(parsed.processing_window),
-      thermal_behavior: safe(parsed.thermal_behavior),
-      flow_characteristics: safe(parsed.flow_characteristics),
+  processing_window: parsed.processing_window || "",
+  thermal_behavior: parsed.thermal_behavior || "",
+  flow_characteristics: parsed.flow_characteristics || "",
 
-      mechanical_behavior: safe(parsed.mechanical_behavior),
-      surface_quality: safe(parsed.surface_quality),
-      structural_consistency: safe(parsed.structural_consistency),
-      application_implication: safe(parsed.application_implication),
+  mechanical_behavior: parsed.mechanical_behavior || "",
+  surface_quality: parsed.surface_quality || "",
+  structural_consistency: parsed.structural_consistency || "",
+  application_implication: parsed.application_implication || "",
 
-      primary_risk_title: safe(parsed.primary_risk_title),
-      primary_risk: safe(parsed.primary_risk),
-      secondary_risk_title: safe(parsed.secondary_risk_title),
-      secondary_risk: safe(parsed.secondary_risk),
-      mechanism: safe(parsed.mechanism),
+  primary_risk: parsed.primary_risk || "",
+  secondary_risk: parsed.secondary_risk || "",
+  mechanism: parsed.mechanism || "",
 
-      stability: safe(parsed.stability, "Moderate"),
-      stability_note: safe(parsed.stability_note),
-      consistency: safe(parsed.consistency, "Moderate"),
-      consistency_note: safe(parsed.consistency_note),
+  stability: parsed.stability || "",
+  consistency: parsed.consistency || "",
 
-      visual_description: safe(parsed.visual_description),
-      next_step: safe(parsed.next_step)
-    });
-
+  visual_description: parsed.visual_description || "",
+  next_step: parsed.next_step || ""
+});
     // =========================
     // PDF生成（1回のみ）
     // =========================
