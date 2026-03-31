@@ -164,18 +164,27 @@ Technical Concern: ${concern}
     // =========================
     // JSON安定処理（完全）
     // =========================
-    let parsed = {};
+    // =========================
+// JSON安定処理（完全版 FINAL）
+// =========================
+let parsed = {};
 
-    try {
-      const clean = claudeReport
-        .replace(/```json/g, "")
-        .replace(/```/g, "")
-        .trim();
+try {
+  if (!claudeReport || claudeReport === "undefined") {
+    throw new Error("Claude returned empty");
+  }
 
-      parsed = JSON.parse(clean);
-    } catch (e) {
-      console.error("❌ JSON PARSE ERROR:", claudeReport);
-    }
+  const clean = String(claudeReport)
+    .replace(/```json/g, "")
+    .replace(/```/g, "")
+    .trim();
+
+  parsed = JSON.parse(clean);
+
+} catch (e) {
+  console.error("❌ JSON PARSE ERROR:", claudeReport);
+  parsed = {};
+}
 
     // =========================
     // HTML読み込み（※これ1回だけ）
