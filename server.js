@@ -16,43 +16,51 @@ app.use(express.urlencoded({ extended: true }));
 // Claude生成
 // =========================
 async function generateClaudeHypothesis(prompt) {
-  try {
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": process.env.ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01"
-      },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-6",
-        max_tokens: 2000,
-        messages: [
-          {
-            role: "user",
-            content: [{ type: "text", text: String(prompt) }]
-          }
-        ]
-      })
-    });
+  for (let i = 0; i < 3; i++) {
+    try {
+      const response = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": process.env.ANTHROPIC_API_KEY,
+          "anthropic-version": "2023-06-01"
+        },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-6",
+          max_tokens: 2000,
+          messages: [
+            {
+              role: "user",
+              content: [{ type: "text", text: String(prompt) }]
+            }
+          ]
+        })
+      });
 
-    if (!response.ok) {
-      const text = await response.text();
-      console.error("❌ CLAUDE API ERROR:", text);
-      throw new Error("Claude API failed");
+      if (!response.ok) {
+        const text = await response.text();
+
+        // 👇 overloaded対策
+        if (text.includes("overloaded")) {
+          console.log("⚠️ Claude overloaded, retrying...");
+          await new Promise(r => setTimeout(r, 1500));
+          continue;
+        }
+
+        throw new Error("Claude API failed");
+      }
+
+      const data = await response.json();
+
+      if (!data.content || !data.content[0]?.text) {
+        throw new Error("Claude returned empty response");
+      }
+
+      return data.content[0].text;
+
+    } catch (err) {
+      if (i === 2) throw err;
     }
-
-    const data = await response.json();
-
-    if (!data.content || !data.content[0]?.text) {
-      throw new Error("Claude returned empty response");
-    }
-
-    return data.content[0].text;
-
-  } catch (err) {
-    console.error("❌ Claude ERROR:", err);
-    throw err;
   }
 }
 
