@@ -6,58 +6,38 @@ import fetch from "node-fetch";
 
 const app = express();
 
-// =========================
-// 受信設定
-// =========================
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // =========================
-// Claude生成
+// Claude
 // =========================
 async function generateClaudeHypothesis(prompt) {
-  try {
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": process.env.ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01"
-      },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-6",
-        max_tokens: 2000,
-        messages: [
-          {
-            role: "user",
-            content: [{ type: "text", text: String(prompt) }]
-          }
-        ]
-      })
-    });
+  const response = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": process.env.ANTHROPIC_API_KEY,
+      "anthropic-version": "2023-06-01"
+    },
+    body: JSON.stringify({
+      model: "claude-sonnet-4-6",
+      max_tokens: 2000,
+      messages: [
+        {
+          role: "user",
+          content: [{ type: "text", text: String(prompt) }]
+        }
+      ]
+    })
+  });
 
-    if (!response.ok) {
-      const text = await response.text();
-      console.error("❌ CLAUDE API ERROR:", text);
-      throw new Error("Claude API failed");
-    }
-
-    const data = await response.json();
-
-    if (!data.content || !data.content[0]?.text) {
-      throw new Error("Claude returned empty response");
-    }
-
-    return data.content[0].text;
-
-  } catch (err) {
-    console.error("❌ Claude ERROR:", err);
-    throw err;
-  }
+  const data = await response.json();
+  return data.content?.[0]?.text || "";
 }
 
 // =========================
-// HTML差し込み
+// HTML inject
 // =========================
 function injectHtml(template, data) {
   let html = template;
@@ -71,16 +51,14 @@ function injectHtml(template, data) {
 }
 
 // =========================
-// 値取得
+// field取得
 // =========================
 function getValue(fields, keyword) {
   for (const f of fields) {
     const label = (f.label || "").toLowerCase().replace("*", "").trim();
 
     if (label.includes(keyword.toLowerCase())) {
-      if (Array.isArray(f.value)) {
-        return f.value.join(", ");
-      }
+      if (Array.isArray(f.value)) return f.value.join(", ");
       return f.value || "";
     }
   }
@@ -88,7 +66,34 @@ function getValue(fields, keyword) {
 }
 
 // =========================
-// PDF生成
+// JSON完全修復（ここが神）
+// =========================
+function safeParseJSON(text) {
+  try {
+    const cleaned = text
+      .replace(/```json/gi, "")
+      .replace(/```/g, "")
+      .replace(/\n/g, " ")
+      .trim();
+
+    // JSONの最初と最後を強制抽出
+    const start = cleaned.indexOf("{");
+    const end = cleaned.lastIndexOf("}");
+
+    if (start === -1 || end === -1) return {};
+
+    const jsonString = cleaned.substring(start, end + 1);
+
+    return JSON.parse(jsonString);
+
+  } catch (e) {
+    console.error("❌ PARSE FAIL:", text);
+    return {};
+  }
+}
+
+// =========================
+// MAIN
 // =========================
 app.post("/tally-pdf", async (req, res) => {
 
@@ -106,8 +111,6 @@ app.post("/tally-pdf", async (req, res) => {
     const concern = getValue(fields, "concern");
 
     const prompt = `
-You are a professional materials engineer.
-
 Return ONLY valid JSON.
 
 {
@@ -145,25 +148,10 @@ Technical Concern: ${concern}
 
     console.log("✅ CLAUDE GENERATED");
 
-    // =========================
-    // JSON整形（←ここが今回の核心）
-    // =========================
-    const cleaned = claudeReport
-      .replace(/```json/g, "")
-      .replace(/```/g, "")
-      .trim();
+    // ⭐ 完全パース
+    const parsed = safeParseJSON(claudeReport);
 
-    let parsed;
-    try {
-      parsed = JSON.parse(cleaned);
-    } catch (e) {
-      console.error("❌ JSON PARSE ERROR:", cleaned);
-      parsed = {};
-    }
-
-    // =========================
-    // HTML生成
-    // =========================
+    // HTML
     const templatePath = path.join(process.cwd(), "template.html");
     const htmlTemplate = fs.readFileSync(templatePath, "utf8");
 
@@ -197,25 +185,13 @@ Technical Concern: ${concern}
       next_step: parsed.next_step || ""
     });
 
-    // =========================
-    // PDF生成
-    // =========================
+    // PDF
     const browser = await puppeteer.launch({
-      args: [
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--disable-dev-shm-usage",
-        "--disable-gpu",
-        "--single-process",
-        "--no-zygote"
-      ]
+      args: ["--no-sandbox","--disable-setuid-sandbox"]
     });
 
     const page = await browser.newPage();
-
-    await page.setContent(finalHtml, {
-      waitUntil: "domcontentloaded"
-    });
+    await page.setContent(finalHtml);
 
     const pdf = await page.pdf({
       format: "A4",
@@ -224,17 +200,12 @@ Technical Concern: ${concern}
 
     await browser.close();
 
-    // =========================
-    // 保存
-    // =========================
-    const latestPdfPath = path.join("/tmp", "latest-report.pdf");
-    fs.writeFileSync(latestPdfPath, pdf);
+    fs.writeFileSync("/tmp/latest-report.pdf", pdf);
 
     console.log("✅ PDF SAVED");
 
     res.set({
-      "Content-Type": "application/pdf",
-      "Content-Disposition": "inline"
+      "Content-Type": "application/pdf"
     });
 
     return res.send(pdf);
@@ -246,26 +217,20 @@ Technical Concern: ${concern}
 });
 
 // =========================
-// 確認URL
-// =========================
 app.get("/latest-pdf", (req, res) => {
-  const latestPdfPath = path.join("/tmp", "latest-report.pdf");
+  const file = "/tmp/latest-report.pdf";
 
-  if (!fs.existsSync(latestPdfPath)) {
+  if (!fs.existsSync(file)) {
     return res.status(404).send("No generated PDF found yet.");
   }
 
   res.set({
-    "Content-Type": "application/pdf",
-    "Content-Disposition": "inline"
+    "Content-Type": "application/pdf"
   });
 
-  return res.sendFile(latestPdfPath);
+  return res.sendFile(file);
 });
 
-// =========================
-// 起動
-// =========================
 app.listen(process.env.PORT || 3000, () => {
   console.log("🚀 Server running");
 });
