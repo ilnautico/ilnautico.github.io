@@ -146,13 +146,18 @@ Technical Concern: ${concern}
     console.log("✅ CLAUDE GENERATED");
 
     // =========================
-    // JSONパース（1回だけ）
+    // JSON整形（←ここが今回の核心）
     // =========================
+    const cleaned = claudeReport
+      .replace(/```json/g, "")
+      .replace(/```/g, "")
+      .trim();
+
     let parsed;
     try {
-      parsed = JSON.parse(claudeReport);
+      parsed = JSON.parse(cleaned);
     } catch (e) {
-      console.error("❌ JSON PARSE ERROR:", claudeReport);
+      console.error("❌ JSON PARSE ERROR:", cleaned);
       parsed = {};
     }
 
