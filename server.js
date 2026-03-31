@@ -40,7 +40,6 @@ async function generateClaudeHypothesis(prompt) {
       if (!response.ok) {
         const text = await response.text();
 
-        // 👇 overloaded対策
         if (text.includes("overloaded")) {
           console.log("⚠️ Claude overloaded, retrying...");
           await new Promise(r => setTimeout(r, 1500));
@@ -93,13 +92,6 @@ function getValue(fields, keyword) {
     }
   }
   return "";
-}
-
-// =========================
-// 空値ガード
-// =========================
-function safe(val, fallback = "Not specified") {
-  return val && String(val).trim() !== "" ? val : fallback;
 }
 
 // =========================
@@ -162,90 +154,76 @@ Technical Concern: ${concern}
     console.log("✅ CLAUDE GENERATED");
 
     // =========================
-    // JSON安定処理（完全）
+    // JSONパース（完全安定版）
     // =========================
-    // =========================
-// JSON安定処理（完全版 FINAL）
-// =========================
-let parsed = {};
-try {
-  if (!claudeReport || claudeReport === "undefined") {
-    throw new Error("Claude empty");
-  }
+    let parsed = {};
 
-  const clean = String(claudeReport)
-    .replace(/```json/g, "")
-    .replace(/```/g, "")
-    .trim();
+    try {
+      if (!claudeReport || claudeReport === "undefined") {
+        throw new Error("Claude empty");
+      }
 
-  parsed = JSON.parse(clean);
+      const clean = String(claudeReport)
+        .replace(/```json/g, "")
+        .replace(/```/g, "")
+        .trim();
 
-  if (!parsed.executive_summary) {
-    throw new Error("Claude incomplete");
-  }
+      parsed = JSON.parse(clean);
 
-} catch (e) {
-  console.error("❌ JSON PARSE ERROR:", claudeReport);
-  parsed = {};
-}
-if (!parsed.executive_summary) {
-    throw new Error("Claude incomplete");
-  }
-
-} catch (e) {
-  console.error("❌ JSON PARSE ERROR:", claudeReport);
-  throw new Error("Retry needed"); // ← retryさせる
-}
+    } catch (e) {
+      console.error("❌ JSON PARSE ERROR:", claudeReport);
+      parsed = {};
+    }
 
     // =========================
-    // HTML読み込み（※これ1回だけ）
+    // HTML読み込み
     // =========================
     const templatePath = path.join(process.cwd(), "template.html");
     const htmlTemplate = fs.readFileSync(templatePath, "utf8");
 
     // =========================
-    // HTML生成（※これ1回だけ）
+    // HTML生成
     // =========================
     const finalHtml = injectHtml(htmlTemplate, {
-  application,
-  material_transition: `${currentMaterial} → ${bioMaterial}`,
-  assessment_type: "Tier 2 – Pre-Commercial Feasibility",
-  report_date: new Date().toLocaleDateString(),
+      application,
+      material_transition: `${currentMaterial} → ${bioMaterial}`,
+      assessment_type: "Tier 2 – Pre-Commercial Feasibility",
+      report_date: new Date().toLocaleDateString(),
 
-  compatibility_level: "Moderate",
-  key_risk: parsed.primary_risk || "",
+      compatibility_level: "Moderate",
+      key_risk: parsed.primary_risk || "",
 
-  executive_summary: parsed.executive_summary || "",
+      executive_summary: parsed.executive_summary || "",
 
-  processing_window: parsed.processing_window || "",
-  thermal_behavior: parsed.thermal_behavior || "",
-  flow_characteristics: parsed.flow_characteristics || "",
+      processing_window: parsed.processing_window || "",
+      thermal_behavior: parsed.thermal_behavior || "",
+      flow_characteristics: parsed.flow_characteristics || "",
 
-  mechanical_behavior: parsed.mechanical_behavior || "",
-  surface_quality: parsed.surface_quality || "",
-  structural_consistency: parsed.structural_consistency || "",
-  application_implication: parsed.application_implication || "",
+      mechanical_behavior: parsed.mechanical_behavior || "",
+      surface_quality: parsed.surface_quality || "",
+      structural_consistency: parsed.structural_consistency || "",
+      application_implication: parsed.application_implication || "",
 
-  // 👇ここ修正
-  primary_risk_title: parsed.primary_risk_title || "",
-  primary_risk: parsed.primary_risk || "",
+      primary_risk_title: parsed.primary_risk_title || "",
+      primary_risk: parsed.primary_risk || "",
 
-  secondary_risk_title: parsed.secondary_risk_title || "",
-  secondary_risk: parsed.secondary_risk || "",
+      secondary_risk_title: parsed.secondary_risk_title || "",
+      secondary_risk: parsed.secondary_risk || "",
 
-  mechanism: parsed.mechanism || "",
+      mechanism: parsed.mechanism || "",
 
-  stability: parsed.stability || "",
-  stability_note: parsed.stability_note || "",
+      stability: parsed.stability || "",
+      stability_note: parsed.stability_note || "",
 
-  consistency: parsed.consistency || "",
-  consistency_note: parsed.consistency_note || "",
+      consistency: parsed.consistency || "",
+      consistency_note: parsed.consistency_note || "",
 
-  visual_description: parsed.visual_description || "",
-  next_step: parsed.next_step || ""
-});
+      visual_description: parsed.visual_description || "",
+      next_step: parsed.next_step || ""
+    });
+
     // =========================
-    // PDF生成（1回のみ）
+    // PDF生成
     // =========================
     const browser = await puppeteer.launch({
       args: [
@@ -314,7 +292,6 @@ app.get("/latest-pdf", (req, res) => {
 app.listen(process.env.PORT || 3000, () => {
   console.log("🚀 Server running");
 });
-
 // HTMLテンプレ（あなたの本番HTML）
 // =========================
 const htmlTemplate = `
