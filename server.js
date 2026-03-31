@@ -88,7 +88,7 @@ function getValue(fields, keyword) {
 }
 
 // =========================
-// 空値ガード（UI崩壊防止）
+// 空値ガード
 // =========================
 function safe(val, fallback = "Not specified") {
   return val && String(val).trim() !== "" ? val : fallback;
@@ -154,7 +154,7 @@ Technical Concern: ${concern}
     console.log("✅ CLAUDE GENERATED");
 
     // =========================
-    // JSON 安定処理（完全版）
+    // JSON安定処理（完全）
     // =========================
     let parsed = {};
 
@@ -170,53 +170,119 @@ Technical Concern: ${concern}
     }
 
     // =========================
-    // HTML生成
+    // HTML読み込み（※これ1回だけ）
     // =========================
     const templatePath = path.join(process.cwd(), "template.html");
     const htmlTemplate = fs.readFileSync(templatePath, "utf8");
 
+    // =========================
+    // HTML生成（※これ1回だけ）
+    // =========================
     const finalHtml = injectHtml(htmlTemplate, {
-      // 基本
+
       application: safe(application),
       material_transition: `${currentMaterial} → ${bioMaterial}`,
       assessment_type: "Tier 2 – Pre-Commercial Feasibility",
       report_date: new Date().toLocaleDateString(),
 
-      // Executive
       compatibility_level: safe(parsed.compatibility_level, "Moderate"),
       key_risk: safe(parsed.primary_risk),
       executive_summary: safe(parsed.executive_summary),
 
-      // Processing
       processing_window: safe(parsed.processing_window),
       thermal_behavior: safe(parsed.thermal_behavior),
       flow_characteristics: safe(parsed.flow_characteristics),
 
-      // Product
       mechanical_behavior: safe(parsed.mechanical_behavior),
       surface_quality: safe(parsed.surface_quality),
       structural_consistency: safe(parsed.structural_consistency),
       application_implication: safe(parsed.application_implication),
 
-      // Failure
       primary_risk_title: safe(parsed.primary_risk_title),
       primary_risk: safe(parsed.primary_risk),
       secondary_risk_title: safe(parsed.secondary_risk_title),
       secondary_risk: safe(parsed.secondary_risk),
       mechanism: safe(parsed.mechanism),
 
-      // Quality
       stability: safe(parsed.stability, "Moderate"),
       stability_note: safe(parsed.stability_note),
       consistency: safe(parsed.consistency, "Moderate"),
       consistency_note: safe(parsed.consistency_note),
 
-      // Visual
       visual_description: safe(parsed.visual_description),
-
-      // Next
       next_step: safe(parsed.next_step)
     });
+
+    // =========================
+    // PDF生成（1回のみ）
+    // =========================
+    const browser = await puppeteer.launch({
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-gpu"
+      ]
+    });
+
+    const page = await browser.newPage();
+
+    await page.setContent(finalHtml, {
+      waitUntil: "domcontentloaded"
+    });
+
+    const pdf = await page.pdf({
+      format: "A4",
+      printBackground: true
+    });
+
+    await browser.close();
+
+    // =========================
+    // 保存
+    // =========================
+    const latestPdfPath = path.join("/tmp", "latest-report.pdf");
+    fs.writeFileSync(latestPdfPath, pdf);
+
+    console.log("✅ PDF SAVED");
+
+    res.set({
+      "Content-Type": "application/pdf",
+      "Content-Disposition": "inline"
+    });
+
+    return res.send(pdf);
+
+  } catch (err) {
+    console.error("❌ ERROR:", err);
+    return res.status(500).send("PDF failed");
+  }
+});
+
+// =========================
+// 確認URL
+// =========================
+app.get("/latest-pdf", (req, res) => {
+  const latestPdfPath = path.join("/tmp", "latest-report.pdf");
+
+  if (!fs.existsSync(latestPdfPath)) {
+    return res.status(404).send("No generated PDF found yet.");
+  }
+
+  res.set({
+    "Content-Type": "application/pdf",
+    "Content-Disposition": "inline"
+  });
+
+  return res.sendFile(latestPdfPath);
+});
+
+// =========================
+// 起動
+// =========================
+app.listen(process.env.PORT || 3000, () => {
+  console.log("🚀 Server running");
+});
 
 // HTMLテンプレ（あなたの本番HTML）
 // =========================
