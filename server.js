@@ -6,38 +6,58 @@ import fetch from "node-fetch";
 
 const app = express();
 
+// =========================
+// 受信設定
+// =========================
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // =========================
-// Claude
+// Claude生成
 // =========================
 async function generateClaudeHypothesis(prompt) {
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": process.env.ANTHROPIC_API_KEY,
-      "anthropic-version": "2023-06-01"
-    },
-    body: JSON.stringify({
-      model: "claude-sonnet-4-6",
-      max_tokens: 2000,
-      messages: [
-        {
-          role: "user",
-          content: [{ type: "text", text: String(prompt) }]
-        }
-      ]
-    })
-  });
+  try {
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": process.env.ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01"
+      },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-6",
+        max_tokens: 2000,
+        messages: [
+          {
+            role: "user",
+            content: [{ type: "text", text: String(prompt) }]
+          }
+        ]
+      })
+    });
 
-  const data = await response.json();
-  return data.content?.[0]?.text || "";
+    if (!response.ok) {
+      const text = await response.text();
+      console.error("❌ CLAUDE API ERROR:", text);
+      throw new Error("Claude API failed");
+    }
+
+    const data = await response.json();
+
+    if (!data.content || !data.content[0]?.text) {
+      throw new Error("Claude returned empty response");
+    }
+
+    return data.content[0].text;
+
+  } catch (err) {
+    console.error("❌ Claude ERROR:", err);
+    throw err;
+  }
 }
 
 // =========================
-// HTML inject
+// HTML差し込み
 // =========================
 function injectHtml(template, data) {
   let html = template;
@@ -51,14 +71,16 @@ function injectHtml(template, data) {
 }
 
 // =========================
-// field取得
+// 値取得
 // =========================
 function getValue(fields, keyword) {
   for (const f of fields) {
     const label = (f.label || "").toLowerCase().replace("*", "").trim();
 
     if (label.includes(keyword.toLowerCase())) {
-      if (Array.isArray(f.value)) return f.value.join(", ");
+      if (Array.isArray(f.value)) {
+        return f.value.join(", ");
+      }
       return f.value || "";
     }
   }
@@ -66,34 +88,14 @@ function getValue(fields, keyword) {
 }
 
 // =========================
-// JSON完全修復（ここが神）
+// 空値ガード（UI崩壊防止）
 // =========================
-function safeParseJSON(text) {
-  try {
-    const cleaned = text
-      .replace(/```json/gi, "")
-      .replace(/```/g, "")
-      .replace(/\n/g, " ")
-      .trim();
-
-    // JSONの最初と最後を強制抽出
-    const start = cleaned.indexOf("{");
-    const end = cleaned.lastIndexOf("}");
-
-    if (start === -1 || end === -1) return {};
-
-    const jsonString = cleaned.substring(start, end + 1);
-
-    return JSON.parse(jsonString);
-
-  } catch (e) {
-    console.error("❌ PARSE FAIL:", text);
-    return {};
-  }
+function safe(val, fallback = "Not specified") {
+  return val && String(val).trim() !== "" ? val : fallback;
 }
 
 // =========================
-// MAIN
+// PDF生成
 // =========================
 app.post("/tally-pdf", async (req, res) => {
 
@@ -111,9 +113,12 @@ app.post("/tally-pdf", async (req, res) => {
     const concern = getValue(fields, "concern");
 
     const prompt = `
+You are a professional materials engineer specializing in polymer processing and biodegradable materials.
+
 Return ONLY valid JSON.
 
 {
+  "compatibility_level": "",
   "executive_summary": "",
   "processing_window": "",
   "thermal_behavior": "",
@@ -148,94 +153,71 @@ Technical Concern: ${concern}
 
     console.log("✅ CLAUDE GENERATED");
 
-    // ⭐ 完全パース
-    const parsed = safeParseJSON(claudeReport);
+    // =========================
+    // JSON 安定処理（完全版）
+    // =========================
+    let parsed = {};
 
-    // HTML
+    try {
+      const clean = claudeReport
+        .replace(/```json/g, "")
+        .replace(/```/g, "")
+        .trim();
+
+      parsed = JSON.parse(clean);
+    } catch (e) {
+      console.error("❌ JSON PARSE ERROR:", claudeReport);
+    }
+
+    // =========================
+    // HTML生成
+    // =========================
     const templatePath = path.join(process.cwd(), "template.html");
     const htmlTemplate = fs.readFileSync(templatePath, "utf8");
 
     const finalHtml = injectHtml(htmlTemplate, {
-      application,
+      // 基本
+      application: safe(application),
       material_transition: `${currentMaterial} → ${bioMaterial}`,
       assessment_type: "Tier 2 – Pre-Commercial Feasibility",
       report_date: new Date().toLocaleDateString(),
 
-      executive_summary: (parsed.executive_summary || "") + 
-　　　　"\n\nFeasibility Verdict: Conditionally Feasible under controlled pilot conditions",
-      processing_window: parsed.processing_window || "",
-      thermal_behavior: parsed.thermal_behavior || "",
-      flow_characteristics: parsed.flow_characteristics || "",
-      mechanical_behavior: parsed.mechanical_behavior || "",
-      surface_quality: parsed.surface_quality || "",
-      structural_consistency: parsed.structural_consistency || "",
-      application_implication: parsed.application_implication || "",
+      // Executive
+      compatibility_level: safe(parsed.compatibility_level, "Moderate"),
+      key_risk: safe(parsed.primary_risk),
+      executive_summary: safe(parsed.executive_summary),
 
-      primary_risk_title: parsed.primary_risk_title || "",
-      primary_risk: parsed.primary_risk || "",
-      secondary_risk_title: parsed.secondary_risk_title || "",
-      secondary_risk: parsed.secondary_risk || "",
-      mechanism: parsed.mechanism || "",
+      // Processing
+      processing_window: safe(parsed.processing_window),
+      thermal_behavior: safe(parsed.thermal_behavior),
+      flow_characteristics: safe(parsed.flow_characteristics),
 
-      stability: parsed.stability || "",
-      stability_note: parsed.stability_note || "",
-      consistency: parsed.consistency || "",
-      consistency_note: parsed.consistency_note || "",
+      // Product
+      mechanical_behavior: safe(parsed.mechanical_behavior),
+      surface_quality: safe(parsed.surface_quality),
+      structural_consistency: safe(parsed.structural_consistency),
+      application_implication: safe(parsed.application_implication),
 
-      visual_description: parsed.visual_description || "",
-      next_step: parsed.next_step || ""
+      // Failure
+      primary_risk_title: safe(parsed.primary_risk_title),
+      primary_risk: safe(parsed.primary_risk),
+      secondary_risk_title: safe(parsed.secondary_risk_title),
+      secondary_risk: safe(parsed.secondary_risk),
+      mechanism: safe(parsed.mechanism),
+
+      // Quality
+      stability: safe(parsed.stability, "Moderate"),
+      stability_note: safe(parsed.stability_note),
+      consistency: safe(parsed.consistency, "Moderate"),
+      consistency_note: safe(parsed.consistency_note),
+
+      // Visual
+      visual_description: safe(parsed.visual_description),
+
+      // Next
+      next_step: safe(parsed.next_step)
     });
-
-    // PDF
-    const browser = await puppeteer.launch({
-      args: ["--no-sandbox","--disable-setuid-sandbox"]
-    });
-
-    const page = await browser.newPage();
-    await page.setContent(finalHtml);
-
-    const pdf = await page.pdf({
-      format: "A4",
-      printBackground: true
-    });
-
-    await browser.close();
-
-    fs.writeFileSync("/tmp/latest-report.pdf", pdf);
-
-    console.log("✅ PDF SAVED");
-
-    res.set({
-      "Content-Type": "application/pdf"
-    });
-
-    return res.send(pdf);
-
-  } catch (err) {
-    console.error("❌ ERROR:", err);
-    return res.status(500).send("PDF failed");
-  }
-});
-
-// =========================
-app.get("/latest-pdf", (req, res) => {
-  const file = "/tmp/latest-report.pdf";
-
-  if (!fs.existsSync(file)) {
-    return res.status(404).send("No generated PDF found yet.");
-  }
-
-  res.set({
-    "Content-Type": "application/pdf"
-  });
-
-  return res.sendFile(file);
-});
-
-app.listen(process.env.PORT || 3000, () => {
-  console.log("🚀 Server running");
-});
-// =========================
+=========================
 // HTMLテンプレ（あなたの本番HTML）
 // =========================
 const htmlTemplate = `
