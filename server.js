@@ -159,39 +159,49 @@ Technical Concern: ${concern}
     // =========================
     // HTML
     // =========================
-    const templatePath = path.join(process.cwd(), "template.html");
-    const htmlTemplate = fs.readFileSync(templatePath, "utf8");
+    // =========================
+// HTML生成
+// =========================
+const templatePath = path.join(process.cwd(), "template.html");
+const htmlTemplate = fs.readFileSync(templatePath, "utf8");
 
-    const finalHtml = injectHtml(htmlTemplate, {
-      application,
-      material_transition: `${currentMaterial} → ${bioMaterial}`,
-      assessment_type: "Tier 2 – Pre-Commercial Feasibility",
-      report_date: new Date().toLocaleDateString(),
+let parsed;
+try {
+  parsed = JSON.parse(claudeReport);
+} catch (e) {
+  console.error("❌ JSON PARSE ERROR:", claudeReport);
+  parsed = {};
+}
 
-      executive_summary: parsed.executive_summary || "",
-      processing_window: parsed.processing_window || "",
-      thermal_behavior: parsed.thermal_behavior || "",
-      flow_characteristics: parsed.flow_characteristics || "",
-      mechanical_behavior: parsed.mechanical_behavior || "",
-      surface_quality: parsed.surface_quality || "",
-      structural_consistency: parsed.structural_consistency || "",
-      application_implication: parsed.application_implication || "",
+const finalHtml = injectHtml(htmlTemplate, {
+  application,
+  material_transition: `${currentMaterial} → ${bioMaterial}`,
+  assessment_type: "Tier 2 – Pre-Commercial Feasibility",
+  report_date: new Date().toLocaleDateString(),
 
-      primary_risk_title: parsed.primary_risk_title || "",
-      primary_risk: parsed.primary_risk || "",
-      secondary_risk_title: parsed.secondary_risk_title || "",
-      secondary_risk: parsed.secondary_risk || "",
-      mechanism: parsed.mechanism || "",
+  executive_summary: parsed.executive_summary || "",
+  processing_window: parsed.processing_window || "",
+  thermal_behavior: parsed.thermal_behavior || "",
+  flow_characteristics: parsed.flow_characteristics || "",
+  mechanical_behavior: parsed.mechanical_behavior || "",
+  surface_quality: parsed.surface_quality || "",
+  structural_consistency: parsed.structural_consistency || "",
+  application_implication: parsed.application_implication || "",
 
-      stability: parsed.stability || "",
-      stability_note: parsed.stability_note || "",
-      consistency: parsed.consistency || "",
-      consistency_note: parsed.consistency_note || "",
+  primary_risk_title: parsed.primary_risk_title || "",
+  primary_risk: parsed.primary_risk || "",
+  secondary_risk_title: parsed.secondary_risk_title || "",
+  secondary_risk: parsed.secondary_risk || "",
+  mechanism: parsed.mechanism || "",
 
-      visual_description: parsed.visual_description || "",
-      next_step: parsed.next_step || ""
-    });
+  stability: parsed.stability || "",
+  stability_note: parsed.stability_note || "",
+  consistency: parsed.consistency || "",
+  consistency_note: parsed.consistency_note || "",
 
+  visual_description: parsed.visual_description || "",
+  next_step: parsed.next_step || ""
+});
     // =========================
     // PDF生成（ここ重要）
     // =========================
