@@ -162,6 +162,9 @@ Technical Concern: ${concern}
     // =========================
 // HTML生成
 // =========================
+// =========================
+// HTML生成
+// =========================
 const templatePath = path.join(process.cwd(), "template.html");
 const htmlTemplate = fs.readFileSync(templatePath, "utf8");
 
@@ -202,12 +205,9 @@ const finalHtml = injectHtml(htmlTemplate, {
   visual_description: parsed.visual_description || "",
   next_step: parsed.next_step || ""
 });
-    // =========================
-    // PDF生成（ここ重要）
-    // =========================
-    const finalHtml = injectHtml(htmlTemplate, {
-  // =========================
-// PDF生成（ここ重要）
+
+// =========================
+// PDF生成
 // =========================
 const browser = await puppeteer.launch({
   args: [
