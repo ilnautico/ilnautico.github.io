@@ -2,127 +2,246 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>FairVia Technical Report</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FairVia™ Technical Hypothesis Report</title>
+
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600&family=IBM+Plex+Mono:wght@300;400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
 
 <style>
-body {
-  font-family: Arial, sans-serif;
-  padding: 40px;
-  line-height: 1.6;
-  color: #111;
+:root {
+  --navy:#0C1C2E;
+  --navy-soft:#2C4A6E;
+  --block-light:#F9FCFF;
+  --block-mid:#E6EFF8;
+  --block-deep:#DDE8F2;
+  --sep:#E6EDF3;
+  --text-body:#374151;
+  --text-muted:#6B7A8E;
+  --text-label:#9AA5B4;
+  --accent-warn:#CFAE5D;
+  --accent-low:#7A6EB0;
 }
 
-h1, h2 {
-  margin-top: 30px;
+*{margin:0;padding:0;box-sizing:border-box;}
+
+body{
+  background:#F4F7FA;
+  font-family:'IBM Plex Sans',sans-serif;
+  color:var(--text-body);
+  font-size:13px;
+  line-height:1.68;
 }
 
-.section {
-  margin-bottom: 25px;
+.page{
+  width:210mm;
+  margin:20mm auto;
+  background:white;
+  border:1px solid #E0E8EF;
 }
 
-.title {
-  font-size: 20px;
-  font-weight: bold;
+.page-top-bar{
+  height:4px;
+  background:linear-gradient(90deg,#0C1C2E,#2C4A6E,#DDE8F2);
 }
 
-.label {
-  font-weight: bold;
+/* COVER */
+.cover{
+  padding:50px;
 }
 
-.small {
-  font-size: 12px;
-  color: #555;
+.cover-title{
+  font-family:'Space Grotesk';
+  font-size:28px;
+  font-weight:600;
+  margin-bottom:20px;
+}
+
+.meta{
+  margin-top:20px;
+}
+
+.meta-item{
+  margin-bottom:10px;
+}
+
+.meta-label{
+  font-size:10px;
+  color:var(--text-label);
+}
+
+.meta-value{
+  font-size:13px;
+  font-weight:500;
+}
+
+/* SECTION */
+.section{
+  padding:40px 50px;
+  border-top:1px solid var(--sep);
+}
+
+.section-title{
+  font-size:14px;
+  font-weight:600;
+  margin-bottom:12px;
+}
+
+.block{
+  background:#F8FAFC;
+  padding:16px;
+  border-radius:8px;
+  margin-bottom:12px;
 }
 </style>
-
 </head>
+
 <body>
 
-<div class="title">FairVia™</div>
-<div class="small">FV-THR-2025-001 · CONFIDENTIAL</div>
+<div class="page">
+<div class="page-top-bar"></div>
 
-<h1>Technical Assessment Document</h1>
-<p>FairVia™ Technical Hypothesis Report</p>
-<p>Material feasibility assessment for pre-commercial transition planning</p>
+<div class="cover">
 
-<div class="section">
-  <div class="label">Application</div>
-  <div>{{application}}</div>
+<h1 class="cover-title">Technical Assessment Document</h1>
 
-  <div class="label">Material Transition</div>
-  <div>{{material_transition}}</div>
+<div class="meta">
 
-  <div class="label">Assessment Type</div>
-  <div>{{assessment_type}}</div>
-
-  <div class="label">Date</div>
-  <div>{{report_date}}</div>
+<div class="meta-item">
+<div class="meta-label">Application</div>
+<div class="meta-value">{{application}}</div>
 </div>
 
-<h2>01 Executive Summary</h2>
-<p>{{executive_summary}}</p>
-
-<h2>02 Processing Behaviour</h2>
-
-<div class="section">
-  <div class="label">Processing Window</div>
-  <div>{{processing_window}}</div>
-
-  <div class="label">Thermal Behaviour</div>
-  <div>{{thermal_behavior}}</div>
-
-  <div class="label">Flow Characteristics</div>
-  <div>{{flow_characteristics}}</div>
+<div class="meta-item">
+<div class="meta-label">Material Transition</div>
+<div class="meta-value">{{material_transition}}</div>
 </div>
 
-<h2>03 Product Realization</h2>
-
-<div class="section">
-  <div class="label">Mechanical Behaviour</div>
-  <div>{{mechanical_behavior}}</div>
-
-  <div class="label">Surface Quality</div>
-  <div>{{surface_quality}}</div>
-
-  <div class="label">Structural Consistency</div>
-  <div>{{structural_consistency}}</div>
-
-  <div class="label">Application Implication</div>
-  <div>{{application_implication}}</div>
+<div class="meta-item">
+<div class="meta-label">Assessment Type</div>
+<div class="meta-value">{{assessment_type}}</div>
 </div>
 
-<h2>04 Failure Analysis</h2>
-
-<div class="section">
-  <div class="label">Primary Risk</div>
-  <div><strong>{{primary_risk_title}}</strong></div>
-  <div>{{primary_risk}}</div>
-
-  <div class="label">Secondary Risk</div>
-  <div><strong>{{secondary_risk_title}}</strong></div>
-  <div>{{secondary_risk}}</div>
-
-  <div class="label">Mechanism</div>
-  <div>{{mechanism}}</div>
+<div class="meta-item">
+<div class="meta-label">Date</div>
+<div class="meta-value">{{report_date}}</div>
 </div>
 
-<h2>05 Quality Assessment</h2>
-
+</div>
+</div>
+<!-- EXECUTIVE SUMMARY -->
 <div class="section">
-  <div class="label">Stability</div>
-  <div>{{stability}}</div>
-  <div class="small">{{stability_note}}</div>
+<div class="section-title">01 Executive Summary</div>
 
-  <div class="label">Consistency</div>
-  <div>{{consistency}}</div>
-  <div class="small">{{consistency_note}}</div>
+<div class="block">
+<strong>{{compatibility_level}}</strong><br><br>
+{{executive_summary}}
 </div>
 
-<h2>06 Conceptual Visualization</h2>
-<p>{{visual_description}}</p>
+<div class="block">
+<strong>Key Risk</strong><br>
+{{key_risk}}
+</div>
+</div>
 
-<h2>07 Recommended Next Step</h2>
-<p>{{next_step}}</p>
+<!-- PROCESSING -->
+<div class="section">
+<div class="section-title">02 Processing Behaviour</div>
 
+<div class="block">
+<strong>Processing Window</strong><br>
+{{processing_window}}
+</div>
+
+<div class="block">
+<strong>Thermal Behaviour</strong><br>
+{{thermal_behavior}}
+</div>
+
+<div class="block">
+<strong>Flow Characteristics</strong><br>
+{{flow_characteristics}}
+</div>
+</div>
+
+<!-- PRODUCT -->
+<div class="section">
+<div class="section-title">03 Product Realization</div>
+
+<div class="block">
+<strong>Mechanical Behaviour</strong><br>
+{{mechanical_behavior}}
+</div>
+
+<div class="block">
+<strong>Surface Quality</strong><br>
+{{surface_quality}}
+</div>
+
+<div class="block">
+<strong>Structural Consistency</strong><br>
+{{structural_consistency}}
+</div>
+
+<div class="block">
+<strong>Application Implication</strong><br>
+{{application_implication}}
+</div>
+</div>
+<!-- FAILURE -->
+<div class="section">
+<div class="section-title">04 Failure Analysis</div>
+
+<div class="block">
+<strong>{{primary_risk_title}}</strong><br>
+{{primary_risk}}
+</div>
+
+<div class="block">
+<strong>{{secondary_risk_title}}</strong><br>
+{{secondary_risk}}
+</div>
+
+<div class="block">
+<strong>Mechanism</strong><br>
+{{mechanism}}
+</div>
+</div>
+
+<!-- QUALITY -->
+<div class="section">
+<div class="section-title">05 Quality Assessment</div>
+
+<div class="block">
+<strong>Stability</strong><br>
+{{stability}}<br>
+{{stability_note}}
+</div>
+
+<div class="block">
+<strong>Consistency</strong><br>
+{{consistency}}<br>
+{{consistency_note}}
+</div>
+</div>
+
+<!-- VISUAL -->
+<div class="section">
+<div class="section-title">06 Conceptual Visualization</div>
+
+<div class="block">
+{{visual_description}}
+</div>
+</div>
+
+<!-- NEXT -->
+<div class="section">
+<div class="section-title">07 Recommended Next Step</div>
+
+<div class="block">
+{{next_step}}
+</div>
+</div>
+
+</div>
 </body>
 </html>
