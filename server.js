@@ -168,10 +168,9 @@ Technical Concern: ${concern}
 // JSON安定処理（完全版 FINAL）
 // =========================
 let parsed = {};
-
 try {
   if (!claudeReport || claudeReport === "undefined") {
-    throw new Error("Claude returned empty");
+    throw new Error("Claude empty");
   }
 
   const clean = String(claudeReport)
@@ -180,6 +179,11 @@ try {
     .trim();
 
   parsed = JSON.parse(clean);
+
+  // 👇ここOK
+  if (!parsed.executive_summary) {
+    throw new Error("Claude incomplete");
+  }
 
 } catch (e) {
   console.error("❌ JSON PARSE ERROR:", claudeReport);
