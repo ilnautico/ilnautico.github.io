@@ -6,9 +6,15 @@ import fetch from "node-fetch";
 
 const app = express();
 
+// =========================
+// request parsing
+// =========================
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// =========================
+// Claude call with retry
+// =========================
 async function generateClaudeHypothesis(prompt) {
   for (let i = 0; i < 3; i++) {
     try {
@@ -67,6 +73,9 @@ async function generateClaudeHypothesis(prompt) {
   return "{}";
 }
 
+// =========================
+// template injection
+// =========================
 function injectHtml(template, data) {
   let html = template;
 
@@ -78,6 +87,9 @@ function injectHtml(template, data) {
   return html;
 }
 
+// =========================
+// field value lookup
+// =========================
 function getValue(fields, keyword) {
   for (const f of fields) {
     const label = (f.label || "").toLowerCase().replace("*", "").trim();
@@ -89,13 +101,20 @@ function getValue(fields, keyword) {
       return f.value || "";
     }
   }
+
   return "";
 }
 
+// =========================
+// safe string helper
+// =========================
 function safe(val, fallback = "") {
   return val && String(val).trim() !== "" ? String(val) : fallback;
 }
 
+// =========================
+// robust Claude JSON parsing
+// =========================
 function parseClaudeJson(rawText) {
   try {
     if (!rawText || rawText === "undefined") {
@@ -123,6 +142,9 @@ function parseClaudeJson(rawText) {
   }
 }
 
+// =========================
+// main PDF route
+// =========================
 app.post("/tally-pdf", async (req, res) => {
   console.log("🔥 HIT");
 
@@ -179,6 +201,7 @@ Technical Concern: ${concern}
 
     const parsed = parseClaudeJson(claudeReport);
 
+    // read external template.html only
     const templatePath = path.join(process.cwd(), "template.html");
     const htmlTemplate = fs.readFileSync(templatePath, "utf8");
 
@@ -259,6 +282,9 @@ Technical Concern: ${concern}
   }
 });
 
+// =========================
+// latest PDF route
+// =========================
 app.get("/latest-pdf", (req, res) => {
   const latestPdfPath = path.join("/tmp", "latest-report.pdf");
 
@@ -274,6 +300,9 @@ app.get("/latest-pdf", (req, res) => {
   return res.sendFile(latestPdfPath);
 });
 
+// =========================
+// start server
+// =========================
 app.listen(process.env.PORT || 3000, () => {
   console.log("🚀 Server running");
 });
