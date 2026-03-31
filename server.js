@@ -55,6 +55,7 @@ async function generateClaudeHypothesis(prompt) {
     throw err;
   }
 }
+
 // =========================
 // HTML差し込み
 // =========================
@@ -70,7 +71,7 @@ function injectHtml(template, data) {
 }
 
 // =========================
-// 値取得（完全版・これ1つだけ）
+// 値取得
 // =========================
 function getValue(fields, keyword) {
   for (const f of fields) {
@@ -104,55 +105,10 @@ app.post("/tally-pdf", async (req, res) => {
     const scale = getValue(fields, "production scale");
     const concern = getValue(fields, "concern");
 
-   const prompt = `
+    const prompt = `
 You are a professional materials engineer specializing in polymer processing and biodegradable materials.
 
-Your task is to generate a structured technical feasibility report for material transition.
-
-Do NOT provide:
-- formulation details
-- blending ratios
-- exact processing parameters
-- supplier recommendations
-
-Focus on:
-- engineering feasibility
-- processing behavior
-- risks and limitations
-- practical implementation considerations
-
----
-
-INPUT DATA:
-
-Application: ${application}
-Current Material: ${currentMaterial}
-Target Material: ${bioMaterial}
-Processing Method: ${processing}
-Equipment: ${equipment}
-Production Scale: ${scale}
-Technical Concern: ${concern}
-
----
-
-INSTRUCTIONS:
-
-Write a professional technical feasibility report.
-
-Ensure:
-- concise engineering language
-- no marketing tone
-- realistic industrial assumptions
-- highlight limitations clearly
-
----
-
-IMPORTANT:
-
-Return the result ONLY in valid JSON format.
-Do NOT include any explanation outside JSON.
-
-Use EXACTLY this structure:
+Return ONLY valid JSON.
 
 {
   "executive_summary": "",
@@ -175,55 +131,81 @@ Use EXACTLY this structure:
   "visual_description": "",
   "next_step": ""
 }
+
+Application: ${application}
+Current Material: ${currentMaterial}
+Target Material: ${bioMaterial}
+Processing Method: ${processing}
+Equipment: ${equipment}
+Production Scale: ${scale}
+Technical Concern: ${concern}
 `;
+
     const claudeReport = await generateClaudeHypothesis(prompt);
-　
+
     console.log("✅ CLAUDE GENERATED");
 
+    // =========================
+    // JSON安全パース（1回だけ）
+    // =========================
+    let parsed;
+    try {
+      parsed = JSON.parse(claudeReport);
+    } catch (e) {
+      console.error("❌ JSON PARSE ERROR:", claudeReport);
+      parsed = {};
+    }
+
+    // =========================
     // HTML
+    // =========================
     const templatePath = path.join(process.cwd(), "template.html");
     const htmlTemplate = fs.readFileSync(templatePath, "utf8");
 
-// ===== JSON安全パース =====
-let parsed;
+    const finalHtml = injectHtml(htmlTemplate, {
+      application,
+      material_transition: `${currentMaterial} → ${bioMaterial}`,
+      assessment_type: "Tier 2 – Pre-Commercial Feasibility",
+      report_date: new Date().toLocaleDateString(),
 
-try {
-  parsed = JSON.parse(claudeReport);
-} catch (e) {
-  console.error("❌ JSON PARSE ERROR:", claudeReport);
-  parsed = {};
-}
+      executive_summary: parsed.executive_summary || "",
+      processing_window: parsed.processing_window || "",
+      thermal_behavior: parsed.thermal_behavior || "",
+      flow_characteristics: parsed.flow_characteristics || "",
+      mechanical_behavior: parsed.mechanical_behavior || "",
+      surface_quality: parsed.surface_quality || "",
+      structural_consistency: parsed.structural_consistency || "",
+      application_implication: parsed.application_implication || "",
 
-// ===== HTML差し込み =====
-const finalHtml = injectHtml(htmlTemplate, {
-  application: application,
-  material_transition: `${currentMaterial} → ${bioMaterial}`,
-  assessment_type: "Tier 2 – Pre-Commercial Feasibility",
-  report_date: new Date().toLocaleDateString(),
+      primary_risk_title: parsed.primary_risk_title || "",
+      primary_risk: parsed.primary_risk || "",
+      secondary_risk_title: parsed.secondary_risk_title || "",
+      secondary_risk: parsed.secondary_risk || "",
+      mechanism: parsed.mechanism || "",
 
-  executive_summary: parsed.executive_summary || "",
-  processing_window: parsed.processing_window || "",
-  thermal_behavior: parsed.thermal_behavior || "",
-  flow_characteristics: parsed.flow_characteristics || "",
-  mechanical_behavior: parsed.mechanical_behavior || "",
-  surface_quality: parsed.surface_quality || "",
-  structural_consistency: parsed.structural_consistency || "",
-  application_implication: parsed.application_implication || "",
+      stability: parsed.stability || "",
+      stability_note: parsed.stability_note || "",
+      consistency: parsed.consistency || "",
+      consistency_note: parsed.consistency_note || "",
 
-  primary_risk_title: parsed.primary_risk_title || "",
-  primary_risk: parsed.primary_risk || "",
-  secondary_risk_title: parsed.secondary_risk_title || "",
-  secondary_risk: parsed.secondary_risk || "",
-  mechanism: parsed.mechanism || "",
+      visual_description: parsed.visual_description || "",
+      next_step: parsed.next_step || ""
+    });
 
-  stability: parsed.stability || "",
-  stability_note: parsed.stability_note || "",
-  consistency: parsed.consistency || "",
-  consistency_note: parsed.consistency_note || "",
+    // =========================
+    // PDF生成（ここ重要）
+    // =========================
+    const browser = await puppeteer.launch({
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-gpu",
+        "--single-process",
+        "--no-zygote"
+      ]
+    });
 
-  visual_description: parsed.visual_description || "",
-  next_step: parsed.next_step || ""
-});
     const page = await browser.newPage();
 
     await page.setContent(finalHtml, {
@@ -237,7 +219,9 @@ const finalHtml = injectHtml(htmlTemplate, {
 
     await browser.close();
 
-    // 保存（Railway対応）
+    // =========================
+    // 保存
+    // =========================
     const latestPdfPath = path.join("/tmp", "latest-report.pdf");
     fs.writeFileSync(latestPdfPath, pdf);
 
