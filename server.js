@@ -192,7 +192,7 @@ Technical Concern: ${concern}
   assessment_type: "Tier 2 – Pre-Commercial Feasibility",
   report_date: new Date().toLocaleDateString(),
 
-  compatibility_level: parsed.compatibility_level || "Moderate",
+  compatibility_level: "Moderate",
   key_risk: parsed.primary_risk || "",
 
   executive_summary: parsed.executive_summary || "",
@@ -206,12 +206,20 @@ Technical Concern: ${concern}
   structural_consistency: parsed.structural_consistency || "",
   application_implication: parsed.application_implication || "",
 
+  // 👇ここ修正
+  primary_risk_title: parsed.primary_risk_title || "",
   primary_risk: parsed.primary_risk || "",
+
+  secondary_risk_title: parsed.secondary_risk_title || "",
   secondary_risk: parsed.secondary_risk || "",
+
   mechanism: parsed.mechanism || "",
 
   stability: parsed.stability || "",
+  stability_note: parsed.stability_note || "",
+
   consistency: parsed.consistency || "",
+  consistency_note: parsed.consistency_note || "",
 
   visual_description: parsed.visual_description || "",
   next_step: parsed.next_step || ""
