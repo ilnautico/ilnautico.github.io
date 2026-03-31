@@ -217,7 +217,7 @@ Technical Concern: ${concern}
       // Next
       next_step: safe(parsed.next_step)
     });
-=========================
+
 // HTMLテンプレ（あなたの本番HTML）
 // =========================
 const htmlTemplate = `
