@@ -2,249 +2,127 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>FairVia™ Technical Hypothesis Report</title>
-
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600&family=IBM+Plex+Mono:wght@300;400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<title>FairVia Technical Report</title>
 
 <style>
-/*（CSSはそのまま維持：あなたのもの完全採用）*/
-{{STYLE_BLOCK}}
+body {
+  font-family: Arial, sans-serif;
+  padding: 40px;
+  line-height: 1.6;
+  color: #111;
+}
+
+h1, h2 {
+  margin-top: 30px;
+}
+
+.section {
+  margin-bottom: 25px;
+}
+
+.title {
+  font-size: 20px;
+  font-weight: bold;
+}
+
+.label {
+  font-weight: bold;
+}
+
+.small {
+  font-size: 12px;
+  color: #555;
+}
 </style>
 
 </head>
 <body>
 
-<div class="page">
+<div class="title">FairVia™</div>
+<div class="small">FV-THR-2025-001 · CONFIDENTIAL</div>
 
-<!-- COVER -->
-<div class="cover">
+<h1>Technical Assessment Document</h1>
+<p>FairVia™ Technical Hypothesis Report</p>
+<p>Material feasibility assessment for pre-commercial transition planning</p>
 
-  <div class="cover-header">
-    <div class="brand-mark">
-      <div class="brand-icon"></div>
-      <span class="brand-name">FairVia™</span>
-    </div>
-    <span class="doc-id">FV-THR-2025-001 · CONFIDENTIAL</span>
-  </div>
-
-  <div class="cover-eyebrow">Technical Assessment Document</div>
-
-  <div class="cover-title">
-    FairVia™ <span>Technical Hypothesis Report</span>
-  </div>
-
-  <div class="cover-subtitle">
-    Material feasibility assessment for pre-commercial transition planning
-  </div>
-
-  <div class="cover-meta-grid">
-    <div class="meta-cell">
-      <div class="meta-label">Application</div>
-      <div class="meta-value">{{application}}</div>
-    </div>
-
-    <div class="meta-cell">
-      <div class="meta-label">Material Transition</div>
-      <div class="meta-value">{{material_transition}}</div>
-    </div>
-
-    <div class="meta-cell">
-      <div class="meta-label">Assessment Type</div>
-      <div class="meta-value">{{assessment_type}}</div>
-    </div>
-
-    <div class="meta-cell">
-      <div class="meta-label">Date</div>
-      <div class="meta-value">{{report_date}}</div>
-    </div>
-  </div>
-
-</div>
-
-<div class="body-wrap">
-
-<!-- 01 -->
 <div class="section">
-  <div class="section-header">
-    <span class="section-num">01</span>
-    <span class="section-title">Executive Summary</span>
-  </div>
+  <div class="label">Application</div>
+  <div>{{application}}</div>
 
-  <div class="exec-card">
+  <div class="label">Material Transition</div>
+  <div>{{material_transition}}</div>
 
-    <div class="compat-row">
-      <span class="compat-label">Compatibility Level</span>
-      <span class="compat-badge">{{compatibility_level}}</span>
-    </div>
+  <div class="label">Assessment Type</div>
+  <div>{{assessment_type}}</div>
 
-    <p class="exec-body">
-      {{executive_summary}}
-    </p>
-
-    <div class="risk-inline">
-      <span class="risk-tag">Key Risk</span>
-      <span class="risk-text">{{key_risk}}</span>
-    </div>
-
-  </div>
+  <div class="label">Date</div>
+  <div>{{report_date}}</div>
 </div>
 
-<!-- 02 -->
+<h2>01 Executive Summary</h2>
+<p>{{executive_summary}}</p>
+
+<h2>02 Processing Behaviour</h2>
+
 <div class="section">
-  <div class="section-header">
-    <span class="section-num">02</span>
-    <span class="section-title">Processing Behaviour</span>
-  </div>
+  <div class="label">Processing Window</div>
+  <div>{{processing_window}}</div>
 
-  <div class="behaviour-grid">
+  <div class="label">Thermal Behaviour</div>
+  <div>{{thermal_behavior}}</div>
 
-    <div class="brow">
-      <div class="brow-label">Processing Window</div>
-      <div class="brow-body">{{processing_window}}</div>
-    </div>
-
-    <div class="brow">
-      <div class="brow-label">Thermal Behaviour</div>
-      <div class="brow-body">{{thermal_behavior}}</div>
-    </div>
-
-    <div class="brow">
-      <div class="brow-label">Flow Characteristics</div>
-      <div class="brow-body">{{flow_characteristics}}</div>
-    </div>
-
-  </div>
+  <div class="label">Flow Characteristics</div>
+  <div>{{flow_characteristics}}</div>
 </div>
 
-<!-- 03 -->
+<h2>03 Product Realization</h2>
+
 <div class="section">
-  <div class="section-header">
-    <span class="section-num">03</span>
-    <span class="section-title">Product Realization</span>
-  </div>
+  <div class="label">Mechanical Behaviour</div>
+  <div>{{mechanical_behavior}}</div>
 
-  <div class="pr-grid">
+  <div class="label">Surface Quality</div>
+  <div>{{surface_quality}}</div>
 
-    <div class="pr-cell">
-      <div class="pr-cell-label">Mechanical Behaviour</div>
-      <div class="pr-cell-body">{{mechanical_behavior}}</div>
-    </div>
+  <div class="label">Structural Consistency</div>
+  <div>{{structural_consistency}}</div>
 
-    <div class="pr-cell">
-      <div class="pr-cell-label">Surface Quality</div>
-      <div class="pr-cell-body">{{surface_quality}}</div>
-    </div>
-
-    <div class="pr-cell">
-      <div class="pr-cell-label">Structural Consistency</div>
-      <div class="pr-cell-body">{{structural_consistency}}</div>
-    </div>
-
-    <div class="pr-cell">
-      <div class="pr-cell-label">Assessment Scope</div>
-      <div class="pr-cell-body">{{assessment_scope}}</div>
-    </div>
-
-  </div>
-
-  <div class="implication-block">
-    <span class="impl-tag">Application Implication</span>
-    <span class="impl-text">{{application_implication}}</span>
-  </div>
-
+  <div class="label">Application Implication</div>
+  <div>{{application_implication}}</div>
 </div>
 
-<!-- 04 -->
+<h2>04 Failure Analysis</h2>
+
 <div class="section">
-  <div class="section-header">
-    <span class="section-num">04</span>
-    <span class="section-title">Failure Analysis</span>
-  </div>
+  <div class="label">Primary Risk</div>
+  <div><strong>{{primary_risk_title}}</strong></div>
+  <div>{{primary_risk}}</div>
 
-  <div class="failure-stack">
+  <div class="label">Secondary Risk</div>
+  <div><strong>{{secondary_risk_title}}</strong></div>
+  <div>{{secondary_risk}}</div>
 
-    <div class="failure-card primary">
-      <div class="failure-type">Primary Risk</div>
-      <div>
-        <div class="failure-label">{{primary_risk_title}}</div>
-        <div class="failure-body">{{primary_risk}}</div>
-      </div>
-    </div>
-
-    <div class="failure-card secondary">
-      <div class="failure-type">Secondary Risk</div>
-      <div>
-        <div class="failure-label">{{secondary_risk_title}}</div>
-        <div class="failure-body">{{secondary_risk}}</div>
-      </div>
-    </div>
-
-    <div class="failure-card mechanism">
-      <div class="failure-type">Mechanism</div>
-      <div class="failure-body">{{mechanism}}</div>
-    </div>
-
-  </div>
+  <div class="label">Mechanism</div>
+  <div>{{mechanism}}</div>
 </div>
 
-<!-- 05 -->
+<h2>05 Quality Assessment</h2>
+
 <div class="section">
-  <div class="section-header">
-    <span class="section-num">05</span>
-    <span class="section-title">Quality Assessment</span>
-  </div>
+  <div class="label">Stability</div>
+  <div>{{stability}}</div>
+  <div class="small">{{stability_note}}</div>
 
-  <div class="qa-top">
-
-    <div class="qa-cell">
-      <div class="qa-cell-label">Stability</div>
-      <div class="qa-rating">{{stability}}</div>
-      <div class="qa-note">{{stability_note}}</div>
-    </div>
-
-    <div class="qa-cell">
-      <div class="qa-cell-label">Consistency</div>
-      <div class="qa-rating">{{consistency}}</div>
-      <div class="qa-note">{{consistency_note}}</div>
-    </div>
-
-  </div>
-
+  <div class="label">Consistency</div>
+  <div>{{consistency}}</div>
+  <div class="small">{{consistency_note}}</div>
 </div>
 
-<!-- 06 -->
-<div class="section">
-  <div class="section-header">
-    <span class="section-num">06</span>
-    <span class="section-title">Conceptual Visualization</span>
-  </div>
+<h2>06 Conceptual Visualization</h2>
+<p>{{visual_description}}</p>
 
-  <div class="viz-block">
-    <div class="viz-body">
-      <img src="{{visual_image}}" style="width:100%; border-radius:8px;" />
-      <p>{{visual_description}}</p>
-    </div>
-  </div>
-
-</div>
-
-<!-- 07 -->
-<div class="section">
-  <div class="section-header">
-    <span class="section-num">07</span>
-    <span class="section-title">Recommended Next Step</span>
-  </div>
-
-  <div class="nextstep-card">
-    <p>{{next_step}}</p>
-  </div>
-
-</div>
-
-</div>
-
-</div>
+<h2>07 Recommended Next Step</h2>
+<p>{{next_step}}</p>
 
 </body>
 </html>
