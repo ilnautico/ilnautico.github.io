@@ -180,7 +180,6 @@ try {
 
   parsed = JSON.parse(clean);
 
-  // 👇ここOK
   if (!parsed.executive_summary) {
     throw new Error("Claude incomplete");
   }
