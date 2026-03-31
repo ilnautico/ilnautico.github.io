@@ -185,6 +185,14 @@ try {
   console.error("❌ JSON PARSE ERROR:", claudeReport);
   parsed = {};
 }
+if (!parsed.executive_summary) {
+    throw new Error("Claude incomplete");
+  }
+
+} catch (e) {
+  console.error("❌ JSON PARSE ERROR:", claudeReport);
+  throw new Error("Retry needed"); // ← retryさせる
+}
 
     // =========================
     // HTML読み込み（※これ1回だけ）
