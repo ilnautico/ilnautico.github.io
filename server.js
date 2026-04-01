@@ -10,6 +10,50 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // =========================
+// 判定ロジック（コア）
+// =========================
+function evaluateScore({ material, process, equipment, concern }) {
+
+  let score = 0;
+
+  // 材料ベース
+  if (material.includes("PE") || material.includes("PP")) score += 2;
+  if (material.includes("PHA")) score -= 1;
+
+  // プロセス
+  if (process.includes("film")) score -= 1;
+  if (process.includes("blown")) score += 1;
+
+  // 設備
+  if (equipment.includes("single")) score -= 1;
+  if (equipment.includes("twin")) score += 1;
+
+  // 課題
+  if (concern.includes("thermal")) score -= 1;
+  if (concern.includes("thickness")) score -= 1;
+
+  return score;
+}
+
+function evaluateCompatibility(score) {
+  if (score >= 3) return "High";
+  if (score >= 1) return "Moderate – Requires Process Control";
+  return "Low";
+}
+
+function evaluateStability(score) {
+  if (score >= 3) return "High";
+  if (score >= 1) return "Moderate";
+  return "Low";
+}
+
+function evaluateConsistency(score) {
+  if (score >= 3) return "High";
+  if (score >= 1) return "Moderate";
+  return "Low";
+}
+
+// =========================
 // Claude生成
 // =========================
 async function generateClaudeHypothesis(prompt) {
@@ -36,14 +80,9 @@ async function generateClaudeHypothesis(prompt) {
 
       const data = await response.json();
 
-      if (!data?.content?.[0]?.text) {
-        throw new Error("Claude empty");
-      }
-
       return data.content[0].text;
 
     } catch (err) {
-      console.log("⚠️ Claude retry...");
       if (i === 2) throw err;
     }
   }
@@ -94,7 +133,7 @@ function getValue(fields, keyword) {
 }
 
 // =========================
-// メイン処理
+// メイン
 // =========================
 app.post("/tally-pdf", async (req, res) => {
 
@@ -112,84 +151,54 @@ app.post("/tally-pdf", async (req, res) => {
     const concern = getValue(fields, "concern");
 
     // =========================
-    // プロンプト（安定版）
+    // 🔥 判定ロジック
+    // =========================
+    const score = evaluateScore({
+      material: currentMaterial,
+      process: processing,
+      equipment: equipment,
+      concern: concern
+    });
+
+    const compatibility = evaluateCompatibility(score);
+    const stability = evaluateStability(score);
+    const consistency = evaluateConsistency(score);
+
+    // =========================
+    // Claude（説明専用）
     // =========================
     const prompt = `
-You are a senior polymer processing engineer.
+You are a polymer processing expert.
 
-Return ONLY valid JSON.
+IMPORTANT:
+- DO NOT decide compatibility
+- DO NOT override given evaluation
+- Explain only
 
-STRICT:
-- Max 2–3 sentences per field
-- No repetition
-- No academic wording
-- Practical engineering only
-
-{
-  "compatibility_level": "",
-  "executive_summary": "",
-  "processing_window": "",
-  "thermal_behavior": "",
-  "flow_characteristics": "",
-  "mechanical_behavior": "",
-  "surface_quality": "",
-  "structural_consistency": "",
-  "application_implication": "",
-  "primary_risk_title": "",
-  "primary_risk": "",
-  "secondary_risk_title": "",
-  "secondary_risk": "",
-  "mechanism": "",
-  "stability": "",
-  "stability_note": "",
-  "consistency": "",
-  "consistency_note": "",
-  "visual_description": "",
-  "next_step": ""
-}
-
-RULES:
-
-compatibility_level:
-High / Moderate / Moderate – Requires Process Control / Low
-
-stability / consistency:
-High / Moderate / Low
-
-next_step:
-Max 6 steps.
-
----
+Keep answers short (2–3 sentences each)
 
 Application: ${application}
 Material: ${currentMaterial} to ${bioMaterial}
 Process: ${processing}
 Equipment: ${equipment}
-Scale: ${scale}
 Concern: ${concern}
 `;
 
     const claudeText = await generateClaudeHypothesis(prompt);
-
-    console.log("✅ CLAUDE GENERATED");
-
     const parsed = safeParseJSON(claudeText);
 
     // =========================
     // HTML
     // =========================
-    const templatePath = path.join(process.cwd(), "template.html");
-    const htmlTemplate = fs.readFileSync(templatePath, "utf8");
+    const template = fs.readFileSync("template.html", "utf8");
 
-    const finalHtml = injectHtml(htmlTemplate, {
-      application: application,
+    const finalHtml = injectHtml(template, {
+      application,
       material_transition: currentMaterial + " to " + bioMaterial,
       assessment_type: "Tier 2 – Pre-Commercial Feasibility",
       report_date: new Date().toLocaleDateString(),
 
-      compatibility_level: parsed.compatibility_level || "Moderate",
-      key_risk: parsed.primary_risk || "",
-
+      compatibility_level: compatibility,
       executive_summary: parsed.executive_summary || "",
 
       processing_window: parsed.processing_window || "",
@@ -209,29 +218,22 @@ Concern: ${concern}
 
       mechanism: parsed.mechanism || "",
 
-      stability: parsed.stability || "",
-      stability_note: parsed.stability_note || "",
-
-      consistency: parsed.consistency || "",
-      consistency_note: parsed.consistency_note || "",
+      stability: stability,
+      consistency: consistency,
 
       visual_description: parsed.visual_description || "",
       next_step: parsed.next_step || ""
     });
 
     // =========================
-    // PDF生成
+    // PDF
     // =========================
     const browser = await puppeteer.launch({
-      headless: "new",
-      args: ["--no-sandbox", "--disable-setuid-sandbox"]
+      args: ["--no-sandbox"]
     });
 
     const page = await browser.newPage();
-
-    await page.setContent(finalHtml, {
-      waitUntil: "domcontentloaded"
-    });
+    await page.setContent(finalHtml);
 
     const pdf = await page.pdf({
       format: "A4",
@@ -240,35 +242,27 @@ Concern: ${concern}
 
     await browser.close();
 
-    // =========================
-    // 保存（ここ重要）
-    // =========================
-    const filePath = "/tmp/latest-report.pdf";
-    fs.writeFileSync(filePath, pdf);
+    // 保存
+    fs.writeFileSync("/tmp/latest-report.pdf", pdf);
 
-    console.log("✅ PDF SAVED");
-
-    res.set({
-      "Content-Type": "application/pdf",
-      "Content-Disposition": "inline"
-    });
-
-    return res.send(pdf);
+    res.set({ "Content-Type": "application/pdf" });
+    res.send(pdf);
 
   } catch (err) {
-    console.error("❌ ERROR:", err);
-    return res.status(500).send("PDF failed");
+    console.error(err);
+    res.status(500).send("ERROR");
   }
 });
 
 // =========================
-// PDF確認ルート
+// PDF確認
 // =========================
 app.get("/latest-pdf", (req, res) => {
+
   const file = "/tmp/latest-report.pdf";
 
   if (!fs.existsSync(file)) {
-    return res.status(404).send("No generated PDF yet.");
+    return res.status(404).send("No PDF yet");
   }
 
   res.set({
@@ -280,10 +274,8 @@ app.get("/latest-pdf", (req, res) => {
 });
 
 // =========================
-// 起動
-// =========================
 app.listen(process.env.PORT || 3000, () => {
-  console.log("🚀 Server running");
+  console.log("🚀 RUNNING");
 });
 // HTMLテンプレ（あなたの本番HTML）
 // =========================
