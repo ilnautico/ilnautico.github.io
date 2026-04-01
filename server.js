@@ -35,9 +35,15 @@ async function generateClaudeHypothesis(prompt) {
       });
 
       const data = await response.json();
+
+      if (!data?.content?.[0]?.text) {
+        throw new Error("Claude empty");
+      }
+
       return data.content[0].text;
 
     } catch (err) {
+      console.log("⚠️ Claude retry...");
       if (i === 2) throw err;
     }
   }
@@ -106,7 +112,7 @@ app.post("/tally-pdf", async (req, res) => {
     const concern = getValue(fields, "concern");
 
     // =========================
-    // 🔥 完全制御プロンプト
+    // プロンプト（安定版）
     // =========================
     const prompt = `
 You are a senior polymer processing engineer.
@@ -118,7 +124,6 @@ STRICT:
 - No repetition
 - No academic wording
 - Practical engineering only
-- Short and decisive
 
 {
   "compatibility_level": "",
@@ -146,17 +151,10 @@ STRICT:
 RULES:
 
 compatibility_level:
-Use ONLY:
-- High
-- Moderate
-- Moderate – Requires Process Control
-- Low
+High / Moderate / Moderate – Requires Process Control / Low
 
 stability / consistency:
-Use ONLY:
-- High
-- Moderate
-- Low
+High / Moderate / Low
 
 next_step:
 Max 6 steps.
@@ -171,18 +169,19 @@ Scale: ${scale}
 Concern: ${concern}
 `;
 
-    const claude = await generateClaudeHypothesis(prompt);
+    const claudeText = await generateClaudeHypothesis(prompt);
 
-    console.log("✅ CLAUDE");
+    console.log("✅ CLAUDE GENERATED");
 
-    const parsed = safeParseJSON(claude);
+    const parsed = safeParseJSON(claudeText);
 
     // =========================
     // HTML
     // =========================
-    const template = fs.readFileSync("template.html", "utf8");
+    const templatePath = path.join(process.cwd(), "template.html");
+    const htmlTemplate = fs.readFileSync(templatePath, "utf8");
 
-    const finalHtml = injectHtml(template, {
+    const finalHtml = injectHtml(htmlTemplate, {
       application: application,
       material_transition: currentMaterial + " to " + bioMaterial,
       assessment_type: "Tier 2 – Pre-Commercial Feasibility",
@@ -221,15 +220,18 @@ Concern: ${concern}
     });
 
     // =========================
-    // PDF
+    // PDF生成
     // =========================
     const browser = await puppeteer.launch({
+      headless: "new",
       args: ["--no-sandbox", "--disable-setuid-sandbox"]
     });
 
     const page = await browser.newPage();
 
-    await page.setContent(finalHtml);
+    await page.setContent(finalHtml, {
+      waitUntil: "domcontentloaded"
+    });
 
     const pdf = await page.pdf({
       format: "A4",
@@ -238,20 +240,50 @@ Concern: ${concern}
 
     await browser.close();
 
+    // =========================
+    // 保存（ここ重要）
+    // =========================
+    const filePath = "/tmp/latest-report.pdf";
+    fs.writeFileSync(filePath, pdf);
+
+    console.log("✅ PDF SAVED");
+
     res.set({
-      "Content-Type": "application/pdf"
+      "Content-Type": "application/pdf",
+      "Content-Disposition": "inline"
     });
 
-    res.send(pdf);
+    return res.send(pdf);
 
   } catch (err) {
-    console.error(err);
-    res.status(500).send("ERROR");
+    console.error("❌ ERROR:", err);
+    return res.status(500).send("PDF failed");
   }
 });
 
+// =========================
+// PDF確認ルート
+// =========================
+app.get("/latest-pdf", (req, res) => {
+  const file = "/tmp/latest-report.pdf";
+
+  if (!fs.existsSync(file)) {
+    return res.status(404).send("No generated PDF yet.");
+  }
+
+  res.set({
+    "Content-Type": "application/pdf",
+    "Content-Disposition": "inline"
+  });
+
+  res.sendFile(file);
+});
+
+// =========================
+// 起動
+// =========================
 app.listen(process.env.PORT || 3000, () => {
-  console.log("🚀 RUNNING");
+  console.log("🚀 Server running");
 });
 // HTMLテンプレ（あなたの本番HTML）
 // =========================
