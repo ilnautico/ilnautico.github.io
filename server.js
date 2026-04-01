@@ -10,25 +10,21 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // =========================
-// 判定ロジック（コア）
+// 判定ロジック
 // =========================
 function evaluateScore({ material, process, equipment, concern }) {
 
   let score = 0;
 
-  // 材料ベース
   if (material.includes("PE") || material.includes("PP")) score += 2;
   if (material.includes("PHA")) score -= 1;
 
-  // プロセス
   if (process.includes("film")) score -= 1;
   if (process.includes("blown")) score += 1;
 
-  // 設備
   if (equipment.includes("single")) score -= 1;
   if (equipment.includes("twin")) score += 1;
 
-  // 課題
   if (concern.includes("thermal")) score -= 1;
   if (concern.includes("thickness")) score -= 1;
 
@@ -54,55 +50,30 @@ function evaluateConsistency(score) {
 }
 
 // =========================
-// Claude生成
+// Claude生成（テキスト専用）
 // =========================
-async function generateClaudeHypothesis(prompt) {
-  for (let i = 0; i < 3; i++) {
-    try {
-      const response = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": process.env.ANTHROPIC_API_KEY,
-          "anthropic-version": "2023-06-01"
-        },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-6",
-          max_tokens: 2500,
-          messages: [
-            {
-              role: "user",
-              content: [{ type: "text", text: prompt }]
-            }
-          ]
-        })
-      });
+async function generateClaudeText(prompt) {
+  const response = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": process.env.ANTHROPIC_API_KEY,
+      "anthropic-version": "2023-06-01"
+    },
+    body: JSON.stringify({
+      model: "claude-sonnet-4-6",
+      max_tokens: 1200,
+      messages: [
+        {
+          role: "user",
+          content: [{ type: "text", text: prompt }]
+        }
+      ]
+    })
+  });
 
-      const data = await response.json();
-
-      return data.content[0].text;
-
-    } catch (err) {
-      if (i === 2) throw err;
-    }
-  }
-}
-
-// =========================
-// JSON安全パース
-// =========================
-function safeParseJSON(text) {
-  try {
-    return JSON.parse(text);
-  } catch {
-    try {
-      const start = text.indexOf("{");
-      const end = text.lastIndexOf("}");
-      return JSON.parse(text.substring(start, end + 1));
-    } catch {
-      return {};
-    }
-  }
+  const data = await response.json();
+  return data.content?.[0]?.text || "";
 }
 
 // =========================
@@ -140,6 +111,7 @@ app.post("/tally-pdf", async (req, res) => {
   console.log("🔥 HIT");
 
   try {
+
     const fields = req.body?.data?.fields || [];
 
     const application = getValue(fields, "application");
@@ -151,7 +123,7 @@ app.post("/tally-pdf", async (req, res) => {
     const concern = getValue(fields, "concern");
 
     // =========================
-    // 🔥 判定ロジック
+    // 判定
     // =========================
     const score = evaluateScore({
       material: currentMaterial,
@@ -165,17 +137,10 @@ app.post("/tally-pdf", async (req, res) => {
     const consistency = evaluateConsistency(score);
 
     // =========================
-    // Claude（説明専用）
+    // Claude（説明のみ）
     // =========================
     const prompt = `
-You are a polymer processing expert.
-
-IMPORTANT:
-- DO NOT decide compatibility
-- DO NOT override given evaluation
-- Explain only
-
-Keep answers short (2–3 sentences each)
+Explain the processing risks and feasibility in a clear and practical engineering tone.
 
 Application: ${application}
 Material: ${currentMaterial} to ${bioMaterial}
@@ -184,8 +149,7 @@ Equipment: ${equipment}
 Concern: ${concern}
 `;
 
-    const claudeText = await generateClaudeHypothesis(prompt);
-    const parsed = safeParseJSON(claudeText);
+    const explanation = await generateClaudeText(prompt);
 
     // =========================
     // HTML
@@ -199,30 +163,36 @@ Concern: ${concern}
       report_date: new Date().toLocaleDateString(),
 
       compatibility_level: compatibility,
-      executive_summary: parsed.executive_summary || "",
+      key_risk: "Thermal degradation and thickness instability risk",
 
-      processing_window: parsed.processing_window || "",
-      thermal_behavior: parsed.thermal_behavior || "",
-      flow_characteristics: parsed.flow_characteristics || "",
+      executive_summary: explanation,
 
-      mechanical_behavior: parsed.mechanical_behavior || "",
-      surface_quality: parsed.surface_quality || "",
-      structural_consistency: parsed.structural_consistency || "",
-      application_implication: parsed.application_implication || "",
+      processing_window: "",
+      thermal_behavior: "",
+      flow_characteristics: "",
 
-      primary_risk_title: parsed.primary_risk_title || "",
-      primary_risk: parsed.primary_risk || "",
+      mechanical_behavior: "",
+      surface_quality: "",
+      structural_consistency: "",
+      application_implication: "",
 
-      secondary_risk_title: parsed.secondary_risk_title || "",
-      secondary_risk: parsed.secondary_risk || "",
+      primary_risk_title: "Thermal degradation",
+      primary_risk: "PHA is sensitive to temperature and degrades rapidly above processing limits.",
 
-      mechanism: parsed.mechanism || "",
+      secondary_risk_title: "Thickness inconsistency",
+      secondary_risk: "Low melt strength leads to unstable bubble and uneven film thickness.",
 
-      stability: stability,
-      consistency: consistency,
+      mechanism: "PHA undergoes thermal chain scission under excessive heat.",
 
-      visual_description: parsed.visual_description || "",
-      next_step: parsed.next_step || ""
+      stability,
+      stability_note: "Requires tight temperature control",
+
+      consistency,
+      consistency_note: "Sensitive to process fluctuation",
+
+      visual_description: "Semi-transparent film with slight haze under stable processing.",
+
+      next_step: "Conduct controlled pilot trials and optimize temperature profile."
     });
 
     // =========================
@@ -245,11 +215,13 @@ Concern: ${concern}
     // 保存
     fs.writeFileSync("/tmp/latest-report.pdf", pdf);
 
+    console.log("✅ PDF SAVED");
+
     res.set({ "Content-Type": "application/pdf" });
     res.send(pdf);
 
   } catch (err) {
-    console.error(err);
+    console.error("❌ ERROR:", err);
     res.status(500).send("ERROR");
   }
 });
@@ -273,7 +245,6 @@ app.get("/latest-pdf", (req, res) => {
   res.sendFile(file);
 });
 
-// =========================
 app.listen(process.env.PORT || 3000, () => {
   console.log("🚀 RUNNING");
 });
