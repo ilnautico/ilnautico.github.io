@@ -7,13 +7,13 @@ import fetch from "node-fetch";
 const app = express();
 
 // =========================
-// request parsing
+// 受信設定
 // =========================
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // =========================
-// Claude call with retry
+// Claude生成（安定版）
 // =========================
 async function generateClaudeHypothesis(prompt) {
   for (let i = 0; i < 3; i++) {
@@ -27,7 +27,7 @@ async function generateClaudeHypothesis(prompt) {
         },
         body: JSON.stringify({
           model: "claude-sonnet-4-6",
-          max_tokens: 2000,
+          max_tokens: 5000, // ←🔥重要（長文化復活）
           messages: [
             {
               role: "user",
@@ -42,39 +42,29 @@ async function generateClaudeHypothesis(prompt) {
 
         if (text.includes("overloaded")) {
           console.log("⚠️ Claude overloaded, retrying...");
-          await new Promise((r) => setTimeout(r, 1500));
+          await new Promise(r => setTimeout(r, 1500));
           continue;
         }
 
-        console.error("❌ CLAUDE API ERROR:", text);
-        await new Promise((r) => setTimeout(r, 1000));
-        continue;
+        throw new Error("Claude API failed");
       }
 
       const data = await response.json();
-      const text = data?.content?.[0]?.text || "";
 
-      if (!text) {
-        console.error("❌ Claude returned empty response");
-        await new Promise((r) => setTimeout(r, 1000));
-        continue;
+      if (!data.content || !data.content[0]?.text) {
+        throw new Error("Claude returned empty response");
       }
 
-      return text;
+      return data.content[0].text;
+
     } catch (err) {
-      console.error("❌ Claude ERROR:", err);
-      if (i < 2) {
-        await new Promise((r) => setTimeout(r, 1000));
-      }
+      if (i === 2) throw err;
     }
   }
-
-  console.error("❌ Claude failed after retries. Using fallback JSON.");
-  return "{}";
 }
 
 // =========================
-// template injection
+// HTML差し込み
 // =========================
 function injectHtml(template, data) {
   let html = template;
@@ -88,7 +78,7 @@ function injectHtml(template, data) {
 }
 
 // =========================
-// field value lookup
+// 値取得
 // =========================
 function getValue(fields, keyword) {
   for (const f of fields) {
@@ -101,51 +91,14 @@ function getValue(fields, keyword) {
       return f.value || "";
     }
   }
-
   return "";
 }
 
 // =========================
-// safe string helper
-// =========================
-function safe(val, fallback = "") {
-  return val && String(val).trim() !== "" ? String(val) : fallback;
-}
-
-// =========================
-// robust Claude JSON parsing
-// =========================
-function parseClaudeJson(rawText) {
-  try {
-    if (!rawText || rawText === "undefined") {
-      return {};
-    }
-
-    const cleaned = String(rawText)
-      .replace(/```json/gi, "")
-      .replace(/```/g, "")
-      .trim();
-
-    const start = cleaned.indexOf("{");
-    const end = cleaned.lastIndexOf("}");
-
-    if (start === -1 || end === -1 || end <= start) {
-      console.error("❌ JSON PARSE ERROR:", rawText);
-      return {};
-    }
-
-    const jsonText = cleaned.slice(start, end + 1);
-    return JSON.parse(jsonText);
-  } catch (e) {
-    console.error("❌ JSON PARSE ERROR:", rawText);
-    return {};
-  }
-}
-
-// =========================
-// main PDF route
+// PDF生成
 // =========================
 app.post("/tally-pdf", async (req, res) => {
+
   console.log("🔥 HIT");
 
   try {
@@ -158,29 +111,32 @@ app.post("/tally-pdf", async (req, res) => {
     const equipment = getValue(fields, "equipment");
     const scale = getValue(fields, "production scale");
     const concern = getValue(fields, "concern");
-const prompt = `
+
+    // =========================
+    // 🔥 完全プロンプト（長文復活版）
+    // =========================
+    const prompt = `
 You are a senior polymer processing engineer.
 
-You are generating a structured technical assessment report.
+You are generating a PROFESSIONAL TECHNICAL CONSULTING REPORT.
 
 CRITICAL OUTPUT RULES:
 - Output MUST be valid JSON only
-- Do NOT include markdown (no \`\`\`)
-- Do NOT include explanations outside JSON
+- Do NOT include markdown
 - Do NOT truncate output
-- Do NOT leave fields incomplete
-- Every field must be filled with full sentences
-- Use double quotes ONLY for JSON
-- Escape any quotes inside text
-- NEVER break JSON structure
+- Every field MUST be fully developed
+- Each field must contain detailed technical explanation
+- Each field must be at least 5–10 sentences
+- Explain WHY, HOW, and IMPACT
+- Include mechanism, cause, and engineering implications
+- Maintain consulting-level depth
 
-FORMAT RULE (VERY IMPORTANT):
-- Each value must be a COMPLETE paragraph
-- Each value must be a SINGLE string (no line breaks breaking JSON)
-- Use \\n only if needed inside string
-- No trailing commas
+VERY IMPORTANT:
+- This is NOT a summary
+- This is a TECHNICAL REPORT
+- Write like a professional consultant delivering analysis to a client
 
-RETURN EXACTLY THIS JSON STRUCTURE:
+RETURN EXACTLY THIS JSON:
 
 {
   "compatibility_level": "",
@@ -205,14 +161,6 @@ RETURN EXACTLY THIS JSON STRUCTURE:
   "next_step": ""
 }
 
-CONTENT REQUIREMENTS:
-- Write in professional engineering language
-- Each field must contain 4–6 sentences
-- Explain mechanisms, not just conclusions
-- Maintain consistent technical depth across all fields
-- Avoid repetition across fields
-
-INPUT DATA:
 Application: ${application}
 Current Material: ${currentMaterial}
 Target Material: ${bioMaterial}
@@ -221,81 +169,83 @@ Equipment: ${equipment}
 Production Scale: ${scale}
 Technical Concern: ${concern}
 `;
+
     const claudeReport = await generateClaudeHypothesis(prompt);
+
     console.log("✅ CLAUDE GENERATED");
 
-   let parsed = parseClaudeJson(claudeReport);
+    // =========================
+    // JSON完全安定処理
+    // =========================
+    let parsed = {};
 
-// 👇 fallback（これが最重要）
-if (!parsed.executive_summary) {
-  console.log("⚠️ Claude fallback used");
+    try {
+      const clean = String(claudeReport)
+        .replace(/```json/g, "")
+        .replace(/```/g, "")
+        .trim();
 
-  parsed = {
-    compatibility_level: "Moderate",
-    executive_summary: "Material transition requires controlled processing due to thermal sensitivity.",
-    processing_window: "Narrower than conventional polymers.",
-    thermal_behavior: "Sensitive to temperature variation.",
-    flow_characteristics: "Lower melt strength.",
-    mechanical_behavior: "More rigid compared to LDPE.",
-    surface_quality: "May vary depending on stability.",
-    structural_consistency: "Requires controlled processing.",
-    application_implication: "Not direct drop-in replacement.",
-    primary_risk_title: "Thermal degradation",
-    primary_risk: "Material may degrade under high temperature.",
-    secondary_risk_title: "Thickness inconsistency",
-    secondary_risk: "Process instability may cause uneven film.",
-    mechanism: "Sensitivity to heat and shear.",
-    stability: "Moderate",
-    stability_note: "Requires process control.",
-    consistency: "Moderate",
-    consistency_note: "Needs optimization.",
-    visual_description: "Semi-transparent film with slight opacity.",
-    next_step: "Proceed with controlled pilot testing."
-  };
-}
+      parsed = JSON.parse(clean);
 
-    // read external template.html only
+      if (!parsed.executive_summary) {
+        throw new Error("Incomplete JSON");
+      }
+
+    } catch (e) {
+      console.error("❌ JSON PARSE ERROR:", claudeReport);
+      throw new Error("Retry needed");
+    }
+
+    // =========================
+    // HTML読み込み
+    // =========================
     const templatePath = path.join(process.cwd(), "template.html");
     const htmlTemplate = fs.readFileSync(templatePath, "utf8");
 
+    // =========================
+    // HTML生成
+    // =========================
     const finalHtml = injectHtml(htmlTemplate, {
-      application: safe(application),
-      material_transition: safe(`${currentMaterial} → ${bioMaterial}`),
+      application,
+      material_transition: `${currentMaterial} → ${bioMaterial}`,
       assessment_type: "Tier 2 – Pre-Commercial Feasibility",
       report_date: new Date().toLocaleDateString(),
 
-      compatibility_level: safe(parsed.compatibility_level, "Moderate"),
-      key_risk: safe(parsed.primary_risk),
+      compatibility_level: parsed.compatibility_level,
+      key_risk: parsed.primary_risk,
 
-      executive_summary: safe(parsed.executive_summary),
+      executive_summary: parsed.executive_summary,
 
-      processing_window: safe(parsed.processing_window),
-      thermal_behavior: safe(parsed.thermal_behavior),
-      flow_characteristics: safe(parsed.flow_characteristics),
+      processing_window: parsed.processing_window,
+      thermal_behavior: parsed.thermal_behavior,
+      flow_characteristics: parsed.flow_characteristics,
 
-      mechanical_behavior: safe(parsed.mechanical_behavior),
-      surface_quality: safe(parsed.surface_quality),
-      structural_consistency: safe(parsed.structural_consistency),
-      application_implication: safe(parsed.application_implication),
+      mechanical_behavior: parsed.mechanical_behavior,
+      surface_quality: parsed.surface_quality,
+      structural_consistency: parsed.structural_consistency,
+      application_implication: parsed.application_implication,
 
-      primary_risk_title: safe(parsed.primary_risk_title),
-      primary_risk: safe(parsed.primary_risk),
+      primary_risk_title: parsed.primary_risk_title,
+      primary_risk: parsed.primary_risk,
 
-      secondary_risk_title: safe(parsed.secondary_risk_title),
-      secondary_risk: safe(parsed.secondary_risk),
+      secondary_risk_title: parsed.secondary_risk_title,
+      secondary_risk: parsed.secondary_risk,
 
-      mechanism: safe(parsed.mechanism),
+      mechanism: parsed.mechanism,
 
-      stability: safe(parsed.stability),
-      stability_note: safe(parsed.stability_note),
+      stability: parsed.stability,
+      stability_note: parsed.stability_note,
 
-      consistency: safe(parsed.consistency),
-      consistency_note: safe(parsed.consistency_note),
+      consistency: parsed.consistency,
+      consistency_note: parsed.consistency_note,
 
-      visual_description: safe(parsed.visual_description),
-      next_step: safe(parsed.next_step)
+      visual_description: parsed.visual_description,
+      next_step: parsed.next_step
     });
 
+    // =========================
+    // PDF生成
+    // =========================
     const browser = await puppeteer.launch({
       args: [
         "--no-sandbox",
@@ -329,6 +279,7 @@ if (!parsed.executive_summary) {
     });
 
     return res.send(pdf);
+
   } catch (err) {
     console.error("❌ ERROR:", err);
     return res.status(500).send("PDF failed");
@@ -336,7 +287,7 @@ if (!parsed.executive_summary) {
 });
 
 // =========================
-// latest PDF route
+// 確認URL
 // =========================
 app.get("/latest-pdf", (req, res) => {
   const latestPdfPath = path.join("/tmp", "latest-report.pdf");
@@ -354,11 +305,11 @@ app.get("/latest-pdf", (req, res) => {
 });
 
 // =========================
-// start server
+// 起動
 // =========================
 app.listen(process.env.PORT || 3000, () => {
   console.log("🚀 Server running");
-});
+});;
 
 // HTMLテンプレ（あなたの本番HTML）
 // =========================
