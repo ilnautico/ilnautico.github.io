@@ -95,6 +95,25 @@ function injectHtml(template, data) {
 }
 
 // =========================
+// 🌍 地域検知（強化版）
+// =========================
+function detectRegionalFactor(text) {
+  const t = (text || "").toLowerCase();
+
+  if (
+    t.includes("middle east") ||
+    t.includes("uae") ||
+    t.includes("saudi") ||
+    t.includes("dubai") ||
+    t.includes("gcc")
+  ) {
+    return "MIDDLE_EAST";
+  }
+
+  return null;
+}
+
+// =========================
 // MAIN
 // =========================
 app.post("/tally-pdf", async (req, res) => {
@@ -122,21 +141,24 @@ app.post("/tally-pdf", async (req, res) => {
     );
 
     // =========================
-    // 地域要素（NEW）
+    // 🌍 地域判定
     // =========================
+    const region = detectRegionalFactor(notes);
+
     let regionalNote = "";
 
-    if ((notes || "").toLowerCase().includes("middle east")) {
+    if (region === "MIDDLE_EAST") {
       regionalNote = `
-      <br><br>
-      <strong>Additional Consideration:</strong><br>
-      High ambient temperature environments may reduce cooling efficiency and increase melt temperature drift. 
-      Ensure sufficient cooling capacity and real-time melt monitoring during pilot trials.
-      `;
+      
+Additional Consideration (Environmental Condition):
+High ambient temperature conditions typical of Middle East regions may reduce cooling efficiency and increase melt temperature drift. 
+This can amplify thermal degradation risk and film instability during pilot-scale extrusion.
+Pilot trials should incorporate real-time melt temperature monitoring and enhanced cooling control capacity.
+`;
     }
 
     // =========================
-    // Claude（説明のみ）
+    // Claude（説明専用）
     // =========================
     const prompt = `
 Return ONLY JSON.
@@ -180,7 +202,17 @@ Concern: ${concern}
     const parsed = safeParseJSON(claudeText);
 
     // =========================
-    // HTML読み込み
+    // Next Step統合（ここが最重要）
+    // =========================
+    const finalNextStep = `
+${parsed.next_step || ""}
+
+Further engineering validation under controlled pilot conditions is strongly recommended prior to commercial deployment.
+${regionalNote}
+`;
+
+    // =========================
+    // HTML
     // =========================
     const template = fs.readFileSync("template.html", "utf8");
 
@@ -221,8 +253,8 @@ Concern: ${concern}
 
       visual_description: parsed.visual_description,
 
-      // 👇ここが追加ポイント
-      next_step: (parsed.next_step || "") + regionalNote
+      // 👇ここが完成形
+      next_step: finalNextStep
     });
 
     // =========================
