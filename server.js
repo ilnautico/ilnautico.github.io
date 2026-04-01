@@ -260,7 +260,7 @@ Material: {{current_material}} → {{bio_material}}
 Process: {{processing}}
 Equipment: {{equipment}}
 Scale: {{scale}}
-Concern: {{concern}}
+Concern: {{concern}}`;
 
     const claudeReport = await generateClaudeHypothesis(prompt);
 
