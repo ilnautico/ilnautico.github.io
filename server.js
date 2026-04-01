@@ -1,7 +1,6 @@
 import express from "express";
 import puppeteer from "puppeteer";
 import fs from "fs";
-import path from "path";
 import fetch from "node-fetch";
 
 const app = express();
@@ -24,10 +23,7 @@ async function generateClaudeHypothesis(prompt) {
       model: "claude-sonnet-4-6",
       max_tokens: 1800,
       messages: [
-        {
-          role: "user",
-          content: [{ type: "text", text: prompt }]
-        }
+        { role: "user", content: [{ type: "text", text: prompt }] }
       ]
     })
   });
@@ -54,24 +50,20 @@ function safeParseJSON(text) {
 }
 
 // =========================
-// 判定ロジック（ここがコア）
+// 判定ロジック（触るな）
 // =========================
 function evaluateCompatibility(material, process) {
-
   const m = material.toLowerCase();
   const p = process.toLowerCase();
 
-  // PHA blown film（今回の主ケース）
   if (m.includes("pha") && p.includes("blown")) {
     return "Moderate – Requires Process Control";
   }
 
-  // PLA系
   if (m.includes("pla")) {
     return "Low";
   }
 
-  // デフォルト
   return "Moderate";
 }
 
@@ -112,16 +104,17 @@ app.post("/tally-pdf", async (req, res) => {
   try {
     const fields = req.body?.data?.fields || [];
 
-    const application = getValue(fields, "application") || "Unknown";
-    const currentMaterial = getValue(fields, "current material") || "Unknown";
-    const bioMaterial = getValue(fields, "target material") || "Unknown";
-    const processing = getValue(fields, "processing") || "Unknown";
-    const equipment = getValue(fields, "equipment") || "Unknown";
-    const scale = getValue(fields, "production scale") || "Unknown";
-    const concern = getValue(fields, "concern") || "Unknown";
+    const application = getValue(fields, "application");
+    const currentMaterial = getValue(fields, "material");
+    const bioMaterial = getValue(fields, "target");
+    const processing = getValue(fields, "processing");
+    const equipment = getValue(fields, "equipment");
+    const scale = getValue(fields, "production");
+    const concern = getValue(fields, "concern");
+    const notes = getValue(fields, "notes");
 
     // =========================
-    // 判定（AIに任せない）
+    // 判定（固定）
     // =========================
     const compatibility = evaluateCompatibility(
       `${currentMaterial} ${bioMaterial}`,
@@ -129,16 +122,29 @@ app.post("/tally-pdf", async (req, res) => {
     );
 
     // =========================
-    // Claudeプロンプト（説明専用）
+    // 地域要素（NEW）
+    // =========================
+    let regionalNote = "";
+
+    if ((notes || "").toLowerCase().includes("middle east")) {
+      regionalNote = `
+      <br><br>
+      <strong>Additional Consideration:</strong><br>
+      High ambient temperature environments may reduce cooling efficiency and increase melt temperature drift. 
+      Ensure sufficient cooling capacity and real-time melt monitoring during pilot trials.
+      `;
+    }
+
+    // =========================
+    // Claude（説明のみ）
     // =========================
     const prompt = `
 Return ONLY JSON.
 
 STRICT:
-- Max 2–3 sentences per field
-- Practical engineering language
-- No long paragraphs
-- Do NOT generate compatibility level
+- Max 2–3 sentences
+- Technical language
+- No compatibility judgement
 
 {
   "executive_summary": "",
@@ -170,14 +176,11 @@ Scale: ${scale}
 Concern: ${concern}
 `;
 
-    const claudeReport = await generateClaudeHypothesis(prompt);
-
-    console.log("✅ CLAUDE GENERATED");
-
-    const parsed = safeParseJSON(claudeReport);
+    const claudeText = await generateClaudeHypothesis(prompt);
+    const parsed = safeParseJSON(claudeText);
 
     // =========================
-    // HTML
+    // HTML読み込み
     // =========================
     const template = fs.readFileSync("template.html", "utf8");
 
@@ -188,36 +191,38 @@ Concern: ${concern}
       assessment_type: "Tier 2 – Pre-Commercial Feasibility",
       report_date: new Date().toLocaleDateString(),
 
-      compatibility_level: compatibility, // ←ここ重要
+      compatibility_level: compatibility,
 
-      executive_summary: parsed.executive_summary || "",
-      key_risk: parsed.primary_risk || "",
+      executive_summary: parsed.executive_summary,
+      key_risk: parsed.primary_risk,
 
-      processing_window: parsed.processing_window || "",
-      thermal_behavior: parsed.thermal_behavior || "",
-      flow_characteristics: parsed.flow_characteristics || "",
+      processing_window: parsed.processing_window,
+      thermal_behavior: parsed.thermal_behavior,
+      flow_characteristics: parsed.flow_characteristics,
 
-      mechanical_behavior: parsed.mechanical_behavior || "",
-      surface_quality: parsed.surface_quality || "",
-      structural_consistency: parsed.structural_consistency || "",
-      application_implication: parsed.application_implication || "",
+      mechanical_behavior: parsed.mechanical_behavior,
+      surface_quality: parsed.surface_quality,
+      structural_consistency: parsed.structural_consistency,
+      application_implication: parsed.application_implication,
 
-      primary_risk_title: parsed.primary_risk_title || "",
-      primary_risk: parsed.primary_risk || "",
+      primary_risk_title: parsed.primary_risk_title,
+      primary_risk: parsed.primary_risk,
 
-      secondary_risk_title: parsed.secondary_risk_title || "",
-      secondary_risk: parsed.secondary_risk || "",
+      secondary_risk_title: parsed.secondary_risk_title,
+      secondary_risk: parsed.secondary_risk,
 
-      mechanism: parsed.mechanism || "",
+      mechanism: parsed.mechanism,
 
-      stability: parsed.stability || "",
-      stability_note: parsed.stability_note || "",
+      stability: parsed.stability,
+      stability_note: parsed.stability_note,
 
-      consistency: parsed.consistency || "",
-      consistency_note: parsed.consistency_note || "",
+      consistency: parsed.consistency,
+      consistency_note: parsed.consistency_note,
 
-      visual_description: parsed.visual_description || "",
-      next_step: parsed.next_step || ""
+      visual_description: parsed.visual_description,
+
+      // 👇ここが追加ポイント
+      next_step: (parsed.next_step || "") + regionalNote
     });
 
     // =========================
@@ -228,7 +233,8 @@ Concern: ${concern}
     });
 
     const page = await browser.newPage();
-    await page.setContent(html);
+
+    await page.setContent(html, { waitUntil: "networkidle0" });
 
     const pdf = await page.pdf({
       format: "A4",
@@ -239,12 +245,7 @@ Concern: ${concern}
 
     fs.writeFileSync("/tmp/latest-report.pdf", pdf);
 
-    console.log("✅ PDF SAVED");
-
-    res.set({
-      "Content-Type": "application/pdf"
-    });
-
+    res.set({ "Content-Type": "application/pdf" });
     res.send(pdf);
 
   } catch (err) {
@@ -257,7 +258,6 @@ Concern: ${concern}
 // PDF取得
 // =========================
 app.get("/latest-pdf", (req, res) => {
-
   const file = "/tmp/latest-report.pdf";
 
   if (!fs.existsSync(file)) {
