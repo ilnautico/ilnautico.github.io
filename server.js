@@ -159,8 +159,18 @@ app.post("/tally-pdf", async (req, res) => {
     const scale = getValue(fields, "production scale");
     const concern = getValue(fields, "concern");
 
-    const prompt = `
-You are a professional materials engineer specializing in polymer processing and biodegradable materials.
+  const prompt = `
+You are a senior polymer processing engineer.
+
+You are preparing a professional technical assessment report for industrial clients.
+
+STRICT REQUIREMENTS:
+- Write in full professional engineering language
+- DO NOT summarize
+- DO NOT shorten
+- Each section must contain detailed explanation (minimum 4–6 sentences)
+- Explain mechanisms, not just results
+- Write as if this will be delivered to a client
 
 Return ONLY valid JSON.
 
@@ -195,7 +205,6 @@ Equipment: ${equipment}
 Production Scale: ${scale}
 Technical Concern: ${concern}
 `;
-
     const claudeReport = await generateClaudeHypothesis(prompt);
     console.log("✅ CLAUDE GENERATED");
 
