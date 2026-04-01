@@ -260,22 +260,42 @@ ${regionalNote}
     // =========================
     // PDF生成
     // =========================
-    const browser = await puppeteer.launch({
-      args: ["--no-sandbox", "--disable-setuid-sandbox"]
-    });
+    // =========================
+// PDF生成（完全安定版）
+// =========================
+const browser = await puppeteer.launch({
+  args: [
+    "--no-sandbox",
+    "--disable-setuid-sandbox",
+    "--disable-dev-shm-usage",
+    "--disable-gpu"
+  ]
+});
 
-    const page = await browser.newPage();
+const page = await browser.newPage();
 
-    await page.setContent(html, { waitUntil: "networkidle0" });
+// ❗ timeout完全無効
+await page.setDefaultNavigationTimeout(0);
+await page.setDefaultTimeout(0);
 
-    const pdf = await page.pdf({
-      format: "A4",
-      printBackground: true
-    });
+// ❗ 軽い待機でHTMLだけ読み込む
+await page.setContent(html, {
+  waitUntil: "domcontentloaded"
+});
 
-    await browser.close();
+// ❗ レンダリング安定待ち（超重要）
+await new Promise(resolve => setTimeout(resolve, 800));
 
-    fs.writeFileSync("/tmp/latest-report.pdf", pdf);
+const pdf = await page.pdf({
+  format: "A4",
+  printBackground: true
+});
+
+await browser.close();
+
+fs.writeFileSync("/tmp/latest-report.pdf", pdf);
+
+console.log("✅ PDF SAVED");
 
     res.set({ "Content-Type": "application/pdf" });
     res.send(pdf);
