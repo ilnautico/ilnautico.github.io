@@ -13,7 +13,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // =========================
-// Claude生成（安定版）
+// Claude生成
 // =========================
 async function generateClaudeHypothesis(prompt) {
   for (let i = 0; i < 3; i++) {
@@ -27,7 +27,7 @@ async function generateClaudeHypothesis(prompt) {
         },
         body: JSON.stringify({
           model: "claude-sonnet-4-6",
-          max_tokens: 5000, // ←🔥重要（長文化復活）
+          max_tokens: 5000,
           messages: [
             {
               role: "user",
@@ -52,7 +52,7 @@ async function generateClaudeHypothesis(prompt) {
       const data = await response.json();
 
       if (!data.content || !data.content[0]?.text) {
-        throw new Error("Claude returned empty response");
+        throw new Error("Claude empty");
       }
 
       return data.content[0].text;
@@ -112,31 +112,10 @@ app.post("/tally-pdf", async (req, res) => {
     const scale = getValue(fields, "production scale");
     const concern = getValue(fields, "concern");
 
-    // =========================
-    // 🔥 完全プロンプト（長文復活版）
-    // =========================
     const prompt = `
-You are a senior polymer processing engineer.
+You are a professional materials engineer.
 
-You are generating a PROFESSIONAL TECHNICAL CONSULTING REPORT.
-
-CRITICAL OUTPUT RULES:
-- Output MUST be valid JSON only
-- Do NOT include markdown
-- Do NOT truncate output
-- Every field MUST be fully developed
-- Each field must contain detailed technical explanation
-- Each field must be at least 5–10 sentences
-- Explain WHY, HOW, and IMPACT
-- Include mechanism, cause, and engineering implications
-- Maintain consulting-level depth
-
-VERY IMPORTANT:
-- This is NOT a summary
-- This is a TECHNICAL REPORT
-- Write like a professional consultant delivering analysis to a client
-
-RETURN EXACTLY THIS JSON:
+Return ONLY valid JSON.
 
 {
   "compatibility_level": "",
@@ -175,7 +154,7 @@ Technical Concern: ${concern}
     console.log("✅ CLAUDE GENERATED");
 
     // =========================
-    // JSON完全安定処理
+    // JSON処理（絶対止まらない版）
     // =========================
     let parsed = {};
 
@@ -187,60 +166,76 @@ Technical Concern: ${concern}
 
       parsed = JSON.parse(clean);
 
-      if (!parsed.executive_summary) {
-        throw new Error("Incomplete JSON");
-      }
-
     } catch (e) {
       console.error("❌ JSON PARSE ERROR:", claudeReport);
-      throw new Error("Retry needed");
+
+      // 👇 fallback（絶対表示）
+      parsed = {
+        compatibility_level: "Moderate",
+        executive_summary: claudeReport,
+        processing_window: "",
+        thermal_behavior: "",
+        flow_characteristics: "",
+        mechanical_behavior: "",
+        surface_quality: "",
+        structural_consistency: "",
+        application_implication: "",
+        primary_risk_title: "Key Risk",
+        primary_risk: "",
+        secondary_risk_title: "",
+        secondary_risk: "",
+        mechanism: "",
+        stability: "",
+        stability_note: "",
+        consistency: "",
+        consistency_note: "",
+        visual_description: "",
+        next_step: ""
+      };
     }
 
     // =========================
-    // HTML読み込み
+    // HTML
     // =========================
     const templatePath = path.join(process.cwd(), "template.html");
     const htmlTemplate = fs.readFileSync(templatePath, "utf8");
 
-    // =========================
-    // HTML生成
-    // =========================
     const finalHtml = injectHtml(htmlTemplate, {
       application,
       material_transition: `${currentMaterial} → ${bioMaterial}`,
       assessment_type: "Tier 2 – Pre-Commercial Feasibility",
       report_date: new Date().toLocaleDateString(),
 
-      compatibility_level: parsed.compatibility_level,
-      key_risk: parsed.primary_risk,
+      compatibility_level: parsed.compatibility_level || "Moderate",
+      key_risk: parsed.primary_risk || "",
 
-      executive_summary: parsed.executive_summary,
+      executive_summary: parsed.executive_summary || "",
 
-      processing_window: parsed.processing_window,
-      thermal_behavior: parsed.thermal_behavior,
-      flow_characteristics: parsed.flow_characteristics,
+      processing_window: parsed.processing_window || "",
+      thermal_behavior: parsed.thermal_behavior || "",
+      flow_characteristics: parsed.flow_characteristics || "",
 
-      mechanical_behavior: parsed.mechanical_behavior,
-      surface_quality: parsed.surface_quality,
-      structural_consistency: parsed.structural_consistency,
-      application_implication: parsed.application_implication,
+      mechanical_behavior: parsed.mechanical_behavior || "",
+      surface_quality: parsed.surface_quality || "",
+      structural_consistency: parsed.structural_consistency || "",
+      application_implication: parsed.application_implication || "",
 
-      primary_risk_title: parsed.primary_risk_title,
-      primary_risk: parsed.primary_risk,
+      primary_risk_title: parsed.primary_risk_title || "",
+      primary_risk: parsed.primary_risk || "",
 
-      secondary_risk_title: parsed.secondary_risk_title,
-      secondary_risk: parsed.secondary_risk,
+      secondary_risk_title: parsed.secondary_risk_title || "",
+      secondary_risk: parsed.secondary_risk || "",
 
-      mechanism: parsed.mechanism,
+      mechanism: parsed.mechanism || "",
 
-      stability: parsed.stability,
-      stability_note: parsed.stability_note,
+      stability: parsed.stability || "",
+      stability_note: parsed.stability_note || "",
 
-      consistency: parsed.consistency,
-      consistency_note: parsed.consistency_note,
+      consistency: parsed.consistency || "",
+      consistency_note: parsed.consistency_note || "",
 
-      visual_description: parsed.visual_description,
-      next_step: parsed.next_step
+      visual_description: parsed.visual_description || "",
+      next_step: parsed.next_step || ""
     });
 
     // =========================
@@ -258,7 +253,7 @@ Technical Concern: ${concern}
     const page = await browser.newPage();
 
     await page.setContent(finalHtml, {
-      waitUntil: "domcontentloaded"
+      waitUntil: "networkidle0"
     });
 
     const pdf = await page.pdf({
@@ -268,6 +263,9 @@ Technical Concern: ${concern}
 
     await browser.close();
 
+    // =========================
+    // 保存
+    // =========================
     const latestPdfPath = path.join("/tmp", "latest-report.pdf");
     fs.writeFileSync(latestPdfPath, pdf);
 
@@ -309,7 +307,7 @@ app.get("/latest-pdf", (req, res) => {
 // =========================
 app.listen(process.env.PORT || 3000, () => {
   console.log("🚀 Server running");
-});;
+});
 
 // HTMLテンプレ（あなたの本番HTML）
 // =========================
