@@ -6,9 +6,6 @@ import fetch from "node-fetch";
 
 const app = express();
 
-// =========================
-// 受信設定
-// =========================
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -41,24 +38,37 @@ async function generateClaudeHypothesis(prompt) {
         const text = await response.text();
 
         if (text.includes("overloaded")) {
-          console.log("⚠️ Claude overloaded, retrying...");
+          console.log("⚠️ Claude overloaded, retry...");
           await new Promise(r => setTimeout(r, 1500));
           continue;
         }
 
-        throw new Error("Claude API failed");
+        throw new Error("Claude API error");
       }
 
       const data = await response.json();
 
-      if (!data.content || !data.content[0]?.text) {
-        throw new Error("Claude empty");
-      }
-
-      return data.content[0].text;
+      return data.content?.[0]?.text || "";
 
     } catch (err) {
       if (i === 2) throw err;
+    }
+  }
+}
+
+// =========================
+// JSON修復
+// =========================
+function safeParseJSON(text) {
+  try {
+    return JSON.parse(text);
+  } catch {
+    try {
+      const start = text.indexOf("{");
+      const end = text.lastIndexOf("}");
+      return JSON.parse(text.substring(start, end + 1));
+    } catch {
+      return {};
     }
   }
 }
@@ -78,42 +88,25 @@ function injectHtml(template, data) {
 }
 
 // =========================
-// 値取得
+// 入力取得（強化版）
 // =========================
-function getValue(fields, keyword) {
+function getValueFlexible(fields, keywords) {
   for (const f of fields) {
-    const label = (f.label || "").toLowerCase().replace("*", "").trim();
+    const label = (f.label || "").toLowerCase();
 
-    if (label.includes(keyword.toLowerCase())) {
-      if (Array.isArray(f.value)) {
-        return f.value.join(", ");
+    for (const keyword of keywords) {
+      if (label.includes(keyword)) {
+        return Array.isArray(f.value)
+          ? f.value.join(", ")
+          : f.value || "";
       }
-      return f.value || "";
     }
   }
   return "";
 }
 
 // =========================
-// JSON修復（最強）
-// =========================
-function safeParseJSON(text) {
-  try {
-    return JSON.parse(text);
-  } catch {
-    try {
-      const start = text.indexOf("{");
-      const end = text.lastIndexOf("}");
-      if (start !== -1 && end !== -1) {
-        return JSON.parse(text.substring(start, end + 1));
-      }
-    } catch {}
-  }
-  return {};
-}
-
-// =========================
-// PDF生成
+// メイン
 // =========================
 app.post("/tally-pdf", async (req, res) => {
 
@@ -122,54 +115,39 @@ app.post("/tally-pdf", async (req, res) => {
   try {
     const fields = req.body?.data?.fields || [];
 
-    const application = getValue(fields, "application");
-    const currentMaterial = getValue(fields, "current material");
-    const bioMaterial = getValue(fields, "target material");
-    const processing = getValue(fields, "processing");
-    const equipment = getValue(fields, "equipment");
-    const scale = getValue(fields, "production scale");
-    const concern = getValue(fields, "concern");
+    console.log("📦 INPUT:", fields);
+
+    const application = getValueFlexible(fields, ["application"]);
+    const currentMaterial = getValueFlexible(fields, ["material"]);
+    const bioMaterial = getValueFlexible(fields, ["target", "bio"]);
+    const processing = getValueFlexible(fields, ["processing"]);
+    const equipment = getValueFlexible(fields, ["equipment"]);
+    const scale = getValueFlexible(fields, ["scale"]);
+    const concern = getValueFlexible(fields, ["concern"]);
 
     // =========================
-    // Claudeプロンプト（完全安定）
+    // 入力チェック
+    // =========================
+    if (!application || !currentMaterial || !bioMaterial) {
+      console.log("⚠️ Missing input → skip Claude");
+
+      return res.status(400).send("Missing required inputs");
+    }
+
+    // =========================
+    // プロンプト（完全版）
     // =========================
     const prompt = `
 You are a professional polymer processing engineer.
 
 Return ONLY valid JSON.
-No explanation.
-No markdown.
-No backticks.
 
-STRICT OUTPUT RULES:
-- Always return valid JSON
-- No extra text before or after JSON
-- No formatting symbols
-- No line breaks outside JSON
-- All values must be plain text
-
-LENGTH CONTROL (CRITICAL):
-- Each field MUST be under 300 characters
-- Maximum 3 sentences per field
-- Prefer 2 sentences
-- No long paragraphs
-
-STYLE RULE (MANDATORY):
-- Sentence 1: conclusion
-- Sentence 2: reason
-- Sentence 3 (optional): implication
-- Use clear, practical engineering language
-- Avoid academic tone
-
-FORBIDDEN:
+STRICT RULES:
+- Each field under 300 characters
+- Max 3 sentences
+- Clear engineering language
 - No repetition
-- No long explanations
-- No vague wording
-- No lists (except next_step)
-- No theoretical discussion
-- No unnecessary detail
-
-OUTPUT FORMAT:
+- No academic tone
 
 {
   "compatibility_level": "",
@@ -194,82 +172,19 @@ OUTPUT FORMAT:
   "next_step": ""
 }
 
-FIELD GUIDELINES:
+Application: ${application}
+Material: ${currentMaterial} → ${bioMaterial}
+Process: ${processing}
+Equipment: ${equipment}
+Scale: ${scale}
+Concern: ${concern}
+`;
 
-Compatibility Level:
-Short label only.
-Example: Moderate – Conditional Compatibility
-
-Executive Summary:
-Explain feasibility + key constraint clearly in business tone.
-
-Processing Window:
-Focus on temperature limits and control difficulty.
-
-Thermal Behaviour:
-Explain degradation risk simply and practically.
-
-Flow Characteristics:
-Explain bubble stability and thickness variation.
-
-Mechanical Behaviour:
-Explain stiffness vs LDPE and practical impact.
-
-Surface Quality:
-Explain defect risks and real-world effect.
-
-Structural Consistency:
-Explain thickness variation and control need.
-
-Application Implication:
-Explain usability and limitations.
-
-Primary Risk:
-Most critical failure risk in operation.
-
-Secondary Risk:
-Second operational risk.
-
-Mechanism:
-Simple explanation of why failure occurs.
-
-Stability:
-Short label (Low / Moderate / High)
-
-Stability Note:
-Explain process stability briefly.
-
-Consistency:
-Short label
-
-Consistency Note:
-Explain thickness / quality consistency.
-
-Visual Description:
-Describe film appearance simply.
-
-Next Step:
-Provide 5–8 short actionable steps only.
-
----
-
-INPUT:
-
-Application: {{application}}
-Material: {{current_material}} → {{bio_material}}
-Process: {{processing}}
-Equipment: {{equipment}}
-Scale: {{scale}}
-Concern: {{concern}}`;
-
-    const claudeReport = await generateClaudeHypothesis(prompt);
+    const claudeRaw = await generateClaudeHypothesis(prompt);
 
     console.log("✅ CLAUDE GENERATED");
 
-    // =========================
-    // JSON処理
-    // =========================
-    let parsed = safeParseJSON(claudeReport);
+    const parsed = safeParseJSON(claudeRaw);
 
     // =========================
     // HTML
@@ -279,11 +194,11 @@ Concern: {{concern}}`;
 
     const finalHtml = injectHtml(htmlTemplate, {
       application,
-      material_transition: `${currentMaterial} → ${bioMaterial}`,
+      material_transition: currentMaterial + " → " + bioMaterial,
       assessment_type: "Tier 2 – Pre-Commercial Feasibility",
       report_date: new Date().toLocaleDateString(),
 
-      compatibility_level: parsed.compatibility_level || "Moderate",
+      compatibility_level: parsed.compatibility_level || "",
       key_risk: parsed.primary_risk || "",
 
       executive_summary: parsed.executive_summary || "",
@@ -316,25 +231,14 @@ Concern: {{concern}}`;
     });
 
     // =========================
-    // Puppeteer（完全安定版）
+    // Puppeteer
     // =========================
     const browser = await puppeteer.launch({
-      headless: "new",
-      args: [
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--disable-dev-shm-usage",
-        "--disable-gpu",
-        "--single-process",
-        "--no-zygote"
-      ]
+      args: ["--no-sandbox", "--disable-setuid-sandbox"]
     });
 
     const page = await browser.newPage();
-
-    await page.setContent(finalHtml, {
-      waitUntil: "domcontentloaded"
-    });
+    await page.setContent(finalHtml);
 
     const pdf = await page.pdf({
       format: "A4",
@@ -343,24 +247,20 @@ Concern: {{concern}}`;
 
     await browser.close();
 
-    // =========================
-    // 保存
-    // =========================
-    const latestPdfPath = path.join("/tmp", "latest-report.pdf");
-    fs.writeFileSync(latestPdfPath, pdf);
+    const filePath = "/tmp/latest-report.pdf";
+    fs.writeFileSync(filePath, pdf);
 
     console.log("✅ PDF SAVED");
 
     res.set({
-      "Content-Type": "application/pdf",
-      "Content-Disposition": "inline"
+      "Content-Type": "application/pdf"
     });
 
     return res.send(pdf);
 
   } catch (err) {
     console.error("❌ ERROR:", err);
-    return res.status(500).send("PDF failed");
+    return res.status(500).send("PDF generation failed");
   }
 });
 
@@ -368,15 +268,14 @@ Concern: {{concern}}`;
 // 確認
 // =========================
 app.get("/latest-pdf", (req, res) => {
-  const file = path.join("/tmp", "latest-report.pdf");
+  const file = "/tmp/latest-report.pdf";
 
   if (!fs.existsSync(file)) {
     return res.status(404).send("No generated PDF found yet.");
   }
 
   res.set({
-    "Content-Type": "application/pdf",
-    "Content-Disposition": "inline"
+    "Content-Type": "application/pdf"
   });
 
   return res.sendFile(file);
@@ -388,7 +287,6 @@ app.get("/latest-pdf", (req, res) => {
 app.listen(process.env.PORT || 3000, () => {
   console.log("🚀 Server running");
 });
-
 // HTMLテンプレ（あなたの本番HTML）
 // =========================
 const htmlTemplate = `
