@@ -95,25 +95,6 @@ function injectHtml(template, data) {
 }
 
 // =========================
-// 🌍 地域検知（強化版）
-// =========================
-function detectRegionalFactor(text) {
-  const t = (text || "").toLowerCase();
-
-  if (
-    t.includes("middle east") ||
-    t.includes("uae") ||
-    t.includes("saudi") ||
-    t.includes("dubai") ||
-    t.includes("gcc")
-  ) {
-    return "MIDDLE_EAST";
-  }
-
-  return null;
-}
-
-// =========================
 // MAIN
 // =========================
 app.post("/tally-pdf", async (req, res) => {
@@ -132,33 +113,32 @@ app.post("/tally-pdf", async (req, res) => {
     const concern = getValue(fields, "concern");
     const notes = getValue(fields, "notes");
 
-    // =========================
-    // 判定（固定）
-    // =========================
     const compatibility = evaluateCompatibility(
       `${currentMaterial} ${bioMaterial}`,
       processing
     );
 
     // =========================
-    // 🌍 地域判定
+    // 地域要素（分離版）
     // =========================
-    const region = detectRegionalFactor(notes);
-
     let regionalNote = "";
 
-    if (region === "MIDDLE_EAST") {
+    if ((notes || "").toLowerCase().includes("middle east")) {
       regionalNote = `
-      
-Additional Consideration (Environmental Condition):
-High ambient temperature conditions typical of Middle East regions may reduce cooling efficiency and increase melt temperature drift. 
-This can amplify thermal degradation risk and film instability during pilot-scale extrusion.
-Pilot trials should incorporate real-time melt temperature monitoring and enhanced cooling control capacity.
-`;
+      <strong>Environmental Consideration (High Temperature Region)</strong><br><br>
+      • Reduced cooling efficiency of air ring systems<br>
+      • Increased melt temperature drift across barrel zones<br>
+      • Elevated thermal degradation risk of PHA<br><br>
+
+      <strong>Recommended Controls:</strong><br>
+      • Increase cooling air capacity and uniformity<br>
+      • Implement real-time melt temperature monitoring<br>
+      • Tighten barrel zone temperature control margins
+      `;
     }
 
     // =========================
-    // Claude（説明専用）
+    // Claude
     // =========================
     const prompt = `
 Return ONLY JSON.
@@ -189,7 +169,6 @@ STRICT:
   "visual_description": "",
   "next_step": ""
 }
-
 Application: ${application}
 Material: ${currentMaterial} → ${bioMaterial}
 Process: ${processing}
@@ -201,19 +180,6 @@ Concern: ${concern}
     const claudeText = await generateClaudeHypothesis(prompt);
     const parsed = safeParseJSON(claudeText);
 
-    // =========================
-    // Next Step統合（ここが最重要）
-    // =========================
-    const finalNextStep = `
-${parsed.next_step || ""}
-
-Further engineering validation under controlled pilot conditions is strongly recommended prior to commercial deployment.
-${regionalNote}
-`;
-
-    // =========================
-    // HTML
-    // =========================
     const template = fs.readFileSync("template.html", "utf8");
 
     const html = injectHtml(template, {
@@ -253,49 +219,28 @@ ${regionalNote}
 
       visual_description: parsed.visual_description,
 
-      // 👇ここが完成形
-      next_step: finalNextStep
+      next_step: parsed.next_step,
+      regional_note: regionalNote // ←追加
     });
 
-    // =========================
-    // PDF生成
-    // =========================
-    // =========================
-// PDF生成（完全安定版）
-// =========================
-const browser = await puppeteer.launch({
-  args: [
-    "--no-sandbox",
-    "--disable-setuid-sandbox",
-    "--disable-dev-shm-usage",
-    "--disable-gpu"
-  ]
-});
+    const browser = await puppeteer.launch({
+      args: ["--no-sandbox", "--disable-setuid-sandbox"]
+    });
 
-const page = await browser.newPage();
+    const page = await browser.newPage();
+    await page.setDefaultNavigationTimeout(0);
 
-// ❗ timeout完全無効
-await page.setDefaultNavigationTimeout(0);
-await page.setDefaultTimeout(0);
+    await page.setContent(html, { waitUntil: "domcontentloaded" });
+    await new Promise(r => setTimeout(r, 800));
 
-// ❗ 軽い待機でHTMLだけ読み込む
-await page.setContent(html, {
-  waitUntil: "domcontentloaded"
-});
+    const pdf = await page.pdf({
+      format: "A4",
+      printBackground: true
+    });
 
-// ❗ レンダリング安定待ち（超重要）
-await new Promise(resolve => setTimeout(resolve, 800));
+    await browser.close();
 
-const pdf = await page.pdf({
-  format: "A4",
-  printBackground: true
-});
-
-await browser.close();
-
-fs.writeFileSync("/tmp/latest-report.pdf", pdf);
-
-console.log("✅ PDF SAVED");
+    fs.writeFileSync("/tmp/latest-report.pdf", pdf);
 
     res.set({ "Content-Type": "application/pdf" });
     res.send(pdf);
@@ -306,9 +251,6 @@ console.log("✅ PDF SAVED");
   }
 });
 
-// =========================
-// PDF取得
-// =========================
 app.get("/latest-pdf", (req, res) => {
   const file = "/tmp/latest-report.pdf";
 
@@ -319,7 +261,6 @@ app.get("/latest-pdf", (req, res) => {
   res.sendFile(file);
 });
 
-// =========================
 app.listen(process.env.PORT || 3000, () => {
   console.log("🚀 Server running");
 });
