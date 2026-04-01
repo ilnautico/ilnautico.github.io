@@ -121,24 +121,19 @@ app.post("/tally-pdf", async (req, res) => {
     // =========================
     // 地域要素（分離版）
     // =========================
-    let regionalNote = "";
+    if ((notes || "").toLowerCase().includes("middle east")) {
+  regionalNote = "...熱...";
+}
 
-if ((notes || "").toLowerCase().includes("middle east")) {
-  regionalNote = `
-  <strong>Environmental Consideration (Middle East Deployment Context)</strong><br><br>
-
-  Under high ambient temperature conditions typical of Middle East regions, 
-  cooling efficiency and melt temperature stability may become critical factors 
-  influencing process consistency and degradation behaviour.
-
-  This introduces increased sensitivity to thermal control during pilot-scale extrusion, 
-  particularly in maintaining stable melt profiles across barrel zones.
+if ((notes || "").toLowerCase().includes("high humidity")) {
+  regionalNote += `
+  <br><br>
+  <strong>Environmental Constraint (High Humidity)</strong><br><br>
+  Moisture exposure may accelerate hydrolytic degradation and affect melt stability.
 
   <br><br>
-
   <strong>Implication:</strong><br>
-  Pilot validation under representative environmental conditions is strongly recommended 
-  prior to commercial decision-making.
+  Moisture-controlled handling and drying validation are required prior to processing.
   `;
 }
     // =========================
