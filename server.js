@@ -233,7 +233,7 @@ Material: ${currentMaterial} → ${bioMaterial}
 Process: ${processing}
 Equipment: ${equipment}
 Scale: ${scale}
-Concern: ${concern}
+Concern: ${concern}`;
 
     const claudeReport = await generateClaudeHypothesis(prompt);
 
