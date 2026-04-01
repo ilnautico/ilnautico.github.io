@@ -113,9 +113,14 @@ app.post("/tally-pdf", async (req, res) => {
     const concern = getValue(fields, "concern");
 
     const prompt = `
-You are a professional materials engineer.
+Your task is to generate a structured, high-quality technical hypothesis report.
 
 Return ONLY valid JSON.
+Do NOT include explanations, markdown, or extra text.
+
+=========================
+OUTPUT FORMAT
+=========================
 
 {
   "compatibility_level": "",
@@ -137,18 +142,76 @@ Return ONLY valid JSON.
   "consistency": "",
   "consistency_note": "",
   "visual_description": "",
-  "next_step": ""
+  "next_step": []
 }
 
-Application: ${application}
-Current Material: ${currentMaterial}
-Target Material: ${bioMaterial}
-Processing Method: ${processing}
-Equipment: ${equipment}
-Production Scale: ${scale}
-Technical Concern: ${concern}
-`;
+=========================
+STRICT LENGTH CONTROL
+=========================
 
+- executive_summary → max 3 sentences
+- processing_window → max 2 sentences
+- thermal_behavior → max 2 sentences
+- flow_characteristics → max 2 sentences
+- mechanical_behavior → max 2 sentences
+- surface_quality → max 2 sentences
+- structural_consistency → max 2 sentences
+- application_implication → max 2 sentences
+
+- primary_risk → max 3 sentences
+- secondary_risk → max 3 sentences
+- mechanism → max 3 sentences
+
+- stability_note → max 2 sentences
+- consistency_note → max 2 sentences
+
+- visual_description → max 3 sentences
+
+- next_step → EXACTLY 5 short actionable bullet points
+
+=========================
+WRITING STYLE
+=========================
+
+- Professional consulting tone
+- Dense but concise
+- No repetition
+- No filler words
+- No vague statements
+- Each sentence must add value
+- Use technical clarity, not verbosity
+
+=========================
+CRITICAL RULES
+=========================
+
+- MUST fit into a 4-page professional PDF layout
+- Avoid long paragraphs
+- Keep each field compact
+- Maintain high information density
+- Do NOT exceed sentence limits
+
+=========================
+QUALITY REQUIREMENTS
+=========================
+
+- Reflect real engineering reasoning
+- Consider process constraints
+- Include cause-and-effect logic
+- Align with industrial feasibility thinking
+- Avoid generic textbook explanations
+
+=========================
+INPUT
+=========================
+
+Application: {{application}}
+Current Material: {{currentMaterial}}
+Target Material: {{bioMaterial}}
+Processing Method: {{processing}}
+Equipment: {{equipment}}
+Production Scale: {{scale}}
+Technical Concern: {{concern}}
     const claudeReport = await generateClaudeHypothesis(prompt);
 
     console.log("✅ CLAUDE GENERATED");
