@@ -136,16 +136,40 @@ app.post("/tally-pdf", async (req, res) => {
     const prompt = `
 You are a professional polymer processing engineer.
 
-Return ONLY JSON. No explanation. No markdown.
+Return ONLY valid JSON.
+No explanation.
+No markdown.
+No backticks.
 
-STRICT RULES:
-- Keep each field concise but technically meaningful
-- Maximum 3–5 sentences per field
+STRICT OUTPUT RULES:
+- Always return valid JSON
+- No extra text before or after JSON
+- No formatting symbols
+- No line breaks outside JSON
+- All values must be plain text
+
+LENGTH CONTROL (CRITICAL):
+- Each field MUST be under 300 characters
+- Maximum 3 sentences per field
+- Prefer 2 sentences
+- No long paragraphs
+
+STYLE RULE (MANDATORY):
+- Sentence 1: conclusion
+- Sentence 2: reason
+- Sentence 3 (optional): implication
+- Use clear, practical engineering language
+- Avoid academic tone
+
+FORBIDDEN:
 - No repetition
-- No academic tone
-- Focus on practical engineering implications
-- Keep structure clean and readable
-- Always valid JSON
+- No long explanations
+- No vague wording
+- No lists (except next_step)
+- No theoretical discussion
+- No unnecessary detail
+
+OUTPUT FORMAT:
 
 {
   "compatibility_level": "",
@@ -170,49 +194,50 @@ STRICT RULES:
   "next_step": ""
 }
 
-GUIDELINES:
+FIELD GUIDELINES:
 
 Compatibility Level:
-Short professional label (e.g. Moderate – Conditional Compatibility)
+Short label only.
+Example: Moderate – Conditional Compatibility
 
 Executive Summary:
-Explain feasibility, key constraints, and overall direction in a clear business tone.
+Explain feasibility + key constraint clearly in business tone.
 
 Processing Window:
-Focus on temperature sensitivity and operational limits. Keep it practical.
+Focus on temperature limits and control difficulty.
 
 Thermal Behaviour:
-Explain degradation risk simply and clearly.
+Explain degradation risk simply and practically.
 
 Flow Characteristics:
-Explain bubble stability and thickness impact.
+Explain bubble stability and thickness variation.
 
 Mechanical Behaviour:
-Explain stiffness vs LDPE and practical consequences.
+Explain stiffness vs LDPE and practical impact.
 
 Surface Quality:
-Focus on defects and real-world implications.
+Explain defect risks and real-world effect.
 
 Structural Consistency:
-Explain thickness variation causes and control needs.
+Explain thickness variation and control need.
 
 Application Implication:
-Explain suitability and limitations in real usage.
+Explain usability and limitations.
 
 Primary Risk:
-Clear, practical explanation of the biggest failure risk.
+Most critical failure risk in operation.
 
 Secondary Risk:
-Second biggest operational risk.
+Second operational risk.
 
 Mechanism:
-Short explanation of why problems happen (not academic).
+Simple explanation of why failure occurs.
 
 Stability:
 Short label (Low / Moderate / High)
 
 Stability Note:
-1–2 sentences explaining operational stability.
+Explain process stability briefly.
 
 Consistency:
 Short label
@@ -221,19 +246,21 @@ Consistency Note:
 Explain thickness / quality consistency.
 
 Visual Description:
-Describe expected film appearance simply.
+Describe film appearance simply.
 
 Next Step:
-Clear, structured, actionable steps (max ~8 steps).
+Provide 5–8 short actionable steps only.
 
 ---
 
-Application: ${application}
-Material: ${currentMaterial} → ${bioMaterial}
-Process: ${processing}
-Equipment: ${equipment}
-Scale: ${scale}
-Concern: ${concern}`;
+INPUT:
+
+Application: {{application}}
+Material: {{current_material}} → {{bio_material}}
+Process: {{processing}}
+Equipment: {{equipment}}
+Scale: {{scale}}
+Concern: {{concern}}
 
     const claudeReport = await generateClaudeHypothesis(prompt);
 
