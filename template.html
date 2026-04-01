@@ -521,9 +521,40 @@ body {
         <span class="section-title">Recommended Next Step</span>
       </div>
       <div class="nextstep-card">
-        <p class="nextstep-lead">
-          {{next_step}}
-        </p>
+
+  <!-- ① 既存 -->
+  <p class="nextstep-lead">
+    {{next_step}}
+  </p>
+
+  <!-- ② ここ追加（地域ブロック） -->
+  <div style="
+    margin-top:14px;
+    padding-top:14px;
+    border-top:1px solid var(--sep);
+  ">
+    <div style="
+      font-family: 'IBM Plex Mono', monospace;
+      font-size:9px;
+      letter-spacing:0.12em;
+      text-transform:uppercase;
+      color:var(--text-label);
+      margin-bottom:8px;
+    ">
+      Environmental Consideration
+    </div>
+
+    <div style="
+      font-size:11.5px;
+      line-height:1.7;
+      color:var(--text-body);
+    ">
+      {{regional_note}}
+    </div>
+  </div>
+
+  <!-- ③ 既存そのまま -->
+  <div class="nextstep-path">
         <div class="nextstep-path">
           <div class="nextstep-path-label">Recommended Pathway</div>
           <ul class="nextstep-list">
