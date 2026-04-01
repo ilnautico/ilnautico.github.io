@@ -13,7 +13,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // =========================
-// Claude生成
+// Claude生成（安定版）
 // =========================
 async function generateClaudeHypothesis(prompt) {
   for (let i = 0; i < 3; i++) {
@@ -95,6 +95,24 @@ function getValue(fields, keyword) {
 }
 
 // =========================
+// JSON修復（最強）
+// =========================
+function safeParseJSON(text) {
+  try {
+    return JSON.parse(text);
+  } catch {
+    try {
+      const start = text.indexOf("{");
+      const end = text.lastIndexOf("}");
+      if (start !== -1 && end !== -1) {
+        return JSON.parse(text.substring(start, end + 1));
+      }
+    } catch {}
+  }
+  return {};
+}
+
+// =========================
 // PDF生成
 // =========================
 app.post("/tally-pdf", async (req, res) => {
@@ -112,15 +130,19 @@ app.post("/tally-pdf", async (req, res) => {
     const scale = getValue(fields, "production scale");
     const concern = getValue(fields, "concern");
 
+    // =========================
+    // Claudeプロンプト（完全安定）
+    // =========================
     const prompt = `
-Your task is to generate a structured, high-quality technical hypothesis report.
+You are a professional polymer processing engineer.
 
-Return ONLY valid JSON.
-Do NOT include explanations, markdown, or extra text.
+Return ONLY JSON. No explanation. No markdown.
 
-=========================
-OUTPUT FORMAT
-=========================
+STRICT RULES:
+- No line breaks inside values
+- No special characters
+- No truncation
+- Always close JSON
 
 {
   "compatibility_level": "",
@@ -142,120 +164,25 @@ OUTPUT FORMAT
   "consistency": "",
   "consistency_note": "",
   "visual_description": "",
-  "next_step": []
+  "next_step": ""
 }
 
-=========================
-STRICT LENGTH CONTROL
-=========================
+Application: ${application}
+Material: ${currentMaterial} → ${bioMaterial}
+Process: ${processing}
+Equipment: ${equipment}
+Scale: ${scale}
+Concern: ${concern}
+`;
 
-- executive_summary → max 3 sentences
-- processing_window → max 2 sentences
-- thermal_behavior → max 2 sentences
-- flow_characteristics → max 2 sentences
-- mechanical_behavior → max 2 sentences
-- surface_quality → max 2 sentences
-- structural_consistency → max 2 sentences
-- application_implication → max 2 sentences
-
-- primary_risk → max 3 sentences
-- secondary_risk → max 3 sentences
-- mechanism → max 3 sentences
-
-- stability_note → max 2 sentences
-- consistency_note → max 2 sentences
-
-- visual_description → max 3 sentences
-
-- next_step → EXACTLY 5 short actionable bullet points
-
-=========================
-WRITING STYLE
-=========================
-
-- Professional consulting tone
-- Dense but concise
-- No repetition
-- No filler words
-- No vague statements
-- Each sentence must add value
-- Use technical clarity, not verbosity
-
-=========================
-CRITICAL RULES
-=========================
-
-- MUST fit into a 4-page professional PDF layout
-- Avoid long paragraphs
-- Keep each field compact
-- Maintain high information density
-- Do NOT exceed sentence limits
-
-=========================
-QUALITY REQUIREMENTS
-=========================
-
-- Reflect real engineering reasoning
-- Consider process constraints
-- Include cause-and-effect logic
-- Align with industrial feasibility thinking
-- Avoid generic textbook explanations
-
-=========================
-INPUT
-=========================
-
-Application: {{application}}
-Current Material: {{currentMaterial}}
-Target Material: {{bioMaterial}}
-Processing Method: {{processing}}
-Equipment: {{equipment}}
-Production Scale: {{scale}}
-Technical Concern: {{concern}}
     const claudeReport = await generateClaudeHypothesis(prompt);
 
     console.log("✅ CLAUDE GENERATED");
 
     // =========================
-    // JSON処理（絶対止まらない版）
+    // JSON処理
     // =========================
-    let parsed = {};
-
-    try {
-      const clean = String(claudeReport)
-        .replace(/```json/g, "")
-        .replace(/```/g, "")
-        .trim();
-
-      parsed = JSON.parse(clean);
-
-    } catch (e) {
-      console.error("❌ JSON PARSE ERROR:", claudeReport);
-
-      // 👇 fallback（絶対表示）
-      parsed = {
-        compatibility_level: "Moderate",
-        executive_summary: claudeReport,
-        processing_window: "",
-        thermal_behavior: "",
-        flow_characteristics: "",
-        mechanical_behavior: "",
-        surface_quality: "",
-        structural_consistency: "",
-        application_implication: "",
-        primary_risk_title: "Key Risk",
-        primary_risk: "",
-        secondary_risk_title: "",
-        secondary_risk: "",
-        mechanism: "",
-        stability: "",
-        stability_note: "",
-        consistency: "",
-        consistency_note: "",
-        visual_description: "",
-        next_step: ""
-      };
-    }
+    let parsed = safeParseJSON(claudeReport);
 
     // =========================
     // HTML
@@ -302,21 +229,24 @@ Technical Concern: {{concern}}
     });
 
     // =========================
-    // PDF生成
+    // Puppeteer（完全安定版）
     // =========================
     const browser = await puppeteer.launch({
+      headless: "new",
       args: [
         "--no-sandbox",
         "--disable-setuid-sandbox",
         "--disable-dev-shm-usage",
-        "--disable-gpu"
+        "--disable-gpu",
+        "--single-process",
+        "--no-zygote"
       ]
     });
 
     const page = await browser.newPage();
 
     await page.setContent(finalHtml, {
-      waitUntil: "networkidle0"
+      waitUntil: "domcontentloaded"
     });
 
     const pdf = await page.pdf({
@@ -348,12 +278,12 @@ Technical Concern: {{concern}}
 });
 
 // =========================
-// 確認URL
+// 確認
 // =========================
 app.get("/latest-pdf", (req, res) => {
-  const latestPdfPath = path.join("/tmp", "latest-report.pdf");
+  const file = path.join("/tmp", "latest-report.pdf");
 
-  if (!fs.existsSync(latestPdfPath)) {
+  if (!fs.existsSync(file)) {
     return res.status(404).send("No generated PDF found yet.");
   }
 
@@ -362,7 +292,7 @@ app.get("/latest-pdf", (req, res) => {
     "Content-Disposition": "inline"
   });
 
-  return res.sendFile(latestPdfPath);
+  return res.sendFile(file);
 });
 
 // =========================
