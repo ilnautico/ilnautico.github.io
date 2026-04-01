@@ -10,7 +10,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // =========================
-// Claude生成（安定版）
+// Claude生成
 // =========================
 async function generateClaudeHypothesis(prompt) {
   for (let i = 0; i < 3; i++) {
@@ -24,31 +24,18 @@ async function generateClaudeHypothesis(prompt) {
         },
         body: JSON.stringify({
           model: "claude-sonnet-4-6",
-          max_tokens: 5000,
+          max_tokens: 2500,
           messages: [
             {
               role: "user",
-              content: [{ type: "text", text: String(prompt) }]
+              content: [{ type: "text", text: prompt }]
             }
           ]
         })
       });
 
-      if (!response.ok) {
-        const text = await response.text();
-
-        if (text.includes("overloaded")) {
-          console.log("⚠️ Claude overloaded, retry...");
-          await new Promise(r => setTimeout(r, 1500));
-          continue;
-        }
-
-        throw new Error("Claude API error");
-      }
-
       const data = await response.json();
-
-      return data.content?.[0]?.text || "";
+      return data.content[0].text;
 
     } catch (err) {
       if (i === 2) throw err;
@@ -57,7 +44,7 @@ async function generateClaudeHypothesis(prompt) {
 }
 
 // =========================
-// JSON修復
+// JSON安全パース
 // =========================
 function safeParseJSON(text) {
   try {
@@ -88,25 +75,20 @@ function injectHtml(template, data) {
 }
 
 // =========================
-// 入力取得（強化版）
+// フィールド取得
 // =========================
-function getValueFlexible(fields, keywords) {
+function getValue(fields, keyword) {
   for (const f of fields) {
     const label = (f.label || "").toLowerCase();
-
-    for (const keyword of keywords) {
-      if (label.includes(keyword)) {
-        return Array.isArray(f.value)
-          ? f.value.join(", ")
-          : f.value || "";
-      }
+    if (label.includes(keyword)) {
+      return Array.isArray(f.value) ? f.value.join(", ") : f.value || "";
     }
   }
   return "";
 }
 
 // =========================
-// メイン
+// メイン処理
 // =========================
 app.post("/tally-pdf", async (req, res) => {
 
@@ -115,39 +97,28 @@ app.post("/tally-pdf", async (req, res) => {
   try {
     const fields = req.body?.data?.fields || [];
 
-    console.log("📦 INPUT:", fields);
-
-    const application = getValueFlexible(fields, ["application"]);
-    const currentMaterial = getValueFlexible(fields, ["material"]);
-    const bioMaterial = getValueFlexible(fields, ["target", "bio"]);
-    const processing = getValueFlexible(fields, ["processing"]);
-    const equipment = getValueFlexible(fields, ["equipment"]);
-    const scale = getValueFlexible(fields, ["scale"]);
-    const concern = getValueFlexible(fields, ["concern"]);
+    const application = getValue(fields, "application");
+    const currentMaterial = getValue(fields, "current material");
+    const bioMaterial = getValue(fields, "target material");
+    const processing = getValue(fields, "processing");
+    const equipment = getValue(fields, "equipment");
+    const scale = getValue(fields, "production");
+    const concern = getValue(fields, "concern");
 
     // =========================
-    // 入力チェック
-    // =========================
-    if (!application || !currentMaterial || !bioMaterial) {
-      console.log("⚠️ Missing input → skip Claude");
-
-      return res.status(400).send("Missing required inputs");
-    }
-
-    // =========================
-    // プロンプト（完全版）
+    // 🔥 完全制御プロンプト
     // =========================
     const prompt = `
-You are a professional polymer processing engineer.
+You are a senior polymer processing engineer.
 
 Return ONLY valid JSON.
 
-STRICT RULES:
-- Each field under 300 characters
-- Max 3 sentences
-- Clear engineering language
+STRICT:
+- Max 2–3 sentences per field
 - No repetition
-- No academic tone
+- No academic wording
+- Practical engineering only
+- Short and decisive
 
 {
   "compatibility_level": "",
@@ -172,33 +143,52 @@ STRICT RULES:
   "next_step": ""
 }
 
+RULES:
+
+compatibility_level:
+Use ONLY:
+- High
+- Moderate
+- Moderate – Requires Process Control
+- Low
+
+stability / consistency:
+Use ONLY:
+- High
+- Moderate
+- Low
+
+next_step:
+Max 6 steps.
+
+---
+
 Application: ${application}
-Material: ${currentMaterial} → ${bioMaterial}
+Material: ${currentMaterial} to ${bioMaterial}
 Process: ${processing}
 Equipment: ${equipment}
 Scale: ${scale}
 Concern: ${concern}
 `;
 
-    const claudeRaw = await generateClaudeHypothesis(prompt);
+    const claude = await generateClaudeHypothesis(prompt);
 
-    console.log("✅ CLAUDE GENERATED");
+    console.log("✅ CLAUDE");
 
-    const parsed = safeParseJSON(claudeRaw);
+    const parsed = safeParseJSON(claude);
 
     // =========================
     // HTML
     // =========================
-    const templatePath = path.join(process.cwd(), "template.html");
-    const htmlTemplate = fs.readFileSync(templatePath, "utf8");
+    const template = fs.readFileSync("template.html", "utf8");
 
-    const finalHtml = injectHtml(htmlTemplate, {
-      application,
-      material_transition: currentMaterial + " → " + bioMaterial,
+    const finalHtml = injectHtml(template, {
+      application: application,
+      material_transition: currentMaterial + " to " + bioMaterial,
       assessment_type: "Tier 2 – Pre-Commercial Feasibility",
       report_date: new Date().toLocaleDateString(),
 
-      compatibility_level: parsed.compatibility_level || "",
+      compatibility_level: parsed.compatibility_level || "Moderate",
       key_risk: parsed.primary_risk || "",
 
       executive_summary: parsed.executive_summary || "",
@@ -231,13 +221,14 @@ Concern: ${concern}
     });
 
     // =========================
-    // Puppeteer
+    // PDF
     // =========================
     const browser = await puppeteer.launch({
       args: ["--no-sandbox", "--disable-setuid-sandbox"]
     });
 
     const page = await browser.newPage();
+
     await page.setContent(finalHtml);
 
     const pdf = await page.pdf({
@@ -247,45 +238,20 @@ Concern: ${concern}
 
     await browser.close();
 
-    const filePath = "/tmp/latest-report.pdf";
-    fs.writeFileSync(filePath, pdf);
-
-    console.log("✅ PDF SAVED");
-
     res.set({
       "Content-Type": "application/pdf"
     });
 
-    return res.send(pdf);
+    res.send(pdf);
 
   } catch (err) {
-    console.error("❌ ERROR:", err);
-    return res.status(500).send("PDF generation failed");
+    console.error(err);
+    res.status(500).send("ERROR");
   }
 });
 
-// =========================
-// 確認
-// =========================
-app.get("/latest-pdf", (req, res) => {
-  const file = "/tmp/latest-report.pdf";
-
-  if (!fs.existsSync(file)) {
-    return res.status(404).send("No generated PDF found yet.");
-  }
-
-  res.set({
-    "Content-Type": "application/pdf"
-  });
-
-  return res.sendFile(file);
-});
-
-// =========================
-// 起動
-// =========================
 app.listen(process.env.PORT || 3000, () => {
-  console.log("🚀 Server running");
+  console.log("🚀 RUNNING");
 });
 // HTMLテンプレ（あなたの本番HTML）
 // =========================
