@@ -13,37 +13,27 @@ app.use(express.urlencoded({ extended: true }));
 // Claude
 // =========================
 async function generateClaudeHypothesis(prompt) {
-  for (let i = 0; i < 3; i++) {
-    try {
-      const response = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": process.env.ANTHROPIC_API_KEY,
-          "anthropic-version": "2023-06-01"
-        },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-6",
-          max_tokens: 2000, // ← 安定化（重要）
-          messages: [
-            {
-              role: "user",
-              content: [{ type: "text", text: String(prompt) }]
-            }
-          ]
-        })
-      });
+  const response = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": process.env.ANTHROPIC_API_KEY,
+      "anthropic-version": "2023-06-01"
+    },
+    body: JSON.stringify({
+      model: "claude-sonnet-4-6",
+      max_tokens: 1800,
+      messages: [
+        {
+          role: "user",
+          content: [{ type: "text", text: prompt }]
+        }
+      ]
+    })
+  });
 
-      const data = await response.json();
-
-      if (!data?.content?.[0]?.text) throw new Error("Claude empty");
-
-      return data.content[0].text;
-
-    } catch (err) {
-      if (i === 2) throw err;
-    }
-  }
+  const data = await response.json();
+  return data.content?.[0]?.text || "";
 }
 
 // =========================
@@ -61,6 +51,28 @@ function safeParseJSON(text) {
       return {};
     }
   }
+}
+
+// =========================
+// 判定ロジック（ここがコア）
+// =========================
+function evaluateCompatibility(material, process) {
+
+  const m = material.toLowerCase();
+  const p = process.toLowerCase();
+
+  // PHA blown film（今回の主ケース）
+  if (m.includes("pha") && p.includes("blown")) {
+    return "Moderate – Requires Process Control";
+  }
+
+  // PLA系
+  if (m.includes("pla")) {
+    return "Low";
+  }
+
+  // デフォルト
+  return "Moderate";
 }
 
 // =========================
@@ -91,7 +103,7 @@ function injectHtml(template, data) {
 }
 
 // =========================
-// API
+// MAIN
 // =========================
 app.post("/tally-pdf", async (req, res) => {
 
@@ -109,19 +121,26 @@ app.post("/tally-pdf", async (req, res) => {
     const concern = getValue(fields, "concern") || "Unknown";
 
     // =========================
-    // Claudeプロンプト（安定版）
+    // 判定（AIに任せない）
+    // =========================
+    const compatibility = evaluateCompatibility(
+      `${currentMaterial} ${bioMaterial}`,
+      processing
+    );
+
+    // =========================
+    // Claudeプロンプト（説明専用）
     // =========================
     const prompt = `
 Return ONLY JSON.
 
 STRICT:
 - Max 2–3 sentences per field
-- Short, practical
+- Practical engineering language
 - No long paragraphs
-- Always valid JSON
+- Do NOT generate compatibility level
 
 {
-  "compatibility_level": "",
   "executive_summary": "",
   "processing_window": "",
   "thermal_behavior": "",
@@ -160,19 +179,18 @@ Concern: ${concern}
     // =========================
     // HTML
     // =========================
-    const templatePath = path.join(process.cwd(), "template.html");
-    const htmlTemplate = fs.readFileSync(templatePath, "utf8");
+    const template = fs.readFileSync("template.html", "utf8");
 
-    const finalHtml = injectHtml(htmlTemplate, {
+    const html = injectHtml(template, {
 
       application,
       material_transition: `${currentMaterial} → ${bioMaterial}`,
       assessment_type: "Tier 2 – Pre-Commercial Feasibility",
       report_date: new Date().toLocaleDateString(),
 
-      compatibility_level: parsed.compatibility_level || "Moderate",
-      executive_summary: parsed.executive_summary || "",
+      compatibility_level: compatibility, // ←ここ重要
 
+      executive_summary: parsed.executive_summary || "",
       key_risk: parsed.primary_risk || "",
 
       processing_window: parsed.processing_window || "",
@@ -203,17 +221,14 @@ Concern: ${concern}
     });
 
     // =========================
-    // Puppeteer
+    // PDF生成
     // =========================
     const browser = await puppeteer.launch({
       args: ["--no-sandbox", "--disable-setuid-sandbox"]
     });
 
     const page = await browser.newPage();
-
-    await page.setContent(finalHtml, {
-      waitUntil: "domcontentloaded"
-    });
+    await page.setContent(html);
 
     const pdf = await page.pdf({
       format: "A4",
@@ -224,16 +239,17 @@ Concern: ${concern}
 
     fs.writeFileSync("/tmp/latest-report.pdf", pdf);
 
+    console.log("✅ PDF SAVED");
+
     res.set({
-      "Content-Type": "application/pdf",
-      "Content-Disposition": "inline"
+      "Content-Type": "application/pdf"
     });
 
-    return res.send(pdf);
+    res.send(pdf);
 
   } catch (err) {
     console.error("❌ ERROR:", err);
-    return res.status(500).send("PDF failed");
+    res.status(500).send("error");
   }
 });
 
@@ -248,7 +264,7 @@ app.get("/latest-pdf", (req, res) => {
     return res.status(404).send("No PDF yet");
   }
 
-  return res.sendFile(file);
+  res.sendFile(file);
 });
 
 // =========================
