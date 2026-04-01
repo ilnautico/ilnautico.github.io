@@ -123,20 +123,24 @@ app.post("/tally-pdf", async (req, res) => {
     // =========================
     let regionalNote = "";
 
-    if ((notes || "").toLowerCase().includes("middle east")) {
-      regionalNote = `
-      <strong>Environmental Consideration (High Temperature Region)</strong><br><br>
-      • Reduced cooling efficiency of air ring systems<br>
-      • Increased melt temperature drift across barrel zones<br>
-      • Elevated thermal degradation risk of PHA<br><br>
+if ((notes || "").toLowerCase().includes("middle east")) {
+  regionalNote = `
+  <strong>Environmental Consideration (Middle East Deployment Context)</strong><br><br>
 
-      <strong>Recommended Controls:</strong><br>
-      • Increase cooling air capacity and uniformity<br>
-      • Implement real-time melt temperature monitoring<br>
-      • Tighten barrel zone temperature control margins
-      `;
-    }
+  Under high ambient temperature conditions typical of Middle East regions, 
+  cooling efficiency and melt temperature stability may become critical factors 
+  influencing process consistency and degradation behaviour.
 
+  This introduces increased sensitivity to thermal control during pilot-scale extrusion, 
+  particularly in maintaining stable melt profiles across barrel zones.
+
+  <br><br>
+
+  <strong>Implication:</strong><br>
+  Pilot validation under representative environmental conditions is strongly recommended 
+  prior to commercial decision-making.
+  `;
+}
     // =========================
     // Claude
     // =========================
