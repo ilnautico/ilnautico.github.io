@@ -139,10 +139,13 @@ You are a professional polymer processing engineer.
 Return ONLY JSON. No explanation. No markdown.
 
 STRICT RULES:
-- No line breaks inside values
-- No special characters
-- No truncation
-- Always close JSON
+- Keep each field concise but technically meaningful
+- Maximum 3–5 sentences per field
+- No repetition
+- No academic tone
+- Focus on practical engineering implications
+- Keep structure clean and readable
+- Always valid JSON
 
 {
   "compatibility_level": "",
@@ -167,13 +170,70 @@ STRICT RULES:
   "next_step": ""
 }
 
+GUIDELINES:
+
+Compatibility Level:
+Short professional label (e.g. Moderate – Conditional Compatibility)
+
+Executive Summary:
+Explain feasibility, key constraints, and overall direction in a clear business tone.
+
+Processing Window:
+Focus on temperature sensitivity and operational limits. Keep it practical.
+
+Thermal Behaviour:
+Explain degradation risk simply and clearly.
+
+Flow Characteristics:
+Explain bubble stability and thickness impact.
+
+Mechanical Behaviour:
+Explain stiffness vs LDPE and practical consequences.
+
+Surface Quality:
+Focus on defects and real-world implications.
+
+Structural Consistency:
+Explain thickness variation causes and control needs.
+
+Application Implication:
+Explain suitability and limitations in real usage.
+
+Primary Risk:
+Clear, practical explanation of the biggest failure risk.
+
+Secondary Risk:
+Second biggest operational risk.
+
+Mechanism:
+Short explanation of why problems happen (not academic).
+
+Stability:
+Short label (Low / Moderate / High)
+
+Stability Note:
+1–2 sentences explaining operational stability.
+
+Consistency:
+Short label
+
+Consistency Note:
+Explain thickness / quality consistency.
+
+Visual Description:
+Describe expected film appearance simply.
+
+Next Step:
+Clear, structured, actionable steps (max ~8 steps).
+
+---
+
 Application: ${application}
 Material: ${currentMaterial} → ${bioMaterial}
 Process: ${processing}
 Equipment: ${equipment}
 Scale: ${scale}
 Concern: ${concern}
-`;
 
     const claudeReport = await generateClaudeHypothesis(prompt);
 
