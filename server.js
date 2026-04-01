@@ -158,21 +158,29 @@ app.post("/tally-pdf", async (req, res) => {
     const equipment = getValue(fields, "equipment");
     const scale = getValue(fields, "production scale");
     const concern = getValue(fields, "concern");
-
-  const prompt = `
+const prompt = `
 You are a senior polymer processing engineer.
 
-You are preparing a professional technical assessment report for industrial clients.
+You are generating a structured technical assessment report.
 
-STRICT REQUIREMENTS:
-- Write in full professional engineering language
-- DO NOT summarize
-- DO NOT shorten
-- Each section must contain detailed explanation (minimum 4–6 sentences)
-- Explain mechanisms, not just results
-- Write as if this will be delivered to a client
+CRITICAL OUTPUT RULES:
+- Output MUST be valid JSON only
+- Do NOT include markdown (no \`\`\`)
+- Do NOT include explanations outside JSON
+- Do NOT truncate output
+- Do NOT leave fields incomplete
+- Every field must be filled with full sentences
+- Use double quotes ONLY for JSON
+- Escape any quotes inside text
+- NEVER break JSON structure
 
-Return ONLY valid JSON.
+FORMAT RULE (VERY IMPORTANT):
+- Each value must be a COMPLETE paragraph
+- Each value must be a SINGLE string (no line breaks breaking JSON)
+- Use \\n only if needed inside string
+- No trailing commas
+
+RETURN EXACTLY THIS JSON STRUCTURE:
 
 {
   "compatibility_level": "",
@@ -197,6 +205,14 @@ Return ONLY valid JSON.
   "next_step": ""
 }
 
+CONTENT REQUIREMENTS:
+- Write in professional engineering language
+- Each field must contain 4–6 sentences
+- Explain mechanisms, not just conclusions
+- Maintain consistent technical depth across all fields
+- Avoid repetition across fields
+
+INPUT DATA:
 Application: ${application}
 Current Material: ${currentMaterial}
 Target Material: ${bioMaterial}
