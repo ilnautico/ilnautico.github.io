@@ -10,70 +10,70 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // =========================
-// 判定ロジック
+// Claude
 // =========================
-function evaluateScore({ material, process, equipment, concern }) {
+async function generateClaudeHypothesis(prompt) {
+  for (let i = 0; i < 3; i++) {
+    try {
+      const response = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": process.env.ANTHROPIC_API_KEY,
+          "anthropic-version": "2023-06-01"
+        },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-6",
+          max_tokens: 2000, // ← 安定化（重要）
+          messages: [
+            {
+              role: "user",
+              content: [{ type: "text", text: String(prompt) }]
+            }
+          ]
+        })
+      });
 
-  let score = 0;
+      const data = await response.json();
 
-  if (material.includes("PE") || material.includes("PP")) score += 2;
-  if (material.includes("PHA")) score -= 1;
+      if (!data?.content?.[0]?.text) throw new Error("Claude empty");
 
-  if (process.includes("film")) score -= 1;
-  if (process.includes("blown")) score += 1;
+      return data.content[0].text;
 
-  if (equipment.includes("single")) score -= 1;
-  if (equipment.includes("twin")) score += 1;
-
-  if (concern.includes("thermal")) score -= 1;
-  if (concern.includes("thickness")) score -= 1;
-
-  return score;
-}
-
-function evaluateCompatibility(score) {
-  if (score >= 3) return "High";
-  if (score >= 1) return "Moderate – Requires Process Control";
-  return "Low";
-}
-
-function evaluateStability(score) {
-  if (score >= 3) return "High";
-  if (score >= 1) return "Moderate";
-  return "Low";
-}
-
-function evaluateConsistency(score) {
-  if (score >= 3) return "High";
-  if (score >= 1) return "Moderate";
-  return "Low";
+    } catch (err) {
+      if (i === 2) throw err;
+    }
+  }
 }
 
 // =========================
-// Claude生成（テキスト専用）
+// JSON修復
 // =========================
-async function generateClaudeText(prompt) {
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": process.env.ANTHROPIC_API_KEY,
-      "anthropic-version": "2023-06-01"
-    },
-    body: JSON.stringify({
-      model: "claude-sonnet-4-6",
-      max_tokens: 1200,
-      messages: [
-        {
-          role: "user",
-          content: [{ type: "text", text: prompt }]
-        }
-      ]
-    })
-  });
+function safeParseJSON(text) {
+  try {
+    return JSON.parse(text);
+  } catch {
+    try {
+      const start = text.indexOf("{");
+      const end = text.lastIndexOf("}");
+      return JSON.parse(text.substring(start, end + 1));
+    } catch {
+      return {};
+    }
+  }
+}
 
-  const data = await response.json();
-  return data.content?.[0]?.text || "";
+// =========================
+// 値取得
+// =========================
+function getValue(fields, keyword) {
+  for (const f of fields) {
+    const label = (f.label || "").toLowerCase();
+    if (label.includes(keyword)) {
+      return Array.isArray(f.value) ? f.value.join(", ") : f.value || "";
+    }
+  }
+  return "";
 }
 
 // =========================
@@ -91,119 +91,129 @@ function injectHtml(template, data) {
 }
 
 // =========================
-// フィールド取得
-// =========================
-function getValue(fields, keyword) {
-  for (const f of fields) {
-    const label = (f.label || "").toLowerCase();
-    if (label.includes(keyword)) {
-      return Array.isArray(f.value) ? f.value.join(", ") : f.value || "";
-    }
-  }
-  return "";
-}
-
-// =========================
-// メイン
+// API
 // =========================
 app.post("/tally-pdf", async (req, res) => {
 
   console.log("🔥 HIT");
 
   try {
-
     const fields = req.body?.data?.fields || [];
 
-    const application = getValue(fields, "application");
-    const currentMaterial = getValue(fields, "current material");
-    const bioMaterial = getValue(fields, "target material");
-    const processing = getValue(fields, "processing");
-    const equipment = getValue(fields, "equipment");
-    const scale = getValue(fields, "production");
-    const concern = getValue(fields, "concern");
+    const application = getValue(fields, "application") || "Unknown";
+    const currentMaterial = getValue(fields, "current material") || "Unknown";
+    const bioMaterial = getValue(fields, "target material") || "Unknown";
+    const processing = getValue(fields, "processing") || "Unknown";
+    const equipment = getValue(fields, "equipment") || "Unknown";
+    const scale = getValue(fields, "production scale") || "Unknown";
+    const concern = getValue(fields, "concern") || "Unknown";
 
     // =========================
-    // 判定
-    // =========================
-    const score = evaluateScore({
-      material: currentMaterial,
-      process: processing,
-      equipment: equipment,
-      concern: concern
-    });
-
-    const compatibility = evaluateCompatibility(score);
-    const stability = evaluateStability(score);
-    const consistency = evaluateConsistency(score);
-
-    // =========================
-    // Claude（説明のみ）
+    // Claudeプロンプト（安定版）
     // =========================
     const prompt = `
-Explain the processing risks and feasibility in a clear and practical engineering tone.
+Return ONLY JSON.
+
+STRICT:
+- Max 2–3 sentences per field
+- Short, practical
+- No long paragraphs
+- Always valid JSON
+
+{
+  "compatibility_level": "",
+  "executive_summary": "",
+  "processing_window": "",
+  "thermal_behavior": "",
+  "flow_characteristics": "",
+  "mechanical_behavior": "",
+  "surface_quality": "",
+  "structural_consistency": "",
+  "application_implication": "",
+  "primary_risk_title": "",
+  "primary_risk": "",
+  "secondary_risk_title": "",
+  "secondary_risk": "",
+  "mechanism": "",
+  "stability": "",
+  "stability_note": "",
+  "consistency": "",
+  "consistency_note": "",
+  "visual_description": "",
+  "next_step": ""
+}
 
 Application: ${application}
-Material: ${currentMaterial} to ${bioMaterial}
+Material: ${currentMaterial} → ${bioMaterial}
 Process: ${processing}
 Equipment: ${equipment}
+Scale: ${scale}
 Concern: ${concern}
 `;
 
-    const explanation = await generateClaudeText(prompt);
+    const claudeReport = await generateClaudeHypothesis(prompt);
+
+    console.log("✅ CLAUDE GENERATED");
+
+    const parsed = safeParseJSON(claudeReport);
 
     // =========================
     // HTML
     // =========================
-    const template = fs.readFileSync("template.html", "utf8");
+    const templatePath = path.join(process.cwd(), "template.html");
+    const htmlTemplate = fs.readFileSync(templatePath, "utf8");
 
-    const finalHtml = injectHtml(template, {
+    const finalHtml = injectHtml(htmlTemplate, {
+
       application,
-      material_transition: currentMaterial + " to " + bioMaterial,
+      material_transition: `${currentMaterial} → ${bioMaterial}`,
       assessment_type: "Tier 2 – Pre-Commercial Feasibility",
       report_date: new Date().toLocaleDateString(),
 
-      compatibility_level: compatibility,
-      key_risk: "Thermal degradation and thickness instability risk",
+      compatibility_level: parsed.compatibility_level || "Moderate",
+      executive_summary: parsed.executive_summary || "",
 
-      executive_summary: explanation,
+      key_risk: parsed.primary_risk || "",
 
-      processing_window: "",
-      thermal_behavior: "",
-      flow_characteristics: "",
+      processing_window: parsed.processing_window || "",
+      thermal_behavior: parsed.thermal_behavior || "",
+      flow_characteristics: parsed.flow_characteristics || "",
 
-      mechanical_behavior: "",
-      surface_quality: "",
-      structural_consistency: "",
-      application_implication: "",
+      mechanical_behavior: parsed.mechanical_behavior || "",
+      surface_quality: parsed.surface_quality || "",
+      structural_consistency: parsed.structural_consistency || "",
+      application_implication: parsed.application_implication || "",
 
-      primary_risk_title: "Thermal degradation",
-      primary_risk: "PHA is sensitive to temperature and degrades rapidly above processing limits.",
+      primary_risk_title: parsed.primary_risk_title || "",
+      primary_risk: parsed.primary_risk || "",
 
-      secondary_risk_title: "Thickness inconsistency",
-      secondary_risk: "Low melt strength leads to unstable bubble and uneven film thickness.",
+      secondary_risk_title: parsed.secondary_risk_title || "",
+      secondary_risk: parsed.secondary_risk || "",
 
-      mechanism: "PHA undergoes thermal chain scission under excessive heat.",
+      mechanism: parsed.mechanism || "",
 
-      stability,
-      stability_note: "Requires tight temperature control",
+      stability: parsed.stability || "",
+      stability_note: parsed.stability_note || "",
 
-      consistency,
-      consistency_note: "Sensitive to process fluctuation",
+      consistency: parsed.consistency || "",
+      consistency_note: parsed.consistency_note || "",
 
-      visual_description: "Semi-transparent film with slight haze under stable processing.",
-
-      next_step: "Conduct controlled pilot trials and optimize temperature profile."
+      visual_description: parsed.visual_description || "",
+      next_step: parsed.next_step || ""
     });
 
     // =========================
-    // PDF
+    // Puppeteer
     // =========================
     const browser = await puppeteer.launch({
-      args: ["--no-sandbox"]
+      args: ["--no-sandbox", "--disable-setuid-sandbox"]
     });
 
     const page = await browser.newPage();
-    await page.setContent(finalHtml);
+
+    await page.setContent(finalHtml, {
+      waitUntil: "domcontentloaded"
+    });
 
     const pdf = await page.pdf({
       format: "A4",
@@ -212,22 +222,23 @@ Concern: ${concern}
 
     await browser.close();
 
-    // 保存
     fs.writeFileSync("/tmp/latest-report.pdf", pdf);
 
-    console.log("✅ PDF SAVED");
+    res.set({
+      "Content-Type": "application/pdf",
+      "Content-Disposition": "inline"
+    });
 
-    res.set({ "Content-Type": "application/pdf" });
-    res.send(pdf);
+    return res.send(pdf);
 
   } catch (err) {
     console.error("❌ ERROR:", err);
-    res.status(500).send("ERROR");
+    return res.status(500).send("PDF failed");
   }
 });
 
 // =========================
-// PDF確認
+// PDF取得
 // =========================
 app.get("/latest-pdf", (req, res) => {
 
@@ -237,18 +248,13 @@ app.get("/latest-pdf", (req, res) => {
     return res.status(404).send("No PDF yet");
   }
 
-  res.set({
-    "Content-Type": "application/pdf",
-    "Content-Disposition": "inline"
-  });
-
-  res.sendFile(file);
+  return res.sendFile(file);
 });
 
+// =========================
 app.listen(process.env.PORT || 3000, () => {
-  console.log("🚀 RUNNING");
+  console.log("🚀 Server running");
 });
-// HTMLテンプレ（あなたの本番HTML）
 // =========================
 const htmlTemplate = `
 <!DOCTYPE html>
