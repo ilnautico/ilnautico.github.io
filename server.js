@@ -68,7 +68,7 @@ function generateProcessVisualSVG({ material }) {
         fill="#C4963E"/>
 
       <!-- ✅ 波だけ修正（ここが今回の本体） -->
-    <path d="M390 78 Q420 58 455 78 T500 82"
+   <path d="M390 78 Q420 58 455 78 T495 80"
   stroke="#E11D48" stroke-width="2" fill="none"/>
       <!-- 下バー -->
       <rect x="380" y="122" width="120" height="5"
