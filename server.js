@@ -38,8 +38,8 @@ function generateProcessVisualSVG({ material }) {
         Wide Window (160–240°C)
       </text>
 
-      <!-- EXTRUDER -->
-      <g transform="translate(240,80)">
+      <!-- EXTRUDER（少し左へ） -->
+      <g transform="translate(220,80)">
         <rect x="0" y="0" width="30" height="18" fill="#60A5FA" stroke="#334155" stroke-width="0.4"/>
         <rect x="30" y="0" width="30" height="18" fill="#93C5FD" stroke="#334155" stroke-width="0.4"/>
         <rect x="60" y="0" width="30" height="18" fill="#FBBF24" stroke="#334155" stroke-width="0.4"/>
@@ -56,48 +56,48 @@ function generateProcessVisualSVG({ material }) {
         </text>
       </g>
 
-      <!-- ARROW（左へ） -->
-      <line x1="350" y1="90" x2="380" y2="90"
+      <!-- ARROW（短縮＆余白確保） -->
+      <line x1="330" y1="90" x2="355" y2="90"
         stroke="#64748B" stroke-width="2.5"/>
-      <polygon points="380,90 370,85 370,95"
+      <polygon points="355,90 345,85 345,95"
         fill="#64748B"/>
 
-      <!-- PHA（右へ逃がす） -->
-      <rect x="400" y="55" width="180" height="65" rx="32"
+      <!-- PHA（中央寄せ＋少し小さく） -->
+      <rect x="360" y="55" width="160" height="65" rx="32"
         fill="#C4963E"/>
 
-      <path d="M430 88 Q460 65 490 88 T550 88"
+      <path d="M390 88 Q420 65 450 88 T510 88"
         stroke="#E11D48" stroke-width="2" fill="none"/>
 
-      <rect x="420" y="122" width="140" height="5"
+      <rect x="380" y="122" width="120" height="5"
         fill="#C4963E"/>
 
-      <rect x="400" y="116" width="15" height="14"
+      <rect x="360" y="116" width="15" height="14"
         fill="#E11D48" opacity="0.6"/>
-      <rect x="565" y="116" width="15" height="14"
+      <rect x="505" y="116" width="15" height="14"
         fill="#E11D48" opacity="0.6"/>
 
-      <!-- TEXT（最後＆上に逃がす） -->
-      <text x="490" y="48" text-anchor="middle"
+      <!-- TEXT -->
+      <text x="440" y="48" text-anchor="middle"
         font-size="9" fill="#334155">PHA</text>
 
-      <text x="490" y="102" text-anchor="middle"
+      <text x="440" y="102" text-anchor="middle"
         font-size="8" fill="#E11D48">
         Bubble Instability
       </text>
 
-      <text x="490" y="142" text-anchor="middle"
+      <text x="440" y="142" text-anchor="middle"
         font-size="7.5" fill="#64748B">
         Narrow Window + Degradation Risk
       </text>
 
-      <text x="490" y="154" text-anchor="middle"
+      <text x="440" y="154" text-anchor="middle"
         font-size="7" fill="#E11D48">
         Degradation Threshold
       </text>
 
       <!-- Transition（上に逃がす） -->
-      <text x="365" y="68" text-anchor="middle"
+      <text x="345" y="55" text-anchor="middle"
         font-size="7.5" fill="#64748B">
         Transition
       </text>
@@ -106,7 +106,6 @@ function generateProcessVisualSVG({ material }) {
   </div>
   `;
 }
-
 
 // =========================
 // HTML差し込み
