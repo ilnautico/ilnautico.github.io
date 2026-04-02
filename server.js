@@ -72,9 +72,9 @@ function generateProcessVisualSVG({ material }) {
       <rect x="380" y="122" width="120" height="5"
         fill="#C4963E"/>
 
-      <rect x="360" y="116" width="15" height="14"
+      <rect x="370" y="118" width="12" height="12"
         fill="#E11D48" opacity="0.6"/>
-      <rect x="505" y="116" width="15" height="14"
+     <rect x="508" y="118" width="12" height="12"
         fill="#E11D48" opacity="0.6"/>
 
       <!-- TEXT -->
