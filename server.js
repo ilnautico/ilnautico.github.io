@@ -237,18 +237,24 @@ Material: ${currentMaterial} → ${bioMaterial}
       next_step: (parsed.next_step || "") + regionalNote
     });
 
-    const browser = await puppeteer.launch({
-      args: ["--no-sandbox", "--disable-setuid-sandbox"]
-    });
+   const browser = await puppeteer.launch({
+  args: [
+    "--no-sandbox",
+    "--disable-setuid-sandbox",
+    "--disable-dev-shm-usage"
+  ]
+});
 
-    const page = await browser.newPage();
+const page = await browser.newPage(); // ← これ復活させる
 
-    await page.setContent(html, { waitUntil: "domcontentloaded" });
+await page.setContent(html, { waitUntil: "domcontentloaded" });
 
-    const pdf = await page.pdf({
-      format: "A4",
-      printBackground: true
-    });
+await new Promise(r => setTimeout(r, 800)); // 安定化
+
+const pdf = await page.pdf({
+  format: "A4",
+  printBackground: true
+});
 
     await browser.close();
 
