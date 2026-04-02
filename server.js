@@ -132,7 +132,7 @@ app.post("/tally-pdf", async (req, res) => {
   console.log("🔥 HIT");
 
   try {
-    const material = "PHA"; // ←仮固定（まずは確認用）
+    const material = "PHA";
 
     const template = fs.readFileSync("template.html", "utf8");
 
@@ -142,28 +142,29 @@ app.post("/tally-pdf", async (req, res) => {
 
     console.log("📄 HTML OK");
 
-const page = await browser.newPage();
+    // ✅ ここ必須（消えてる原因）
+    const browser = await puppeteer.launch({
+      headless: "new",
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-gpu"
+      ]
+    });
 
-// ★ここ変更
-await page.setContent(html, { waitUntil: "networkidle0" });
+    const page = await browser.newPage();
 
-// ★これ追加（安定用）
-await page.evaluateHandle('document.fonts.ready');
+    await page.setContent(html, { waitUntil: "networkidle0" });
 
-const pdf = await page.pdf({
-  format: "A4",
-  printBackground: true
-});
+    await page.evaluateHandle('document.fonts.ready');
 
-await page.setDefaultNavigationTimeout(0);
+    const pdf = await page.pdf({
+      format: "A4",
+      printBackground: true
+    });
 
-await page.setContent(html, { waitUntil: "domcontentloaded" });
-
-await new Promise(r => setTimeout(r, 300));
-
-
-
-await browser.close();
+    await browser.close();
 
     fs.writeFileSync("/tmp/latest-report.pdf", pdf);
 
