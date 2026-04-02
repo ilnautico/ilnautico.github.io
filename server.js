@@ -25,6 +25,7 @@ function generateProcessVisualSVG({ material }) {
       <!-- ===== LDPE ===== -->
       <rect x="40" y="55" width="180" height="65" rx="32"
         fill="#CBD5E1"/>
+
       <text x="130" y="48" text-anchor="middle"
         font-size="9" fill="#334155">LDPE</text>
 
@@ -41,66 +42,55 @@ function generateProcessVisualSVG({ material }) {
         Wide Window (160–240°C)
       </text>
 
-
       <!-- ===== EXTRUDER ===== -->
       <g transform="translate(230,80)">
-        <rect x="0" y="0" width="30" height="18" fill="#60A5FA" stroke="#334155" stroke-width="0.4"/>
-        <rect x="30" y="0" width="30" height="18" fill="#93C5FD" stroke="#334155" stroke-width="0.4"/>
-        <rect x="60" y="0" width="30" height="18" fill="#FBBF24" stroke="#334155" stroke-width="0.4"/>
-        <rect x="90" y="0" width="30" height="18" fill="#F87171" stroke="#334155" stroke-width="0.4"/>
+        <rect x="0" y="0" width="30" height="18" fill="#60A5FA"/>
+        <rect x="30" y="0" width="30" height="18" fill="#93C5FD"/>
+        <rect x="60" y="0" width="30" height="18" fill="#FBBF24"/>
+        <rect x="90" y="0" width="30" height="18" fill="#F87171"/>
 
-        <text x="15" y="-6" font-size="6.5" text-anchor="middle" fill="#64748B">Z1</text>
-        <text x="45" y="-6" font-size="6.5" text-anchor="middle" fill="#64748B">Z2</text>
-        <text x="75" y="-6" font-size="6.5" text-anchor="middle" fill="#64748B">Z3</text>
-        <text x="105" y="-6" font-size="6.5" text-anchor="middle" fill="#64748B">Z4</text>
-
-        <text x="60" y="-16" text-anchor="middle"
-          font-size="7.5" fill="#64748B">
-          Temperature Control
+        <text x="60" y="-14" text-anchor="middle"
+          font-size="7" fill="#64748B">
+          Temperature
         </text>
       </g>
 
-
       <!-- ===== ARROW ===== -->
       <line x1="350" y1="90" x2="380" y2="90"
-        stroke="#64748B" stroke-width="2.5"/>
+        stroke="#64748B" stroke-width="2"/>
       <polygon points="380,90 370,85 370,95"
         fill="#64748B"/>
 
-
       <!-- ===== PHA ===== -->
-      <!-- 中心 = 440 -->
+      <!-- 中心 440 -->
       <rect x="360" y="55" width="160" height="65" rx="32"
         fill="#C4963E"/>
 
-      <!-- 波（完全中央配置） -->
-      <path d="M400 90 Q440 65 480 90 T560 90"
-        stroke="#E11D48" stroke-width="2" fill="none"/>
-
-      <!-- 下バー（中央基準） -->
-      <rect x="400" y="122" width="120" height="5"
-        fill="#C4963E"/>
-
-      <!-- リスク端（左右対称） -->
-      <rect x="388" y="118" width="12" height="12"
-        fill="#E11D48" opacity="0.6"/>
-
-      <rect x="520" y="118" width="12" height="12"
-        fill="#E11D48" opacity="0.6"/>
-
-
-      <!-- ===== TEXT ===== -->
       <text x="440" y="48" text-anchor="middle"
         font-size="9" fill="#334155">PHA</text>
+
+      <!-- 波（完全中央＋範囲内） -->
+      <path d="M400 90 Q440 65 480 90 T520 90"
+        stroke="#E11D48" stroke-width="2" fill="none"/>
 
       <text x="440" y="100" text-anchor="middle"
         font-size="8" fill="#E11D48">
         Bubble Instability
       </text>
 
+      <!-- 下バー（中央固定） -->
+      <rect x="400" y="122" width="80" height="5"
+        fill="#C4963E"/>
+
+      <!-- 赤端（左右対称） -->
+      <rect x="388" y="118" width="12" height="12"
+        fill="#E11D48" opacity="0.6"/>
+      <rect x="480" y="118" width="12" height="12"
+        fill="#E11D48" opacity="0.6"/>
+
       <text x="440" y="142" text-anchor="middle"
         font-size="7.5" fill="#64748B">
-        Narrow Window + Degradation Risk
+        Narrow Window + Risk
       </text>
 
       <text x="440" y="154" text-anchor="middle"
@@ -108,10 +98,9 @@ function generateProcessVisualSVG({ material }) {
         Degradation Threshold
       </text>
 
-
-      <!-- ===== TRANSITION ===== -->
+      <!-- Transition -->
       <text x="365" y="70" text-anchor="middle"
-        font-size="7.5" fill="#64748B">
+        font-size="7" fill="#64748B">
         Transition
       </text>
 
