@@ -161,10 +161,7 @@ await page.setContent(html, { waitUntil: "domcontentloaded" });
 
 await new Promise(r => setTimeout(r, 300));
 
-const pdf = await page.pdf({
-  format: "A4",
-  printBackground: true
-});
+
 
 await browser.close();
 
