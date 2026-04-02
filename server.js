@@ -14,94 +14,82 @@ app.use(express.urlencoded({ extended: true }));
 function generateProcessVisualSVG({ material }) {
   return `
   <div style="width:100%; text-align:center; margin:4px 0;">
-    <svg width="100%" height="170" viewBox="0 0 600 170">
+    <svg width="100%" height="160" viewBox="0 0 600 160">
 
       <!-- TITLE -->
-      <text x="300" y="20" text-anchor="middle"
+      <text x="300" y="18" text-anchor="middle"
         font-size="10" fill="#334155">
         Processing Behavior Comparison (LDPE vs PHA)
       </text>
 
       <!-- ===== LDPE ===== -->
-      <rect x="40" y="55" width="180" height="65" rx="32"
+      <rect x="40" y="50" width="170" height="60" rx="30"
         fill="#CBD5E1"/>
 
-      <text x="130" y="48" text-anchor="middle"
+      <text x="125" y="45" text-anchor="middle"
         font-size="9" fill="#334155">LDPE</text>
 
-      <text x="130" y="90" text-anchor="middle"
+      <text x="125" y="85" text-anchor="middle"
         font-size="8.5" fill="#334155">
-        Highly Stable Bubble
+        Stable Bubble
       </text>
 
-      <rect x="40" y="122" width="180" height="5"
+      <rect x="40" y="115" width="170" height="4"
         fill="#94A3B8"/>
 
-      <text x="130" y="142" text-anchor="middle"
-        font-size="7.5" fill="#64748B">
-        Wide Window (160–240°C)
+      <text x="125" y="135" text-anchor="middle"
+        font-size="7" fill="#64748B">
+        Wide Window
       </text>
 
       <!-- ===== EXTRUDER ===== -->
-      <g transform="translate(230,80)">
-        <rect x="0" y="0" width="30" height="18" fill="#60A5FA"/>
-        <rect x="30" y="0" width="30" height="18" fill="#93C5FD"/>
-        <rect x="60" y="0" width="30" height="18" fill="#FBBF24"/>
-        <rect x="90" y="0" width="30" height="18" fill="#F87171"/>
-
-        <text x="60" y="-14" text-anchor="middle"
-          font-size="7" fill="#64748B">
-          Temperature
-        </text>
+      <g transform="translate(210,75)">
+        <rect x="0" y="0" width="25" height="15" fill="#60A5FA"/>
+        <rect x="25" y="0" width="25" height="15" fill="#93C5FD"/>
+        <rect x="50" y="0" width="25" height="15" fill="#FBBF24"/>
+        <rect x="75" y="0" width="25" height="15" fill="#F87171"/>
       </g>
 
       <!-- ===== ARROW ===== -->
-      <line x1="350" y1="90" x2="380" y2="90"
+      <line x1="310" y1="82" x2="335" y2="82"
         stroke="#64748B" stroke-width="2"/>
-      <polygon points="380,90 370,85 370,95"
+      <polygon points="335,82 325,77 325,87"
         fill="#64748B"/>
 
-      <!-- ===== PHA ===== -->
-      <!-- 中心 440 -->
-      <rect x="360" y="55" width="160" height="65" rx="32"
+      <!-- ===== PHA（中央に寄せ直し） ===== -->
+      <rect x="340" y="50" width="150" height="60" rx="30"
         fill="#C4963E"/>
 
-      <text x="440" y="48" text-anchor="middle"
+      <text x="415" y="45" text-anchor="middle"
         font-size="9" fill="#334155">PHA</text>
 
-      <!-- 波（完全中央＋範囲内） -->
-      <path d="M400 90 Q440 65 480 90 T520 90"
+      <!-- 波（完全収める） -->
+      <path d="M360 82 Q400 60 440 82 T480 82"
         stroke="#E11D48" stroke-width="2" fill="none"/>
 
-      <text x="440" y="100" text-anchor="middle"
+      <text x="415" y="95" text-anchor="middle"
         font-size="8" fill="#E11D48">
-        Bubble Instability
+        Instability
       </text>
 
-      <!-- 下バー（中央固定） -->
-      <rect x="400" y="122" width="80" height="5"
+      <!-- 下バー（短く＆中央） -->
+      <rect x="370" y="115" width="90" height="4"
         fill="#C4963E"/>
 
-      <!-- 赤端（左右対称） -->
-      <rect x="388" y="118" width="12" height="12"
+      <!-- 赤端 -->
+      <rect x="360" y="112" width="10" height="10"
         fill="#E11D48" opacity="0.6"/>
-      <rect x="480" y="118" width="12" height="12"
+      <rect x="460" y="112" width="10" height="10"
         fill="#E11D48" opacity="0.6"/>
 
-      <text x="440" y="142" text-anchor="middle"
-        font-size="7.5" fill="#64748B">
-        Narrow Window + Risk
-      </text>
-
-      <text x="440" y="154" text-anchor="middle"
-        font-size="7" fill="#E11D48">
-        Degradation Threshold
-      </text>
-
-      <!-- Transition -->
-      <text x="365" y="70" text-anchor="middle"
+      <text x="415" y="135" text-anchor="middle"
         font-size="7" fill="#64748B">
-        Transition
+        Narrow + Risk
+      </text>
+
+      <text x="415" y="147" text-anchor="middle"
+        font-size="6.5" fill="#E11D48">
+        Degradation
       </text>
 
     </svg>
