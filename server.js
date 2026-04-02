@@ -14,84 +14,101 @@ app.use(express.urlencoded({ extended: true }));
 function generateProcessVisualSVG({ material }) {
   return `
   <div style="width:100%; text-align:center; margin:6px 0;">
-    <svg width="100%" height="180" viewBox="0 0 600 180">
+    <svg width="100%" height="170" viewBox="0 0 600 170">
 
       <!-- ===== TITLE ===== -->
-      <text x="300" y="20" text-anchor="middle"
+      <text x="300" y="18" text-anchor="middle"
         font-size="11" fill="#334155">
         Processing Behavior Comparison (LDPE vs PHA)
       </text>
 
-      <!-- ===== LDPE (LEFT) ===== -->
-      <rect x="60" y="55" width="180" height="70" rx="35"
+      <!-- ===== LDPE ===== -->
+      <rect x="60" y="50" width="180" height="65" rx="32"
         fill="#CBD5E1"/>
-      <text x="150" y="50" text-anchor="middle"
+      <text x="150" y="45" text-anchor="middle"
         font-size="10" fill="#334155">LDPE</text>
 
-      <!-- Stable Bubble -->
-      <text x="150" y="95" text-anchor="middle"
-        font-size="9" fill="#475569">
-        Stable Bubble
+      <text x="150" y="88" text-anchor="middle"
+        font-size="9" fill="#334155">
+        Highly Stable Bubble
       </text>
 
-      <!-- Wide Processing Window -->
-      <rect x="60" y="130" width="180" height="6"
+      <rect x="60" y="120" width="180" height="5"
         fill="#94A3B8"/>
-      <text x="150" y="150" text-anchor="middle"
+      <text x="150" y="140" text-anchor="middle"
         font-size="8" fill="#64748B">
         Wide Window (160–240°C)
       </text>
 
-      <!-- ===== EXTRUDER (CENTER) ===== -->
-      <!-- Barrel -->
-      <rect x="240" y="85" width="120" height="10"
+      <!-- ===== EXTRUDER ===== -->
+      <rect x="240" y="75" width="120" height="10"
         fill="#94A3B8"/>
 
       <!-- Temperature Zones -->
-      <rect x="240" y="80" width="30" height="20" fill="#60A5FA"/>
-      <rect x="270" y="80" width="30" height="20" fill="#93C5FD"/>
-      <rect x="300" y="80" width="30" height="20" fill="#FBBF24"/>
-      <rect x="330" y="80" width="30" height="20" fill="#F87171"/>
+      <rect x="240" y="70" width="30" height="20"
+        fill="#60A5FA" stroke="#334155" stroke-width="0.4"/>
+      <rect x="270" y="70" width="30" height="20"
+        fill="#93C5FD" stroke="#334155" stroke-width="0.4"/>
+      <rect x="300" y="70" width="30" height="20"
+        fill="#FBBF24" stroke="#334155" stroke-width="0.4"/>
+      <rect x="330" y="70" width="30" height="20"
+        fill="#F87171" stroke="#334155" stroke-width="0.4"/>
 
-      <!-- Labels -->
-      <text x="300" y="70" text-anchor="middle"
+      <!-- Zone Labels -->
+      <text x="255" y="65" font-size="7" text-anchor="middle" fill="#64748B">Z1</text>
+      <text x="285" y="65" font-size="7" text-anchor="middle" fill="#64748B">Z2</text>
+      <text x="315" y="65" font-size="7" text-anchor="middle" fill="#64748B">Z3</text>
+      <text x="345" y="65" font-size="7" text-anchor="middle" fill="#64748B">Z4</text>
+
+      <text x="300" y="55" text-anchor="middle"
         font-size="8" fill="#64748B">
-        Temperature Zones
+        Temperature Control Zones
       </text>
 
       <!-- Arrow -->
-      <line x1="360" y1="90" x2="390" y2="90"
-        stroke="#94A3B8" stroke-width="2"/>
-      <polygon points="390,90 380,85 380,95"
-        fill="#94A3B8"/>
+      <line x1="360" y1="80" x2="390" y2="80"
+        stroke="#64748B" stroke-width="2.5"/>
+      <polygon points="390,80 380,75 380,85"
+        fill="#64748B"/>
 
-      <!-- ===== PHA (RIGHT) ===== -->
-      <rect x="390" y="60" width="140" height="60" rx="30"
+      <text x="375" y="70" text-anchor="middle"
+        font-size="8" fill="#64748B">
+        Material Transition
+      </text>
+
+      <!-- ===== PHA ===== -->
+      <rect x="390" y="55" width="140" height="60" rx="30"
         fill="#C4963E"/>
-      <text x="460" y="50" text-anchor="middle"
+      <text x="460" y="45" text-anchor="middle"
         font-size="10" fill="#334155">PHA</text>
 
       <!-- Instability Curve -->
-      <path d="M410 90 Q430 70 450 90 T490 90"
+      <path d="M410 85 Q430 65 450 85 T490 85"
         stroke="#E11D48" stroke-width="2" fill="none"/>
-      <text x="460" y="105" text-anchor="middle"
+
+      <text x="460" y="100" text-anchor="middle"
         font-size="8" fill="#E11D48">
         Bubble Instability
       </text>
 
       <!-- Narrow Window -->
-      <rect x="400" y="130" width="120" height="6"
+      <rect x="400" y="120" width="120" height="5"
         fill="#C4963E"/>
 
-      <!-- Risk Ends -->
-      <rect x="390" y="125" width="15" height="16"
+      <!-- Risk Zones -->
+      <rect x="390" y="115" width="15" height="15"
         fill="#E11D48" opacity="0.6"/>
-      <rect x="515" y="125" width="15" height="16"
+      <rect x="515" y="115" width="15" height="15"
         fill="#E11D48" opacity="0.6"/>
 
-      <text x="460" y="150" text-anchor="middle"
+      <text x="460" y="140" text-anchor="middle"
         font-size="8" fill="#64748B">
         Narrow Window + Degradation Risk
+      </text>
+
+      <text x="460" y="152" text-anchor="middle"
+        font-size="7" fill="#E11D48">
+        Degradation Threshold
       </text>
 
     </svg>
