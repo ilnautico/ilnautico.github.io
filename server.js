@@ -1,7 +1,6 @@
 import express from "express";
 import puppeteer from "puppeteer";
 import fs from "fs";
-import fetch from "node-fetch";
 
 const app = express();
 
@@ -9,20 +8,18 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // =========================
-// SVG生成（←今回の本体）
-/* 絶対にここに置く */
-function generateProcessVisualSVG({ material }) {
+// SVG（最終版）
+function generateProcessVisualSVG() {
   return `
   <div style="width:100%; text-align:center; margin:4px 0;">
     <svg width="100%" height="190" viewBox="0 0 600 190">
 
-      <!-- TITLE -->
       <text x="300" y="20" text-anchor="middle"
         font-size="10" fill="#334155">
         Film Extrusion Behavior (LDPE vs PHA)
       </text>
 
-      <!-- ===== EXTRUDER ===== -->
+      <!-- EXTRUDER -->
       <rect x="20" y="95" width="100" height="18" rx="4"
         fill="#334155"/>
       <line x1="25" y1="104" x2="115" y2="104"
@@ -30,25 +27,15 @@ function generateProcessVisualSVG({ material }) {
       <rect x="115" y="92" width="8" height="24"
         fill="#64748B"/>
 
-      <!-- ===== TEMPERATURE ZONES（復活） ===== -->
+      <!-- TEMP ZONES -->
       <g transform="translate(130,85)">
-        <rect x="0" y="0" width="30" height="18" fill="#60A5FA" stroke="#334155" stroke-width="0.4"/>
-        <rect x="30" y="0" width="30" height="18" fill="#93C5FD" stroke="#334155" stroke-width="0.4"/>
-        <rect x="60" y="0" width="30" height="18" fill="#FBBF24" stroke="#334155" stroke-width="0.4"/>
-        <rect x="90" y="0" width="30" height="18" fill="#F87171" stroke="#334155" stroke-width="0.4"/>
-
-        <text x="15" y="-6" font-size="6.5" text-anchor="middle" fill="#64748B">Z1</text>
-        <text x="45" y="-6" font-size="6.5" text-anchor="middle" fill="#64748B">Z2</text>
-        <text x="75" y="-6" font-size="6.5" text-anchor="middle" fill="#64748B">Z3</text>
-        <text x="105" y="-6" font-size="6.5" text-anchor="middle" fill="#64748B">Z4</text>
-
-        <text x="60" y="-16" text-anchor="middle"
-          font-size="7.5" fill="#64748B">
-          Temperature Control
-        </text>
+        <rect x="0" y="0" width="30" height="18" fill="#60A5FA"/>
+        <rect x="30" y="0" width="30" height="18" fill="#93C5FD"/>
+        <rect x="60" y="0" width="30" height="18" fill="#FBBF24"/>
+        <rect x="90" y="0" width="30" height="18" fill="#F87171"/>
       </g>
 
-      <!-- ===== LDPE ===== -->
+      <!-- LDPE -->
       <ellipse cx="240" cy="95" rx="75" ry="50"
         fill="#CBD5E1"/>
 
@@ -59,27 +46,23 @@ function generateProcessVisualSVG({ material }) {
 
       <rect x="180" y="145" width="120" height="5"
         fill="#94A3B8"/>
+
       <text x="240" y="165" text-anchor="middle"
         font-size="7.5" fill="#64748B">
         Wide Processing Window
       </text>
 
-      <!-- ===== TRANSITION ===== -->
+      <!-- ARROW -->
       <line x1="300" y1="95" x2="330" y2="95"
         stroke="#64748B" stroke-width="2.5"/>
       <polygon points="330,95 320,90 320,100"
         fill="#64748B"/>
 
-      <text x="315" y="70" text-anchor="middle"
-        font-size="7.5" fill="#64748B">
-        Material Transition
-      </text>
-
-      <!-- ===== PHA ===== -->
+      <!-- PHA -->
       <ellipse cx="420" cy="95" rx="75" ry="50"
         fill="#C4963E"/>
 
-      <!-- 波（中央固定・はみ出さない） -->
+      <!-- WAVE（修正版） -->
       <path d="M380 88 Q420 65 460 88 T480 88"
         stroke="#E11D48" stroke-width="2.2" fill="none"/>
 
@@ -88,11 +71,9 @@ function generateProcessVisualSVG({ material }) {
         Bubble Instability
       </text>
 
-      <!-- バー -->
       <rect x="360" y="145" width="120" height="5"
         fill="#C4963E"/>
 
-      <!-- リスク -->
       <rect x="350" y="138" width="12" height="14"
         fill="#E11D48" opacity="0.6"/>
       <rect x="470" y="138" width="12" height="14"
@@ -113,6 +94,9 @@ function generateProcessVisualSVG({ material }) {
   `;
 }
 // =========================
+
+
+// =========================
 // HTML差し込み
 function injectHtml(template, data) {
   let html = template;
@@ -128,23 +112,19 @@ function injectHtml(template, data) {
 
 
 // =========================
-// MAIN（←これだけ確認用）
+// MAIN
 app.post("/tally-pdf", async (req, res) => {
-
   console.log("🔥 HIT");
 
   try {
-    const material = "PHA";
-
     const template = fs.readFileSync("template.html", "utf8");
 
     const html = injectHtml(template, {
-      process_visual: generateProcessVisualSVG({ material })
+      process_visual: generateProcessVisualSVG()
     });
 
     console.log("📄 HTML OK");
 
-    // ✅ ここ必須（消えてる原因）
     const browser = await puppeteer.launch({
       headless: "new",
       args: [
@@ -157,14 +137,26 @@ app.post("/tally-pdf", async (req, res) => {
 
     const page = await browser.newPage();
 
-    await page.setContent(html, { waitUntil: "domcontentloaded" });
+    // 🔥 タイムアウト完全解除
+    await page.setDefaultNavigationTimeout(0);
+    await page.setDefaultTimeout(0);
 
-await new Promise(resolve => setTimeout(resolve, 300));
+    await page.setContent(html, {
+      waitUntil: "domcontentloaded"
+    });
 
-const pdf = await page.pdf({
-  format: "A4",
-  printBackground: true
-});
+    // フォント待機
+    await page.evaluate(() => document.fonts.ready);
+
+    // SVG安定待ち
+    await new Promise(r => setTimeout(r, 500));
+
+    const pdf = await page.pdf({
+      format: "A4",
+      printBackground: true,
+      timeout: 0
+    });
+
     await browser.close();
 
     fs.writeFileSync("/tmp/latest-report.pdf", pdf);
@@ -179,6 +171,7 @@ const pdf = await page.pdf({
     res.status(500).send("error");
   }
 });
+// =========================
 
 
 // =========================
