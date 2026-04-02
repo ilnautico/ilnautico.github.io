@@ -107,7 +107,6 @@ function generateProcessVisualSVG({ material }) {
   </div>
   `;
 }
-
 // =========================
 // HTML差し込み
 function injectHtml(template, data) {
