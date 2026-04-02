@@ -140,23 +140,30 @@ app.post("/tally-pdf", async (req, res) => {
 
     console.log("📄 HTML OK");
 
-    const browser = await puppeteer.launch({
+const browser = await puppeteer.launch({
   headless: "new",
-  args: ["--no-sandbox", "--disable-setuid-sandbox"]
+  args: [
+    "--no-sandbox",
+    "--disable-setuid-sandbox",
+    "--disable-dev-shm-usage",
+    "--disable-gpu"
+  ]
 });
 
 const page = await browser.newPage();
 
+await page.setDefaultNavigationTimeout(0);
+
 await page.setContent(html, { waitUntil: "domcontentloaded" });
 
-await new Promise(r => setTimeout(r, 500));
+await new Promise(r => setTimeout(r, 300));
 
 const pdf = await page.pdf({
   format: "A4",
   printBackground: true
 });
 
-    await browser.close();
+await browser.close();
 
     fs.writeFileSync("/tmp/latest-report.pdf", pdf);
 
