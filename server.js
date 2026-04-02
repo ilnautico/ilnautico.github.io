@@ -16,63 +16,82 @@ function generateProcessVisualSVG({ material }) {
 
   return `
   <div style="width:100%; text-align:center; margin:12px 0;">
-    <svg width="100%" height="240" viewBox="0 0 600 240">
+    <svg width="100%" height="260" viewBox="0 0 640 260">
 
       <!-- Background -->
-      <rect width="600" height="240" fill="#ffffff"/>
+      <rect width="640" height="260" fill="#ffffff"/>
+
+      <!-- ===== TITLE ===== -->
+      <text x="320" y="30" text-anchor="middle"
+        font-size="12" fill="#475569">
+        Processing Behavior Comparison
+      </text>
 
       <!-- ===== LDPE ===== -->
-      <rect x="60" y="70" width="180" height="80" rx="40"
+      <rect x="80" y="80" width="200" height="90" rx="45"
         fill="#CBD5E1"/>
-      <text x="150" y="60" text-anchor="middle"
+      <text x="180" y="70" text-anchor="middle"
         font-size="12" fill="#334155">LDPE</text>
 
-      <!-- LDPE Stable Zone -->
-      <rect x="60" y="160" width="180" height="8"
+      <!-- LDPE Stable Window -->
+      <rect x="80" y="185" width="200" height="10"
         fill="#94A3B8"/>
-      <text x="150" y="185" text-anchor="middle"
+
+      <!-- LDPE Label -->
+      <text x="180" y="210" text-anchor="middle"
         font-size="9" fill="#64748B">
-        Wide Processing Window
+        Wide Window (160–240°C)
       </text>
 
       <!-- ===== ARROW ===== -->
-      <line x1="240" y1="110" x2="360" y2="110"
+      <line x1="280" y1="125" x2="380" y2="125"
         stroke="#94A3B8" stroke-width="2"/>
-      <polygon points="360,110 350,105 350,115"
+      <polygon points="380,125 370,120 370,130"
         fill="#94A3B8"/>
 
       <!-- ===== PHA ===== -->
-      <rect x="360" y="90" width="140" height="60" rx="30"
+      <rect x="400" y="95" width="150" height="70" rx="35"
         fill="#C4963E"/>
-      <text x="430" y="60" text-anchor="middle"
+
+      <text x="475" y="70" text-anchor="middle"
         font-size="12" fill="#334155">PHA</text>
 
-      <!-- PHA Stable Narrow -->
-      <rect x="380" y="160" width="100" height="8"
+      <!-- PHA Narrow Window -->
+      <rect x="420" y="185" width="110" height="10"
         fill="#C4963E"/>
 
-      <!-- PHA Risk Zones -->
-      <rect x="360" y="155" width="20" height="18"
-        fill="#E11D48" opacity="0.6"/>
-      <rect x="480" y="155" width="20" height="18"
-        fill="#E11D48" opacity="0.6"/>
+      <!-- ===== RISK ZONES ===== -->
+      <rect x="400" y="180" width="20" height="20"
+        fill="#E11D48" opacity="0.7"/>
+      <rect x="530" y="180" width="20" height="20"
+        fill="#E11D48" opacity="0.7"/>
 
-      <text x="430" y="185" text-anchor="middle"
+      <!-- Risk label -->
+      <text x="475" y="215" text-anchor="middle"
         font-size="9" fill="#64748B">
-        Narrow + Degradation Risk
+        Narrow Window + Degradation Risk
       </text>
 
-      <!-- Caption -->
-      <text x="300" y="215" text-anchor="middle"
-        font-size="10" fill="#64748B">
-        Thermal Processing Window Comparison
+      <!-- ===== INSTABILITY VISUAL ===== -->
+      <!-- 波線で不安定表現 -->
+      <path d="M400 130 Q410 120 420 130 Q430 140 440 130 Q450 120 460 130"
+        stroke="#E11D48" stroke-width="1.5" fill="none" opacity="0.6"/>
+
+      <text x="475" y="150" text-anchor="middle"
+        font-size="8.5" fill="#E11D48">
+        Bubble Instability
+      </text>
+
+      <!-- ===== TEMPERATURE BAND ===== -->
+      <text x="475" y="235" text-anchor="middle"
+        font-size="8.5" fill="#64748B">
+        Typical: 150–175°C ±10°C
       </text>
 
     </svg>
   </div>
   `;
-}
-// =========================
+}// =========================
 
 
 // =========================
