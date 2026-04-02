@@ -9,13 +9,6 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // =========================
-// ✅ GET（動作確認用）←追加
-// =========================
-app.get("/", (req, res) => {
-  res.send("OK");
-});
-
-// =========================
 // Claude
 // =========================
 async function generateClaudeHypothesis(prompt) {
@@ -88,52 +81,6 @@ function getValue(fields, keyword) {
 }
 
 // =========================
-// 🎨 SVGグラフィック
-// =========================
-function generateProcessVisualSVG({ material }) {
-
-  const phaMin = 155;
-  const phaMax = 175;
-
-  const ldpeMin = 160;
-  const ldpeMax = 240;
-
-  const scaleMin = 140;
-  const scaleMax = 250;
-
-  function mapTempToX(temp) {
-    return 100 + ((temp - scaleMin) / (scaleMax - scaleMin)) * 400;
-  }
-
-  const phaX = mapTempToX(phaMin);
-  const phaWidth = mapTempToX(phaMax) - phaX;
-
-  const ldpeX = mapTempToX(ldpeMin);
-  const ldpeWidth = mapTempToX(ldpeMax) - ldpeX;
-
-  return `
-  <svg width="100%" height="220" viewBox="0 0 600 220">
-    <rect x="0" y="0" width="600" height="220" fill="#ffffff"/>
-
-    <rect x="${ldpeX}" y="60" width="${ldpeWidth}" height="40"
-      fill="#dfe7ef" stroke="#b8c8d8"/>
-
-    <rect x="${phaX}" y="110" width="${phaWidth}" height="40"
-      fill="#c4963e" opacity="0.9"/>
-
-    <text x="100" y="40" font-size="12" fill="#6b7c8f">Temperature (°C)</text>
-
-    <line x1="100" y1="180" x2="500" y2="180" stroke="#17263c"/>
-
-    <text x="100" y="200" font-size="10">140</text>
-    <text x="250" y="200" font-size="10">180</text>
-    <text x="400" y="200" font-size="10">220</text>
-    <text x="500" y="200" font-size="10">250</text>
-  </svg>
-  `;
-}
-
-// =========================
 // HTML差し込み
 // =========================
 function injectHtml(template, data) {
@@ -179,8 +126,16 @@ app.post("/tally-pdf", async (req, res) => {
     if ((notes || "").toLowerCase().includes("middle east")) {
       regionalNote += `
       <br><br>
-      <strong>Environmental Constraint</strong><br>
-      High ambient temperature may affect cooling efficiency.
+      <strong>Environmental Constraint (Middle East)</strong><br><br>
+      High ambient temperature may reduce cooling efficiency and increase melt drift.
+      `;
+    }
+
+    if ((notes || "").toLowerCase().includes("humidity")) {
+      regionalNote += `
+      <br><br>
+      <strong>Environmental Constraint (Humidity)</strong><br><br>
+      Moisture may accelerate hydrolytic degradation.
       `;
     }
 
@@ -189,6 +144,7 @@ app.post("/tally-pdf", async (req, res) => {
     // =========================
     const prompt = `
 Return ONLY JSON.
+
 {
   "executive_summary": "",
   "processing_window": "",
@@ -200,26 +156,34 @@ Return ONLY JSON.
   "application_implication": "",
   "primary_risk_title": "",
   "primary_risk": "",
+  "secondary_risk_title": "",
+  "secondary_risk": "",
   "mechanism": "",
   "stability": "",
+  "stability_note": "",
   "consistency": "",
+  "consistency_note": "",
   "visual_description": "",
   "next_step": ""
 }
+
 Application: ${application}
 Material: ${currentMaterial} → ${bioMaterial}
+Process: ${processing}
 `;
 
-    const parsed = safeParseJSON(await generateClaudeHypothesis(prompt));
+    const claudeText = await generateClaudeHypothesis(prompt);
+    const parsed = safeParseJSON(claudeText);
 
     const template = fs.readFileSync("template.html", "utf8");
 
     const html = injectHtml(template, {
-
       application,
       material_transition: `${currentMaterial} → ${bioMaterial}`,
-      compatibility_level: compatibility,
+      assessment_type: "Tier 2",
+      report_date: new Date().toLocaleDateString(),
 
+      compatibility_level: compatibility,
       executive_summary: parsed.executive_summary,
       key_risk: parsed.primary_risk,
 
@@ -227,36 +191,67 @@ Material: ${currentMaterial} → ${bioMaterial}
       thermal_behavior: parsed.thermal_behavior,
       flow_characteristics: parsed.flow_characteristics,
 
-      visual_description: parsed.visual_description,
+      mechanical_behavior: parsed.mechanical_behavior,
+      surface_quality: parsed.surface_quality,
+      structural_consistency: parsed.structural_consistency,
+      application_implication: parsed.application_implication,
 
-      // 👇グラフィック
-      process_visual: generateProcessVisualSVG({
-        material: bioMaterial
-      }),
+      primary_risk_title: parsed.primary_risk_title,
+      primary_risk: parsed.primary_risk,
+
+      secondary_risk_title: parsed.secondary_risk_title,
+      secondary_risk: parsed.secondary_risk,
+
+      mechanism: parsed.mechanism,
+
+      stability: parsed.stability,
+      stability_note: parsed.stability_note,
+
+      consistency: parsed.consistency,
+      consistency_note: parsed.consistency_note,
+
+      visual_description: parsed.visual_description,
 
       next_step: (parsed.next_step || "") + regionalNote
     });
 
-   const browser = await puppeteer.launch({
-  args: [
-    "--no-sandbox",
-    "--disable-setuid-sandbox",
-    "--disable-dev-shm-usage"
-  ]
-});
+    console.log("📄 HTML生成OK");
 
-const page = await browser.newPage(); // ← これ復活させる
+    // =========================
+    // Puppeteer（安定版）
+    // =========================
+    const browser = await puppeteer.launch({
+      headless: "new",
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-gpu",
+        "--single-process",
+        "--no-zygote"
+      ]
+    });
 
-await page.setContent(html, { waitUntil: "domcontentloaded" });
+    const page = await browser.newPage();
+    console.log("🌐 Page生成OK");
 
-await new Promise(r => setTimeout(r, 800)); // 安定化
+    await page.setDefaultNavigationTimeout(0);
 
-const pdf = await page.pdf({
-  format: "A4",
-  printBackground: true
-});
+    await page.setContent(html, { waitUntil: "domcontentloaded" });
+    console.log("🧠 HTML読み込みOK");
+
+    await new Promise(r => setTimeout(r, 800));
+
+    const pdf = await page.pdf({
+      format: "A4",
+      printBackground: true
+    });
+
+    console.log("📦 PDF生成OK");
 
     await browser.close();
+
+    fs.writeFileSync("/tmp/latest-report.pdf", pdf);
 
     res.set({ "Content-Type": "application/pdf" });
     res.send(pdf);
@@ -266,11 +261,11 @@ const pdf = await page.pdf({
     res.status(500).send("error");
   }
 });
-// =========================
-// PDF取得（追加）
- // =========================
-app.get("/latest-pdf", (req, res) => {
 
+// =========================
+// PDF取得
+// =========================
+app.get("/latest-pdf", (req, res) => {
   const file = "/tmp/latest-report.pdf";
 
   if (!fs.existsSync(file)) {
@@ -279,8 +274,7 @@ app.get("/latest-pdf", (req, res) => {
 
   res.sendFile(file);
 });
-// =========================
-// 🔥 ここ重要（修正済み）
+
 // =========================
 app.listen(process.env.PORT || 3000, () => {
   console.log("🚀 Server running");
