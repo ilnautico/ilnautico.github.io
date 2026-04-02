@@ -13,100 +13,106 @@ app.use(express.urlencoded({ extended: true }));
 /* 絶対にここに置く */
 function generateProcessVisualSVG({ material }) {
   return `
-  <div style="width:100%; text-align:center; margin:6px 0;">
+  <div style="width:100%; text-align:center; margin:4px 0;">
     <svg width="100%" height="170" viewBox="0 0 600 170">
 
-      <!-- ===== TITLE ===== -->
-      <text x="300" y="18" text-anchor="middle"
-        font-size="11" fill="#334155">
+      <!-- ===== TITLE（少し下げて安定） ===== -->
+      <text x="300" y="20" text-anchor="middle"
+        font-size="10" fill="#334155">
         Processing Behavior Comparison (LDPE vs PHA)
       </text>
 
       <!-- ===== LDPE ===== -->
-      <rect x="60" y="50" width="180" height="65" rx="32"
+      <rect x="40" y="55" width="180" height="65" rx="32"
         fill="#CBD5E1"/>
-      <text x="150" y="45" text-anchor="middle"
-        font-size="10" fill="#334155">LDPE</text>
 
-      <text x="150" y="88" text-anchor="middle"
-        font-size="9" fill="#334155">
+      <text x="130" y="48" text-anchor="middle"
+        font-size="9" fill="#334155">LDPE</text>
+
+      <text x="130" y="90" text-anchor="middle"
+        font-size="8.5" fill="#334155">
         Highly Stable Bubble
       </text>
 
-      <rect x="60" y="120" width="180" height="5"
+      <rect x="40" y="122" width="180" height="5"
         fill="#94A3B8"/>
-      <text x="150" y="140" text-anchor="middle"
-        font-size="8" fill="#64748B">
+
+      <text x="130" y="142" text-anchor="middle"
+        font-size="7.5" fill="#64748B">
         Wide Window (160–240°C)
       </text>
 
-      <!-- ===== EXTRUDER ===== -->
-      <rect x="240" y="75" width="120" height="10"
-        fill="#94A3B8"/>
+      <!-- ===== EXTRUDER（完全中央） ===== -->
+      <g transform="translate(240,78)">
 
-      <!-- Temperature Zones -->
-      <rect x="240" y="70" width="30" height="20"
-        fill="#60A5FA" stroke="#334155" stroke-width="0.4"/>
-      <rect x="270" y="70" width="30" height="20"
-        fill="#93C5FD" stroke="#334155" stroke-width="0.4"/>
-      <rect x="300" y="70" width="30" height="20"
-        fill="#FBBF24" stroke="#334155" stroke-width="0.4"/>
-      <rect x="330" y="70" width="30" height="20"
-        fill="#F87171" stroke="#334155" stroke-width="0.4"/>
+        <!-- ZONES -->
+        <rect x="0" y="0" width="30" height="18"
+          fill="#60A5FA" stroke="#334155" stroke-width="0.4"/>
+        <rect x="30" y="0" width="30" height="18"
+          fill="#93C5FD" stroke="#334155" stroke-width="0.4"/>
+        <rect x="60" y="0" width="30" height="18"
+          fill="#FBBF24" stroke="#334155" stroke-width="0.4"/>
+        <rect x="90" y="0" width="30" height="18"
+          fill="#F87171" stroke="#334155" stroke-width="0.4"/>
 
-      <!-- Zone Labels -->
-      <text x="255" y="65" font-size="7" text-anchor="middle" fill="#64748B">Z1</text>
-      <text x="285" y="65" font-size="7" text-anchor="middle" fill="#64748B">Z2</text>
-      <text x="315" y="65" font-size="7" text-anchor="middle" fill="#64748B">Z3</text>
-      <text x="345" y="65" font-size="7" text-anchor="middle" fill="#64748B">Z4</text>
+        <!-- Z LABELS（少し上） -->
+        <text x="15" y="-4" font-size="6.5" text-anchor="middle" fill="#64748B">Z1</text>
+        <text x="45" y="-4" font-size="6.5" text-anchor="middle" fill="#64748B">Z2</text>
+        <text x="75" y="-4" font-size="6.5" text-anchor="middle" fill="#64748B">Z3</text>
+        <text x="105" y="-4" font-size="6.5" text-anchor="middle" fill="#64748B">Z4</text>
 
-      <text x="300" y="55" text-anchor="middle"
-        font-size="8" fill="#64748B">
-        Temperature Control Zones
-      </text>
+        <!-- TITLE -->
+        <text x="60" y="-14" text-anchor="middle"
+          font-size="7.5" fill="#64748B">
+          Temperature Control
+        </text>
 
-      <!-- Arrow -->
-      <line x1="360" y1="80" x2="390" y2="80"
+      </g>
+
+      <!-- ===== ARROW（少し太く＆中央補正） ===== -->
+      <line x1="360" y1="88" x2="390" y2="88"
         stroke="#64748B" stroke-width="2.5"/>
-      <polygon points="390,80 380,75 380,85"
+
+      <polygon points="390,88 380,83 380,93"
         fill="#64748B"/>
 
-      <text x="375" y="70" text-anchor="middle"
-        font-size="8" fill="#64748B">
-        Material Transition
+      <text x="375" y="78" text-anchor="middle"
+        font-size="7.5" fill="#64748B">
+        Transition
       </text>
 
-      <!-- ===== PHA ===== -->
-      <rect x="390" y="55" width="140" height="60" rx="30"
+      <!-- ===== PHA（視覚補正：少し左へ） ===== -->
+      <rect x="370" y="55" width="180" height="65" rx="32"
         fill="#C4963E"/>
-      <text x="460" y="45" text-anchor="middle"
-        font-size="10" fill="#334155">PHA</text>
 
-      <!-- Instability Curve -->
-      <path d="M410 85 Q430 65 450 85 T490 85"
+      <text x="460" y="48" text-anchor="middle"
+        font-size="9" fill="#334155">PHA</text>
+
+      <!-- instability -->
+      <path d="M400 88 Q430 65 460 88 T520 88"
         stroke="#E11D48" stroke-width="2" fill="none"/>
 
-      <text x="460" y="100" text-anchor="middle"
+      <text x="460" y="102" text-anchor="middle"
         font-size="8" fill="#E11D48">
         Bubble Instability
       </text>
 
-      <!-- Narrow Window -->
-      <rect x="400" y="120" width="120" height="5"
+      <!-- window -->
+      <rect x="390" y="122" width="140" height="5"
         fill="#C4963E"/>
 
-      <!-- Risk Zones -->
-      <rect x="390" y="115" width="15" height="15"
+      <!-- risk zones -->
+      <rect x="370" y="116" width="15" height="14"
         fill="#E11D48" opacity="0.6"/>
-      <rect x="515" y="115" width="15" height="15"
+      <rect x="535" y="116" width="15" height="14"
         fill="#E11D48" opacity="0.6"/>
 
-      <text x="460" y="140" text-anchor="middle"
-        font-size="8" fill="#64748B">
+      <text x="460" y="142" text-anchor="middle"
+        font-size="7.5" fill="#64748B">
         Narrow Window + Degradation Risk
       </text>
 
-      <text x="460" y="152" text-anchor="middle"
+      <text x="460" y="154" text-anchor="middle"
         font-size="7" fill="#E11D48">
         Degradation Threshold
       </text>
