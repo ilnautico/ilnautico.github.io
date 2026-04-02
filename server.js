@@ -151,9 +151,7 @@ app.post("/tally-pdf", async (req, res) => {
       args: ["--no-sandbox", "--disable-setuid-sandbox"]
     });
 
-    const page = await browser.newPage();
-
-    await page.setContent(html, { waitUntil: "domcontentloaded" });
+   await page.setContent(html, { waitUntil: "domcontentloaded" });
 
 await new Promise(r => setTimeout(r, 500));
 
