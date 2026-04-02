@@ -16,44 +16,35 @@ function generateProcessVisualSVG({ material }) {
   <div style="width:100%; text-align:center; margin:4px 0;">
     <svg width="100%" height="170" viewBox="0 0 600 170">
 
-      <!-- ===== TITLE ===== -->
+      <!-- TITLE -->
       <text x="300" y="20" text-anchor="middle"
         font-size="10" fill="#334155">
         Processing Behavior Comparison (LDPE vs PHA)
       </text>
 
-      <!-- ===== LDPE ===== -->
+      <!-- LDPE -->
       <rect x="40" y="55" width="180" height="65" rx="32"
         fill="#CBD5E1"/>
-
       <text x="130" y="48" text-anchor="middle"
         font-size="9" fill="#334155">LDPE</text>
-
       <text x="130" y="90" text-anchor="middle"
         font-size="8.5" fill="#334155">
         Highly Stable Bubble
       </text>
-
       <rect x="40" y="122" width="180" height="5"
         fill="#94A3B8"/>
-
       <text x="130" y="142" text-anchor="middle"
         font-size="7.5" fill="#64748B">
         Wide Window (160–240°C)
       </text>
 
-      <!-- ===== EXTRUDER ===== -->
+      <!-- EXTRUDER -->
       <g transform="translate(240,80)">
-        <rect x="0" y="0" width="30" height="18"
-          fill="#60A5FA" stroke="#334155" stroke-width="0.4"/>
-        <rect x="30" y="0" width="30" height="18"
-          fill="#93C5FD" stroke="#334155" stroke-width="0.4"/>
-        <rect x="60" y="0" width="30" height="18"
-          fill="#FBBF24" stroke="#334155" stroke-width="0.4"/>
-        <rect x="90" y="0" width="30" height="18"
-          fill="#F87171" stroke="#334155" stroke-width="0.4"/>
+        <rect x="0" y="0" width="30" height="18" fill="#60A5FA" stroke="#334155" stroke-width="0.4"/>
+        <rect x="30" y="0" width="30" height="18" fill="#93C5FD" stroke="#334155" stroke-width="0.4"/>
+        <rect x="60" y="0" width="30" height="18" fill="#FBBF24" stroke="#334155" stroke-width="0.4"/>
+        <rect x="90" y="0" width="30" height="18" fill="#F87171" stroke="#334155" stroke-width="0.4"/>
 
-        <!-- Zラベル（上に） -->
         <text x="15" y="-6" font-size="6.5" text-anchor="middle" fill="#64748B">Z1</text>
         <text x="45" y="-6" font-size="6.5" text-anchor="middle" fill="#64748B">Z2</text>
         <text x="75" y="-6" font-size="6.5" text-anchor="middle" fill="#64748B">Z3</text>
@@ -65,51 +56,48 @@ function generateProcessVisualSVG({ material }) {
         </text>
       </g>
 
-      <!-- ===== ARROW ===== -->
-      <line x1="360" y1="90" x2="390" y2="90"
+      <!-- ARROW（左へ） -->
+      <line x1="350" y1="90" x2="380" y2="90"
         stroke="#64748B" stroke-width="2.5"/>
-
-      <polygon points="390,90 380,85 380,95"
+      <polygon points="380,90 370,85 370,95"
         fill="#64748B"/>
 
-      <!-- ===== PHA（少し右へ戻す） ===== -->
-      <rect x="380" y="55" width="180" height="65" rx="32"
+      <!-- PHA（右へ逃がす） -->
+      <rect x="400" y="55" width="180" height="65" rx="32"
         fill="#C4963E"/>
 
-      <!-- instability -->
-      <path d="M410 88 Q440 65 470 88 T520 88"
+      <path d="M430 88 Q460 65 490 88 T550 88"
         stroke="#E11D48" stroke-width="2" fill="none"/>
 
-      <rect x="400" y="122" width="140" height="5"
+      <rect x="420" y="122" width="140" height="5"
         fill="#C4963E"/>
 
-      <rect x="380" y="116" width="15" height="14"
+      <rect x="400" y="116" width="15" height="14"
         fill="#E11D48" opacity="0.6"/>
-      <rect x="545" y="116" width="15" height="14"
+      <rect x="565" y="116" width="15" height="14"
         fill="#E11D48" opacity="0.6"/>
 
-      <!-- ===== TEXTは最後（最重要） ===== -->
-
-      <text x="460" y="48" text-anchor="middle"
+      <!-- TEXT（最後＆上に逃がす） -->
+      <text x="490" y="48" text-anchor="middle"
         font-size="9" fill="#334155">PHA</text>
 
-      <text x="460" y="102" text-anchor="middle"
+      <text x="490" y="102" text-anchor="middle"
         font-size="8" fill="#E11D48">
         Bubble Instability
       </text>
 
-      <text x="460" y="142" text-anchor="middle"
+      <text x="490" y="142" text-anchor="middle"
         font-size="7.5" fill="#64748B">
         Narrow Window + Degradation Risk
       </text>
 
-      <text x="460" y="154" text-anchor="middle"
+      <text x="490" y="154" text-anchor="middle"
         font-size="7" fill="#E11D48">
         Degradation Threshold
       </text>
 
-      <!-- Transition（最後に出す） -->
-      <text x="375" y="78" text-anchor="middle"
+      <!-- Transition（上に逃がす） -->
+      <text x="365" y="68" text-anchor="middle"
         font-size="7.5" fill="#64748B">
         Transition
       </text>
@@ -117,7 +105,7 @@ function generateProcessVisualSVG({ material }) {
     </svg>
   </div>
   `;
-}// =========================
+}/ =========================
 
 
 // =========================
