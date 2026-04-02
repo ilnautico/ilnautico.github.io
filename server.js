@@ -178,43 +178,47 @@ Process: ${processing}
     const template = fs.readFileSync("template.html", "utf8");
 
     const html = injectHtml(template, {
-      application,
-      material_transition: `${currentMaterial} → ${bioMaterial}`,
-      assessment_type: "Tier 2",
-      report_date: new Date().toLocaleDateString(),
+  application,
+  material_transition: `${currentMaterial} → ${bioMaterial}`,
+  assessment_type: "Tier 2 – Pre-Commercial Feasibility",
+  report_date: new Date().toLocaleDateString(),
 
-      compatibility_level: compatibility,
-      executive_summary: parsed.executive_summary,
-      key_risk: parsed.primary_risk,
+  compatibility_level: compatibility,
 
-      processing_window: parsed.processing_window,
-      thermal_behavior: parsed.thermal_behavior,
-      flow_characteristics: parsed.flow_characteristics,
+  executive_summary: parsed.executive_summary,
+  key_risk: parsed.primary_risk,
 
-      mechanical_behavior: parsed.mechanical_behavior,
-      surface_quality: parsed.surface_quality,
-      structural_consistency: parsed.structural_consistency,
-      application_implication: parsed.application_implication,
+  processing_window: parsed.processing_window,
+  thermal_behavior: parsed.thermal_behavior,
+  flow_characteristics: parsed.flow_characteristics,
 
-      primary_risk_title: parsed.primary_risk_title,
-      primary_risk: parsed.primary_risk,
+  mechanical_behavior: parsed.mechanical_behavior,
+  surface_quality: parsed.surface_quality,
+  structural_consistency: parsed.structural_consistency,
+  application_implication: parsed.application_implication,
 
-      secondary_risk_title: parsed.secondary_risk_title,
-      secondary_risk: parsed.secondary_risk,
+  primary_risk_title: parsed.primary_risk_title,
+  primary_risk: parsed.primary_risk,
 
-      mechanism: parsed.mechanism,
+  secondary_risk_title: parsed.secondary_risk_title,
+  secondary_risk: parsed.secondary_risk,
 
-      stability: parsed.stability,
-      stability_note: parsed.stability_note,
+  mechanism: parsed.mechanism,
 
-      consistency: parsed.consistency,
-      consistency_note: parsed.consistency_note,
+  stability: parsed.stability,
+  stability_note: parsed.stability_note,
 
-      visual_description: parsed.visual_description,
+  consistency: parsed.consistency,
+  consistency_note: parsed.consistency_note,
 
-      next_step: (parsed.next_step || "") + regionalNote
-    });
+  visual_description: parsed.visual_description,
 
+  process_visual: generateProcessVisualSVG({
+    material: bioMaterial
+  }),
+
+  next_step: (parsed.next_step || "") + regionalNote
+});
     console.log("📄 HTML生成OK");
 
     // =========================
