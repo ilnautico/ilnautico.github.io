@@ -15,33 +15,59 @@ function generateProcessVisualSVG({ material }) {
   const isPHA = (material || "").toLowerCase().includes("pha");
 
   return `
-  <div style="width:100%; text-align:center; margin:10px 0;">
-    <svg width="100%" height="220" viewBox="0 0 600 220">
-      <rect width="600" height="220" fill="#ffffff"/>
+  <div style="width:100%; text-align:center; margin:12px 0;">
+    <svg width="100%" height="240" viewBox="0 0 600 240">
 
-      <!-- LDPE -->
-      <rect x="60" y="70" width="160" height="80" rx="40"
-        fill="${isPHA ? "#E5E7EB" : "#1E3A5F"}"/>
-      <text x="140" y="60" text-anchor="middle"
+      <!-- Background -->
+      <rect width="600" height="240" fill="#ffffff"/>
+
+      <!-- ===== LDPE ===== -->
+      <rect x="60" y="70" width="180" height="80" rx="40"
+        fill="#CBD5E1"/>
+      <text x="150" y="60" text-anchor="middle"
         font-size="12" fill="#334155">LDPE</text>
 
-      <!-- PHA -->
-      <rect x="360" y="90" width="120" height="60" rx="30"
-        fill="${isPHA ? "#C4963E" : "#CBD5E1"}"/>
-      <text x="420" y="60" text-anchor="middle"
-        font-size="12" fill="#334155">PHA</text>
+      <!-- LDPE Stable Zone -->
+      <rect x="60" y="160" width="180" height="8"
+        fill="#94A3B8"/>
+      <text x="150" y="185" text-anchor="middle"
+        font-size="9" fill="#64748B">
+        Wide Processing Window
+      </text>
 
-      <!-- Arrow -->
-      <line x1="220" y1="110" x2="360" y2="110"
+      <!-- ===== ARROW ===== -->
+      <line x1="240" y1="110" x2="360" y2="110"
         stroke="#94A3B8" stroke-width="2"/>
       <polygon points="360,110 350,105 350,115"
         fill="#94A3B8"/>
 
-      <!-- Caption -->
-      <text x="300" y="180" text-anchor="middle"
-        font-size="10" fill="#64748B">
-        Material Transition Behavior
+      <!-- ===== PHA ===== -->
+      <rect x="360" y="90" width="140" height="60" rx="30"
+        fill="#C4963E"/>
+      <text x="430" y="60" text-anchor="middle"
+        font-size="12" fill="#334155">PHA</text>
+
+      <!-- PHA Stable Narrow -->
+      <rect x="380" y="160" width="100" height="8"
+        fill="#C4963E"/>
+
+      <!-- PHA Risk Zones -->
+      <rect x="360" y="155" width="20" height="18"
+        fill="#E11D48" opacity="0.6"/>
+      <rect x="480" y="155" width="20" height="18"
+        fill="#E11D48" opacity="0.6"/>
+
+      <text x="430" y="185" text-anchor="middle"
+        font-size="9" fill="#64748B">
+        Narrow + Degradation Risk
       </text>
+
+      <!-- Caption -->
+      <text x="300" y="215" text-anchor="middle"
+        font-size="10" fill="#64748B">
+        Thermal Processing Window Comparison
+      </text>
+
     </svg>
   </div>
   `;
