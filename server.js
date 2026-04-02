@@ -260,7 +260,19 @@ Material: ${currentMaterial} → ${bioMaterial}
     res.status(500).send("error");
   }
 });
+// =========================
+// PDF取得（追加）
+ // =========================
+app.get("/latest-pdf", (req, res) => {
 
+  const file = "/tmp/latest-report.pdf";
+
+  if (!fs.existsSync(file)) {
+    return res.status(404).send("No PDF yet");
+  }
+
+  res.sendFile(file);
+});
 // =========================
 // 🔥 ここ重要（修正済み）
 // =========================
