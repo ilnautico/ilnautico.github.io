@@ -116,9 +116,12 @@ app.post("/tally-pdf", async (req, res) => {
 
     await page.setContent(html, { waitUntil: "domcontentloaded" });
 
-    const pdf = await page.pdf({
-      format: "A4",
-      printBackground: true
+await new Promise(r => setTimeout(r, 500));
+
+const pdf = await page.pdf({
+  format: "A4",
+  printBackground: true
+});round: true
     });
 
     await browser.close();
