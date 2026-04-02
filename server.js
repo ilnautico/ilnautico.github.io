@@ -69,13 +69,14 @@ function generateProcessVisualSVG({ material }) {
       <path d="M390 88 Q420 65 450 88 T510 88"
         stroke="#E11D48" stroke-width="2" fill="none"/>
 
-      <rect x="380" y="122" width="120" height="5"
-        fill="#C4963E"/>
+     <rect x="380" y="122" width="120" height="5"
+  fill="#C4963E"/>
 
-      <rect x="370" y="118" width="12" height="12"
-        fill="#E11D48" opacity="0.6"/>
-     <rect x="508" y="118" width="12" height="12"
-        fill="#E11D48" opacity="0.6"/>
+<rect x="350" y="118" width="12" height="12"
+  fill="#E11D48" opacity="0.6"/>
+
+<rect x="508" y="118" width="12" height="12"
+  fill="#E11D48" opacity="0.6"/>
 
       <!-- TEXT -->
       <text x="440" y="48" text-anchor="middle"
