@@ -121,8 +121,7 @@ await new Promise(r => setTimeout(r, 500));
 const pdf = await page.pdf({
   format: "A4",
   printBackground: true
-});round: true
-    });
+});
 
     await browser.close();
 
