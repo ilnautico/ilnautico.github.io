@@ -22,24 +22,28 @@ function generateProcessVisualSVG({ material }) {
         Processing Behavior Comparison (LDPE vs PHA)
       </text>
 
-      <!-- LDPE -->
+      <!-- ===== LDPE ===== -->
       <rect x="40" y="55" width="180" height="65" rx="32"
         fill="#CBD5E1"/>
       <text x="130" y="48" text-anchor="middle"
         font-size="9" fill="#334155">LDPE</text>
+
       <text x="130" y="90" text-anchor="middle"
         font-size="8.5" fill="#334155">
         Highly Stable Bubble
       </text>
+
       <rect x="40" y="122" width="180" height="5"
         fill="#94A3B8"/>
+
       <text x="130" y="142" text-anchor="middle"
         font-size="7.5" fill="#64748B">
         Wide Window (160–240°C)
       </text>
 
-      <!-- EXTRUDER（少し左へ） -->
-      <g transform="translate(220,80)">
+
+      <!-- ===== EXTRUDER ===== -->
+      <g transform="translate(230,80)">
         <rect x="0" y="0" width="30" height="18" fill="#60A5FA" stroke="#334155" stroke-width="0.4"/>
         <rect x="30" y="0" width="30" height="18" fill="#93C5FD" stroke="#334155" stroke-width="0.4"/>
         <rect x="60" y="0" width="30" height="18" fill="#FBBF24" stroke="#334155" stroke-width="0.4"/>
@@ -56,33 +60,40 @@ function generateProcessVisualSVG({ material }) {
         </text>
       </g>
 
-      <!-- ARROW（短縮＆余白確保） -->
-      <line x1="330" y1="90" x2="355" y2="90"
+
+      <!-- ===== ARROW ===== -->
+      <line x1="350" y1="90" x2="380" y2="90"
         stroke="#64748B" stroke-width="2.5"/>
-      <polygon points="355,90 345,85 345,95"
+      <polygon points="380,90 370,85 370,95"
         fill="#64748B"/>
 
-      <!-- PHA（中央寄せ＋少し小さく） -->
+
+      <!-- ===== PHA ===== -->
+      <!-- 中心 = 440 -->
       <rect x="360" y="55" width="160" height="65" rx="32"
         fill="#C4963E"/>
 
-      <path d="M390 88 Q420 65 450 88 T510 88"
+      <!-- 波（完全中央配置） -->
+      <path d="M400 90 Q440 65 480 90 T560 90"
         stroke="#E11D48" stroke-width="2" fill="none"/>
 
-     <rect x="380" y="122" width="120" height="5"
-  fill="#C4963E"/>
+      <!-- 下バー（中央基準） -->
+      <rect x="400" y="122" width="120" height="5"
+        fill="#C4963E"/>
 
-<rect x="350" y="118" width="12" height="12"
-  fill="#E11D48" opacity="0.6"/>
+      <!-- リスク端（左右対称） -->
+      <rect x="388" y="118" width="12" height="12"
+        fill="#E11D48" opacity="0.6"/>
 
-<rect x="508" y="118" width="12" height="12"
-  fill="#E11D48" opacity="0.6"/>
+      <rect x="520" y="118" width="12" height="12"
+        fill="#E11D48" opacity="0.6"/>
 
-      <!-- TEXT -->
+
+      <!-- ===== TEXT ===== -->
       <text x="440" y="48" text-anchor="middle"
         font-size="9" fill="#334155">PHA</text>
 
-      <text x="440" y="102" text-anchor="middle"
+      <text x="440" y="100" text-anchor="middle"
         font-size="8" fill="#E11D48">
         Bubble Instability
       </text>
@@ -97,8 +108,9 @@ function generateProcessVisualSVG({ material }) {
         Degradation Threshold
       </text>
 
-      <!-- Transition（上に逃がす） -->
-      <text x="345" y="55" text-anchor="middle"
+
+      <!-- ===== TRANSITION ===== -->
+      <text x="365" y="70" text-anchor="middle"
         font-size="7.5" fill="#64748B">
         Transition
       </text>
