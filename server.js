@@ -157,15 +157,14 @@ app.post("/tally-pdf", async (req, res) => {
 
     const page = await browser.newPage();
 
-    await page.setContent(html, { waitUntil: "networkidle0" });
+    await page.setContent(html, { waitUntil: "domcontentloaded" });
 
-    await page.evaluateHandle('document.fonts.ready');
+await new Promise(resolve => setTimeout(resolve, 300));
 
-    const pdf = await page.pdf({
-      format: "A4",
-      printBackground: true
-    });
-
+const pdf = await page.pdf({
+  format: "A4",
+  printBackground: true
+});
     await browser.close();
 
     fs.writeFileSync("/tmp/latest-report.pdf", pdf);
