@@ -9,80 +9,48 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // =========================
-// Claude
-// =========================
-async function generateClaudeHypothesis(prompt) {
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": process.env.ANTHROPIC_API_KEY,
-      "anthropic-version": "2023-06-01"
-    },
-    body: JSON.stringify({
-      model: "claude-sonnet-4-6",
-      max_tokens: 1800,
-      messages: [
-        { role: "user", content: [{ type: "text", text: prompt }] }
-      ]
-    })
-  });
+// SVG生成（←今回の本体）
+/* 絶対にここに置く */
+function generateProcessVisualSVG({ material }) {
+  const isPHA = (material || "").toLowerCase().includes("pha");
 
-  const data = await response.json();
-  return data.content?.[0]?.text || "";
+  return `
+  <div style="width:100%; text-align:center; margin:10px 0;">
+    <svg width="100%" height="220" viewBox="0 0 600 220">
+      <rect width="600" height="220" fill="#ffffff"/>
+
+      <!-- LDPE -->
+      <rect x="60" y="70" width="160" height="80" rx="40"
+        fill="${isPHA ? "#E5E7EB" : "#1E3A5F"}"/>
+      <text x="140" y="60" text-anchor="middle"
+        font-size="12" fill="#334155">LDPE</text>
+
+      <!-- PHA -->
+      <rect x="360" y="90" width="120" height="60" rx="30"
+        fill="${isPHA ? "#C4963E" : "#CBD5E1"}"/>
+      <text x="420" y="60" text-anchor="middle"
+        font-size="12" fill="#334155">PHA</text>
+
+      <!-- Arrow -->
+      <line x1="220" y1="110" x2="360" y2="110"
+        stroke="#94A3B8" stroke-width="2"/>
+      <polygon points="360,110 350,105 350,115"
+        fill="#94A3B8"/>
+
+      <!-- Caption -->
+      <text x="300" y="180" text-anchor="middle"
+        font-size="10" fill="#64748B">
+        Material Transition Behavior
+      </text>
+    </svg>
+  </div>
+  `;
 }
-
 // =========================
-// JSON修復
-// =========================
-function safeParseJSON(text) {
-  try {
-    return JSON.parse(text);
-  } catch {
-    try {
-      const start = text.indexOf("{");
-      const end = text.lastIndexOf("}");
-      return JSON.parse(text.substring(start, end + 1));
-    } catch {
-      return {};
-    }
-  }
-}
 
-// =========================
-// 判定ロジック
-// =========================
-function evaluateCompatibility(material, process) {
-  const m = material.toLowerCase();
-  const p = process.toLowerCase();
-
-  if (m.includes("pha") && p.includes("blown")) {
-    return "Moderate – Requires Process Control";
-  }
-
-  if (m.includes("pla")) {
-    return "Low";
-  }
-
-  return "Moderate";
-}
-
-// =========================
-// 値取得
-// =========================
-function getValue(fields, keyword) {
-  for (const f of fields) {
-    const label = (f.label || "").toLowerCase();
-    if (label.includes(keyword)) {
-      return Array.isArray(f.value) ? f.value.join(", ") : f.value || "";
-    }
-  }
-  return "";
-}
 
 // =========================
 // HTML差し込み
-// =========================
 function injectHtml(template, data) {
   let html = template;
 
@@ -93,169 +61,45 @@ function injectHtml(template, data) {
 
   return html;
 }
+// =========================
+
 
 // =========================
-// MAIN
-// =========================
+// MAIN（←これだけ確認用）
 app.post("/tally-pdf", async (req, res) => {
 
   console.log("🔥 HIT");
 
   try {
-    const fields = req.body?.data?.fields || [];
-
-    const application = getValue(fields, "application");
-    const currentMaterial = getValue(fields, "material");
-    const bioMaterial = getValue(fields, "target");
-    const processing = getValue(fields, "processing");
-    const equipment = getValue(fields, "equipment");
-    const scale = getValue(fields, "production");
-    const concern = getValue(fields, "concern");
-    const notes = getValue(fields, "notes");
-
-    const compatibility = evaluateCompatibility(
-      `${currentMaterial} ${bioMaterial}`,
-      processing
-    );
-
-    // =========================
-    // 地域要素
-    // =========================
-    let regionalNote = "";
-
-    if ((notes || "").toLowerCase().includes("middle east")) {
-      regionalNote += `
-      <br><br>
-      <strong>Environmental Constraint (Middle East)</strong><br><br>
-      High ambient temperature may reduce cooling efficiency and increase melt drift.
-      `;
-    }
-
-    if ((notes || "").toLowerCase().includes("humidity")) {
-      regionalNote += `
-      <br><br>
-      <strong>Environmental Constraint (Humidity)</strong><br><br>
-      Moisture may accelerate hydrolytic degradation.
-      `;
-    }
-
-    // =========================
-    // Claude
-    // =========================
-    const prompt = `
-Return ONLY JSON.
-
-{
-  "executive_summary": "",
-  "processing_window": "",
-  "thermal_behavior": "",
-  "flow_characteristics": "",
-  "mechanical_behavior": "",
-  "surface_quality": "",
-  "structural_consistency": "",
-  "application_implication": "",
-  "primary_risk_title": "",
-  "primary_risk": "",
-  "secondary_risk_title": "",
-  "secondary_risk": "",
-  "mechanism": "",
-  "stability": "",
-  "stability_note": "",
-  "consistency": "",
-  "consistency_note": "",
-  "visual_description": "",
-  "next_step": ""
-}
-
-Application: ${application}
-Material: ${currentMaterial} → ${bioMaterial}
-Process: ${processing}
-`;
-
-    const claudeText = await generateClaudeHypothesis(prompt);
-    const parsed = safeParseJSON(claudeText);
+    const material = "PHA"; // ←仮固定（まずは確認用）
 
     const template = fs.readFileSync("template.html", "utf8");
 
     const html = injectHtml(template, {
-  application,
-  material_transition: `${currentMaterial} → ${bioMaterial}`,
-  assessment_type: "Tier 2 – Pre-Commercial Feasibility",
-  report_date: new Date().toLocaleDateString(),
+      process_visual: generateProcessVisualSVG({ material })
+    });
 
-  compatibility_level: compatibility,
+    console.log("📄 HTML OK");
 
-  executive_summary: parsed.executive_summary,
-  key_risk: parsed.primary_risk,
-
-  processing_window: parsed.processing_window,
-  thermal_behavior: parsed.thermal_behavior,
-  flow_characteristics: parsed.flow_characteristics,
-
-  mechanical_behavior: parsed.mechanical_behavior,
-  surface_quality: parsed.surface_quality,
-  structural_consistency: parsed.structural_consistency,
-  application_implication: parsed.application_implication,
-
-  primary_risk_title: parsed.primary_risk_title,
-  primary_risk: parsed.primary_risk,
-
-  secondary_risk_title: parsed.secondary_risk_title,
-  secondary_risk: parsed.secondary_risk,
-
-  mechanism: parsed.mechanism,
-
-  stability: parsed.stability,
-  stability_note: parsed.stability_note,
-
-  consistency: parsed.consistency,
-  consistency_note: parsed.consistency_note,
-
-  visual_description: parsed.visual_description,
-
-  process_visual: generateProcessVisualSVG({
-    material: bioMaterial
-  }),
-
-  next_step: (parsed.next_step || "") + regionalNote
-});
-    console.log("📄 HTML生成OK");
-
-    // =========================
-    // Puppeteer（安定版）
-    // =========================
     const browser = await puppeteer.launch({
       headless: "new",
-      args: [
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--disable-dev-shm-usage",
-        "--disable-gpu",
-        "--single-process",
-        "--no-zygote"
-      ]
+      args: ["--no-sandbox", "--disable-setuid-sandbox"]
     });
 
     const page = await browser.newPage();
-    console.log("🌐 Page生成OK");
-
-    await page.setDefaultNavigationTimeout(0);
 
     await page.setContent(html, { waitUntil: "domcontentloaded" });
-    console.log("🧠 HTML読み込みOK");
-
-    await new Promise(r => setTimeout(r, 800));
 
     const pdf = await page.pdf({
       format: "A4",
       printBackground: true
     });
 
-    console.log("📦 PDF生成OK");
-
     await browser.close();
 
     fs.writeFileSync("/tmp/latest-report.pdf", pdf);
+
+    console.log("📦 PDF OK");
 
     res.set({ "Content-Type": "application/pdf" });
     res.send(pdf);
@@ -266,9 +110,9 @@ Process: ${processing}
   }
 });
 
+
 // =========================
-// PDF取得
-// =========================
+// PDF確認
 app.get("/latest-pdf", (req, res) => {
   const file = "/tmp/latest-report.pdf";
 
@@ -278,9 +122,9 @@ app.get("/latest-pdf", (req, res) => {
 
   res.sendFile(file);
 });
-
 // =========================
-app.listen(process.env.PORT || 3000, () => {
+
+app.listen(3000, () => {
   console.log("🚀 Server running");
 });
 // =========================
