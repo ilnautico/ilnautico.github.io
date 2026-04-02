@@ -142,17 +142,18 @@ app.post("/tally-pdf", async (req, res) => {
 
     console.log("📄 HTML OK");
 
-const browser = await puppeteer.launch({
-  headless: "new",
-  args: [
-    "--no-sandbox",
-    "--disable-setuid-sandbox",
-    "--disable-dev-shm-usage",
-    "--disable-gpu"
-  ]
-});
-
 const page = await browser.newPage();
+
+// ★ここ変更
+await page.setContent(html, { waitUntil: "networkidle0" });
+
+// ★これ追加（安定用）
+await page.evaluateHandle('document.fonts.ready');
+
+const pdf = await page.pdf({
+  format: "A4",
+  printBackground: true
+});
 
 await page.setDefaultNavigationTimeout(0);
 
