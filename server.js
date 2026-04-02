@@ -22,73 +22,70 @@ function generateProcessVisualSVG({ material }) {
         Film Extrusion Behavior (LDPE vs PHA)
       </text>
 
-      <!-- ===== EXTRUDER BODY ===== -->
-      <rect x="70" y="95" width="120" height="18" rx="4"
+      <!-- ===== EXTRUDER ===== -->
+      <rect x="40" y="95" width="110" height="18" rx="4"
         fill="#334155"/>
-
-      <!-- Screw hint -->
-      <line x1="75" y1="104" x2="185" y2="104"
+      <line x1="45" y1="104" x2="145" y2="104"
         stroke="#94A3B8" stroke-width="2"/>
-
-      <!-- Die -->
-      <rect x="185" y="92" width="10" height="24"
+      <rect x="145" y="92" width="8" height="24"
         fill="#64748B"/>
 
-      <!-- ===== FILM BUBBLE LDPE ===== -->
-      <ellipse cx="250" cy="95" rx="85" ry="50"
-        fill="#CBD5E1" opacity="0.9"/>
+      <!-- ===== LDPE BUBBLE ===== -->
+      <ellipse cx="220" cy="95" rx="70" ry="45"
+        fill="#CBD5E1"/>
 
-      <text x="250" y="40" text-anchor="middle"
-        font-size="9" fill="#334155">LDPE Stable Bubble</text>
+      <text x="220" y="45" text-anchor="middle"
+        font-size="9" fill="#334155">
+        LDPE Stable Bubble
+      </text>
 
-      <!-- Stability band -->
-      <rect x="180" y="145" width="140" height="5"
+      <rect x="165" y="145" width="110" height="5"
         fill="#94A3B8"/>
-      <text x="250" y="165" text-anchor="middle"
+      <text x="220" y="165" text-anchor="middle"
         font-size="7.5" fill="#64748B">
         Wide Processing Window
       </text>
 
       <!-- ===== TRANSITION ===== -->
-      <line x1="320" y1="95" x2="350" y2="95"
+      <line x1="290" y1="95" x2="320" y2="95"
         stroke="#64748B" stroke-width="2.5"/>
-      <polygon points="350,95 340,90 340,100"
+      <polygon points="320,95 310,90 310,100"
         fill="#64748B"/>
 
-      <text x="335" y="70" text-anchor="middle"
+      <text x="305" y="70" text-anchor="middle"
         font-size="7.5" fill="#64748B">
         Material Transition
       </text>
 
       <!-- ===== PHA BUBBLE ===== -->
-      <ellipse cx="450" cy="95" rx="75" ry="45"
+      <ellipse cx="400" cy="95" rx="70" ry="45"
         fill="#C4963E"/>
 
-      <!-- Instability wave -->
-      <path d="M400 95 Q430 70 460 95 T490 95"
+      <!-- 安定した位置の波（中央より少し上） -->
+      <path d="M360 90 Q390 70 420 90 T440 90"
         stroke="#E11D48" stroke-width="2.2" fill="none"/>
 
-      <text x="450" y="95" text-anchor="middle"
+      <text x="400" y="100" text-anchor="middle"
         font-size="8.5" fill="#E11D48">
         Bubble Instability
       </text>
 
-      <!-- Narrow band -->
-      <rect x="400" y="145" width="100" height="5"
+      <!-- バー -->
+      <rect x="350" y="145" width="100" height="5"
         fill="#C4963E"/>
 
-      <!-- Risk zones -->
-      <rect x="385" y="138" width="12" height="14"
+      <!-- リスク端 -->
+      <rect x="340" y="138" width="12" height="14"
         fill="#E11D48" opacity="0.6"/>
-      <rect x="505" y="138" width="12" height="14"
+      <rect x="458" y="138" width="12" height="14"
         fill="#E11D48" opacity="0.6"/>
 
-      <text x="450" y="165" text-anchor="middle"
+      <text x="400" y="165" text-anchor="middle"
         font-size="7.5" fill="#64748B">
         Narrow Window + Degradation Risk
       </text>
 
-      <text x="450" y="178" text-anchor="middle"
+      <text x="400" y="178" text-anchor="middle"
         font-size="7" fill="#E11D48">
         Degradation Threshold
       </text>
