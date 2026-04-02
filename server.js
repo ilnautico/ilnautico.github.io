@@ -9,6 +9,13 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // =========================
+// ✅ GET（動作確認用）←追加
+// =========================
+app.get("/", (req, res) => {
+  res.send("OK");
+});
+
+// =========================
 // Claude
 // =========================
 async function generateClaudeHypothesis(prompt) {
@@ -81,7 +88,7 @@ function getValue(fields, keyword) {
 }
 
 // =========================
-// 🎨 SVGグラフィック生成
+// 🎨 SVGグラフィック
 // =========================
 function generateProcessVisualSVG({ material }) {
 
@@ -145,6 +152,8 @@ function injectHtml(template, data) {
 // =========================
 app.post("/tally-pdf", async (req, res) => {
 
+  console.log("🔥 HIT");
+
   try {
     const fields = req.body?.data?.fields || [];
 
@@ -170,8 +179,8 @@ app.post("/tally-pdf", async (req, res) => {
     if ((notes || "").toLowerCase().includes("middle east")) {
       regionalNote += `
       <br><br>
-      <strong>Environmental Constraint (High Temperature)</strong><br><br>
-      Elevated ambient temperature may reduce cooling efficiency and increase thermal drift.
+      <strong>Environmental Constraint</strong><br>
+      High ambient temperature may affect cooling efficiency.
       `;
     }
 
@@ -180,7 +189,6 @@ app.post("/tally-pdf", async (req, res) => {
     // =========================
     const prompt = `
 Return ONLY JSON.
-
 {
   "executive_summary": "",
   "processing_window": "",
@@ -192,22 +200,14 @@ Return ONLY JSON.
   "application_implication": "",
   "primary_risk_title": "",
   "primary_risk": "",
-  "secondary_risk_title": "",
-  "secondary_risk": "",
   "mechanism": "",
   "stability": "",
-  "stability_note": "",
   "consistency": "",
-  "consistency_note": "",
   "visual_description": "",
   "next_step": ""
 }
 Application: ${application}
 Material: ${currentMaterial} → ${bioMaterial}
-Process: ${processing}
-Equipment: ${equipment}
-Scale: ${scale}
-Concern: ${concern}
 `;
 
     const parsed = safeParseJSON(await generateClaudeHypothesis(prompt));
@@ -227,22 +227,9 @@ Concern: ${concern}
       thermal_behavior: parsed.thermal_behavior,
       flow_characteristics: parsed.flow_characteristics,
 
-      mechanical_behavior: parsed.mechanical_behavior,
-      surface_quality: parsed.surface_quality,
-      structural_consistency: parsed.structural_consistency,
-      application_implication: parsed.application_implication,
-
-      primary_risk_title: parsed.primary_risk_title,
-      primary_risk: parsed.primary_risk,
-
-      mechanism: parsed.mechanism,
-
-      stability: parsed.stability,
-      consistency: parsed.consistency,
-
       visual_description: parsed.visual_description,
 
-      // 👇 ここが今回の追加
+      // 👇グラフィック
       process_visual: generateProcessVisualSVG({
         material: bioMaterial
       }),
@@ -269,14 +256,16 @@ Concern: ${concern}
     res.send(pdf);
 
   } catch (err) {
-    console.error(err);
+    console.error("❌ ERROR:", err);
     res.status(500).send("error");
   }
 });
 
 // =========================
-app.listen(3000, () => {
-  console.log("🚀 running");
+// 🔥 ここ重要（修正済み）
+// =========================
+app.listen(process.env.PORT || 3000, () => {
+  console.log("🚀 Server running");
 });
 // =========================
 const htmlTemplate = `
