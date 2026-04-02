@@ -147,11 +147,13 @@ app.post("/tally-pdf", async (req, res) => {
     console.log("📄 HTML OK");
 
     const browser = await puppeteer.launch({
-      headless: "new",
-      args: ["--no-sandbox", "--disable-setuid-sandbox"]
-    });
+  headless: "new",
+  args: ["--no-sandbox", "--disable-setuid-sandbox"]
+});
 
-   await page.setContent(html, { waitUntil: "domcontentloaded" });
+const page = await browser.newPage();
+
+await page.setContent(html, { waitUntil: "domcontentloaded" });
 
 await new Promise(r => setTimeout(r, 500));
 
