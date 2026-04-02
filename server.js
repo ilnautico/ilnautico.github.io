@@ -14,95 +14,83 @@ app.use(express.urlencoded({ extended: true }));
 function generateProcessVisualSVG({ material }) {
   return `
   <div style="width:100%; text-align:center; margin:4px 0;">
-    <svg width="100%" height="170" viewBox="0 0 600 170">
+    <svg width="100%" height="190" viewBox="0 0 600 190">
 
       <!-- TITLE -->
       <text x="300" y="20" text-anchor="middle"
         font-size="10" fill="#334155">
-        Processing Behavior Comparison (LDPE vs PHA)
+        Film Extrusion Behavior (LDPE vs PHA)
       </text>
 
-      <!-- LDPE -->
-      <rect x="40" y="55" width="180" height="65" rx="32"
-        fill="#CBD5E1"/>
-      <text x="130" y="48" text-anchor="middle"
-        font-size="9" fill="#334155">LDPE</text>
-      <text x="130" y="90" text-anchor="middle"
-        font-size="8.5" fill="#334155">
-        Highly Stable Bubble
-      </text>
+      <!-- ===== EXTRUDER BODY ===== -->
+      <rect x="70" y="95" width="120" height="18" rx="4"
+        fill="#334155"/>
 
-      <rect x="40" y="122" width="180" height="5"
-        fill="#94A3B8"/>
-      <text x="130" y="142" text-anchor="middle"
-        font-size="7.5" fill="#64748B">
-        Wide Window (160–240°C)
-      </text>
+      <!-- Screw hint -->
+      <line x1="75" y1="104" x2="185" y2="104"
+        stroke="#94A3B8" stroke-width="2"/>
 
-      <!-- EXTRUDER -->
-      <g transform="translate(220,80)">
-        <rect x="0" y="0" width="30" height="18" fill="#60A5FA" stroke="#334155" stroke-width="0.4"/>
-        <rect x="30" y="0" width="30" height="18" fill="#93C5FD" stroke="#334155" stroke-width="0.4"/>
-        <rect x="60" y="0" width="30" height="18" fill="#FBBF24" stroke="#334155" stroke-width="0.4"/>
-        <rect x="90" y="0" width="30" height="18" fill="#F87171" stroke="#334155" stroke-width="0.4"/>
-
-        <text x="15" y="-6" font-size="6.5" text-anchor="middle" fill="#64748B">Z1</text>
-        <text x="45" y="-6" font-size="6.5" text-anchor="middle" fill="#64748B">Z2</text>
-        <text x="75" y="-6" font-size="6.5" text-anchor="middle" fill="#64748B">Z3</text>
-        <text x="105" y="-6" font-size="6.5" text-anchor="middle" fill="#64748B">Z4</text>
-
-        <text x="60" y="-16" text-anchor="middle"
-          font-size="7.5" fill="#64748B">
-          Temperature Control
-        </text>
-      </g>
-
-      <!-- ARROW -->
-      <line x1="330" y1="90" x2="355" y2="90"
-        stroke="#64748B" stroke-width="2.5"/>
-      <polygon points="355,90 345,85 345,95"
+      <!-- Die -->
+      <rect x="185" y="92" width="10" height="24"
         fill="#64748B"/>
 
-      <!-- PHA（←ここは元の位置 그대로） -->
-      <rect x="360" y="55" width="160" height="65" rx="32"
+      <!-- ===== FILM BUBBLE LDPE ===== -->
+      <ellipse cx="250" cy="95" rx="85" ry="50"
+        fill="#CBD5E1" opacity="0.9"/>
+
+      <text x="250" y="40" text-anchor="middle"
+        font-size="9" fill="#334155">LDPE Stable Bubble</text>
+
+      <!-- Stability band -->
+      <rect x="180" y="145" width="140" height="5"
+        fill="#94A3B8"/>
+      <text x="250" y="165" text-anchor="middle"
+        font-size="7.5" fill="#64748B">
+        Wide Processing Window
+      </text>
+
+      <!-- ===== TRANSITION ===== -->
+      <line x1="320" y1="95" x2="350" y2="95"
+        stroke="#64748B" stroke-width="2.5"/>
+      <polygon points="350,95 340,90 340,100"
+        fill="#64748B"/>
+
+      <text x="335" y="70" text-anchor="middle"
+        font-size="7.5" fill="#64748B">
+        Material Transition
+      </text>
+
+      <!-- ===== PHA BUBBLE ===== -->
+      <ellipse cx="450" cy="95" rx="75" ry="45"
         fill="#C4963E"/>
 
-      <!-- ✅ 波だけ修正（ここが今回の本体） -->
-   <path d="M390 78 Q420 58 455 78 T495 80"
-  stroke="#E11D48" stroke-width="2" fill="none"/>
-      <!-- 下バー -->
-      <rect x="380" y="122" width="120" height="5"
-        fill="#C4963E"/>
+      <!-- Instability wave -->
+      <path d="M400 95 Q430 70 460 95 T490 95"
+        stroke="#E11D48" stroke-width="2.2" fill="none"/>
 
-      <!-- 赤ゾーン -->
-      <rect x="350" y="118" width="12" height="12"
-        fill="#E11D48" opacity="0.6"/>
-      <rect x="508" y="118" width="12" height="12"
-        fill="#E11D48" opacity="0.6"/>
-
-      <!-- TEXT -->
-      <text x="440" y="48" text-anchor="middle"
-        font-size="9" fill="#334155">PHA</text>
-
-      <text x="440" y="102" text-anchor="middle"
-        font-size="8" fill="#E11D48">
+      <text x="450" y="95" text-anchor="middle"
+        font-size="8.5" fill="#E11D48">
         Bubble Instability
       </text>
 
-      <text x="440" y="142" text-anchor="middle"
+      <!-- Narrow band -->
+      <rect x="400" y="145" width="100" height="5"
+        fill="#C4963E"/>
+
+      <!-- Risk zones -->
+      <rect x="385" y="138" width="12" height="14"
+        fill="#E11D48" opacity="0.6"/>
+      <rect x="505" y="138" width="12" height="14"
+        fill="#E11D48" opacity="0.6"/>
+
+      <text x="450" y="165" text-anchor="middle"
         font-size="7.5" fill="#64748B">
         Narrow Window + Degradation Risk
       </text>
 
-      <text x="440" y="154" text-anchor="middle"
+      <text x="450" y="178" text-anchor="middle"
         font-size="7" fill="#E11D48">
         Degradation Threshold
-      </text>
-
-      <!-- Transition -->
-      <text x="345" y="55" text-anchor="middle"
-        font-size="7.5" fill="#64748B">
-        Transition
       </text>
 
     </svg>
