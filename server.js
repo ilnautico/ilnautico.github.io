@@ -12,80 +12,100 @@ app.use(express.urlencoded({ extended: true }));
 // SVG生成（←今回の本体）
 /* 絶対にここに置く */
 function generateProcessVisualSVG({ material }) {
-  const isPHA = (material || "").toLowerCase().includes("pha");
-
   return `
   <div style="width:100%; text-align:center; margin:12px 0;">
-    <svg width="100%" height="260" viewBox="0 0 640 260">
+    <svg width="100%" height="280" viewBox="0 0 700 280">
 
       <!-- Background -->
-      <rect width="640" height="260" fill="#ffffff"/>
+      <rect width="700" height="280" fill="#ffffff"/>
 
       <!-- ===== TITLE ===== -->
-      <text x="320" y="30" text-anchor="middle"
-        font-size="12" fill="#475569">
-        Processing Behavior Comparison
+      <text x="350" y="28" text-anchor="middle"
+        font-size="13" fill="#475569">
+        Processing Behavior Comparison (LDPE vs PHA)
       </text>
 
       <!-- ===== LDPE ===== -->
-      <rect x="80" y="80" width="200" height="90" rx="45"
+      <rect x="80" y="90" width="220" height="90" rx="45"
         fill="#CBD5E1"/>
-      <text x="180" y="70" text-anchor="middle"
+
+      <text x="190" y="70" text-anchor="middle"
         font-size="12" fill="#334155">LDPE</text>
 
-      <!-- LDPE Stable Window -->
-      <rect x="80" y="185" width="200" height="10"
+      <!-- LDPE 안정 텍스트 -->
+      <text x="190" y="135" text-anchor="middle"
+        font-size="10" fill="#334155">
+        Stable Bubble
+      </text>
+
+      <!-- LDPE Window -->
+      <rect x="80" y="190" width="220" height="10"
         fill="#94A3B8"/>
 
-      <!-- LDPE Label -->
-      <text x="180" y="210" text-anchor="middle"
+      <text x="190" y="215" text-anchor="middle"
         font-size="9" fill="#64748B">
         Wide Window (160–240°C)
       </text>
 
       <!-- ===== ARROW ===== -->
-      <line x1="280" y1="125" x2="380" y2="125"
+      <line x1="300" y1="135" x2="420" y2="135"
         stroke="#94A3B8" stroke-width="2"/>
-      <polygon points="380,125 370,120 370,130"
+
+      <polygon points="420,135 408,129 408,141"
         fill="#94A3B8"/>
 
+      <text x="360" y="120" text-anchor="middle"
+        font-size="9" fill="#64748B">
+        Material Transition
+      </text>
+
       <!-- ===== PHA ===== -->
-      <rect x="400" y="95" width="150" height="70" rx="35"
+      <rect x="440" y="100" width="180" height="80" rx="40"
         fill="#C4963E"/>
 
-      <text x="475" y="70" text-anchor="middle"
+      <text x="530" y="70" text-anchor="middle"
         font-size="12" fill="#334155">PHA</text>
 
-      <!-- PHA Narrow Window -->
-      <rect x="420" y="185" width="110" height="10"
+      <!-- instability wave -->
+      <path d="M460 140 
+               Q475 125 490 140 
+               Q505 155 520 140 
+               Q535 125 550 140"
+        stroke="#E11D48" stroke-width="2" fill="none" opacity="0.7"/>
+
+      <text x="530" y="160" text-anchor="middle"
+        font-size="9.5" fill="#E11D48">
+        Bubble Instability
+      </text>
+
+      <!-- Narrow Window -->
+      <rect x="460" y="190" width="140" height="10"
         fill="#C4963E"/>
 
-      <!-- ===== RISK ZONES ===== -->
-      <rect x="400" y="180" width="20" height="20"
+      <!-- Risk edges -->
+      <rect x="440" y="185" width="20" height="20"
         fill="#E11D48" opacity="0.7"/>
-      <rect x="530" y="180" width="20" height="20"
+      <rect x="600" y="185" width="20" height="20"
         fill="#E11D48" opacity="0.7"/>
 
-      <!-- Risk label -->
-      <text x="475" y="215" text-anchor="middle"
+      <text x="530" y="215" text-anchor="middle"
         font-size="9" fill="#64748B">
         Narrow Window + Degradation Risk
       </text>
 
-      <!-- ===== INSTABILITY VISUAL ===== -->
-      <!-- 波線で不安定表現 -->
-      <path d="M400 130 Q410 120 420 130 Q430 140 440 130 Q450 120 460 130"
-        stroke="#E11D48" stroke-width="1.5" fill="none" opacity="0.6"/>
-
-      <text x="475" y="150" text-anchor="middle"
-        font-size="8.5" fill="#E11D48">
-        Bubble Instability
-      </text>
-
-      <!-- ===== TEMPERATURE BAND ===== -->
-      <text x="475" y="235" text-anchor="middle"
+      <!-- Temperature -->
+      <text x="530" y="235" text-anchor="middle"
         font-size="8.5" fill="#64748B">
         Typical: 150–175°C ±10°C
+      </text>
+
+      <!-- ===== EXTRUDER (簡易追加) ===== -->
+      <rect x="250" y="240" width="200" height="10"
+        fill="#CBD5E1"/>
+
+      <text x="350" y="260" text-anchor="middle"
+        font-size="8.5" fill="#64748B">
+        Extrusion Stability Sensitivity (PHA ↑)
       </text>
 
     </svg>
