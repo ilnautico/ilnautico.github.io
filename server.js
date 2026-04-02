@@ -105,7 +105,7 @@ function generateProcessVisualSVG({ material }) {
     </svg>
   </div>
   `;
-}/ 
+}
 
 
 // =========================
