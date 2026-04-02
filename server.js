@@ -81,6 +81,52 @@ function getValue(fields, keyword) {
 }
 
 // =========================
+// 🎨 SVGグラフィック生成
+// =========================
+function generateProcessVisualSVG({ material }) {
+
+  const phaMin = 155;
+  const phaMax = 175;
+
+  const ldpeMin = 160;
+  const ldpeMax = 240;
+
+  const scaleMin = 140;
+  const scaleMax = 250;
+
+  function mapTempToX(temp) {
+    return 100 + ((temp - scaleMin) / (scaleMax - scaleMin)) * 400;
+  }
+
+  const phaX = mapTempToX(phaMin);
+  const phaWidth = mapTempToX(phaMax) - phaX;
+
+  const ldpeX = mapTempToX(ldpeMin);
+  const ldpeWidth = mapTempToX(ldpeMax) - ldpeX;
+
+  return `
+  <svg width="100%" height="220" viewBox="0 0 600 220">
+    <rect x="0" y="0" width="600" height="220" fill="#ffffff"/>
+
+    <rect x="${ldpeX}" y="60" width="${ldpeWidth}" height="40"
+      fill="#dfe7ef" stroke="#b8c8d8"/>
+
+    <rect x="${phaX}" y="110" width="${phaWidth}" height="40"
+      fill="#c4963e" opacity="0.9"/>
+
+    <text x="100" y="40" font-size="12" fill="#6b7c8f">Temperature (°C)</text>
+
+    <line x1="100" y1="180" x2="500" y2="180" stroke="#17263c"/>
+
+    <text x="100" y="200" font-size="10">140</text>
+    <text x="250" y="200" font-size="10">180</text>
+    <text x="400" y="200" font-size="10">220</text>
+    <text x="500" y="200" font-size="10">250</text>
+  </svg>
+  `;
+}
+
+// =========================
 // HTML差し込み
 // =========================
 function injectHtml(template, data) {
@@ -98,8 +144,6 @@ function injectHtml(template, data) {
 // MAIN
 // =========================
 app.post("/tally-pdf", async (req, res) => {
-
-  console.log("🔥 HIT");
 
   try {
     const fields = req.body?.data?.fields || [];
@@ -119,34 +163,15 @@ app.post("/tally-pdf", async (req, res) => {
     );
 
     // =========================
-    // ✅ 地域要素（完全修正版）
+    // 地域要素
     // =========================
     let regionalNote = "";
 
     if ((notes || "").toLowerCase().includes("middle east")) {
       regionalNote += `
       <br><br>
-      <strong>Environmental Constraint (Middle East Deployment Context)</strong><br><br>
-
-      High ambient temperature conditions may reduce cooling efficiency and 
-      increase melt temperature drift, amplifying thermal degradation risk.
-
-      <br><br>
-      <strong>Implication:</strong><br>
-      Pilot validation under representative environmental conditions is recommended.
-      `;
-    }
-
-    if ((notes || "").toLowerCase().includes("high humidity")) {
-      regionalNote += `
-      <br><br>
-      <strong>Environmental Constraint (High Humidity)</strong><br><br>
-
-      Moisture exposure may accelerate hydrolytic degradation and affect melt stability.
-
-      <br><br>
-      <strong>Implication:</strong><br>
-      Moisture-controlled handling and drying validation are required.
+      <strong>Environmental Constraint (High Temperature)</strong><br><br>
+      Elevated ambient temperature may reduce cooling efficiency and increase thermal drift.
       `;
     }
 
@@ -155,11 +180,6 @@ app.post("/tally-pdf", async (req, res) => {
     // =========================
     const prompt = `
 Return ONLY JSON.
-
-STRICT:
-- Max 2–3 sentences
-- Technical language
-- No compatibility judgement
 
 {
   "executive_summary": "",
@@ -190,8 +210,7 @@ Scale: ${scale}
 Concern: ${concern}
 `;
 
-    const claudeText = await generateClaudeHypothesis(prompt);
-    const parsed = safeParseJSON(claudeText);
+    const parsed = safeParseJSON(await generateClaudeHypothesis(prompt));
 
     const template = fs.readFileSync("template.html", "utf8");
 
@@ -199,9 +218,6 @@ Concern: ${concern}
 
       application,
       material_transition: `${currentMaterial} → ${bioMaterial}`,
-      assessment_type: "Tier 2 – Pre-Commercial Feasibility",
-      report_date: new Date().toLocaleDateString(),
-
       compatibility_level: compatibility,
 
       executive_summary: parsed.executive_summary,
@@ -219,20 +235,18 @@ Concern: ${concern}
       primary_risk_title: parsed.primary_risk_title,
       primary_risk: parsed.primary_risk,
 
-      secondary_risk_title: parsed.secondary_risk_title,
-      secondary_risk: parsed.secondary_risk,
-
       mechanism: parsed.mechanism,
 
       stability: parsed.stability,
-      stability_note: parsed.stability_note,
-
       consistency: parsed.consistency,
-      consistency_note: parsed.consistency_note,
 
       visual_description: parsed.visual_description,
 
-      // 👇安全に統合
+      // 👇 ここが今回の追加
+      process_visual: generateProcessVisualSVG({
+        material: bioMaterial
+      }),
+
       next_step: (parsed.next_step || "") + regionalNote
     });
 
@@ -242,11 +256,7 @@ Concern: ${concern}
 
     const page = await browser.newPage();
 
-    await page.setDefaultNavigationTimeout(0);
-
     await page.setContent(html, { waitUntil: "domcontentloaded" });
-
-    await new Promise(r => setTimeout(r, 800));
 
     const pdf = await page.pdf({
       format: "A4",
@@ -255,32 +265,18 @@ Concern: ${concern}
 
     await browser.close();
 
-    fs.writeFileSync("/tmp/latest-report.pdf", pdf);
-
     res.set({ "Content-Type": "application/pdf" });
     res.send(pdf);
 
   } catch (err) {
-    console.error("❌ ERROR:", err);
+    console.error(err);
     res.status(500).send("error");
   }
 });
 
 // =========================
-// PDF取得
-// =========================
-app.get("/latest-pdf", (req, res) => {
-  const file = "/tmp/latest-report.pdf";
-
-  if (!fs.existsSync(file)) {
-    return res.status(404).send("No PDF yet");
-  }
-
-  res.sendFile(file);
-});
-
-app.listen(process.env.PORT || 3000, () => {
-  console.log("🚀 Server running");
+app.listen(3000, () => {
+  console.log("🚀 running");
 });
 // =========================
 const htmlTemplate = `
