@@ -50,7 +50,7 @@ function safeParseJSON(text) {
 }
 
 // =========================
-// 判定ロジック（触るな）
+// 判定ロジック
 // =========================
 function evaluateCompatibility(material, process) {
   const m = material.toLowerCase();
@@ -119,23 +119,37 @@ app.post("/tally-pdf", async (req, res) => {
     );
 
     // =========================
-    // 地域要素（分離版）
+    // ✅ 地域要素（完全修正版）
     // =========================
+    let regionalNote = "";
+
     if ((notes || "").toLowerCase().includes("middle east")) {
-  regionalNote = "...熱...";
-}
+      regionalNote += `
+      <br><br>
+      <strong>Environmental Constraint (Middle East Deployment Context)</strong><br><br>
 
-if ((notes || "").toLowerCase().includes("high humidity")) {
-  regionalNote += `
-  <br><br>
-  <strong>Environmental Constraint (High Humidity)</strong><br><br>
-  Moisture exposure may accelerate hydrolytic degradation and affect melt stability.
+      High ambient temperature conditions may reduce cooling efficiency and 
+      increase melt temperature drift, amplifying thermal degradation risk.
 
-  <br><br>
-  <strong>Implication:</strong><br>
-  Moisture-controlled handling and drying validation are required prior to processing.
-  `;
-}
+      <br><br>
+      <strong>Implication:</strong><br>
+      Pilot validation under representative environmental conditions is recommended.
+      `;
+    }
+
+    if ((notes || "").toLowerCase().includes("high humidity")) {
+      regionalNote += `
+      <br><br>
+      <strong>Environmental Constraint (High Humidity)</strong><br><br>
+
+      Moisture exposure may accelerate hydrolytic degradation and affect melt stability.
+
+      <br><br>
+      <strong>Implication:</strong><br>
+      Moisture-controlled handling and drying validation are required.
+      `;
+    }
+
     // =========================
     // Claude
     // =========================
@@ -218,8 +232,8 @@ Concern: ${concern}
 
       visual_description: parsed.visual_description,
 
-      next_step: parsed.next_step,
-      regional_note: regionalNote // ←追加
+      // 👇安全に統合
+      next_step: (parsed.next_step || "") + regionalNote
     });
 
     const browser = await puppeteer.launch({
@@ -227,9 +241,11 @@ Concern: ${concern}
     });
 
     const page = await browser.newPage();
+
     await page.setDefaultNavigationTimeout(0);
 
     await page.setContent(html, { waitUntil: "domcontentloaded" });
+
     await new Promise(r => setTimeout(r, 800));
 
     const pdf = await page.pdf({
@@ -250,6 +266,9 @@ Concern: ${concern}
   }
 });
 
+// =========================
+// PDF取得
+// =========================
 app.get("/latest-pdf", (req, res) => {
   const file = "/tmp/latest-report.pdf";
 
