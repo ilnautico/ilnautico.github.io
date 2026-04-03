@@ -95,8 +95,10 @@ function generateProcessVisualSVG() {
       fill="white" opacity="0.08"/>
 
       <!-- 波（完全補正済み） -->
-      <path d="M395 110 Q430 85 465 110 T480 110"
-        stroke="#E11D48" stroke-width="2.8" fill="none"/>
+      <path d="M400 100 Q430 80 460 100 T490 100"
+  stroke="#E11D48"
+  stroke-width="2.6"
+  fill="none"/>
 
       <text x="435" y="115" text-anchor="middle"
         font-size="9" fill="#E11D48">
