@@ -161,16 +161,23 @@ app.post("/tally-pdf", async (req, res) => {
     });
 
     // フォント待機
-    await page.evaluate(() => document.fonts.ready);
+   await page.setContent(html, { waitUntil: "domcontentloaded" });
 
-    // SVG安定待ち
-    await new Promise(r => setTimeout(r, 500));
+await page.emulateMediaType("screen");
 
-    const pdf = await page.pdf({
-      format: "A4",
-      printBackground: true,
-      timeout: 0
+await page.evaluate(() => {
+  return new Promise(resolve => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(resolve);
     });
+  });
+});
+
+const pdf = await page.pdf({
+  format: "A4",
+  printBackground: true,
+  timeout: 0
+});
 
     await browser.close();
 
