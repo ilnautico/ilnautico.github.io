@@ -12,79 +12,96 @@ app.use(express.urlencoded({ extended: true }));
 function generateProcessVisualSVG() {
   return `
   <div style="width:100%; text-align:center; margin:4px 0;">
-    <svg width="100%" height="190" viewBox="0 0 600 190">
+    <svg width="100%" height="200" viewBox="0 0 600 200">
 
-      <text x="300" y="20" text-anchor="middle"
-        font-size="10" fill="#334155">
+      <!-- ===== TITLE ===== -->
+      <text x="300" y="25" text-anchor="middle"
+        font-size="11" fill="#334155">
         Film Extrusion Behavior (LDPE vs PHA)
       </text>
 
-      <!-- EXTRUDER -->
-      <rect x="20" y="95" width="100" height="18" rx="4"
+      <!-- ===== BASELINE（設計軸） ===== -->
+      <!-- 基準Y = 100 -->
+
+      <!-- ===== EXTRUDER ===== -->
+      <rect x="40" y="92" width="90" height="16" rx="4"
         fill="#334155"/>
-      <line x1="25" y1="104" x2="115" y2="104"
+      <line x1="45" y1="100" x2="125" y2="100"
         stroke="#94A3B8" stroke-width="2"/>
-      <rect x="115" y="92" width="8" height="24"
+      <rect x="125" y="88" width="10" height="24"
         fill="#64748B"/>
 
-      <!-- TEMP ZONES -->
-      <g transform="translate(130,85)">
-        <rect x="0" y="0" width="30" height="18" fill="#60A5FA"/>
-        <rect x="30" y="0" width="30" height="18" fill="#93C5FD"/>
-        <rect x="60" y="0" width="30" height="18" fill="#FBBF24"/>
-        <rect x="90" y="0" width="30" height="18" fill="#F87171"/>
+      <!-- ===== TEMPERATURE ZONES ===== -->
+      <g transform="translate(135,90)">
+        <rect x="0" y="0" width="28" height="20" fill="#60A5FA"/>
+        <rect x="28" y="0" width="28" height="20" fill="#93C5FD"/>
+        <rect x="56" y="0" width="28" height="20" fill="#FBBF24"/>
+        <rect x="84" y="0" width="28" height="20" fill="#F87171"/>
+
+        <text x="56" y="-8" text-anchor="middle"
+          font-size="7" fill="#64748B">
+          Temperature Control
+        </text>
       </g>
 
-      <!-- LDPE -->
-      <ellipse cx="240" cy="95" rx="75" ry="50"
+      <!-- ===== LDPE BUBBLE（基準：cx=250） ===== -->
+      <ellipse cx="250" cy="100" rx="75" ry="50"
         fill="#CBD5E1"/>
 
-      <text x="240" y="45" text-anchor="middle"
+      <text x="250" y="45" text-anchor="middle"
         font-size="9" fill="#334155">
         LDPE Stable Bubble
       </text>
 
-      <rect x="180" y="145" width="120" height="5"
+      <!-- 安定バー -->
+      <rect x="190" y="155" width="120" height="5"
         fill="#94A3B8"/>
 
-      <text x="240" y="165" text-anchor="middle"
+      <text x="250" y="175" text-anchor="middle"
         font-size="7.5" fill="#64748B">
         Wide Processing Window
       </text>
 
-      <!-- ARROW -->
-      <line x1="300" y1="95" x2="330" y2="95"
+      <!-- ===== TRANSITION ===== -->
+      <line x1="320" y1="100" x2="350" y2="100"
         stroke="#64748B" stroke-width="2.5"/>
-      <polygon points="330,95 320,90 320,100"
+      <polygon points="350,100 340,95 340,105"
         fill="#64748B"/>
 
-      <!-- PHA -->
-      <ellipse cx="420" cy="95" rx="75" ry="50"
+      <text x="335" y="75" text-anchor="middle"
+        font-size="7.5" fill="#64748B">
+        Material Transition
+      </text>
+
+      <!-- ===== PHA BUBBLE（基準：cx=430） ===== -->
+      <ellipse cx="430" cy="100" rx="75" ry="50"
         fill="#C4963E"/>
 
-      <!-- WAVE（修正版） -->
-      <path d="M380 88 Q420 65 460 88 T480 88"
-        stroke="#E11D48" stroke-width="2.2" fill="none"/>
+      <!-- 波（完全中央固定） -->
+      <path d="M390 95 Q430 70 470 95 T480 95"
+        stroke="#E11D48" stroke-width="2.4" fill="none"/>
 
-      <text x="420" y="100" text-anchor="middle"
-        font-size="8.5" fill="#E11D48">
+      <text x="430" y="105" text-anchor="middle"
+        font-size="9" fill="#E11D48">
         Bubble Instability
       </text>
 
-      <rect x="360" y="145" width="120" height="5"
+      <!-- 狭いバー -->
+      <rect x="370" y="155" width="120" height="5"
         fill="#C4963E"/>
 
-      <rect x="350" y="138" width="12" height="14"
+      <!-- リスクマーカー（完全対称） -->
+      <rect x="360" y="148" width="12" height="14"
         fill="#E11D48" opacity="0.6"/>
-      <rect x="470" y="138" width="12" height="14"
+      <rect x="488" y="148" width="12" height="14"
         fill="#E11D48" opacity="0.6"/>
 
-      <text x="420" y="165" text-anchor="middle"
+      <text x="430" y="175" text-anchor="middle"
         font-size="7.5" fill="#64748B">
         Narrow Window + Degradation Risk
       </text>
 
-      <text x="420" y="178" text-anchor="middle"
+      <text x="430" y="188" text-anchor="middle"
         font-size="7" fill="#E11D48">
         Degradation Threshold
       </text>
@@ -93,8 +110,6 @@ function generateProcessVisualSVG() {
   </div>
   `;
 }
-// =========================
-
 
 // =========================
 // HTML差し込み
