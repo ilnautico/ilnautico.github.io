@@ -12,7 +12,7 @@ app.use(express.urlencoded({ extended: true }));
 function generateProcessVisualSVG() {
   return `
   <div style="width:100%; text-align:center; margin:4px 0;">
-    <svg width="100%" height="200" viewBox="0 0 600 200">
+    <svg width="100%" height="220" viewBox="0 0 600 220">
 
       <!-- ===== TITLE ===== -->
       <text x="300" y="25" text-anchor="middle"
@@ -20,19 +20,16 @@ function generateProcessVisualSVG() {
         Film Extrusion Behavior (LDPE vs PHA)
       </text>
 
-      <!-- ===== BASELINE（設計軸） ===== -->
-      <!-- 基準Y = 100 -->
-
-      <!-- ===== EXTRUDER ===== -->
-      <rect x="40" y="92" width="90" height="16" rx="4"
-        fill="#334155"/>
-      <line x1="45" y1="100" x2="125" y2="100"
-        stroke="#94A3B8" stroke-width="2"/>
-      <rect x="125" y="88" width="10" height="24"
-        fill="#64748B"/>
+      <!-- ===== EXTRUDER（リアル化） ===== -->
+      <rect x="20" y="95" width="85" height="18" rx="6"
+        fill="#1E293B"/>
+      <rect x="25" y="102" width="70" height="3"
+        fill="#94A3B8" opacity="0.6"/>
+      <rect x="100" y="88" width="12" height="32"
+        fill="#475569"/>
 
       <!-- ===== TEMPERATURE ZONES ===== -->
-      <g transform="translate(135,90)">
+      <g transform="translate(112,95)">
         <rect x="0" y="0" width="28" height="20" fill="#60A5FA"/>
         <rect x="28" y="0" width="28" height="20" fill="#93C5FD"/>
         <rect x="56" y="0" width="28" height="20" fill="#FBBF24"/>
@@ -44,64 +41,84 @@ function generateProcessVisualSVG() {
         </text>
       </g>
 
-      <!-- ===== LDPE BUBBLE（基準：cx=250） ===== -->
-      <ellipse cx="250" cy="100" rx="75" ry="50"
+      <!-- ===== LDPE BUBBLE（少し右へ） ===== -->
+      <ellipse cx="270" cy="110" rx="70" ry="48"
         fill="#CBD5E1"/>
 
-      <text x="250" y="45" text-anchor="middle"
+      <!-- ハイライト -->
+      <ellipse cx="260" cy="100" rx="45" ry="25"
+        fill="white" opacity="0.15"/>
+
+      <text x="270" y="50" text-anchor="middle"
         font-size="9" fill="#334155">
         LDPE Stable Bubble
       </text>
 
       <!-- 安定バー -->
-      <rect x="190" y="155" width="120" height="5"
+      <rect x="215" y="165" width="110" height="5"
         fill="#94A3B8"/>
 
-      <text x="250" y="175" text-anchor="middle"
+      <text x="270" y="185" text-anchor="middle"
         font-size="7.5" fill="#64748B">
         Wide Processing Window
       </text>
 
       <!-- ===== TRANSITION ===== -->
-      <line x1="320" y1="100" x2="350" y2="100"
+      <line x1="330" y1="110" x2="355" y2="110"
         stroke="#64748B" stroke-width="2.5"/>
-      <polygon points="350,100 340,95 340,105"
+      <polygon points="355,110 345,105 345,115"
         fill="#64748B"/>
 
-      <text x="335" y="75" text-anchor="middle"
+      <text x="342" y="80" text-anchor="middle"
         font-size="7.5" fill="#64748B">
         Material Transition
       </text>
 
-      <!-- ===== PHA BUBBLE（基準：cx=430） ===== -->
-      <ellipse cx="430" cy="100" rx="75" ry="50"
-        fill="#C4963E"/>
+      <!-- ===== PHA（不安定形状） ===== -->
+      <path d="
+        M390 85
+        Q430 55 470 85
+        Q510 115 470 140
+        Q430 165 390 140
+        Q350 115 390 85
+      "
+      fill="#C4963E"/>
 
-      <!-- 波（完全中央固定） -->
-      <path d="M390 95 Q430 70 470 95 T480 95"
-        stroke="#E11D48" stroke-width="2.4" fill="none"/>
+      <!-- 内部ハイライト -->
+      <path d="
+        M400 95
+        Q430 75 460 95
+        Q480 110 460 120
+        Q430 135 400 120
+        Q380 110 400 95
+      "
+      fill="white" opacity="0.08"/>
 
-      <text x="430" y="105" text-anchor="middle"
+      <!-- 波（完全補正済み） -->
+      <path d="M395 110 Q430 85 465 110 T480 110"
+        stroke="#E11D48" stroke-width="2.8" fill="none"/>
+
+      <text x="435" y="115" text-anchor="middle"
         font-size="9" fill="#E11D48">
         Bubble Instability
       </text>
 
-      <!-- 狭いバー -->
-      <rect x="370" y="155" width="120" height="5"
+      <!-- リスクバー -->
+      <rect x="385" y="165" width="110" height="5"
         fill="#C4963E"/>
 
-      <!-- リスクマーカー（完全対称） -->
-      <rect x="360" y="148" width="12" height="14"
+      <!-- 赤マーカー（対称） -->
+      <rect x="375" y="158" width="12" height="14"
         fill="#E11D48" opacity="0.6"/>
-      <rect x="488" y="148" width="12" height="14"
+      <rect x="495" y="158" width="12" height="14"
         fill="#E11D48" opacity="0.6"/>
 
-      <text x="430" y="175" text-anchor="middle"
+      <text x="440" y="185" text-anchor="middle"
         font-size="7.5" fill="#64748B">
         Narrow Window + Degradation Risk
       </text>
 
-      <text x="430" y="188" text-anchor="middle"
+      <text x="440" y="198" text-anchor="middle"
         font-size="7" fill="#E11D48">
         Degradation Threshold
       </text>
