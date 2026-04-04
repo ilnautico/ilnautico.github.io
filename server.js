@@ -50,59 +50,40 @@ function injectHtml(template, data) {
 
 // =========================
 // MAIN（既存そのまま＋1行追加）
-app.post("/tally-pdf", async (req, res) => {
-  console.log("🔥 HIT");
+app.get("/tally-pdf", async (req, res) => {
+  console.log("🔥 GET HIT");
 
   try {
     const template = fs.readFileSync("template.html", "utf8");
 
     const html = injectHtml(template, {
       process_visual: generateProcessVisualSVG(),
-
-      // 🔥 ここだけ追加
       base_image: getBase64Image()
     });
 
-    console.log("📄 HTML OK");
-
     const browser = await puppeteer.launch({
       headless: "new",
-      args: [
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--disable-dev-shm-usage",
-        "--disable-gpu"
-      ]
+      args: ["--no-sandbox"]
     });
 
     const page = await browser.newPage();
 
-    await page.setDefaultNavigationTimeout(0);
-    await page.setDefaultTimeout(0);
-
-    await page.setContent(html, {
-      waitUntil: "domcontentloaded"
-    });
-
-    await page.emulateMediaType("screen");
+    await page.setContent(html);
 
     const pdf = await page.pdf({
       format: "A4",
-      printBackground: true,
-      timeout: 0
+      printBackground: true
     });
 
     await browser.close();
 
     fs.writeFileSync("/tmp/latest-report.pdf", pdf);
 
-    console.log("📦 PDF OK");
-
     res.set({ "Content-Type": "application/pdf" });
     res.send(pdf);
 
   } catch (err) {
-    console.error("❌ ERROR:", err);
+    console.error(err);
     res.status(500).send("error");
   }
 });
