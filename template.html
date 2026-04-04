@@ -506,8 +506,16 @@ body {
           <span class="viz-header-text">Visual Description — Indicative Only</span>
         </div>
         <div class="viz-body">
-         <div class="viz-image">
-  {{process_visual}}
+        <div class="viz-image">
+
+  <!-- 背景画像 -->
+  <img src="/visual-base.png" style="width:100%; display:block;">
+
+  <!-- 上に重ねる -->
+  <div class="viz-overlay">
+    {{dynamic_overlay}}
+  </div>
+
 </div>
           <div class="viz-caption">
             Conceptual representation — material behaviour interpretation (non-physical validation)
