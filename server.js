@@ -8,7 +8,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // =========================
-// 🔥 追加（画像を確実に出すだけ）
+// 🔥 画像を確実に読み込む（同階層）
 function getBase64Image() {
   const img = fs.readFileSync("visual-base.png");
   return `data:image/png;base64,${img.toString("base64")}`;
@@ -34,7 +34,7 @@ function generateProcessVisualSVG() {
 
 
 // =========================
-// HTML差し込み（既存そのまま）
+// HTML差し込み（既存）
 function injectHtml(template, data) {
   let html = template;
 
@@ -49,9 +49,65 @@ function injectHtml(template, data) {
 
 
 // =========================
-// MAIN（既存そのまま＋1行追加）
+// 🔥 GET（ブラウザ直接用）
 app.get("/tally-pdf", async (req, res) => {
   console.log("🔥 GET HIT");
+
+  try {
+    const template = fs.readFileSync("template.html", "utf8");
+
+    const html = injectHtml(template, {
+      process_visual: generateProcessVisualSVG(),
+      base_image: getBase64Image()
+    });
+
+    console.log("📄 HTML OK");
+
+    const browser = await puppeteer.launch({
+      headless: "new",
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-gpu"
+      ]
+    });
+
+    const page = await browser.newPage();
+
+    await page.setContent(html, {
+      waitUntil: "domcontentloaded"
+    });
+
+    await page.emulateMediaType("screen");
+
+    const pdf = await page.pdf({
+      format: "A4",
+      printBackground: true,
+      timeout: 0
+    });
+
+    await browser.close();
+
+    fs.writeFileSync("/tmp/latest-report.pdf", pdf);
+
+    console.log("📦 PDF OK");
+
+    res.set({ "Content-Type": "application/pdf" });
+    res.send(pdf);
+
+  } catch (err) {
+    console.error("❌ ERROR:", err);
+    res.status(500).send("error");
+  }
+});
+// =========================
+
+
+// =========================
+// 🔥 POST（既存フォーム用：そのまま残す）
+app.post("/tally-pdf", async (req, res) => {
+  console.log("🔥 POST HIT");
 
   try {
     const template = fs.readFileSync("template.html", "utf8");
@@ -91,7 +147,7 @@ app.get("/tally-pdf", async (req, res) => {
 
 
 // =========================
-// PDF確認（既存そのまま）
+// PDF確認
 app.get("/latest-pdf", (req, res) => {
   const file = "/tmp/latest-report.pdf";
 
