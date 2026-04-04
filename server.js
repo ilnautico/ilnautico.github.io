@@ -175,12 +175,10 @@ app.post("/tally-pdf", async (req, res) => {
     await page.setDefaultNavigationTimeout(0);
     await page.setDefaultTimeout(0);
 
-    await page.setContent(html, {
-      waitUntil: "domcontentloaded"
-    });
-
     // フォント待機
-   await page.setContent(html, { waitUntil: "domcontentloaded" });
+   await page.setContent(html, {
+  waitUntil: "domcontentloaded"
+});
 
 await page.emulateMediaType("screen");
 
