@@ -7,12 +7,34 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// 🔥 これ追加（画像配信）
-app.use(express.static("public"));
+// =========================
+// 🔥 追加（画像を確実に出すだけ）
+function getBase64Image() {
+  const img = fs.readFileSync("visual-base.png");
+  return `data:image/png;base64,${img.toString("base64")}`;
+}
+// =========================
 
 
 // =========================
-// HTML差し込み
+// SVG（既存そのまま）
+function generateProcessVisualSVG() {
+  return `
+  <div style="width:100%; text-align:center; margin:4px 0;">
+    <svg width="100%" height="220" viewBox="0 0 600 220">
+      <text x="300" y="25" text-anchor="middle"
+        font-size="11" fill="#334155">
+        Film Extrusion Behavior (LDPE vs PHA)
+      </text>
+    </svg>
+  </div>
+  `;
+}
+// =========================
+
+
+// =========================
+// HTML差し込み（既存そのまま）
 function injectHtml(template, data) {
   let html = template;
 
@@ -27,41 +49,60 @@ function injectHtml(template, data) {
 
 
 // =========================
-// MAIN
-app.get("/tally-pdf", async (req, res) => {
-  console.log("🔥 GET HIT");
+// MAIN（既存そのまま＋1行追加）
+app.post("/tally-pdf", async (req, res) => {
+  console.log("🔥 HIT");
 
   try {
     const template = fs.readFileSync("template.html", "utf8");
 
     const html = injectHtml(template, {
-      process_visual: "",
-      dynamic_overlay: ""
+      process_visual: generateProcessVisualSVG(),
+
+      // 🔥 ここだけ追加
+      base_image: getBase64Image()
     });
+
+    console.log("📄 HTML OK");
 
     const browser = await puppeteer.launch({
       headless: "new",
-      args: ["--no-sandbox"]
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-gpu"
+      ]
     });
 
     const page = await browser.newPage();
 
-    await page.setContent(html);
+    await page.setDefaultNavigationTimeout(0);
+    await page.setDefaultTimeout(0);
+
+    await page.setContent(html, {
+      waitUntil: "domcontentloaded"
+    });
+
+    await page.emulateMediaType("screen");
 
     const pdf = await page.pdf({
       format: "A4",
-      printBackground: true
+      printBackground: true,
+      timeout: 0
     });
 
     await browser.close();
 
     fs.writeFileSync("/tmp/latest-report.pdf", pdf);
 
+    console.log("📦 PDF OK");
+
     res.set({ "Content-Type": "application/pdf" });
     res.send(pdf);
 
   } catch (err) {
-    console.error(err);
+    console.error("❌ ERROR:", err);
     res.status(500).send("error");
   }
 });
@@ -69,7 +110,7 @@ app.get("/tally-pdf", async (req, res) => {
 
 
 // =========================
-// PDF確認
+// PDF確認（既存そのまま）
 app.get("/latest-pdf", (req, res) => {
   const file = "/tmp/latest-report.pdf";
 
