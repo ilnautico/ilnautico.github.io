@@ -176,24 +176,15 @@ app.post("/tally-pdf", async (req, res) => {
     await page.setDefaultTimeout(0);
 
     // フォント待機
-   await page.setContent(html, {
+  await page.setContent(html, {
   waitUntil: "domcontentloaded"
 });
 
 await page.emulateMediaType("screen");
 
-await page.evaluate(() => {
-  return new Promise(resolve => {
-    requestAnimationFrame(() => {
-      requestAnimationFrame(resolve);
-    });
-  });
-});
-
 const pdf = await page.pdf({
   format: "A4",
-  printBackground: true,
-  timeout: 0
+  printBackground: true
 });
 
     await browser.close();
