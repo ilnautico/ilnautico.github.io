@@ -154,53 +154,42 @@ app.post("/tally-pdf", async (req, res) => {
     const template = fs.readFileSync("template.html", "utf8");
 
     const html = injectHtml(template, {
-  process_visual: "",
-  dynamic_overlay: ""
-});
+      process_visual: generateProcessVisualSVG()
+    });
 
     console.log("📄 HTML OK");
 
     const browser = await puppeteer.launch({
-      headless: "new",
+      headless: true,
       args: [
         "--no-sandbox",
         "--disable-setuid-sandbox",
-        "--disable-dev-shm-usage",
-        "--disable-gpu"
+        "--disable-dev-shm-usage"
       ]
     });
 
     const page = await browser.newPage();
 
-    // 🔥 タイムアウト完全解除
-    await page.setDefaultNavigationTimeout(0);
-    await page.setDefaultTimeout(0);
+    // ❌ timeout全部無効
+    page.setDefaultTimeout(0);
+    page.setDefaultNavigationTimeout(0);
 
-    // フォント待機
- await page.setContent(html, {
-  waitUntil: "domcontentloaded"
-});
+    // 🔥 ここがポイント（軽くする）
+    await page.setContent(html);
 
-await page.emulateMediaType("screen");
+    // 少し待つ（安定用）
+    await new Promise(r => setTimeout(r, 500));
 
-await page.evaluate(() => {
-  return new Promise(resolve => {
-    requestAnimationFrame(() => {
-      requestAnimationFrame(resolve);
+    console.log("🧠 RENDER READY");
+
+    const pdf = await page.pdf({
+      format: "A4",
+      printBackground: true
     });
-  });
-});
-
-const pdf = await page.pdf({
-  format: "A4",
-  printBackground: true
-});
-
-    await browser.close();
-
-    fs.writeFileSync("/tmp/latest-report.pdf", pdf);
 
     console.log("📦 PDF OK");
+
+    await browser.close();
 
     res.set({ "Content-Type": "application/pdf" });
     res.send(pdf);
