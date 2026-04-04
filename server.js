@@ -1,8 +1,6 @@
 import express from "express";
 import puppeteer from "puppeteer";
 import fs from "fs";
-import path from "path";
-import { fileURLToPath } from "url";
 
 const app = express();
 
@@ -10,32 +8,46 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // =========================
-// 🔥 パス解決（Railway対応）
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+// overlay生成
+function generateOverlay() {
+  return `
+  <div style="position:relative; width:100%; height:100%; font-family:sans-serif;">
 
-// =========================
-// 🔥 画像を確実に取得（これで100%）
-function getBase64Image() {
-  const candidates = [
-    path.join(__dirname, "visual-base.png"),
-    path.join(__dirname, "public", "visual-base.png"),
-  ];
+    <!-- 温度 -->
+    <div style="position:absolute; top:18%; left:25%; font-size:28px; color:#334155;">
+      230°C
+    </div>
 
-  const imagePath = candidates.find((p) => fs.existsSync(p));
+    <div style="position:absolute; top:18%; right:20%; font-size:28px; color:#DC2626;">
+      180°C
+    </div>
 
-  if (!imagePath) {
-    throw new Error(
-      `visual-base.png not found. Checked: ${candidates.join(" , ")}`
-    );
-  }
+    <!-- 強度 -->
+    <div style="position:absolute; top:30%; left:27%; font-size:18px; color:#0F766E;">
+      80
+    </div>
 
-  const img = fs.readFileSync(imagePath);
-  return `data:image/png;base64,${img.toString("base64")}`;
+    <div style="position:absolute; top:30%; right:24%; font-size:18px; color:#DC2626;">
+      35
+    </div>
+
+    <!-- 波 -->
+    <svg style="position:absolute; bottom:12%; left:20%; width:35%;">
+      <path d="M0 20 Q20 0 40 20 T80 20 T120 20"
+        stroke="#38BDF8" stroke-width="3" fill="none"/>
+    </svg>
+
+    <svg style="position:absolute; bottom:12%; right:15%; width:35%;">
+      <path d="M0 20 Q20 5 40 20 T80 10 T120 20"
+        stroke="#DC2626" stroke-width="3" fill="none"/>
+    </svg>
+
+  </div>
+  `;
 }
 
 // =========================
-// HTML差し込み（既存構造維持）
+// HTML差し込み
 function injectHtml(template, data) {
   let html = template;
 
@@ -48,26 +60,34 @@ function injectHtml(template, data) {
 }
 
 // =========================
-// 🔥 PDF生成（GET）
-app.get("/tally-pdf", async (req, res) => {
-  console.log("🔥 GET HIT");
+// MAIN
+app.post("/tally-pdf", async (req, res) => {
+  console.log("🔥 POST HIT");
 
   try {
     const template = fs.readFileSync("template.html", "utf8");
 
     const html = injectHtml(template, {
-      base_image: getBase64Image(),
-      visual_description: "Material behavior visualization"
+      base_image: "https://ilnautico.github.io/visual-base.png",
+      dynamic_overlay: generateOverlay()
     });
 
+    console.log("📄 HTML OK");
+
     const browser = await puppeteer.launch({
-      headless: "new",
-      args: ["--no-sandbox"]
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-gpu"
+      ]
     });
 
     const page = await browser.newPage();
 
-    await page.setContent(html);
+    await page.setContent(html, {
+      waitUntil: "networkidle0"
+    });
 
     const pdf = await page.pdf({
       format: "A4",
@@ -78,12 +98,14 @@ app.get("/tally-pdf", async (req, res) => {
 
     fs.writeFileSync("/tmp/latest-report.pdf", pdf);
 
+    console.log("📦 PDF OK");
+
     res.set({ "Content-Type": "application/pdf" });
     res.send(pdf);
 
   } catch (err) {
     console.error("❌ ERROR:", err);
-    res.status(500).send(err.message);
+    res.status(500).send("error");
   }
 });
 
