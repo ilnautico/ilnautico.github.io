@@ -188,7 +188,10 @@ app.post("/tally-pdf", async (req, res) => {
     });
 
     console.log("📦 PDF OK");
+   fs.writeFileSync("/tmp/latest-report.pdf", pdf);
 
+res.set({ "Content-Type": "application/pdf" });
+res.send(pdf);
     await browser.close();
 
     res.set({ "Content-Type": "application/pdf" });
