@@ -7,128 +7,9 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// =========================
-// SVG（最終版）
-function generateProcessVisualSVG() {
-  return `
-  <div style="width:100%; text-align:center; margin:4px 0;">
-    <svg width="100%" height="220" viewBox="0 0 600 220">
+// 🔥 これ追加（画像配信）
+app.use(express.static("public"));
 
-      <!-- ===== TITLE ===== -->
-      <text x="300" y="25" text-anchor="middle"
-        font-size="11" fill="#334155">
-        Film Extrusion Behavior (LDPE vs PHA)
-      </text>
-
-      <!-- ===== EXTRUDER（リアル化） ===== -->
-      <rect x="20" y="95" width="85" height="18" rx="6"
-        fill="#1E293B"/>
-      <rect x="25" y="102" width="70" height="3"
-        fill="#94A3B8" opacity="0.6"/>
-      <rect x="100" y="88" width="12" height="32"
-        fill="#475569"/>
-
-      <!-- ===== TEMPERATURE ZONES ===== -->
-      <g transform="translate(112,95)">
-        <rect x="0" y="0" width="28" height="20" fill="#60A5FA"/>
-        <rect x="28" y="0" width="28" height="20" fill="#93C5FD"/>
-        <rect x="56" y="0" width="28" height="20" fill="#FBBF24"/>
-        <rect x="84" y="0" width="28" height="20" fill="#F87171"/>
-
-        <text x="56" y="-8" text-anchor="middle"
-          font-size="7" fill="#64748B">
-          Temperature Control
-        </text>
-      </g>
-
-      <!-- ===== LDPE BUBBLE（少し右へ） ===== -->
-      <ellipse cx="270" cy="110" rx="70" ry="48"
-        fill="#CBD5E1"/>
-
-      <!-- ハイライト -->
-      <ellipse cx="260" cy="100" rx="45" ry="25"
-        fill="white" opacity="0.15"/>
-
-      <text x="270" y="50" text-anchor="middle"
-        font-size="9" fill="#334155">
-        LDPE Stable Bubble
-      </text>
-
-      <!-- 安定バー -->
-      <rect x="215" y="165" width="110" height="5"
-        fill="#94A3B8"/>
-
-      <text x="270" y="185" text-anchor="middle"
-        font-size="7.5" fill="#64748B">
-        Wide Processing Window
-      </text>
-
-      <!-- ===== TRANSITION ===== -->
-      <line x1="330" y1="110" x2="355" y2="110"
-        stroke="#64748B" stroke-width="2.5"/>
-      <polygon points="355,110 345,105 345,115"
-        fill="#64748B"/>
-
-      <text x="342" y="80" text-anchor="middle"
-        font-size="7.5" fill="#64748B">
-        Material Transition
-      </text>
-
-      <!-- ===== PHA（不安定形状） ===== -->
-      <path d="
-        M390 85
-        Q430 55 470 85
-        Q510 115 470 140
-        Q430 165 390 140
-        Q350 115 390 85
-      "
-      fill="#C4963E"/>
-
-      <!-- 内部ハイライト -->
-      <path d="
-        M400 95
-        Q430 75 460 95
-        Q480 110 460 120
-        Q430 135 400 120
-        Q380 110 400 95
-      "
-      fill="white" opacity="0.08"/>
-
-      <!-- 波（完全補正済み） -->
-      <path d="M400 100 Q430 80 460 100 T490 100"
-  stroke="#E11D48"
-  stroke-width="2.6"
-  fill="none"/>
-
-      <text x="435" y="115" text-anchor="middle"
-        font-size="9" fill="#E11D48">
-        Bubble Instability
-      </text>
-
-      <!-- リスクバー -->
-      <rect x="385" y="165" width="110" height="5"
-        fill="#C4963E"/>
-
-      <!-- 赤マーカー（対称） -->
-      <rect x="375" y="158" width="12" height="14"
-        fill="#E11D48" opacity="0.6"/>
-      <rect x="495" y="158" width="12" height="14"
-        fill="#E11D48" opacity="0.6"/>
-
-      <text x="440" y="185" text-anchor="middle"
-        font-size="7.5" fill="#64748B">
-        Narrow Window + Degradation Risk
-      </text>
-
-      <text x="440" y="198" text-anchor="middle"
-        font-size="7" fill="#E11D48">
-        Degradation Threshold
-      </text>
-
-    </svg>
-  </div>
-  `;
-}
 
 // =========================
 // HTML差し込み
@@ -154,45 +35,53 @@ app.post("/tally-pdf", async (req, res) => {
     const template = fs.readFileSync("template.html", "utf8");
 
     const html = injectHtml(template, {
-      process_visual: generateProcessVisualSVG()
+      // 🔥 ここ重要：何も入れない
+      process_visual: "",
+      dynamic_overlay: ""
     });
 
     console.log("📄 HTML OK");
 
     const browser = await puppeteer.launch({
-      headless: true,
+      headless: "new",
       args: [
         "--no-sandbox",
         "--disable-setuid-sandbox",
-        "--disable-dev-shm-usage"
+        "--disable-dev-shm-usage",
+        "--disable-gpu"
       ]
     });
 
     const page = await browser.newPage();
 
-    // ❌ timeout全部無効
-    page.setDefaultTimeout(0);
-    page.setDefaultNavigationTimeout(0);
+    await page.setDefaultNavigationTimeout(0);
+    await page.setDefaultTimeout(0);
 
-    // 🔥 ここがポイント（軽くする）
-    await page.setContent(html);
+    await page.setContent(html, {
+      waitUntil: "domcontentloaded"
+    });
 
-    // 少し待つ（安定用）
-    await new Promise(r => setTimeout(r, 500));
+    await page.emulateMediaType("screen");
 
-    console.log("🧠 RENDER READY");
+    await page.evaluate(() => {
+      return new Promise(resolve => {
+        requestAnimationFrame(() => {
+          requestAnimationFrame(resolve);
+        });
+      });
+    });
 
     const pdf = await page.pdf({
       format: "A4",
-      printBackground: true
+      printBackground: true,
+      timeout: 0
     });
 
-    console.log("📦 PDF OK");
-   fs.writeFileSync("/tmp/latest-report.pdf", pdf);
-
-res.set({ "Content-Type": "application/pdf" });
-res.send(pdf);
     await browser.close();
+
+    fs.writeFileSync("/tmp/latest-report.pdf", pdf);
+
+    console.log("📦 PDF OK");
 
     res.set({ "Content-Type": "application/pdf" });
     res.send(pdf);
