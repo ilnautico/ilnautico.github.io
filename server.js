@@ -1,6 +1,8 @@
 import express from "express";
 import puppeteer from "puppeteer";
 import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
 
 const app = express();
 
@@ -8,33 +10,32 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // =========================
-// 🔥 画像を確実に読み込む（同階層）
+// 🔥 パス解決（Railway対応）
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// =========================
+// 🔥 画像を確実に取得（これで100%）
 function getBase64Image() {
-  const img = fs.readFileSync("visual-base.png");
+  const candidates = [
+    path.join(__dirname, "visual-base.png"),
+    path.join(__dirname, "public", "visual-base.png"),
+  ];
+
+  const imagePath = candidates.find((p) => fs.existsSync(p));
+
+  if (!imagePath) {
+    throw new Error(
+      `visual-base.png not found. Checked: ${candidates.join(" , ")}`
+    );
+  }
+
+  const img = fs.readFileSync(imagePath);
   return `data:image/png;base64,${img.toString("base64")}`;
 }
-// =========================
-
 
 // =========================
-// SVG（既存そのまま）
-function generateProcessVisualSVG() {
-  return `
-  <div style="width:100%; text-align:center; margin:4px 0;">
-    <svg width="100%" height="220" viewBox="0 0 600 220">
-      <text x="300" y="25" text-anchor="middle"
-        font-size="11" fill="#334155">
-        Film Extrusion Behavior (LDPE vs PHA)
-      </text>
-    </svg>
-  </div>
-  `;
-}
-// =========================
-
-
-// =========================
-// HTML差し込み（既存）
+// HTML差し込み（既存構造維持）
 function injectHtml(template, data) {
   let html = template;
 
@@ -45,11 +46,9 @@ function injectHtml(template, data) {
 
   return html;
 }
-// =========================
-
 
 // =========================
-// 🔥 GET（ブラウザ直接用）
+// 🔥 PDF生成（GET）
 app.get("/tally-pdf", async (req, res) => {
   console.log("🔥 GET HIT");
 
@@ -57,64 +56,8 @@ app.get("/tally-pdf", async (req, res) => {
     const template = fs.readFileSync("template.html", "utf8");
 
     const html = injectHtml(template, {
-      process_visual: generateProcessVisualSVG(),
-      base_image: getBase64Image()
-    });
-
-    console.log("📄 HTML OK");
-
-    const browser = await puppeteer.launch({
-      headless: "new",
-      args: [
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--disable-dev-shm-usage",
-        "--disable-gpu"
-      ]
-    });
-
-    const page = await browser.newPage();
-
-    await page.setContent(html, {
-      waitUntil: "domcontentloaded"
-    });
-
-    await page.emulateMediaType("screen");
-
-    const pdf = await page.pdf({
-      format: "A4",
-      printBackground: true,
-      timeout: 0
-    });
-
-    await browser.close();
-
-    fs.writeFileSync("/tmp/latest-report.pdf", pdf);
-
-    console.log("📦 PDF OK");
-
-    res.set({ "Content-Type": "application/pdf" });
-    res.send(pdf);
-
-  } catch (err) {
-    console.error("❌ ERROR:", err);
-    res.status(500).send("error");
-  }
-});
-// =========================
-
-
-// =========================
-// 🔥 POST（既存フォーム用：そのまま残す）
-app.post("/tally-pdf", async (req, res) => {
-  console.log("🔥 POST HIT");
-
-  try {
-    const template = fs.readFileSync("template.html", "utf8");
-
-    const html = injectHtml(template, {
-      process_visual: generateProcessVisualSVG(),
-      base_image: getBase64Image()
+      base_image: getBase64Image(),
+      visual_description: "Material behavior visualization"
     });
 
     const browser = await puppeteer.launch({
@@ -139,12 +82,10 @@ app.post("/tally-pdf", async (req, res) => {
     res.send(pdf);
 
   } catch (err) {
-    console.error(err);
-    res.status(500).send("error");
+    console.error("❌ ERROR:", err);
+    res.status(500).send(err.message);
   }
 });
-// =========================
-
 
 // =========================
 // PDF確認
@@ -157,8 +98,8 @@ app.get("/latest-pdf", (req, res) => {
 
   res.sendFile(file);
 });
-// =========================
 
+// =========================
 app.listen(process.env.PORT || 3000, () => {
   console.log("🚀 Server running");
 });
