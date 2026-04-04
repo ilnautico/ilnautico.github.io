@@ -8,13 +8,12 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // =========================
-// overlay生成（完全版）
 function generateOverlay() {
   return `
-  <div style="position:relative; width:100%; height:100%; font-family:sans-serif;">
+  <div style="position:relative; width:100%; height:100%;">
 
     <!-- 温度 -->
-    <div style="position:absolute; top:15%; left:28%; font-size:26px; color:#334155;">
+    <div style="position:absolute; top:15%; left:28%; font-size:26px;">
       230°C
     </div>
 
@@ -31,44 +30,47 @@ function generateOverlay() {
       35
     </div>
 
-    <!-- 波（左） -->
-    <svg style="position:absolute; bottom:18%; left:20%; width:35%;">
-      <path d="M0 20 Q20 0 40 20 T80 20 T120 20"
+    <!-- LDPE 波 -->
+    <svg style="position:absolute; top:55%; left:30%; width:20%;">
+      <path d="M0 20 Q20 0 40 20 T80 20"
         stroke="#38BDF8" stroke-width="3" fill="none"/>
     </svg>
 
-    <!-- 波（右） -->
-    <svg style="position:absolute; bottom:18%; right:15%; width:35%;">
-      <path d="M0 20 Q20 5 40 20 T80 10 T120 20"
+    <!-- PHA 波 -->
+    <svg style="position:absolute; top:55%; right:25%; width:20%;">
+      <path d="M0 20 Q20 10 40 20 T80 5"
         stroke="#DC2626" stroke-width="3" fill="none"/>
     </svg>
 
     <!-- メーター -->
     <div style="
       position:absolute;
-      bottom:5%;
-      right:10%;
-      width:120px;
-      height:60px;
-      background:linear-gradient(90deg,#f87171,#facc15,#4ade80);
-      border-radius:60px 60px 0 0;
+      bottom:8%;
+      right:12%;
+      width:140px;
+      height:70px;
+      border-radius:70px 70px 0 0;
+      background:conic-gradient(
+        #22c55e 0deg 60deg,
+        #facc15 60deg 120deg,
+        #ef4444 120deg 180deg
+      );
     ">
       <div style="
         position:absolute;
         bottom:0;
         left:50%;
-        width:2px;
-        height:50px;
+        width:3px;
+        height:60px;
         background:#111;
-        transform:rotate(30deg);
         transform-origin:bottom;
+        transform:rotate(110deg);
       "></div>
     </div>
 
   </div>
   `;
 }
-
 // =========================
 // HTML差し込み
 function injectHtml(template, data) {
