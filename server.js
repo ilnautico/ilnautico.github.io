@@ -154,8 +154,8 @@ app.post("/tally-pdf", async (req, res) => {
     const template = fs.readFileSync("template.html", "utf8");
 
     const html = injectHtml(template, {
-  process_visual: generateProcessVisualSVG(),
-  dynamic_overlay: generateProcessVisualSVG() // ←これ追加
+  process_visual: "",
+  dynamic_overlay: ""
 });
 
     console.log("📄 HTML OK");
