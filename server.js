@@ -8,39 +8,62 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // =========================
-// overlay生成
+// overlay生成（完全版）
 function generateOverlay() {
   return `
   <div style="position:relative; width:100%; height:100%; font-family:sans-serif;">
 
     <!-- 温度 -->
-    <div style="position:absolute; top:18%; left:25%; font-size:28px; color:#334155;">
+    <div style="position:absolute; top:15%; left:28%; font-size:26px; color:#334155;">
       230°C
     </div>
 
-    <div style="position:absolute; top:18%; right:20%; font-size:28px; color:#DC2626;">
+    <div style="position:absolute; top:15%; right:22%; font-size:26px; color:#DC2626;">
       180°C
     </div>
 
     <!-- 強度 -->
-    <div style="position:absolute; top:30%; left:27%; font-size:18px; color:#0F766E;">
+    <div style="position:absolute; top:28%; left:30%; font-size:18px; color:#0F766E;">
       80
     </div>
 
-    <div style="position:absolute; top:30%; right:24%; font-size:18px; color:#DC2626;">
+    <div style="position:absolute; top:28%; right:25%; font-size:18px; color:#DC2626;">
       35
     </div>
 
-    <!-- 波 -->
-    <svg style="position:absolute; bottom:12%; left:20%; width:35%;">
+    <!-- 波（左） -->
+    <svg style="position:absolute; bottom:18%; left:20%; width:35%;">
       <path d="M0 20 Q20 0 40 20 T80 20 T120 20"
         stroke="#38BDF8" stroke-width="3" fill="none"/>
     </svg>
 
-    <svg style="position:absolute; bottom:12%; right:15%; width:35%;">
+    <!-- 波（右） -->
+    <svg style="position:absolute; bottom:18%; right:15%; width:35%;">
       <path d="M0 20 Q20 5 40 20 T80 10 T120 20"
         stroke="#DC2626" stroke-width="3" fill="none"/>
     </svg>
+
+    <!-- メーター -->
+    <div style="
+      position:absolute;
+      bottom:5%;
+      right:10%;
+      width:120px;
+      height:60px;
+      background:linear-gradient(90deg,#f87171,#facc15,#4ade80);
+      border-radius:60px 60px 0 0;
+    ">
+      <div style="
+        position:absolute;
+        bottom:0;
+        left:50%;
+        width:2px;
+        height:50px;
+        background:#111;
+        transform:rotate(30deg);
+        transform-origin:bottom;
+      "></div>
+    </div>
 
   </div>
   `;
@@ -60,7 +83,7 @@ function injectHtml(template, data) {
 }
 
 // =========================
-// MAIN
+// PDF生成
 app.post("/tally-pdf", async (req, res) => {
   console.log("🔥 POST HIT");
 
