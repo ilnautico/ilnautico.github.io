@@ -1,234 +1,104 @@
 import express from "express";
 import puppeteer from "puppeteer";
+import fs from "fs";
 
 const app = express();
 
-/* ===== ヘルスチェック ===== */
-app.get("/", (req, res) => {
-  res.send("SERVER OK");
-});
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-/* ===== PDF生成（固定テンプレ＋動的差し替え） ===== */
-app.get("/tally-pdf", async (req, res) => {
-  try {
-    // ===== データ（ここだけ触る） =====
-    const data = {
-      base_image: "https://ilnautico.github.io/image.png", // 元の背景
-      temp_ldpe: 180,
-      temp_pha: 165,
-      score_ldpe: 80,
-      score_pha: 35,
-      executive_summary:
-        "Material shows moderate compatibility with current process conditions.",
-      primary_risk:
-        "Thermal instability may occur under extended residence time."
-    };
+// =========================
+// Overlay（そのまま維持）
+function generateOverlay() {
+  return `
+  <div style="position:relative; width:100%; height:100%;">
 
-    // ===== 波（強さ連動・形固定） =====
-    function wavePath(score) {
-      const amp = Math.max(6, score * 0.22);
-      return `M0 15 Q20 ${15 - amp} 40 15 Q60 ${15 + amp * 0.6} 80 15`;
-    }
-    const wave1 = wavePath(data.score_ldpe);
-    const wave2 = wavePath(data.score_pha);
+    <div style="position:absolute; top:12%; left:32%; font-size:26px; color:#334155;">
+      230°C
+    </div>
 
-    // ===== メーター針（完全角度連動） =====
-    const angle = (-100 + data.score_pha * 2.0) * (Math.PI / 180);
-    const needle = {
-      x: 60 + 35 * Math.cos(angle),
-      y: 50 + 35 * Math.sin(angle)
-    };
+    <div style="position:absolute; top:12%; right:26%; font-size:26px; color:#DC2626;">
+      180°C
+    </div>
 
-    // ===== 完全固定テンプレ（ここは絶対触らない） =====
-    const html = `
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<title>FairVia Report</title>
+    <div style="position:absolute; top:22%; left:34%; font-size:18px; color:#0F766E;">
+      80
+    </div>
 
-<style>
-body {
-  margin:0;
-  background:#f6f9fc;
-  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto;
-}
+    <div style="position:absolute; top:22%; right:28%; font-size:18px; color:#DC2626;">
+      35
+    </div>
 
-/* ===== カード ===== */
-.section {
-  width:900px;
-  margin:30px auto;
-  background:#ffffff;
-  border-radius:14px;
-  padding:28px;
-  box-shadow:0 8px 30px rgba(0,0,0,0.06);
-}
+    <svg style="position:absolute; top:58%; left:38%; width:14%;">
+      <path d="M0 20 Q20 0 40 20 T80 20"
+        stroke="#38BDF8" stroke-width="3" fill="none"/>
+    </svg>
 
-/* ===== 水色ボックス ===== */
-.viz-block {
-  background:#eef4f9;
-  border-radius:12px;
-  padding:22px;
-}
+    <svg style="position:absolute; top:58%; right:32%; width:14%;">
+      <path d="M0 20 Q20 10 40 20 T80 5"
+        stroke="#DC2626" stroke-width="3" fill="none"/>
+    </svg>
 
-/* ===== タイトル ===== */
-h2 {
-  font-size:18px;
-  margin-bottom:12px;
-}
-
-/* ===== グラフィック領域 ===== */
-.graph-wrap {
-  position:relative;
-  width:100%;
-  height:320px;
-}
-
-/* 背景画像（絶対基準） */
-.graph-wrap img {
-  position:absolute;
-  width:100%;
-  height:100%;
-  object-fit:contain;
-}
-
-/* ===== 数値（固定位置） ===== */
-.temp-left {
-  position:absolute;
-  left:280px;
-  top:60px;
-  font-size:38px;
-}
-
-.temp-right {
-  position:absolute;
-  left:540px;
-  top:60px;
-  font-size:38px;
-  color:#dc2626;
-}
-
-.score-left {
-  position:absolute;
-  left:320px;
-  top:120px;
-  font-size:20px;
-  color:#166534;
-}
-
-.score-right {
-  position:absolute;
-  left:580px;
-  top:120px;
-  font-size:20px;
-  color:#dc2626;
-}
-
-/* ===== 波（固定位置） ===== */
-.wave-left {
-  position:absolute;
-  left:340px;
-  top:215px;
-}
-
-.wave-right {
-  position:absolute;
-  left:500px;
-  top:215px;
-}
-
-/* ===== メーター（固定位置） ===== */
-.meter {
-  position:absolute;
-  left:580px;
-  top:200px;
-}
-</style>
-</head>
-
-<body>
-
-<div class="section">
-  <h2>Executive Summary</h2>
-  <p>${data.executive_summary}</p>
-</div>
-
-<div class="section">
-  <h2>Processing Behaviour</h2>
-
-  <div class="viz-block">
-
-    <div class="graph-wrap">
-
-      <!-- 背景（絶対基準） -->
-      <img src="${data.base_image}">
-
-      <!-- 温度 -->
-      <div class="temp-left">${data.temp_ldpe}°C</div>
-      <div class="temp-right">${data.temp_pha}°C</div>
-
-      <!-- スコア -->
-      <div class="score-left">${data.score_ldpe}</div>
-      <div class="score-right">${data.score_pha}</div>
-
-      <!-- 波 -->
-      <svg class="wave-left" width="120" height="40">
-        <path d="${wave1}" stroke="#3B82A0" stroke-width="3" fill="none"/>
-      </svg>
-
-      <svg class="wave-right" width="120" height="40">
-        <path d="${wave2}" stroke="#dc2626" stroke-width="3" fill="none"/>
-      </svg>
-
-      <!-- メーター -->
-      <div class="meter">
-        <svg viewBox="0 0 120 60" width="140">
-          <defs>
-            <linearGradient id="g">
-              <stop offset="0%" stop-color="#16a34a"/>
-              <stop offset="50%" stop-color="#facc15"/>
-              <stop offset="100%" stop-color="#dc2626"/>
-            </linearGradient>
-          </defs>
-
-          <path d="M10 50 A50 50 0 0 1 110 50"
-            fill="none"
-            stroke="url(#g)"
-            stroke-width="10"
-            stroke-linecap="round"/>
-
-          <line x1="60" y1="50"
-            x2="${needle.x}"
-            y2="${needle.y}"
-            stroke="#111"
-            stroke-width="3"/>
-
-          <circle cx="60" cy="50" r="4" fill="#111"/>
-        </svg>
-      </div>
-
+    <div style="
+      position:absolute;
+      bottom:6%;
+      right:18%;
+      width:120px;
+      height:60px;
+      border-radius:60px 60px 0 0;
+      background:conic-gradient(
+        #22c55e 0deg 60deg,
+        #facc15 60deg 120deg,
+        #ef4444 120deg 180deg
+      );
+    ">
+      <div style="
+        position:absolute;
+        bottom:0;
+        left:50%;
+        width:2px;
+        height:50px;
+        background:#111;
+        transform-origin:bottom;
+        transform:rotate(120deg);
+      "></div>
     </div>
 
   </div>
-</div>
+  `;
+}
 
-<div class="section">
-  <h2>Failure Analysis</h2>
-  <p>${data.primary_risk}</p>
-</div>
+// =========================
+// HTML差し込み
+function injectHtml(template, data) {
+  let html = template;
 
-<div class="section">
-  <h2>Closing</h2>
-  <p>End of report</p>
-</div>
+  Object.keys(data).forEach((key) => {
+    const regex = new RegExp(`{{\\s*${key}\\s*}}`, "g");
+    html = html.replace(regex, data[key] || "");
+  });
 
-</body>
-</html>
-`;
+  return html;
+}
+
+// =========================
+// PDF生成（1つだけに統一）
+app.post("/tally-pdf", async (req, res) => {
+  try {
+    const template = fs.readFileSync("template.html", "utf8");
+
+    const html = injectHtml(template, {
+      base_image: "https://ilnautico.github.io/visual-base.png",
+      dynamic_overlay: generateOverlay()
+    });
 
     const browser = await puppeteer.launch({
-      headless: true,
-      args: ["--no-sandbox", "--disable-setuid-sandbox"]
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-gpu"
+      ]
     });
 
     const page = await browser.newPage();
@@ -241,18 +111,33 @@ h2 {
 
     await browser.close();
 
+    fs.writeFileSync("/tmp/latest-report.pdf", pdf);
+
     res.set({ "Content-Type": "application/pdf" });
     res.send(pdf);
 
   } catch (err) {
-    console.error(err);
-    res.status(500).send("ERROR");
+    console.error("ERROR:", err);
+    res.status(500).send("error");
   }
 });
 
-/* ===== 起動 ===== */
-app.listen(8080, () => {
-  console.log("Server running on 8080");
+// =========================
+// PDF確認（これで表示できる）
+app.get("/latest-pdf", (req, res) => {
+  const file = "/tmp/latest-report.pdf";
+
+  if (!fs.existsSync(file)) {
+    return res.status(404).send("No PDF yet");
+  }
+
+  res.sendFile(file);
+});
+
+// =========================
+// 起動（1回だけ）
+app.listen(process.env.PORT || 8080, () => {
+  console.log("🚀 Server running");
 });
 const htmlTemplate = `
 <!DOCTYPE html>
