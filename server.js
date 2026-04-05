@@ -145,8 +145,7 @@ app.get("/latest-pdf", (req, res) => {
 
   res.sendFile(file);
 });
-import express from "express";
-import puppeteer from "puppeteer";
+
 
 const app = express();
 app.use(express.json());
