@@ -2,7 +2,6 @@ import express from "express";
 import puppeteer from "puppeteer";
 
 const app = express();
-app.use(express.json());
 
 const PORT = process.env.PORT || 3000;
 
@@ -17,21 +16,19 @@ app.get("/", (req, res) => {
 });
 
 /* =========================
-   既存
+   🔥 これがメイン（ブラウザでOK）
 ========================= */
-app.post("/tally-pdf", (req, res) => {
-  res.send("OK");
-});
-
-/* =========================
-   PDF生成
-========================= */
-app.post("/tally-pdf-v2", async (req, res) => {
+app.get("/tally-pdf", async (req, res) => {
   try {
-    const data = req.body;
 
-    const score_ldpe = Number(data.score_ldpe || 80);
-    const score_pha = Number(data.score_pha || 35);
+    // 👉 ここでデータ固定（元のやり方）
+    const data = {
+      base_image: "https://via.placeholder.com/700x260",
+      temp_ldpe: 180,
+      temp_pha: 165,
+      score_ldpe: 80,
+      score_pha: 35
+    };
 
     function generateWave(score) {
       const amp = Math.max(4, score * 0.15);
@@ -50,22 +47,17 @@ app.post("/tally-pdf-v2", async (req, res) => {
       };
     }
 
-    const wave_ldpe = generateWave(score_ldpe);
-    const wave_pha = generateWave(score_pha);
-    const needle = getNeedle(score_pha);
+    const wave_ldpe = generateWave(data.score_ldpe);
+    const wave_pha = generateWave(data.score_pha);
+    const needle = getNeedle(data.score_pha);
 
     const html = `
     <div style="position:relative;width:700px;height:260px;margin:0 auto;">
 
-      <img src="${data.base_image}" style="
-        width:700px;
-        height:260px;
-        object-fit:cover;
-      ">
+      <img src="${data.base_image}" style="width:700px;height:260px;object-fit:cover;">
 
       <div style="position:absolute;top:0;left:0;width:700px;height:260px;">
 
-        <!-- 温度 -->
         <div style="position:absolute;left:220px;top:40px;font-size:32px;">
           ${data.temp_ldpe}°C
         </div>
@@ -74,13 +66,12 @@ app.post("/tally-pdf-v2", async (req, res) => {
           ${data.temp_pha}°C
         </div>
 
-        <!-- スコア -->
         <div style="position:absolute;left:260px;top:95px;">
-          ${score_ldpe}
+          ${data.score_ldpe}
         </div>
 
         <div style="position:absolute;left:500px;top:95px;color:#dc2626;">
-          ${score_pha}
+          ${data.score_pha}
         </div>
 
         <!-- 波 -->
@@ -130,15 +121,11 @@ app.post("/tally-pdf-v2", async (req, res) => {
         "--disable-setuid-sandbox",
         "--disable-dev-shm-usage",
         "--disable-gpu"
-      ],
-      timeout: 0
+      ]
     });
 
     const page = await browser.newPage();
-
-    await page.setContent(html, {
-      waitUntil: "domcontentloaded"
-    });
+    await page.setContent(html);
 
     const pdf = await page.pdf({
       format: "A4",
