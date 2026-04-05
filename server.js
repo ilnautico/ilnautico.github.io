@@ -92,7 +92,9 @@ app.use(express.json());
 
 
 // 既存ルート
-app.post("/tally-pdf", ...);
+app.post("/tally-pdf-v2", async (req, res) => {
+  // ←ここに処理
+});
 
 
 // 👇ここだけ追加（これが正解）
