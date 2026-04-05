@@ -18,13 +18,11 @@ app.post("/tally-pdf-v2", async (req, res) => {
   try {
     const data = req.body;
 
-    // ---- 波 ----
     function generateWave(score) {
       const amp = Math.max(4, score * 0.15);
       return `M0 15 Q20 ${15 - amp} 40 15 T80 15`;
     }
 
-    // ---- メーター ----
     function getNeedlePosition(score) {
       const angle = (-90 + score * 1.8) * (Math.PI / 180);
       const cx = 60;
@@ -46,20 +44,11 @@ app.post("/tally-pdf-v2", async (req, res) => {
 
     const html = `
     <div style="position:relative;width:700px;height:260px;margin:0 auto;">
-      
-      <!-- 背景 -->
-      <img src="${data.base_image}" style="
-        width:700px;
-        height:260px;
-        object-fit:cover;
-        display:block;
-      ">
+      <img src="${data.base_image}" style="width:700px;height:260px;object-fit:cover;">
 
-      <!-- overlay -->
       <div style="position:absolute;top:0;left:0;width:700px;height:260px;">
 
-        <!-- 温度 -->
-        <div style="position:absolute;left:220px;top:40px;font-size:36px;color:#1f2937;">
+        <div style="position:absolute;left:220px;top:40px;font-size:36px;">
           ${data.temp_ldpe}°C
         </div>
 
@@ -67,16 +56,14 @@ app.post("/tally-pdf-v2", async (req, res) => {
           ${data.temp_pha}°C
         </div>
 
-        <!-- スコア -->
-        <div style="position:absolute;left:260px;top:95px;font-size:20px;color:#166534;">
+        <div style="position:absolute;left:260px;top:95px;">
           ${score_ldpe}
         </div>
 
-        <div style="position:absolute;left:500px;top:95px;font-size:20px;color:#dc2626;">
+        <div style="position:absolute;left:500px;top:95px;color:#dc2626;">
           ${score_pha}
         </div>
 
-        <!-- 波（位置修正済） -->
         <svg style="position:absolute;left:300px;top:165px;width:100px;height:30px;">
           <path d="${wave_ldpe}" stroke="#3B82A0" stroke-width="2.5" fill="none"/>
         </svg>
@@ -85,10 +72,8 @@ app.post("/tally-pdf-v2", async (req, res) => {
           <path d="${wave_pha}" stroke="#dc2626" stroke-width="3" fill="none"/>
         </svg>
 
-        <!-- メーター（グラフィック修正版） -->
         <div style="position:absolute;left:520px;top:180px;width:120px;height:60px;">
           <svg viewBox="0 0 120 60">
-
             <defs>
               <linearGradient id="g" x1="0" x2="1">
                 <stop offset="0%" stop-color="#16a34a"/>
@@ -108,7 +93,6 @@ app.post("/tally-pdf-v2", async (req, res) => {
               stroke-width="2"/>
 
             <circle cx="60" cy="50" r="3" fill="#111"/>
-
           </svg>
         </div>
 
@@ -116,23 +100,36 @@ app.post("/tally-pdf-v2", async (req, res) => {
     </div>
     `;
 
+    /* =========================
+       🔥 Puppeteer安定版（ここだけ変えた）
+    ========================= */
     const browser = await puppeteer.launch({
-      args: ["--no-sandbox", "--disable-setuid-sandbox"],
+      headless: true,
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-gpu"
+      ],
+      timeout: 0
     });
 
     const page = await browser.newPage();
-    await page.setContent(html);
+
+    await page.setContent(html, {
+      waitUntil: "domcontentloaded"
+    });
 
     const pdf = await page.pdf({
       format: "A4",
-      printBackground: true,
+      printBackground: true
     });
 
     await browser.close();
 
     res.set({
       "Content-Type": "application/pdf",
-      "Content-Disposition": "attachment; filename=report.pdf",
+      "Content-Disposition": "attachment; filename=report.pdf"
     });
 
     res.send(pdf);
@@ -149,6 +146,7 @@ app.post("/tally-pdf-v2", async (req, res) => {
 app.listen(3000, () => {
   console.log("Server running");
 });
+
 // =========================
 const htmlTemplate = `
 <!DOCTYPE html>
