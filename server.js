@@ -54,8 +54,10 @@ app.post("/tally-pdf-v2", async (req, res) => {
 });
 
 // ---------- 起動 ----------
-app.listen(3000, () => {
-  console.log("Server running on 3000");
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, () => {
+  console.log("Server running on", PORT);
 });
 // =========================
 const htmlTemplate = `
