@@ -145,7 +145,137 @@ app.get("/latest-pdf", (req, res) => {
 
   res.sendFile(file);
 });
+import express from "express";
+import puppeteer from "puppeteer";
 
+const app = express();
+app.use(express.json());
+
+// ---------- 波生成 ----------
+function generateWave(score) {
+  const amp = Math.max(4, score * 0.15);
+  return `M0 15 Q20 ${15 - amp} 40 15 T80 15`;
+}
+
+// ---------- メーター ----------
+function getNeedlePosition(score) {
+  const angle = (-90 + (score * 1.8)) * (Math.PI / 180);
+  const cx = 60;
+  const cy = 50;
+  const r = 35;
+
+  return {
+    x: cx + r * Math.cos(angle),
+    y: cy + r * Math.sin(angle)
+  };
+}
+
+// ---------- メイン ----------
+app.post("/tally-pdf", async (req, res) => {
+
+  const data = req.body;
+
+  const score_ldpe = Number(data.score_ldpe || 80);
+  const score_pha = Number(data.score_pha || 35);
+
+  const wave_ldpe = generateWave(score_ldpe);
+  const wave_pha = generateWave(score_pha);
+
+  const needle = getNeedlePosition(score_pha);
+
+  let html = `
+  <!DOCTYPE html>
+  <html>
+  <body>
+
+  <div style="position:relative;width:700px;height:260px;margin:0 auto;">
+
+    <img src="${data.base_image}" style="width:700px;height:260px;object-fit:cover;">
+
+    <div style="position:absolute;top:0;left:0;width:700px;height:260px;">
+
+      <div style="position:absolute;left:220px;top:40px;font-size:36px;">
+        ${data.temp_ldpe}°C
+      </div>
+
+      <div style="position:absolute;left:460px;top:40px;font-size:36px;color:#dc2626;">
+        ${data.temp_pha}°C
+      </div>
+
+      <div style="position:absolute;left:260px;top:90px;color:#166534;">
+        ${score_ldpe}
+      </div>
+
+      <div style="position:absolute;left:500px;top:90px;color:#dc2626;">
+        ${score_pha}
+      </div>
+
+      <!-- 波 -->
+      <svg style="position:absolute;left:310px;top:155px;width:90px;height:25px;">
+        <path d="${wave_ldpe}" stroke="#3B82A0" stroke-width="2.5" fill="none"/>
+      </svg>
+
+      <svg style="position:absolute;left:470px;top:160px;width:100px;height:30px;">
+        <path d="${wave_pha}" stroke="#dc2626" stroke-width="3" fill="none"/>
+      </svg>
+
+      <!-- メーター -->
+      <div style="position:absolute;left:520px;top:180px;width:120px;height:60px;">
+        <svg viewBox="0 0 120 60">
+
+          <defs>
+            <linearGradient id="g" x1="0" x2="1">
+              <stop offset="0%" stop-color="#16a34a"/>
+              <stop offset="50%" stop-color="#facc15"/>
+              <stop offset="100%" stop-color="#dc2626"/>
+            </linearGradient>
+          </defs>
+
+          <path d="M10 50 A50 50 0 0 1 110 50"
+            fill="none"
+            stroke="url(#g)"
+            stroke-width="10"
+            stroke-linecap="round"/>
+
+          <line x1="60" y1="50" x2="${needle.x}" y2="${needle.y}"
+            stroke="#111"
+            stroke-width="2"/>
+
+          <circle cx="60" cy="50" r="3" fill="#111"/>
+
+        </svg>
+      </div>
+
+    </div>
+  </div>
+
+  </body>
+  </html>
+  `;
+
+  const browser = await puppeteer.launch({
+    args: ["--no-sandbox", "--disable-setuid-sandbox"]
+  });
+
+  const page = await browser.newPage();
+  await page.setContent(html);
+
+  const pdf = await page.pdf({
+    format: "A4",
+    printBackground: true
+  });
+
+  await browser.close();
+
+  res.set({
+    "Content-Type": "application/pdf",
+    "Content-Disposition": "attachment; filename=report.pdf"
+  });
+
+  res.send(pdf);
+});
+
+app.listen(3000, () => console.log("Server running"));
 // =========================
 app.listen(process.env.PORT || 3000, () => {
   console.log("🚀 Server running");
