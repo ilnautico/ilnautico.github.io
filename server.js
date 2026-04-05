@@ -23,12 +23,12 @@ app.get("/tally-pdf", async (req, res) => {
 
     // 👉 ここでデータ固定（元のやり方）
     const data = {
-    base_image: "https://ilnautico.github.io/image.png"
-      temp_ldpe: 180,
-      temp_pha: 165,
-      score_ldpe: 80,
-      score_pha: 35
-    };
+  base_image: "https://ilnautico.github.io/image.png", ← ★これ追加
+  temp_ldpe: 180,
+  temp_pha: 165,
+  score_ldpe: 80,
+  score_pha: 35
+};
 
     function generateWave(score) {
       const amp = Math.max(4, score * 0.15);
