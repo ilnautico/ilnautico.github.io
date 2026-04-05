@@ -1,191 +1,153 @@
 import express from "express";
 import puppeteer from "puppeteer";
-import fs from "fs";
 
-
-
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-
-// =========================
-function generateOverlay() {
-  return `
-  <div style="position:relative; width:100%; height:100%;">
-
-    <!-- 温度 -->
-    <div style="position:absolute; top:12%; left:32%; font-size:26px; color:#334155;">
-      230°C
-    </div>
-
-    <div style="position:absolute; top:12%; right:26%; font-size:26px; color:#DC2626;">
-      180°C
-    </div>
-
-    <!-- 強度 -->
-    <div style="position:absolute; top:22%; left:34%; font-size:18px; color:#0F766E;">
-      80
-    </div>
-
-    <div style="position:absolute; top:22%; right:28%; font-size:18px; color:#DC2626;">
-      35
-    </div>
-
-    <!-- LDPE波（バブル出口ぴったり） -->
-    <svg style="position:absolute; top:58%; left:38%; width:14%;">
-      <path d="M0 20 Q20 0 40 20 T80 20"
-        stroke="#38BDF8" stroke-width="3" fill="none"/>
-    </svg>
-
-    <!-- PHA波（崩壊側ぴったり） -->
-    <svg style="position:absolute; top:58%; right:32%; width:14%;">
-      <path d="M0 20 Q20 10 40 20 T80 5"
-        stroke="#DC2626" stroke-width="3" fill="none"/>
-    </svg>
-
-    <!-- メーター（中央寄せ・バランス改善） -->
-    <div style="
-      position:absolute;
-      bottom:6%;
-      right:18%;
-      width:120px;
-      height:60px;
-      border-radius:60px 60px 0 0;
-      background:conic-gradient(
-        #22c55e 0deg 60deg,
-        #facc15 60deg 120deg,
-        #ef4444 120deg 180deg
-      );
-    ">
-      <div style="
-        position:absolute;
-        bottom:0;
-        left:50%;
-        width:2px;
-        height:50px;
-        background:#111;
-        transform-origin:bottom;
-        transform:rotate(120deg);
-      "></div>
-    </div>
-
-  </div>
-  `;
-}
-// =========================
-// HTML差し込み
-function injectHtml(template, data) {
-  let html = template;
-
-  Object.keys(data).forEach((key) => {
-    const regex = new RegExp(`{{\\s*${key}\\s*}}`, "g");
-    html = html.replace(regex, data[key] || "");
-  });
-
-  return html;
-}
-
-// =========================
-// PDF生成
-// 既存（触らない）
 const app = express();
 app.use(express.json());
 
-
-// 既存ルート
-app.post("/tally-pdf-v2", async (req, res) => {
-
-  function generateWave(score) {
-    const amp = Math.max(4, score * 0.15);
-    return `M0 15 Q20 ${15 - amp} 40 15 T80 15`;
-  }
-
-  function getNeedlePosition(score) {
-    const angle = (-90 + (score * 1.8)) * (Math.PI / 180);
-    const cx = 60;
-    const cy = 50;
-    const r = 35;
-
-    return {
-      x: cx + r * Math.cos(angle),
-      y: cy + r * Math.sin(angle)
-    };
-  }
-
-  const data = req.body;
-
-  const score_ldpe = Number(data.score_ldpe || 80);
-  const score_pha = Number(data.score_pha || 35);
-
-  const wave_ldpe = generateWave(score_ldpe);
-  const wave_pha = generateWave(score_pha);
-  const needle = getNeedlePosition(score_pha);
-
-  const html = `
-  <div style="position:relative;width:700px;height:260px;margin:0 auto;">
-    <img src="${data.base_image}" style="width:700px;height:260px;object-fit:cover;">
-    <div style="position:absolute;top:0;left:0;width:700px;height:260px;">
-
-      <div style="position:absolute;left:220px;top:40px;font-size:36px;">
-        ${data.temp_ldpe}°C
-      </div>
-
-      <div style="position:absolute;left:460px;top:40px;font-size:36px;color:#dc2626;">
-        ${data.temp_pha}°C
-      </div>
-
-      <div style="position:absolute;left:260px;top:90px;">
-        ${score_ldpe}
-      </div>
-
-      <div style="position:absolute;left:500px;top:90px;color:#dc2626;">
-        ${score_pha}
-      </div>
-
-      <svg style="position:absolute;left:310px;top:155px;width:90px;height:25px;">
-        <path d="${wave_ldpe}" stroke="#3B82A0" stroke-width="2.5" fill="none"/>
-      </svg>
-
-      <svg style="position:absolute;left:470px;top:160px;width:100px;height:30px;">
-        <path d="${wave_pha}" stroke="#dc2626" stroke-width="3" fill="none"/>
-      </svg>
-
-      <div style="position:absolute;left:520px;top:180px;width:120px;height:60px;">
-        <svg viewBox="0 0 120 60">
-          <path d="M10 50 A50 50 0 0 1 110 50"
-            fill="none"
-            stroke="red"
-            stroke-width="10"/>
-
-          <line x1="60" y1="50" x2="${needle.x}" y2="${needle.y}"
-            stroke="#111"
-            stroke-width="2"/>
-        </svg>
-      </div>
-
-    </div>
-  </div>
-  `;
-
-  const browser = await puppeteer.launch({
-    args: ["--no-sandbox"]
-  });
-
-  const page = await browser.newPage();
-  await page.setContent(html);
-
-  const pdf = await page.pdf({
-    format: "A4",
-    printBackground: true
-  });
-
-  await browser.close();
-  res.send(pdf);
+/* =========================
+   ✅ 既存ルート（壊さない）
+========================= */
+app.post("/tally-pdf", async (req, res) => {
+  res.send("OK");
 });
 
-app.listen(3000, () => console.log("Server running"));
-// =========================
-app.listen(process.env.PORT || 3000, () => {
-  console.log("🚀 Server running");
+/* =========================
+   🔥 新ルート（安全追加）
+========================= */
+app.post("/tally-pdf-v2", async (req, res) => {
+  try {
+    const data = req.body;
+
+    // ---- 波 ----
+    function generateWave(score) {
+      const amp = Math.max(4, score * 0.15);
+      return `M0 15 Q20 ${15 - amp} 40 15 T80 15`;
+    }
+
+    // ---- メーター ----
+    function getNeedlePosition(score) {
+      const angle = (-90 + score * 1.8) * (Math.PI / 180);
+      const cx = 60;
+      const cy = 50;
+      const r = 35;
+
+      return {
+        x: cx + r * Math.cos(angle),
+        y: cy + r * Math.sin(angle),
+      };
+    }
+
+    const score_ldpe = Number(data.score_ldpe || 80);
+    const score_pha = Number(data.score_pha || 35);
+
+    const wave_ldpe = generateWave(score_ldpe);
+    const wave_pha = generateWave(score_pha);
+    const needle = getNeedlePosition(score_pha);
+
+    const html = `
+    <div style="position:relative;width:700px;height:260px;margin:0 auto;">
+      
+      <!-- 背景 -->
+      <img src="${data.base_image}" style="
+        width:700px;
+        height:260px;
+        object-fit:cover;
+        display:block;
+      ">
+
+      <!-- overlay -->
+      <div style="position:absolute;top:0;left:0;width:700px;height:260px;">
+
+        <!-- 温度 -->
+        <div style="position:absolute;left:220px;top:40px;font-size:36px;color:#1f2937;">
+          ${data.temp_ldpe}°C
+        </div>
+
+        <div style="position:absolute;left:460px;top:40px;font-size:36px;color:#dc2626;">
+          ${data.temp_pha}°C
+        </div>
+
+        <!-- スコア -->
+        <div style="position:absolute;left:260px;top:95px;font-size:20px;color:#166534;">
+          ${score_ldpe}
+        </div>
+
+        <div style="position:absolute;left:500px;top:95px;font-size:20px;color:#dc2626;">
+          ${score_pha}
+        </div>
+
+        <!-- 波（位置修正済） -->
+        <svg style="position:absolute;left:300px;top:165px;width:100px;height:30px;">
+          <path d="${wave_ldpe}" stroke="#3B82A0" stroke-width="2.5" fill="none"/>
+        </svg>
+
+        <svg style="position:absolute;left:460px;top:170px;width:110px;height:30px;">
+          <path d="${wave_pha}" stroke="#dc2626" stroke-width="3" fill="none"/>
+        </svg>
+
+        <!-- メーター（グラフィック修正版） -->
+        <div style="position:absolute;left:520px;top:180px;width:120px;height:60px;">
+          <svg viewBox="0 0 120 60">
+
+            <defs>
+              <linearGradient id="g" x1="0" x2="1">
+                <stop offset="0%" stop-color="#16a34a"/>
+                <stop offset="50%" stop-color="#facc15"/>
+                <stop offset="100%" stop-color="#dc2626"/>
+              </linearGradient>
+            </defs>
+
+            <path d="M10 50 A50 50 0 0 1 110 50"
+              fill="none"
+              stroke="url(#g)"
+              stroke-width="10"
+              stroke-linecap="round"/>
+
+            <line x1="60" y1="50" x2="${needle.x}" y2="${needle.y}"
+              stroke="#111"
+              stroke-width="2"/>
+
+            <circle cx="60" cy="50" r="3" fill="#111"/>
+
+          </svg>
+        </div>
+
+      </div>
+    </div>
+    `;
+
+    const browser = await puppeteer.launch({
+      args: ["--no-sandbox", "--disable-setuid-sandbox"],
+    });
+
+    const page = await browser.newPage();
+    await page.setContent(html);
+
+    const pdf = await page.pdf({
+      format: "A4",
+      printBackground: true,
+    });
+
+    await browser.close();
+
+    res.set({
+      "Content-Type": "application/pdf",
+      "Content-Disposition": "attachment; filename=report.pdf",
+    });
+
+    res.send(pdf);
+
+  } catch (err) {
+    console.error("ERROR:", err);
+    res.status(500).send("PDF generation failed");
+  }
+});
+
+/* =========================
+   🚀 起動
+========================= */
+app.listen(3000, () => {
+  console.log("Server running");
 });
 // =========================
 const htmlTemplate = `
