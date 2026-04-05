@@ -508,105 +508,99 @@ body {
     <div class="viz-body">
 
       <!-- 🔥 中央固定レイヤー（これが重要） -->
-      <div style="
-        position:relative;
-        width:100%;
-        height:360px;
-        display:flex;
-        align-items:center;
-        justify-content:center;
-      ">
+<div style="
+  position:relative;
+  width:700px;
+  height:260px;
+  margin:0 auto;
+">
 
-        <!-- 画像 -->
-        <img src="{{base_image}}" style="
-          max-width:100%;
-          max-height:100%;
-          display:block;
-        ">
+  <!-- 画像（サイズ固定） -->
+  <img src="{{base_image}}" style="
+    width:700px;
+    height:260px;
+    display:block;
+  ">
 
-        <!-- overlay（完全固定座標） -->
-        <div style="
-          position:absolute;
-          width:720px;
-          height:260px;
-        ">
+  <!-- 🔢 温度 -->
+  <div style="position:absolute; left:200px; top:5px; font-size:32px; color:#1f2937;">
+    230°C
+  </div>
 
-          <!-- 🔢 温度 -->
-          <div style="position:absolute; left:220px; top:10px; font-size:32px; color:#1f2937;">
-            230°C
-          </div>
+  <div style="position:absolute; left:470px; top:5px; font-size:32px; color:#dc2626;">
+    180°C
+  </div>
 
-          <div style="position:absolute; left:470px; top:10px; font-size:32px; color:#dc2626;">
-            180°C
-          </div>
+  <!-- 🔢 スコア -->
+  <div style="position:absolute; left:220px; top:50px; font-size:18px; color:#047857;">
+    80
+  </div>
 
-          <!-- 🔢 スコア -->
-          <div style="position:absolute; left:240px; top:60px; font-size:18px; color:#047857;">
-            80
-          </div>
+  <div style="position:absolute; left:490px; top:50px; font-size:18px; color:#dc2626;">
+    35
+  </div>
 
-          <div style="position:absolute; left:490px; top:60px; font-size:18px; color:#dc2626;">
-            35
-          </div>
+  <!-- 🔵 波（ノズル出口） -->
+  <svg style="
+    position:absolute;
+    left:250px;
+    top:140px;
+    width:120px;
+    opacity:0.6;
+    filter:blur(1px);
+  ">
+    <path d="M0 10 Q20 0 40 10 T80 10"
+      stroke="#3B82A0"
+      stroke-width="3"
+      fill="none"/>
+  </svg>
 
-          <!-- 🔵 波（ノズル出口） -->
-          <svg style="
-            position:absolute;
-            left:260px;
-            top:150px;
-            width:120px;
-            opacity:0.6;
-            filter:blur(1px);
-          ">
-            <path d="M0 10 Q20 0 40 10 T80 10"
-              stroke="#3B82A0"
-              stroke-width="3"
-              fill="none"/>
-          </svg>
+  <!-- 🔴 波（素材） -->
+  <svg style="
+    position:absolute;
+    left:400px;
+    top:145px;
+    width:120px;
+    opacity:0.6;
+    filter:blur(1px);
+  ">
+    <path d="M0 10 Q20 0 40 10 T80 10"
+      stroke="#dc2626"
+      stroke-width="3"
+      fill="none"/>
+  </svg>
 
-          <!-- 🔴 波（素材側） -->
-          <svg style="
-            position:absolute;
-            left:410px;
-            top:155px;
-            width:120px;
-            opacity:0.6;
-            filter:blur(1px);
-          ">
-            <path d="M0 10 Q20 0 40 10 T80 10"
-              stroke="#dc2626"
-              stroke-width="3"
-              fill="none"/>
-          </svg>
+  <!-- 🔥 メーター -->
+  <div style="
+    position:absolute;
+    left:420px;
+    top:180px;
+    width:140px;
+    height:70px;
+    border-radius:140px 140px 0 0;
+    background:conic-gradient(
+      from 180deg,
+      #16a34a 0deg,
+      #facc15 120deg,
+      #dc2626 180deg
+    );
+    box-shadow:0 6px 18px rgba(0,0,0,0.25);
+  ">
 
-          <!-- 🔥 メーター -->
-          <div style="
-            position:absolute;
-            left:430px;
-            top:190px;
-            width:140px;
-            height:70px;
-            border-radius:140px 140px 0 0;
-            background:conic-gradient(
-              from 180deg,
-              #16a34a 0deg,
-              #facc15 120deg,
-              #dc2626 180deg
-            );
-            box-shadow:0 6px 18px rgba(0,0,0,0.25);
-          ">
+    <div style="
+      position:absolute;
+      bottom:0;
+      left:50%;
+      width:2px;
+      height:60px;
+      background:#111;
+      transform-origin:bottom;
+      transform:rotate(35deg);
+    "></div>
 
-            <!-- 針 -->
-            <div style="
-              position:absolute;
-              bottom:0;
-              left:50%;
-              width:2px;
-              height:60px;
-              background:#111;
-              transform-origin:bottom;
-              transform:rotate(35deg);
-            "></div>
+  </div>
+
+</div>
 
           </div>
 
