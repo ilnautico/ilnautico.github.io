@@ -162,7 +162,7 @@ app.get("/tally-pdf", async (req, res) => {
 ========================= */
 app.listen(8080, () => {
   console.log("Server running on 8080");
-});========================
+});
 const htmlTemplate = `
 <!DOCTYPE html>
 <html lang="en">
