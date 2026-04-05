@@ -47,82 +47,160 @@ app.get("/tally-pdf", async (req, res) => {
     const wave2 = generateWave(data.score_pha);
     const needle = getNeedle(data.score_pha);
 
-    const html = `
-    <div style="
-      width:900px;
-      height:360px;
-      margin:0 auto;
-      position:relative;
-      background:white;
-    ">
+  const html = `
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+body {
+  font-family: Arial, sans-serif;
+  background: white;
+}
 
-      <!-- 背景画像（ここが修正ポイント） -->
-      <img src="${data.base_image}" style="
-        position:absolute;
-        left:0;
-        top:0;
-        width:900px;
-        height:360px;
-        object-fit:contain;
-      ">
+.section {
+  margin: 40px;
+}
 
-      <!-- 温度 -->
-      <div style="position:absolute;left:300px;top:60px;font-size:42px;">
-        ${data.temp_ldpe}°C
-      </div>
+/* グラフィック部分だけ */
+.graph-wrap {
+  width: 900px;
+  height: 360px;
+  margin: 40px auto;
+  position: relative;
+}
 
-      <div style="position:absolute;left:580px;top:60px;font-size:42px;color:#dc2626;">
-        ${data.temp_pha}°C
-      </div>
+.graph-wrap img {
+  position: absolute;
+  width: 900px;
+  height: 360px;
+  object-fit: contain;
+}
 
-      <!-- スコア -->
-      <div style="position:absolute;left:340px;top:120px;font-size:22px;color:#166534;">
-        ${data.score_ldpe}
-      </div>
+/* 温度 */
+.temp-left {
+  position:absolute;
+  left:300px;
+  top:60px;
+  font-size:42px;
+}
+.temp-right {
+  position:absolute;
+  left:580px;
+  top:60px;
+  font-size:42px;
+  color:#dc2626;
+}
 
-      <div style="position:absolute;left:620px;top:120px;font-size:22px;color:#dc2626;">
-        ${data.score_pha}
-      </div>
+/* スコア */
+.score-left {
+  position:absolute;
+  left:340px;
+  top:120px;
+  font-size:22px;
+  color:#166534;
+}
+.score-right {
+  position:absolute;
+  left:620px;
+  top:120px;
+  font-size:22px;
+  color:#dc2626;
+}
 
-      <!-- 波（位置完全固定） -->
-      <svg style="position:absolute;left:360px;top:220px;width:120px;height:40px;">
-        <path d="${wave1}" stroke="#3B82A0" stroke-width="3" fill="none"/>
-      </svg>
+/* 波 */
+.wave-left {
+  position:absolute;
+  left:360px;
+  top:220px;
+}
+.wave-right {
+  position:absolute;
+  left:520px;
+  top:220px;
+}
 
-      <svg style="position:absolute;left:520px;top:220px;width:120px;height:40px;">
-        <path d="${wave2}" stroke="#dc2626" stroke-width="3" fill="none"/>
-      </svg>
+/* メーター */
+.meter {
+  position:absolute;
+  left:620px;
+  top:220px;
+}
+</style>
+</head>
 
-      <!-- メーター（完全グラフィック） -->
-      <div style="position:absolute;left:620px;top:220px;">
-        <svg viewBox="0 0 120 60" width="140">
+<body>
 
-          <defs>
-            <linearGradient id="g">
-              <stop offset="0%" stop-color="#16a34a"/>
-              <stop offset="50%" stop-color="#facc15"/>
-              <stop offset="100%" stop-color="#dc2626"/>
-            </linearGradient>
-          </defs>
+<div class="section">
+  <h2>Executive Summary</h2>
+  <p>${data.executive_summary || "Sample summary"}</p>
+</div>
 
-          <path d="M10 50 A50 50 0 0 1 110 50"
-            fill="none"
-            stroke="url(#g)"
-            stroke-width="10"
-            stroke-linecap="round"/>
+<div class="section">
+  <h2>Processing Behaviour</h2>
+  <p>${data.processing_window || "Processing details..."}</p>
+</div>
 
-          <line x1="60" y1="50"
-            x2="${needle.x}"
-            y2="${needle.y}"
-            stroke="#111"
-            stroke-width="3"/>
+<!-- グラフィック -->
+<div class="graph-wrap">
 
-          <circle cx="60" cy="50" r="4" fill="#111"/>
-        </svg>
-      </div>
+  <img src="${data.base_image}">
 
-    </div>
-    `;
+  <div class="temp-left">${data.temp_ldpe}°C</div>
+  <div class="temp-right">${data.temp_pha}°C</div>
+
+  <div class="score-left">${data.score_ldpe}</div>
+  <div class="score-right">${data.score_pha}</div>
+
+  <svg class="wave-left" width="120" height="40">
+    <path d="${wave1}" stroke="#3B82A0" stroke-width="3" fill="none"/>
+  </svg>
+
+  <svg class="wave-right" width="120" height="40">
+    <path d="${wave2}" stroke="#dc2626" stroke-width="3" fill="none"/>
+  </svg>
+
+  <div class="meter">
+    <svg viewBox="0 0 120 60" width="140">
+      <defs>
+        <linearGradient id="g">
+          <stop offset="0%" stop-color="#16a34a"/>
+          <stop offset="50%" stop-color="#facc15"/>
+          <stop offset="100%" stop-color="#dc2626"/>
+        </linearGradient>
+      </defs>
+
+      <path d="M10 50 A50 50 0 0 1 110 50"
+        fill="none"
+        stroke="url(#g)"
+        stroke-width="10"
+        stroke-linecap="round"/>
+
+      <line x1="60" y1="50"
+        x2="${needle.x}"
+        y2="${needle.y}"
+        stroke="#111"
+        stroke-width="3"/>
+
+      <circle cx="60" cy="50" r="4" fill="#111"/>
+    </svg>
+  </div>
+
+</div>
+
+<div class="section">
+  <h2>Failure Analysis</h2>
+  <p>${data.primary_risk || "Risk analysis..."}</p>
+</div>
+
+<div class="section">
+  <h2>Closing</h2>
+  <p>End of report</p>
+</div>
+
+</body>
+</html>
+`;
 
     const browser = await puppeteer.launch({
       headless: true,
