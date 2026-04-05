@@ -507,72 +507,87 @@ body {
 
     <div class="viz-body">
 
-      <!-- 🔥 コア -->
-      <div style="position:relative; width:100%; height:320px;">
+      <!-- 🔥 親固定（ここが超重要） -->
+      <div style="position:relative; width:100%; height:340px;">
 
-        <!-- 背景画像 -->
+        <!-- 背景 -->
         <img src="{{base_image}}" style="
           width:100%;
-          height:320px;
+          height:340px;
           object-fit:contain;
           display:block;
         ">
 
-        <!-- 🔥 overlay -->
+        <!-- 🔥 overlay（完全一致） -->
         <div style="
           position:absolute;
-          top:0;
-          left:0;
-          width:100%;
-          height:100%;
+          inset:0;
         ">
 
-          <!-- 🔵 LDPE 波（自然化） -->
+          <!-- 🔢 温度 -->
+          <div style="position:absolute; left:36%; top:28%; font-size:32px; color:#1f2937;">
+            230°C
+          </div>
+
+          <div style="position:absolute; left:62%; top:28%; font-size:32px; color:#dc2626;">
+            180°C
+          </div>
+
+          <!-- 🔢 スコア -->
+          <div style="position:absolute; left:38%; top:38%; font-size:18px; color:#047857;">
+            80
+          </div>
+
+          <div style="position:absolute; left:64%; top:38%; font-size:18px; color:#dc2626;">
+            35
+          </div>
+
+          <!-- 🔵 波（LDPE：ノズル直後） -->
           <svg style="
             position:absolute;
-            left:38%;
+            left:42%;
             top:60%;
-            width:140px;
+            width:120px;
             opacity:0.6;
             filter:blur(1px);
           ">
-            <path d="M0 10 Q25 0 50 10 T100 10"
+            <path d="M0 10 Q20 0 40 10 T80 10"
               stroke="#3B82A0"
               stroke-width="3"
               fill="none"/>
           </svg>
 
-          <!-- 🔴 PHA 波 -->
+          <!-- 🔴 波（PHA：素材後） -->
           <svg style="
             position:absolute;
-            left:56%;
+            left:58%;
             top:60%;
-            width:140px;
+            width:120px;
             opacity:0.6;
             filter:blur(1px);
           ">
-            <path d="M0 10 Q25 0 50 10 T100 10"
-              stroke="#DC2626"
+            <path d="M0 10 Q20 0 40 10 T80 10"
+              stroke="#dc2626"
               stroke-width="3"
               fill="none"/>
           </svg>
 
-          <!-- 🔥 メーター（UI感 제거 + グラフィック化） -->
+          <!-- 🔥 メーター -->
           <div style="
             position:absolute;
-            left:58%;
+            left:60%;
             top:72%;
-            width:160px;
-            height:80px;
-            border-radius:160px 160px 0 0;
-            background:linear-gradient(
-              90deg,
-              #16a34a 0%,
-              #facc15 50%,
-              #dc2626 100%
+            width:140px;
+            height:70px;
+            border-radius:140px 140px 0 0;
+            background:conic-gradient(
+              from 180deg,
+              #16a34a 0deg,
+              #facc15 120deg,
+              #dc2626 180deg
             );
-            box-shadow:0 6px 14px rgba(0,0,0,0.18);
-            opacity:0.9;
+            box-shadow:0 6px 16px rgba(0,0,0,0.2);
+            opacity:0.95;
           ">
 
             <!-- 針 -->
@@ -581,10 +596,10 @@ body {
               bottom:0;
               left:50%;
               width:2px;
-              height:65px;
+              height:60px;
               background:#111;
               transform-origin:bottom;
-              transform:rotate(25deg);
+              transform:rotate(35deg);
             "></div>
 
           </div>
