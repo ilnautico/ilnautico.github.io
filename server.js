@@ -22,8 +22,8 @@ app.get("/tally-pdf", async (req, res) => {
   try {
 
     // 👉 ここでデータ固定（元のやり方）
-    const data = {
-  base_image: "https://ilnautico.github.io/image.png", ← ★これ追加
+   const data = {
+  base_image: "https://ilnautico.github.io/image.png",
   temp_ldpe: 180,
   temp_pha: 165,
   score_ldpe: 80,
