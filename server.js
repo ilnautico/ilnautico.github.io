@@ -1,21 +1,62 @@
 import express from "express";
+import puppeteer from "puppeteer";
 
-const app = express();
+const app = express(); // ← 必ず一番上で定義
 
-app.use(express.json());
+app.use(express.json()); // ← そのあと
 
+// ---------- 動作確認 ----------
 app.get("/", (req, res) => {
-  res.send("OK");
+  res.send("SERVER OK");
 });
 
+// ---------- 既存ルート（残す） ----------
 app.post("/tally-pdf", (req, res) => {
   res.send("OK");
 });
 
-app.listen(3000, () => {
-  console.log("Server running");
+// ---------- 新ルート ----------
+app.post("/tally-pdf-v2", async (req, res) => {
+  try {
+    const html = `<h1>PDF OK</h1>`;
+
+    const browser = await puppeteer.launch({
+      headless: true,
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-gpu"
+      ]
+    });
+
+    const page = await browser.newPage();
+    await page.setContent(html);
+
+    const pdf = await page.pdf({
+      format: "A4",
+      printBackground: true
+    });
+
+    await browser.close();
+
+    res.set({
+      "Content-Type": "application/pdf",
+      "Content-Disposition": "attachment; filename=test.pdf"
+    });
+
+    res.send(pdf);
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("ERROR");
+  }
 });
 
+// ---------- 起動 ----------
+app.listen(3000, () => {
+  console.log("Server running on 3000");
+});
 // =========================
 const htmlTemplate = `
 <!DOCTYPE html>
