@@ -48,83 +48,108 @@ app.get("/tally-pdf", async (req, res) => {
     const needle = getNeedle(data.score_pha);
 
   const html = `
+const html = `
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
 <meta charset="UTF-8">
+<title>FairVia™ Report</title>
+
 <style>
 body {
-  font-family: Arial, sans-serif;
-  background: white;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto;
+  margin:0;
+  background:#f6f9fc;
+  color:#1e293b;
 }
 
+/* ===== カード ===== */
 .section {
-  margin: 40px;
+  width: 900px;
+  margin: 30px auto;
+  background: #ffffff;
+  border-radius: 14px;
+  padding: 28px;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.06);
 }
 
-/* グラフィック部分だけ */
+/* ===== 水色エリア ===== */
+.viz-block {
+  background: #eef4f9;
+  border-radius: 12px;
+  padding: 22px;
+}
+
+/* ===== タイトル ===== */
+h2 {
+  font-size: 18px;
+  margin-bottom: 12px;
+}
+
+/* ===== グラフィック ===== */
 .graph-wrap {
-  width: 900px;
-  height: 360px;
-  margin: 40px auto;
   position: relative;
+  width: 100%;
+  height: 320px;
 }
 
 .graph-wrap img {
   position: absolute;
-  width: 900px;
-  height: 360px;
+  width: 100%;
+  height: 100%;
   object-fit: contain;
 }
 
-/* 温度 */
+/* ===== 数値 ===== */
 .temp-left {
   position:absolute;
-  left:300px;
+  left:280px;
   top:60px;
-  font-size:42px;
+  font-size:38px;
 }
+
 .temp-right {
   position:absolute;
-  left:580px;
+  left:540px;
   top:60px;
-  font-size:42px;
+  font-size:38px;
   color:#dc2626;
 }
 
-/* スコア */
 .score-left {
   position:absolute;
-  left:340px;
+  left:320px;
   top:120px;
-  font-size:22px;
+  font-size:20px;
   color:#166534;
 }
+
 .score-right {
   position:absolute;
-  left:620px;
+  left:580px;
   top:120px;
-  font-size:22px;
+  font-size:20px;
   color:#dc2626;
 }
 
-/* 波 */
+/* ===== 波 ===== */
 .wave-left {
   position:absolute;
-  left:360px;
-  top:220px;
-}
-.wave-right {
-  position:absolute;
-  left:520px;
-  top:220px;
+  left:320px;
+  top:210px;
 }
 
-/* メーター */
+.wave-right {
+  position:absolute;
+  left:480px;
+  top:210px;
+}
+
+/* ===== メーター ===== */
 .meter {
   position:absolute;
-  left:620px;
-  top:220px;
+  left:580px;
+  top:200px;
 }
 </style>
 </head>
@@ -133,69 +158,79 @@ body {
 
 <div class="section">
   <h2>Executive Summary</h2>
-  <p>${data.executive_summary || "Sample summary"}</p>
+  <p>${data.executive_summary || "Material shows moderate compatibility with current process conditions."}</p>
 </div>
 
 <div class="section">
   <h2>Processing Behaviour</h2>
-  <p>${data.processing_window || "Processing details..."}</p>
-</div>
 
-<!-- グラフィック -->
-<div class="graph-wrap">
+  <div class="viz-block">
 
-  <img src="${data.base_image}">
+    <div class="graph-wrap">
 
-  <div class="temp-left">${data.temp_ldpe}°C</div>
-  <div class="temp-right">${data.temp_pha}°C</div>
+      <!-- 背景 -->
+      <img src="${data.base_image}">
 
-  <div class="score-left">${data.score_ldpe}</div>
-  <div class="score-right">${data.score_pha}</div>
+      <!-- 温度 -->
+      <div class="temp-left">${data.temp_ldpe}°C</div>
+      <div class="temp-right">${data.temp_pha}°C</div>
 
-  <svg class="wave-left" width="120" height="40">
-    <path d="${wave1}" stroke="#3B82A0" stroke-width="3" fill="none"/>
-  </svg>
+      <!-- スコア -->
+      <div class="score-left">${data.score_ldpe}</div>
+      <div class="score-right">${data.score_pha}</div>
 
-  <svg class="wave-right" width="120" height="40">
-    <path d="${wave2}" stroke="#dc2626" stroke-width="3" fill="none"/>
-  </svg>
+      <!-- 波 -->
+      <svg class="wave-left" width="120" height="40">
+        <path d="${wave1}" stroke="#3B82A0" stroke-width="3" fill="none"/>
+      </svg>
 
-  <div class="meter">
-    <svg viewBox="0 0 120 60" width="140">
-      <defs>
-        <linearGradient id="g">
-          <stop offset="0%" stop-color="#16a34a"/>
-          <stop offset="50%" stop-color="#facc15"/>
-          <stop offset="100%" stop-color="#dc2626"/>
-        </linearGradient>
-      </defs>
+      <svg class="wave-right" width="120" height="40">
+        <path d="${wave2}" stroke="#dc2626" stroke-width="3" fill="none"/>
+      </svg>
 
-      <path d="M10 50 A50 50 0 0 1 110 50"
-        fill="none"
-        stroke="url(#g)"
-        stroke-width="10"
-        stroke-linecap="round"/>
+      <!-- メーター -->
+      <div class="meter">
+        <svg viewBox="0 0 120 60" width="140">
 
-      <line x1="60" y1="50"
-        x2="${needle.x}"
-        y2="${needle.y}"
-        stroke="#111"
-        stroke-width="3"/>
+          <defs>
+            <linearGradient id="g">
+              <stop offset="0%" stop-color="#16a34a"/>
+              <stop offset="50%" stop-color="#facc15"/>
+              <stop offset="100%" stop-color="#dc2626"/>
+            </linearGradient>
+          </defs>
 
-      <circle cx="60" cy="50" r="4" fill="#111"/>
-    </svg>
+          <path d="M10 50 A50 50 0 0 1 110 50"
+            fill="none"
+            stroke="url(#g)"
+            stroke-width="10"
+            stroke-linecap="round"/>
+
+          <line x1="60" y1="50"
+            x2="${needle.x}"
+            y2="${needle.y}"
+            stroke="#111"
+            stroke-width="3"/>
+
+          <circle cx="60" cy="50" r="4" fill="#111"/>
+
+        </svg>
+      </div>
+
+    </div>
+
   </div>
 
 </div>
 
 <div class="section">
   <h2>Failure Analysis</h2>
-  <p>${data.primary_risk || "Risk analysis..."}</p>
+  <p>${data.primary_risk || "Thermal instability may occur under extended residence time."}</p>
 </div>
 
 <div class="section">
   <h2>Closing</h2>
-  <p>End of report</p>
+  <p>This assessment is based on preliminary evaluation and should be validated through pilot testing.</p>
 </div>
 
 </body>
