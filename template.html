@@ -507,46 +507,53 @@ body {
 
     <div class="viz-body">
 
-      <!-- 🔥 親固定（ここが超重要） -->
-      <div style="position:relative; width:100%; height:340px;">
+      <!-- 🔥 中央固定レイヤー（これが重要） -->
+      <div style="
+        position:relative;
+        width:100%;
+        height:360px;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+      ">
 
-        <!-- 背景 -->
+        <!-- 画像 -->
         <img src="{{base_image}}" style="
-          width:100%;
-          height:340px;
-          object-fit:contain;
+          max-width:100%;
+          max-height:100%;
           display:block;
         ">
 
-        <!-- 🔥 overlay（完全一致） -->
+        <!-- overlay（完全固定座標） -->
         <div style="
           position:absolute;
-          inset:0;
+          width:720px;
+          height:260px;
         ">
 
           <!-- 🔢 温度 -->
-          <div style="position:absolute; left:36%; top:28%; font-size:32px; color:#1f2937;">
+          <div style="position:absolute; left:220px; top:10px; font-size:32px; color:#1f2937;">
             230°C
           </div>
 
-          <div style="position:absolute; left:62%; top:28%; font-size:32px; color:#dc2626;">
+          <div style="position:absolute; left:470px; top:10px; font-size:32px; color:#dc2626;">
             180°C
           </div>
 
           <!-- 🔢 スコア -->
-          <div style="position:absolute; left:38%; top:38%; font-size:18px; color:#047857;">
+          <div style="position:absolute; left:240px; top:60px; font-size:18px; color:#047857;">
             80
           </div>
 
-          <div style="position:absolute; left:64%; top:38%; font-size:18px; color:#dc2626;">
+          <div style="position:absolute; left:490px; top:60px; font-size:18px; color:#dc2626;">
             35
           </div>
 
-          <!-- 🔵 波（LDPE：ノズル直後） -->
+          <!-- 🔵 波（ノズル出口） -->
           <svg style="
             position:absolute;
-            left:42%;
-            top:60%;
+            left:260px;
+            top:150px;
             width:120px;
             opacity:0.6;
             filter:blur(1px);
@@ -557,11 +564,11 @@ body {
               fill="none"/>
           </svg>
 
-          <!-- 🔴 波（PHA：素材後） -->
+          <!-- 🔴 波（素材側） -->
           <svg style="
             position:absolute;
-            left:58%;
-            top:60%;
+            left:410px;
+            top:155px;
             width:120px;
             opacity:0.6;
             filter:blur(1px);
@@ -575,8 +582,8 @@ body {
           <!-- 🔥 メーター -->
           <div style="
             position:absolute;
-            left:60%;
-            top:72%;
+            left:430px;
+            top:190px;
             width:140px;
             height:70px;
             border-radius:140px 140px 0 0;
@@ -586,8 +593,7 @@ body {
               #facc15 120deg,
               #dc2626 180deg
             );
-            box-shadow:0 6px 16px rgba(0,0,0,0.2);
-            opacity:0.95;
+            box-shadow:0 6px 18px rgba(0,0,0,0.25);
           ">
 
             <!-- 針 -->
