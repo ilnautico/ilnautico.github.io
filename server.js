@@ -86,91 +86,36 @@ function injectHtml(template, data) {
 
 // =========================
 // PDF生成
-app.post("/tally-pdf", async (req, res) => {
-  console.log("🔥 POST HIT");
-
-  try {
-    const template = fs.readFileSync("template.html", "utf8");
-
-    const html = injectHtml(template, {
-      base_image: "https://ilnautico.github.io/visual-base.png",
-      dynamic_overlay: generateOverlay()
-    });
-
-    console.log("📄 HTML OK");
-
-    const browser = await puppeteer.launch({
-      args: [
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--disable-dev-shm-usage",
-        "--disable-gpu"
-      ]
-    });
-
-    const page = await browser.newPage();
-
-    await page.setContent(html, {
-      waitUntil: "networkidle0"
-    });
-
-    const pdf = await page.pdf({
-      format: "A4",
-      printBackground: true
-    });
-
-    await browser.close();
-
-    fs.writeFileSync("/tmp/latest-report.pdf", pdf);
-
-    console.log("📦 PDF OK");
-
-    res.set({ "Content-Type": "application/pdf" });
-    res.send(pdf);
-
-  } catch (err) {
-    console.error("❌ ERROR:", err);
-    res.status(500).send("error");
-  }
-});
-
-// =========================
-// PDF確認
-app.get("/latest-pdf", (req, res) => {
-  const file = "/tmp/latest-report.pdf";
-
-  if (!fs.existsSync(file)) {
-    return res.status(404).send("No PDF yet");
-  }
-
-  res.sendFile(file);
-});
-
-
+// 既存（触らない）
 const app = express();
 app.use(express.json());
 
-// ---------- 波生成 ----------
-function generateWave(score) {
-  const amp = Math.max(4, score * 0.15);
-  return `M0 15 Q20 ${15 - amp} 40 15 T80 15`;
-}
 
-// ---------- メーター ----------
-function getNeedlePosition(score) {
-  const angle = (-90 + (score * 1.8)) * (Math.PI / 180);
-  const cx = 60;
-  const cy = 50;
-  const r = 35;
+// 既存ルート
+app.post("/tally-pdf", ...);
 
-  return {
-    x: cx + r * Math.cos(angle),
-    y: cy + r * Math.sin(angle)
-  };
-}
 
-// ---------- メイン ----------
-app.post("/tally-pdf", async (req, res) => {
+// 👇ここだけ追加（これが正解）
+app.post("/tally-pdf-v2", async (req, res) => {
+
+  // 波
+  function generateWave(score) {
+    const amp = Math.max(4, score * 0.15);
+    return `M0 15 Q20 ${15 - amp} 40 15 T80 15`;
+  }
+
+  // メーター
+  function getNeedlePosition(score) {
+    const angle = (-90 + (score * 1.8)) * (Math.PI / 180);
+    const cx = 60;
+    const cy = 50;
+    const r = 35;
+
+    return {
+      x: cx + r * Math.cos(angle),
+      y: cy + r * Math.sin(angle)
+    };
+  }
 
   const data = req.body;
 
@@ -182,15 +127,9 @@ app.post("/tally-pdf", async (req, res) => {
 
   const needle = getNeedlePosition(score_pha);
 
-  let html = `
-  <!DOCTYPE html>
-  <html>
-  <body>
-
+  const html = `
   <div style="position:relative;width:700px;height:260px;margin:0 auto;">
-
     <img src="${data.base_image}" style="width:700px;height:260px;object-fit:cover;">
-
     <div style="position:absolute;top:0;left:0;width:700px;height:260px;">
 
       <div style="position:absolute;left:220px;top:40px;font-size:36px;">
@@ -209,7 +148,6 @@ app.post("/tally-pdf", async (req, res) => {
         ${score_pha}
       </div>
 
-      <!-- 波 -->
       <svg style="position:absolute;left:310px;top:155px;width:90px;height:25px;">
         <path d="${wave_ldpe}" stroke="#3B82A0" stroke-width="2.5" fill="none"/>
       </svg>
@@ -218,42 +156,25 @@ app.post("/tally-pdf", async (req, res) => {
         <path d="${wave_pha}" stroke="#dc2626" stroke-width="3" fill="none"/>
       </svg>
 
-      <!-- メーター -->
       <div style="position:absolute;left:520px;top:180px;width:120px;height:60px;">
         <svg viewBox="0 0 120 60">
-
-          <defs>
-            <linearGradient id="g" x1="0" x2="1">
-              <stop offset="0%" stop-color="#16a34a"/>
-              <stop offset="50%" stop-color="#facc15"/>
-              <stop offset="100%" stop-color="#dc2626"/>
-            </linearGradient>
-          </defs>
-
           <path d="M10 50 A50 50 0 0 1 110 50"
             fill="none"
-            stroke="url(#g)"
-            stroke-width="10"
-            stroke-linecap="round"/>
+            stroke="red"
+            stroke-width="10"/>
 
           <line x1="60" y1="50" x2="${needle.x}" y2="${needle.y}"
             stroke="#111"
             stroke-width="2"/>
-
-          <circle cx="60" cy="50" r="3" fill="#111"/>
-
         </svg>
       </div>
 
     </div>
   </div>
-
-  </body>
-  </html>
   `;
 
   const browser = await puppeteer.launch({
-    args: ["--no-sandbox", "--disable-setuid-sandbox"]
+    args: ["--no-sandbox"]
   });
 
   const page = await browser.newPage();
@@ -265,12 +186,6 @@ app.post("/tally-pdf", async (req, res) => {
   });
 
   await browser.close();
-
-  res.set({
-    "Content-Type": "application/pdf",
-    "Content-Disposition": "attachment; filename=report.pdf"
-  });
-
   res.send(pdf);
 });
 
