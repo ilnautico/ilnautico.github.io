@@ -93,20 +93,12 @@ app.use(express.json());
 
 // 既存ルート
 app.post("/tally-pdf-v2", async (req, res) => {
-  // ←ここに処理
-});
 
-
-// 👇ここだけ追加（これが正解）
-app.post("/tally-pdf-v2", async (req, res) => {
-
-  // 波
   function generateWave(score) {
     const amp = Math.max(4, score * 0.15);
     return `M0 15 Q20 ${15 - amp} 40 15 T80 15`;
   }
 
-  // メーター
   function getNeedlePosition(score) {
     const angle = (-90 + (score * 1.8)) * (Math.PI / 180);
     const cx = 60;
@@ -126,7 +118,6 @@ app.post("/tally-pdf-v2", async (req, res) => {
 
   const wave_ldpe = generateWave(score_ldpe);
   const wave_pha = generateWave(score_pha);
-
   const needle = getNeedlePosition(score_pha);
 
   const html = `
@@ -142,7 +133,7 @@ app.post("/tally-pdf-v2", async (req, res) => {
         ${data.temp_pha}°C
       </div>
 
-      <div style="position:absolute;left:260px;top:90px;color:#166534;">
+      <div style="position:absolute;left:260px;top:90px;">
         ${score_ldpe}
       </div>
 
