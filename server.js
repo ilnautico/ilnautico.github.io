@@ -1387,13 +1387,14 @@ score_eol_note: "End-of-life compliance should be evaluated based on regional re
     });
 
     const browser = await puppeteer.launch({
-      args: [
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--disable-dev-shm-usage"
-      ]
-    });
-
+  headless: true,
+  args: [
+    "--no-sandbox",
+    "--disable-setuid-sandbox",
+    "--disable-dev-shm-usage",
+    "--disable-gpu"
+  ]
+});
     
     await page.setContent(html, { waitUntil: "networkidle0" });
 
