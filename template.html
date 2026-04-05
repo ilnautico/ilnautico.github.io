@@ -523,83 +523,137 @@ body {
   ">
 
   <!-- 🔢 温度 -->
-  <div style="position:absolute; left:200px; top:5px; font-size:32px; color:#1f2937;">
-    230°C
-  </div>
+ 
+<!-- 温度 -->
+<div style="
+  position:absolute;
+  left:235px;
+  top:8px;
+  font-size:32px;
+  line-height:1;
+  color:#1f2937;
+  font-weight:500;
+">
+  230°C
+</div>
 
-  <div style="position:absolute; left:470px; top:5px; font-size:32px; color:#dc2626;">
-    180°C
-  </div>
+<div style="
+  position:absolute;
+  left:470px;
+  top:8px;
+  font-size:32px;
+  line-height:1;
+  color:#dc2626;
+  font-weight:500;
+">
+  180°C
+</div>
 
-  <!-- 🔢 スコア -->
-  <div style="position:absolute; left:220px; top:50px; font-size:18px; color:#047857;">
-    80
-  </div>
+<!-- スコア -->
+<div style="
+  position:absolute;
+  left:285px;
+  top:56px;
+  font-size:18px;
+  line-height:1;
+  color:#047857;
+  font-weight:500;
+">
+  80
+</div>
 
-  <div style="position:absolute; left:490px; top:50px; font-size:18px; color:#dc2626;">
-    35
-  </div>
+<div style="
+  position:absolute;
+  left:520px;
+  top:56px;
+  font-size:18px;
+  line-height:1;
+  color:#dc2626;
+  font-weight:500;
+">
+  35
+</div>
 
-  <!-- 🔵 波（ノズル出口） -->
-  <svg style="
-    position:absolute;
-    left:250px;
-    top:140px;
-    width:120px;
-    opacity:0.6;
-    filter:blur(1px);
-  ">
-    <path d="M0 10 Q20 0 40 10 T80 10"
-      stroke="#3B82A0"
-      stroke-width="3"
-      fill="none"/>
-  </svg>
+<!-- LDPE 安定波：左バブル下辺に沿わせる -->
+<svg style="
+  position:absolute;
+  left:250px;
+  top:150px;
+  width:110px;
+  height:26px;
+  opacity:0.45;
+  filter:blur(0.6px);
+">
+  <path d="M0 14 Q18 9 36 14 T72 14 T108 14"
+    stroke="#3B82A0"
+    stroke-width="3"
+    fill="none"
+    stroke-linecap="round"/>
+</svg>
 
-  <!-- 🔴 波（素材） -->
-  <svg style="
-    position:absolute;
-    left:400px;
-    top:145px;
-    width:120px;
-    opacity:0.6;
-    filter:blur(1px);
-  ">
-    <path d="M0 10 Q20 0 40 10 T80 10"
+<!-- PHA 不安定波：右素材の手前にだけ置く -->
+<svg style="
+  position:absolute;
+  left:405px;
+  top:152px;
+  width:120px;
+  height:32px;
+  opacity:0.65;
+  filter:blur(0.6px);
+">
+  <path d="M0 16 Q15 4 30 16 T60 16 T90 6 T120 16"
+    stroke="#dc2626"
+    stroke-width="3"
+    fill="none"
+    stroke-linecap="round"/>
+</svg>
+
+<!-- リスクメーター：PHAの真下に小さく -->
+<div style="
+  position:absolute;
+  left:455px;
+  top:186px;
+  width:120px;
+  height:62px;
+">
+  <svg viewBox="0 0 120 62" width="120" height="62">
+    <!-- 背景弧 -->
+    <path d="M10 52 A50 50 0 0 1 110 52"
+      fill="none"
+      stroke="#E5E7EB"
+      stroke-width="12"
+      stroke-linecap="round"/>
+
+    <!-- 緑 -->
+    <path d="M10 52 A50 50 0 0 1 40 15"
+      fill="none"
+      stroke="#16a34a"
+      stroke-width="12"
+      stroke-linecap="round"/>
+
+    <!-- 黄 -->
+    <path d="M40 15 A50 50 0 0 1 78 10"
+      fill="none"
+      stroke="#facc15"
+      stroke-width="12"
+      stroke-linecap="round"/>
+
+    <!-- 赤 -->
+    <path d="M78 10 A50 50 0 0 1 110 52"
+      fill="none"
       stroke="#dc2626"
-      stroke-width="3"
-      fill="none"/>
+      stroke-width="12"
+      stroke-linecap="round"/>
+
+    <!-- 針 -->
+    <line x1="60" y1="52" x2="82" y2="21"
+      stroke="#111827"
+      stroke-width="2.5"
+      stroke-linecap="round"/>
+
+    <!-- 軸 -->
+    <circle cx="60" cy="52" r="4" fill="#111827"/>
   </svg>
-
-  <!-- 🔥 メーター -->
-  <div style="
-    position:absolute;
-    left:420px;
-    top:180px;
-    width:140px;
-    height:70px;
-    border-radius:140px 140px 0 0;
-    background:conic-gradient(
-      from 180deg,
-      #16a34a 0deg,
-      #facc15 120deg,
-      #dc2626 180deg
-    );
-    box-shadow:0 6px 18px rgba(0,0,0,0.25);
-  ">
-
-    <div style="
-      position:absolute;
-      bottom:0;
-      left:50%;
-      width:2px;
-      height:60px;
-      background:#111;
-      transform-origin:bottom;
-      transform:rotate(35deg);
-    "></div>
-
-  </div>
-
 </div>
 
           </div>
