@@ -2,44 +2,40 @@ import express from "express";
 import puppeteer from "puppeteer";
 
 const app = express();
-
-const PORT = process.env.PORT || 3000;
-
-// 最新PDF保存
-let latestPdf = null;
+app.use(express.json());
 
 /* =========================
-   ROOT
+   既存ルート（そのまま）
 ========================= */
-app.get("/", (req, res) => {
-  res.send("SERVER OK");
+app.post("/tally-pdf", async (req, res) => {
+  res.send("OK");
 });
 
 /* =========================
-   🔥 これがメイン（ブラウザでOK）
+   PDF生成（完全復旧版）
 ========================= */
 app.get("/tally-pdf", async (req, res) => {
   try {
 
-    // 👉 ここでデータ固定（元のやり方）
-   const data = {
-  base_image: "https://ilnautico.github.io/image.png",
-  temp_ldpe: 180,
-  temp_pha: 165,
-  score_ldpe: 80,
-  score_pha: 35
-};
+    // 🔥 データ固定（元のやり方）
+    const data = {
+      base_image: "https://ilnautico.github.io/image.png",
+      temp_ldpe: 180,
+      temp_pha: 165,
+      score_ldpe: 80,
+      score_pha: 35
+    };
 
     function generateWave(score) {
-      const amp = Math.max(4, score * 0.15);
-      return `M0 15 Q20 ${15 - amp} 40 15 T80 15`;
+      const amp = Math.max(6, score * 0.2);
+      return `M0 15 Q25 ${15 - amp} 50 15 T100 15`;
     }
 
     function getNeedle(score) {
       const angle = (-90 + score * 1.8) * (Math.PI / 180);
       const cx = 60;
       const cy = 50;
-      const r = 35;
+      const r = 38;
 
       return {
         x: cx + r * Math.cos(angle),
@@ -47,70 +43,84 @@ app.get("/tally-pdf", async (req, res) => {
       };
     }
 
-    const wave_ldpe = generateWave(data.score_ldpe);
-    const wave_pha = generateWave(data.score_pha);
+    const wave1 = generateWave(data.score_ldpe);
+    const wave2 = generateWave(data.score_pha);
     const needle = getNeedle(data.score_pha);
 
     const html = `
-    <div style="position:relative;width:700px;height:260px;margin:0 auto;">
+    <div style="
+      width:900px;
+      height:360px;
+      margin:0 auto;
+      position:relative;
+      background:white;
+    ">
 
-      <img src="${data.base_image}" style="width:700px;height:260px;object-fit:cover;">
+      <!-- 背景画像（ここが修正ポイント） -->
+      <img src="${data.base_image}" style="
+        position:absolute;
+        left:0;
+        top:0;
+        width:900px;
+        height:360px;
+        object-fit:contain;
+      ">
 
-      <div style="position:absolute;top:0;left:0;width:700px;height:260px;">
-
-        <div style="position:absolute;left:220px;top:40px;font-size:32px;">
-          ${data.temp_ldpe}°C
-        </div>
-
-        <div style="position:absolute;left:460px;top:40px;font-size:32px;color:#dc2626;">
-          ${data.temp_pha}°C
-        </div>
-
-        <div style="position:absolute;left:260px;top:95px;">
-          ${data.score_ldpe}
-        </div>
-
-        <div style="position:absolute;left:500px;top:95px;color:#dc2626;">
-          ${data.score_pha}
-        </div>
-
-        <!-- 波 -->
-        <svg style="position:absolute;left:300px;top:165px;width:100px;height:30px;">
-          <path d="${wave_ldpe}" stroke="#3B82A0" stroke-width="2.5" fill="none"/>
-        </svg>
-
-        <svg style="position:absolute;left:460px;top:165px;width:100px;height:30px;">
-          <path d="${wave_pha}" stroke="#dc2626" stroke-width="3" fill="none"/>
-        </svg>
-
-        <!-- メーター -->
-        <div style="position:absolute;left:520px;top:170px;width:120px;height:60px;">
-          <svg viewBox="0 0 120 60">
-
-            <defs>
-              <linearGradient id="g" x1="0" x2="1">
-                <stop offset="0%" stop-color="#16a34a"/>
-                <stop offset="50%" stop-color="#facc15"/>
-                <stop offset="100%" stop-color="#dc2626"/>
-              </linearGradient>
-            </defs>
-
-            <path d="M10 50 A50 50 0 0 1 110 50"
-              fill="none"
-              stroke="url(#g)"
-              stroke-width="10"
-              stroke-linecap="round"/>
-
-            <line x1="60" y1="50" x2="${needle.x}" y2="${needle.y}"
-              stroke="#111"
-              stroke-width="2"/>
-
-            <circle cx="60" cy="50" r="3" fill="#111"/>
-
-          </svg>
-        </div>
-
+      <!-- 温度 -->
+      <div style="position:absolute;left:300px;top:60px;font-size:42px;">
+        ${data.temp_ldpe}°C
       </div>
+
+      <div style="position:absolute;left:580px;top:60px;font-size:42px;color:#dc2626;">
+        ${data.temp_pha}°C
+      </div>
+
+      <!-- スコア -->
+      <div style="position:absolute;left:340px;top:120px;font-size:22px;color:#166534;">
+        ${data.score_ldpe}
+      </div>
+
+      <div style="position:absolute;left:620px;top:120px;font-size:22px;color:#dc2626;">
+        ${data.score_pha}
+      </div>
+
+      <!-- 波（位置完全固定） -->
+      <svg style="position:absolute;left:360px;top:220px;width:120px;height:40px;">
+        <path d="${wave1}" stroke="#3B82A0" stroke-width="3" fill="none"/>
+      </svg>
+
+      <svg style="position:absolute;left:520px;top:220px;width:120px;height:40px;">
+        <path d="${wave2}" stroke="#dc2626" stroke-width="3" fill="none"/>
+      </svg>
+
+      <!-- メーター（完全グラフィック） -->
+      <div style="position:absolute;left:620px;top:220px;">
+        <svg viewBox="0 0 120 60" width="140">
+
+          <defs>
+            <linearGradient id="g">
+              <stop offset="0%" stop-color="#16a34a"/>
+              <stop offset="50%" stop-color="#facc15"/>
+              <stop offset="100%" stop-color="#dc2626"/>
+            </linearGradient>
+          </defs>
+
+          <path d="M10 50 A50 50 0 0 1 110 50"
+            fill="none"
+            stroke="url(#g)"
+            stroke-width="10"
+            stroke-linecap="round"/>
+
+          <line x1="60" y1="50"
+            x2="${needle.x}"
+            y2="${needle.y}"
+            stroke="#111"
+            stroke-width="3"/>
+
+          <circle cx="60" cy="50" r="4" fill="#111"/>
+        </svg>
+      </div>
+
     </div>
     `;
 
@@ -134,42 +144,25 @@ app.get("/tally-pdf", async (req, res) => {
 
     await browser.close();
 
-    latestPdf = pdf;
-
     res.set({
-      "Content-Type": "application/pdf"
+      "Content-Type": "application/pdf",
+      "Content-Disposition": "inline"
     });
 
     res.send(pdf);
 
-  } catch (err) {
-    console.error(err);
-    res.status(500).send("PDF ERROR");
+  } catch (e) {
+    console.error(e);
+    res.status(500).send("ERROR");
   }
 });
 
 /* =========================
-   最新PDF
+   起動（触らない）
 ========================= */
-app.get("/latest-pdf", (req, res) => {
-  if (!latestPdf) {
-    return res.send("No PDF yet");
-  }
-
-  res.set({
-    "Content-Type": "application/pdf"
-  });
-
-  res.send(latestPdf);
-});
-
-/* =========================
-   起動
-========================= */
-app.listen(PORT, () => {
-  console.log("Server running on", PORT);
-});
-// =========================
+app.listen(8080, () => {
+  console.log("Server running on 8080");
+});========================
 const htmlTemplate = `
 <!DOCTYPE html>
 <html lang="en">
