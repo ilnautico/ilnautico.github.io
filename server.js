@@ -1,24 +1,116 @@
 import express from "express";
 import puppeteer from "puppeteer";
 
-const app = express(); // ← 必ず一番上で定義
+const app = express();
+app.use(express.json());
 
-app.use(express.json()); // ← そのあと
+const PORT = process.env.PORT || 3000;
 
-// ---------- 動作確認 ----------
+// 最新PDF保存
+let latestPdf = null;
+
+/* =========================
+   ROOT（確認）
+========================= */
 app.get("/", (req, res) => {
   res.send("SERVER OK");
 });
 
-// ---------- 既存ルート（残す） ----------
+/* =========================
+   既存ルート
+========================= */
 app.post("/tally-pdf", (req, res) => {
   res.send("OK");
 });
 
-// ---------- 新ルート ----------
+/* =========================
+   🔥 PDF生成（本体）
+========================= */
 app.post("/tally-pdf-v2", async (req, res) => {
   try {
-    const html = `<h1>PDF OK</h1>`;
+    const data = req.body;
+
+    function generateWave(score) {
+      const amp = Math.max(4, score * 0.15);
+      return `M0 15 Q20 ${15 - amp} 40 15 T80 15`;
+    }
+
+    function getNeedlePosition(score) {
+      const angle = (-90 + score * 1.8) * (Math.PI / 180);
+      const cx = 60;
+      const cy = 50;
+      const r = 35;
+
+      return {
+        x: cx + r * Math.cos(angle),
+        y: cy + r * Math.sin(angle),
+      };
+    }
+
+    const score_ldpe = Number(data.score_ldpe || 80);
+    const score_pha = Number(data.score_pha || 35);
+
+    const wave_ldpe = generateWave(score_ldpe);
+    const wave_pha = generateWave(score_pha);
+    const needle = getNeedlePosition(score_pha);
+
+    const html = `
+    <div style="position:relative;width:700px;height:260px;margin:0 auto;">
+      <img src="${data.base_image}" style="width:700px;height:260px;object-fit:cover;">
+
+      <div style="position:absolute;top:0;left:0;width:700px;height:260px;">
+
+        <div style="position:absolute;left:220px;top:40px;font-size:36px;">
+          ${data.temp_ldpe}°C
+        </div>
+
+        <div style="position:absolute;left:460px;top:40px;font-size:36px;color:#dc2626;">
+          ${data.temp_pha}°C
+        </div>
+
+        <div style="position:absolute;left:260px;top:95px;">
+          ${score_ldpe}
+        </div>
+
+        <div style="position:absolute;left:500px;top:95px;color:#dc2626;">
+          ${score_pha}
+        </div>
+
+        <svg style="position:absolute;left:300px;top:165px;width:100px;height:30px;">
+          <path d="${wave_ldpe}" stroke="#3B82A0" stroke-width="2.5" fill="none"/>
+        </svg>
+
+        <svg style="position:absolute;left:460px;top:170px;width:110px;height:30px;">
+          <path d="${wave_pha}" stroke="#dc2626" stroke-width="3" fill="none"/>
+        </svg>
+
+        <div style="position:absolute;left:520px;top:180px;width:120px;height:60px;">
+          <svg viewBox="0 0 120 60">
+            <defs>
+              <linearGradient id="g" x1="0" x2="1">
+                <stop offset="0%" stop-color="#16a34a"/>
+                <stop offset="50%" stop-color="#facc15"/>
+                <stop offset="100%" stop-color="#dc2626"/>
+              </linearGradient>
+            </defs>
+
+            <path d="M10 50 A50 50 0 0 1 110 50"
+              fill="none"
+              stroke="url(#g)"
+              stroke-width="10"
+              stroke-linecap="round"/>
+
+            <line x1="60" y1="50" x2="${needle.x}" y2="${needle.y}"
+              stroke="#111"
+              stroke-width="2"/>
+
+            <circle cx="60" cy="50" r="3" fill="#111"/>
+          </svg>
+        </div>
+
+      </div>
+    </div>
+    `;
 
     const browser = await puppeteer.launch({
       headless: true,
@@ -40,22 +132,35 @@ app.post("/tally-pdf-v2", async (req, res) => {
 
     await browser.close();
 
-    res.set({
-      "Content-Type": "application/pdf",
-      "Content-Disposition": "attachment; filename=test.pdf"
-    });
+    // 保存
+    latestPdf = pdf;
 
     res.send(pdf);
 
   } catch (err) {
     console.error(err);
-    res.status(500).send("ERROR");
+    res.status(500).send("PDF error");
   }
 });
 
-// ---------- 起動 ----------
-const PORT = process.env.PORT || 3000;
+/* =========================
+   🔥 最新PDF取得（復活）
+========================= */
+app.get("/latest-pdf", (req, res) => {
+  if (!latestPdf) {
+    return res.send("No PDF yet");
+  }
 
+  res.set({
+    "Content-Type": "application/pdf"
+  });
+
+  res.send(latestPdf);
+});
+
+/* =========================
+   起動
+========================= */
 app.listen(PORT, () => {
   console.log("Server running on", PORT);
 });
