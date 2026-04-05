@@ -13,43 +13,43 @@ function generateOverlay() {
   <div style="position:relative; width:100%; height:100%;">
 
     <!-- 温度 -->
-    <div style="position:absolute; top:15%; left:28%; font-size:26px;">
+    <div style="position:absolute; top:12%; left:32%; font-size:26px; color:#334155;">
       230°C
     </div>
 
-    <div style="position:absolute; top:15%; right:22%; font-size:26px; color:#DC2626;">
+    <div style="position:absolute; top:12%; right:26%; font-size:26px; color:#DC2626;">
       180°C
     </div>
 
     <!-- 強度 -->
-    <div style="position:absolute; top:28%; left:30%; font-size:18px; color:#0F766E;">
+    <div style="position:absolute; top:22%; left:34%; font-size:18px; color:#0F766E;">
       80
     </div>
 
-    <div style="position:absolute; top:28%; right:25%; font-size:18px; color:#DC2626;">
+    <div style="position:absolute; top:22%; right:28%; font-size:18px; color:#DC2626;">
       35
     </div>
 
-    <!-- LDPE 波 -->
-    <svg style="position:absolute; top:55%; left:30%; width:20%;">
+    <!-- LDPE波（バブル出口ぴったり） -->
+    <svg style="position:absolute; top:58%; left:38%; width:14%;">
       <path d="M0 20 Q20 0 40 20 T80 20"
         stroke="#38BDF8" stroke-width="3" fill="none"/>
     </svg>
 
-    <!-- PHA 波 -->
-    <svg style="position:absolute; top:55%; right:25%; width:20%;">
+    <!-- PHA波（崩壊側ぴったり） -->
+    <svg style="position:absolute; top:58%; right:32%; width:14%;">
       <path d="M0 20 Q20 10 40 20 T80 5"
         stroke="#DC2626" stroke-width="3" fill="none"/>
     </svg>
 
-    <!-- メーター -->
+    <!-- メーター（中央寄せ・バランス改善） -->
     <div style="
       position:absolute;
-      bottom:8%;
-      right:12%;
-      width:140px;
-      height:70px;
-      border-radius:70px 70px 0 0;
+      bottom:6%;
+      right:18%;
+      width:120px;
+      height:60px;
+      border-radius:60px 60px 0 0;
       background:conic-gradient(
         #22c55e 0deg 60deg,
         #facc15 60deg 120deg,
@@ -60,11 +60,11 @@ function generateOverlay() {
         position:absolute;
         bottom:0;
         left:50%;
-        width:3px;
-        height:60px;
+        width:2px;
+        height:50px;
         background:#111;
         transform-origin:bottom;
-        transform:rotate(110deg);
+        transform:rotate(120deg);
       "></div>
     </div>
 
