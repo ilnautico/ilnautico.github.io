@@ -11,141 +11,73 @@ app.use(express.urlencoded({ extended: true }));
 // Overlay（ここだけ触る）
 function generateOverlay() {
   return `
-  <div style="position:relative; width:100%; height:100%;">
+  <div style="
+    position:absolute;
+    top:0;
+    left:0;
+    width:700px;
+    height:260px;
+    pointer-events:none;
+    z-index:10;
+  ">
 
     <!-- 温度 -->
-    <div style="position:absolute; left:280px; top:60px; font-size:26px; color:#334155;">
+    <div style="position:absolute; left:235px; top:8px; font-size:32px; color:#1f2937;">
       230°C
     </div>
 
-    <div style="position:absolute; left:540px; top:60px; font-size:26px; color:#DC2626;">
+    <div style="position:absolute; left:480px; top:8px; font-size:32px; color:#dc2626;">
       180°C
     </div>
 
     <!-- スコア -->
-    <div style="position:absolute; left:320px; top:110px; font-size:18px; color:#0F766E;">
+    <div style="position:absolute; left:270px; top:55px; font-size:18px; color:#166534;">
       80
     </div>
 
-    <div style="position:absolute; left:580px; top:110px; font-size:18px; color:#DC2626;">
+    <div style="position:absolute; left:520px; top:55px; font-size:18px; color:#dc2626;">
       35
     </div>
 
-    <!-- 波（固定位置に変更済） -->
-    <svg style="position:absolute; left:335px; top:210px; width:110px; height:36px;">
-      <path d="M0 18 Q18 8 36 18 Q54 28 72 18 Q90 8 108 18"
-        stroke="#38BDF8" stroke-width="3" fill="none"/>
+    <!-- 波 -->
+    <svg style="position:absolute; left:330px; top:170px; width:90px; height:30px;">
+      <path d="M0 20 Q20 0 40 20 T80 20"
+        stroke="#3B82A0" stroke-width="2.5" fill="none"/>
     </svg>
 
-    <svg style="position:absolute; left:495px; top:210px; width:110px; height:36px;">
-      <path d="M0 18 Q18 2 36 18 Q54 34 72 18 Q90 4 108 18"
-        stroke="#DC2626" stroke-width="3" fill="none"/>
+    <svg style="position:absolute; left:500px; top:175px; width:100px; height:30px;">
+      <path d="M0 20 Q20 10 40 20 T80 5"
+        stroke="#dc2626" stroke-width="3" fill="none"/>
     </svg>
 
     <!-- メーター -->
-    <div style="
-      position:absolute;
-      left:590px;
-      top:205px;
-      width:120px;
-      height:60px;
-      border-radius:60px 60px 0 0;
-      background:conic-gradient(
-        #22c55e 0deg 60deg,
-        #facc15 60deg 120deg,
-        #ef4444 120deg 180deg
-      );
-    ">
-      <div style="
-        position:absolute;
-        bottom:0;
-        left:50%;
-        width:2px;
-        height:50px;
-        background:#111;
-        transform-origin:bottom;
-        transform:rotate(120deg);
-      "></div>
+    <div style="position:absolute; left:540px; top:185px; width:120px; height:60px;">
+      <svg viewBox="0 0 120 60">
+        <defs>
+          <linearGradient id="g" x1="0" x2="1">
+            <stop offset="0%" stop-color="#16a34a"/>
+            <stop offset="50%" stop-color="#facc15"/>
+            <stop offset="100%" stop-color="#dc2626"/>
+          </linearGradient>
+        </defs>
+
+        <path d="M10 50 A50 50 0 0 1 110 50"
+          fill="none"
+          stroke="url(#g)"
+          stroke-width="10"
+          stroke-linecap="round"/>
+
+        <line x1="60" y1="50" x2="90" y2="30"
+          stroke="#111"
+          stroke-width="2"/>
+
+        <circle cx="60" cy="50" r="3" fill="#111"/>
+      </svg>
     </div>
 
   </div>
   `;
 }
-
-// =========================
-// HTML差し込み（触らない）
-function injectHtml(template, data) {
-  let html = template;
-
-  Object.keys(data).forEach((key) => {
-    const regex = new RegExp(`{{\\s*${key}\\s*}}`, "g");
-    html = html.replace(regex, data[key] || "");
-  });
-
-  return html;
-}
-
-// =========================
-// PDF生成（1つだけ）
-app.post("/tally-pdf", async (req, res) => {
-  try {
-    const template = fs.readFileSync("template.html", "utf8");
-
-    const html = injectHtml(template, {
-      base_image: "https://ilnautico.github.io/visual-base.png",
-      dynamic_overlay: generateOverlay()
-    });
-
-    const browser = await puppeteer.launch({
-      args: [
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--disable-dev-shm-usage",
-        "--disable-gpu"
-      ]
-    });
-
-    const page = await browser.newPage();
-
-    await page.setContent(html, {
-      waitUntil: "networkidle0"
-    });
-
-    const pdf = await page.pdf({
-      format: "A4",
-      printBackground: true
-    });
-
-    await browser.close();
-
-    fs.writeFileSync("/tmp/latest-report.pdf", pdf);
-
-    res.set({ "Content-Type": "application/pdf" });
-    res.send(pdf);
-
-  } catch (err) {
-    console.error("ERROR:", err);
-    res.status(500).send("error");
-  }
-});
-
-// =========================
-// PDF確認
-app.get("/latest-pdf", (req, res) => {
-  const file = "/tmp/latest-report.pdf";
-
-  if (!fs.existsSync(file)) {
-    return res.status(404).send("No PDF yet");
-  }
-
-  res.sendFile(file);
-});
-
-// =========================
-// 起動（1回だけ）
-app.listen(process.env.PORT || 8080, () => {
-  console.log("🚀 Server running");
-});
 const htmlTemplate = `
 <!DOCTYPE html>
 <html lang="en">
