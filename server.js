@@ -1,3 +1,6 @@
+app.get("/", (req, res) => {
+  res.send("SERVER OK");
+});
 import express from "express";
 import puppeteer from "puppeteer";
 import fs from "fs";
