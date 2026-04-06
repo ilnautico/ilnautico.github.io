@@ -508,33 +508,108 @@ body {
 
     <div class="viz-body">
 
-      <div style="
-        position:relative;
-        width:700px;
-        height:260px;
-        margin:0 auto;
-      ">
-
-        <!-- 背景 -->
-      <img src="{{base_image}}" style="
+     <div style="
+  position:relative;
   width:700px;
   height:260px;
-  object-fit:contain;
-  background:#fff;
+  margin:0 auto;
 ">
 
-        <!-- 🔥これだけ残す（唯一の描画） -->
-        {{dynamic_overlay}}
+  <!-- 背景 -->
+  <img src="{{base_image}}" style="
+    width:700px;
+    height:260px;
+    display:block;
+  ">
 
-      </div>
+  <!-- オーバーレイ（ここが唯一） -->
+  <div style="
+    position:absolute;
+    top:0;
+    left:0;
+    width:700px;
+    height:260px;
+  ">
 
-      <div class="viz-caption">
-        Conceptual representation — material behaviour interpretation (non-physical validation)
-      </div>
+    <!-- 温度 -->
+    <div style="
+      position:absolute;
+      left:235px;
+      top:8px;
+      font-size:32px;
+      color:#1f2937;
+    ">230°C</div>
 
-      {{visual_description}}
+    <div style="
+      position:absolute;
+      left:470px;
+      top:8px;
+      font-size:32px;
+      color:#dc2626;
+    ">180°C</div>
 
+    <!-- スコア -->
+    <div style="
+      position:absolute;
+      left:285px;
+      top:56px;
+      font-size:18px;
+      color:#047857;
+    ">80</div>
+
+    <div style="
+      position:absolute;
+      left:520px;
+      top:56px;
+      font-size:18px;
+      color:#dc2626;
+    ">35</div>
+
+    <!-- 波（中央固定） -->
+    <svg style="
+      position:absolute;
+      left:290px;
+      top:150px;
+      width:80px;
+      height:24px;
+    ">
+      <path d="M0 12 Q20 0 40 12 T80 12"
+        stroke="#3B82A0"
+        stroke-width="2.5"
+        fill="none"/>
+    </svg>
+
+    <svg style="
+      position:absolute;
+      left:420px;
+      top:150px;
+      width:80px;
+      height:24px;
+    ">
+      <path d="M0 12 Q20 0 40 12 T80 12"
+        stroke="#dc2626"
+        stroke-width="2.5"
+        fill="none"/>
+    </svg>
+
+    <!-- メーター -->
+    <div style="
+      position:absolute;
+      left:450px;
+      top:180px;
+      width:110px;
+    ">
+      <svg viewBox="0 0 120 60">
+        <path d="M10 50 A50 50 0 0 1 110 50"
+          fill="none"
+          stroke="#ddd"
+          stroke-width="10"/>
+        <line x1="60" y1="50" x2="80" y2="20"
+          stroke="#111"
+          stroke-width="2"/>
+      </svg>
     </div>
+
   </div>
 </div>
     <!-- 07 Recommended Next Step -->
