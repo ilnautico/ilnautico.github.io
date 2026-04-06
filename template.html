@@ -494,6 +494,7 @@ body {
 
 <!-- 06 Conceptual Visualization -->
 <!-- 06 Conceptual Visualization -->
+<!-- 06 Conceptual Visualization -->
 <div class="section">
   <div class="section-header">
     <span class="section-num">06</span>
@@ -505,191 +506,25 @@ body {
       <span class="viz-header-text">Visual Description — Indicative Only</span>
     </div>
 
-  <div class="viz-body">
+    <div class="viz-body">
 
-  <div style="
-    position:relative;
-    width:700px;
-    height:260px;
-    margin:0 auto;
-  ">
+      <div style="
+        position:relative;
+        width:700px;
+        height:260px;
+        margin:0 auto;
+      ">
 
-    <!-- 背景 -->
-    <img src="{{base_image}}" style="
-      width:700px;
-      height:260px;
-      display:block;
-    ">
+        <!-- 背景 -->
+        <img src="{{base_image}}" style="
+          width:700px;
+          height:260px;
+          display:block;
+        ">
 
-    <!-- これだけ残す -->
-    {{dynamic_overlay}}
+        <!-- 🔥これだけ残す（唯一の描画） -->
+        {{dynamic_overlay}}
 
-  </div>
-
-</div>
-
-  
-
-      <!-- 🔥 中央固定レイヤー（これが重要） -->
-<div style="
-  position:relative;
-  width:700px;
-  height:260px;
-  margin:0 auto;
-">
-
-  <!-- 画像（サイズ固定） -->
-  <img src="{{base_image}}" style="
-  width:700px;
-  height:260px;
-  display:block;
-">
-<div style="
-  position:absolute;
-  top:0;
-  left:0;
-  width:100%;
-  height:100%;
-  z-index:999;
-">
-
-  <!-- 🔢 温度 -->
- 
-<!-- 温度 -->
-<div style="
-  position:absolute;
-  left:235px;
-  top:8px;
-  font-size:32px;
-  line-height:1;
-  color:#1f2937;
-  font-weight:500;
-">
-  230°C
-</div>
-
-<div style="
-  position:absolute;
-  left:470px;
-  top:8px;
-  font-size:32px;
-  line-height:1;
-  color:#dc2626;
-  font-weight:500;
-">
-  180°C
-</div>
-
-<!-- スコア -->
-<div style="
-  position:absolute;
-  left:285px;
-  top:56px;
-  font-size:18px;
-  line-height:1;
-  color:#047857;
-  font-weight:500;
-">
-  80
-</div>
-
-<div style="
-  position:absolute;
-  left:520px;
-  top:56px;
-  font-size:18px;
-  line-height:1;
-  color:#dc2626;
-  font-weight:500;
-">
-  35
-</div>
-
-<!-- LDPE 安定波：左バブル下辺に沿わせる -->
-<svg style="
-  position:absolute;
-  left:250px;
-  top:150px;
-  width:110px;
-  height:26px;
-  opacity:0.45;
-  filter:blur(0.6px);
-">
-  <path d="M0 14 Q18 9 36 14 T72 14 T108 14"
-    stroke="#3B82A0"
-    stroke-width="3"
-    fill="none"
-    stroke-linecap="round"/>
-</svg>
-
-<!-- PHA 不安定波：右素材の手前にだけ置く -->
-<svg style="
-  position:absolute;
-  left:405px;
-  top:152px;
-  width:120px;
-  height:32px;
-  opacity:0.65;
-  filter:blur(0.6px);
-">
-  <path d="M0 16 Q15 4 30 16 T60 16 T90 6 T120 16"
-    stroke="#dc2626"
-    stroke-width="3"
-    fill="none"
-    stroke-linecap="round"/>
-</svg>
-
-<!-- リスクメーター：PHAの真下に小さく -->
-<div style="
-  position:absolute;
-  left:455px;
-  top:186px;
-  width:120px;
-  height:62px;
-">
-  <svg viewBox="0 0 120 62" width="120" height="62">
-    <!-- 背景弧 -->
-    <path d="M10 52 A50 50 0 0 1 110 52"
-      fill="none"
-      stroke="#E5E7EB"
-      stroke-width="12"
-      stroke-linecap="round"/>
-
-    <!-- 緑 -->
-    <path d="M10 52 A50 50 0 0 1 40 15"
-      fill="none"
-      stroke="#16a34a"
-      stroke-width="12"
-      stroke-linecap="round"/>
-
-    <!-- 黄 -->
-    <path d="M40 15 A50 50 0 0 1 78 10"
-      fill="none"
-      stroke="#facc15"
-      stroke-width="12"
-      stroke-linecap="round"/>
-
-    <!-- 赤 -->
-    <path d="M78 10 A50 50 0 0 1 110 52"
-      fill="none"
-      stroke="#dc2626"
-      stroke-width="12"
-      stroke-linecap="round"/>
-
-    <!-- 針 -->
-    <line x1="60" y1="52" x2="82" y2="21"
-      stroke="#111827"
-      stroke-width="2.5"
-      stroke-linecap="round"/>
-
-    <!-- 軸 -->
-    <circle cx="60" cy="52" r="4" fill="#111827"/>
-  </svg>
-</div>
-
-          </div>
-
-        </div>
       </div>
 
       <div class="viz-caption">
@@ -701,18 +536,6 @@ body {
     </div>
   </div>
 </div>
-
-  <!-- 背景画像 -->
-
-</div>
-          <div class="viz-caption">
-            Conceptual representation — material behaviour interpretation (non-physical validation)
-          </div>
-          {{visual_description}}
-        </div>
-      </div>
-    </div>
-
     <!-- 07 Recommended Next Step -->
     <div class="section">
       <div class="section-header">
