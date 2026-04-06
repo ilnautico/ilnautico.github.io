@@ -27,36 +27,36 @@ function generateOverlay() {
   ">
 
     <!-- 温度 -->
-    <div style="position:absolute; left:235px; top:8px; font-size:32px; color:#1f2937;">
+    <div style="position:absolute; left:240px; top:10px; font-size:32px; color:#1f2937;">
       230°C
     </div>
 
-    <div style="position:absolute; left:480px; top:8px; font-size:32px; color:#dc2626;">
+    <div style="position:absolute; left:500px; top:10px; font-size:32px; color:#dc2626;">
       180°C
     </div>
 
     <!-- スコア -->
-    <div style="position:absolute; left:270px; top:55px; font-size:18px; color:#166534;">
+    <div style="position:absolute; left:275px; top:55px; font-size:18px; color:#166534;">
       80
     </div>
 
-    <div style="position:absolute; left:520px; top:55px; font-size:18px; color:#dc2626;">
+    <div style="position:absolute; left:530px; top:55px; font-size:18px; color:#dc2626;">
       35
     </div>
 
-    <!-- 波 -->
-    <svg style="position:absolute; left:330px; top:170px; width:90px; height:30px;">
+    <!-- 波（ここが効く） -->
+    <svg style="position:absolute; left:350px; top:170px; width:90px; height:30px;">
       <path d="M0 20 Q20 0 40 20 T80 20"
         stroke="#3B82A0" stroke-width="2.5" fill="none"/>
     </svg>
 
-    <svg style="position:absolute; left:500px; top:175px; width:100px; height:30px;">
+    <svg style="position:absolute; left:520px; top:175px; width:100px; height:30px;">
       <path d="M0 20 Q20 10 40 20 T80 5"
         stroke="#dc2626" stroke-width="3" fill="none"/>
     </svg>
 
     <!-- メーター -->
-    <div style="position:absolute; left:540px; top:185px; width:120px; height:60px;">
+    <div style="position:absolute; left:560px; top:185px; width:120px; height:60px;">
       <svg viewBox="0 0 120 60">
         <defs>
           <linearGradient id="g" x1="0" x2="1">
