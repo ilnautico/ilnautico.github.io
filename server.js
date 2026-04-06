@@ -1,6 +1,3 @@
-app.get("/", (req, res) => {
-  res.send("SERVER OK");
-});
 import express from "express";
 import puppeteer from "puppeteer";
 import fs from "fs";
@@ -10,8 +7,13 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// ✅ ヘルスチェック（Railway用）
+app.get("/", (req, res) => {
+  res.send("SERVER OK");
+});
+
 // =========================
-// Overlay（ここだけ触る）
+// Overlay（修正済み）
 function generateOverlay() {
   return `
   <div style="
@@ -81,6 +83,87 @@ function generateOverlay() {
   </div>
   `;
 }
+
+// =========================
+// HTML差し込み
+function injectHtml(template, data) {
+  let html = template;
+
+  Object.keys(data).forEach((key) => {
+    const regex = new RegExp(`{{\\s*${key}\\s*}}`, "g");
+    html = html.replace(regex, data[key] || "");
+  });
+
+  return html;
+}
+
+// =========================
+// PDF生成
+app.post("/tally-pdf", async (req, res) => {
+  try {
+    const template = fs.readFileSync("template.html", "utf8");
+
+    const html = injectHtml(template, {
+      base_image: "https://ilnautico.github.io/visual-base.png",
+      dynamic_overlay: generateOverlay()
+    });
+
+    const browser = await puppeteer.launch({
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-gpu"
+      ]
+    });
+
+    const page = await browser.newPage(); // ←絶対必要
+
+    await page.setContent(html, {
+      waitUntil: "networkidle0"
+    });
+
+    const pdf = await page.pdf({
+      format: "A4",
+      printBackground: true
+    });
+
+    await browser.close();
+
+    fs.writeFileSync("/tmp/latest-report.pdf", pdf);
+
+    res.set({
+      "Content-Type": "application/pdf",
+      "Content-Disposition": "attachment; filename=report.pdf"
+    });
+
+    res.send(pdf);
+
+  } catch (err) {
+    console.error("❌ ERROR:", err);
+    res.status(500).send("PDF generation failed");
+  }
+});
+
+// =========================
+// PDF確認
+app.get("/latest-pdf", (req, res) => {
+  const file = "/tmp/latest-report.pdf";
+
+  if (!fs.existsSync(file)) {
+    return res.status(404).send("No PDF yet");
+  }
+
+  res.sendFile(file);
+});
+
+// =========================
+// 起動
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, () => {
+  console.log("🚀 Server running on", PORT);
+});
 const htmlTemplate = `
 <!DOCTYPE html>
 <html lang="en">
