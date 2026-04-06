@@ -516,11 +516,12 @@ body {
       ">
 
         <!-- 背景 -->
-        <img src="{{base_image}}" style="
-          width:700px;
-          height:260px;
-          display:block;
-        ">
+      <img src="{{base_image}}" style="
+  width:700px;
+  height:260px;
+  object-fit:contain;
+  background:#fff;
+">
 
         <!-- 🔥これだけ残す（唯一の描画） -->
         {{dynamic_overlay}}
