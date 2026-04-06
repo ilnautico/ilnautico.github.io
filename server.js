@@ -8,41 +8,45 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // =========================
-// Overlay（そのまま維持）
+// Overlay（ここだけ触る）
 function generateOverlay() {
   return `
   <div style="position:relative; width:100%; height:100%;">
 
-    <div style="position:absolute; top:12%; left:32%; font-size:26px; color:#334155;">
+    <!-- 温度 -->
+    <div style="position:absolute; left:280px; top:60px; font-size:26px; color:#334155;">
       230°C
     </div>
 
-    <div style="position:absolute; top:12%; right:26%; font-size:26px; color:#DC2626;">
+    <div style="position:absolute; left:540px; top:60px; font-size:26px; color:#DC2626;">
       180°C
     </div>
 
-    <div style="position:absolute; top:22%; left:34%; font-size:18px; color:#0F766E;">
+    <!-- スコア -->
+    <div style="position:absolute; left:320px; top:110px; font-size:18px; color:#0F766E;">
       80
     </div>
 
-    <div style="position:absolute; top:22%; right:28%; font-size:18px; color:#DC2626;">
+    <div style="position:absolute; left:580px; top:110px; font-size:18px; color:#DC2626;">
       35
     </div>
 
-    <svg style="position:absolute; top:58%; left:38%; width:14%;">
-      <path d="M0 20 Q20 0 40 20 T80 20"
+    <!-- 波（固定位置に変更済） -->
+    <svg style="position:absolute; left:335px; top:210px; width:110px; height:36px;">
+      <path d="M0 18 Q18 8 36 18 Q54 28 72 18 Q90 8 108 18"
         stroke="#38BDF8" stroke-width="3" fill="none"/>
     </svg>
 
-    <svg style="position:absolute; top:58%; right:32%; width:14%;">
-      <path d="M0 20 Q20 10 40 20 T80 5"
+    <svg style="position:absolute; left:495px; top:210px; width:110px; height:36px;">
+      <path d="M0 18 Q18 2 36 18 Q54 34 72 18 Q90 4 108 18"
         stroke="#DC2626" stroke-width="3" fill="none"/>
     </svg>
 
+    <!-- メーター -->
     <div style="
       position:absolute;
-      bottom:6%;
-      right:18%;
+      left:590px;
+      top:205px;
       width:120px;
       height:60px;
       border-radius:60px 60px 0 0;
@@ -69,7 +73,7 @@ function generateOverlay() {
 }
 
 // =========================
-// HTML差し込み
+// HTML差し込み（触らない）
 function injectHtml(template, data) {
   let html = template;
 
@@ -82,7 +86,7 @@ function injectHtml(template, data) {
 }
 
 // =========================
-// PDF生成（1つだけに統一）
+// PDF生成（1つだけ）
 app.post("/tally-pdf", async (req, res) => {
   try {
     const template = fs.readFileSync("template.html", "utf8");
@@ -102,7 +106,10 @@ app.post("/tally-pdf", async (req, res) => {
     });
 
     const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: "networkidle0" });
+
+    await page.setContent(html, {
+      waitUntil: "networkidle0"
+    });
 
     const pdf = await page.pdf({
       format: "A4",
@@ -123,7 +130,7 @@ app.post("/tally-pdf", async (req, res) => {
 });
 
 // =========================
-// PDF確認（これで表示できる）
+// PDF確認
 app.get("/latest-pdf", (req, res) => {
   const file = "/tmp/latest-report.pdf";
 
