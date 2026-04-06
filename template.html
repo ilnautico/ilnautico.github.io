@@ -507,6 +507,27 @@ body {
 
     <div class="viz-body">
 
+  <div style="
+    position:relative;
+    width:700px;
+    height:260px;
+    margin:0 auto;
+  ">
+
+    <!-- 背景画像 -->
+    <img src="{{base_image}}" style="
+      width:700px;
+      height:260px;
+      display:block;
+    ">
+
+    <!-- ここに追加 -->
+    {{dynamic_overlay}}
+
+  </div>
+
+</div>
+
       <!-- 🔥 中央固定レイヤー（これが重要） -->
 <div style="
   position:relative;
