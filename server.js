@@ -15,7 +15,7 @@ app.get("/", (req, res) => {
 
 
 // =========================
-// 🔥 フィールド抽出（壊れない）
+// 🔥 フィールド抽出（完全耐性）
 function extractFields(body) {
 
   const answers =
@@ -26,7 +26,11 @@ function extractFields(body) {
   const map = {};
 
   for (const item of answers) {
-    const key = String(item?.label || "").toLowerCase();
+    const key = String(item?.label || "")
+      .toLowerCase()
+      .replace(/\s+/g, " ")   // ←空白統一（重要）
+      .trim();
+
     const value = String(item?.value || "").toLowerCase();
 
     map[key] = value;
@@ -37,28 +41,45 @@ function extractFields(body) {
 
 
 // =========================
-// 🔥 評価ロジック（触ってない）
+// 🔥 評価ロジック（完全一致依存しない）
 function evaluateMaterial(map) {
 
   let stability = 70;
   let risk = 40;
 
-  if (map["current material"]?.includes("ldpe")) {
-    stability += 10;
-    risk -= 5;
-  }
+  for (const key in map) {
 
-  if (map["processing method"]?.includes("film")) {
-    stability -= 10;
-    risk += 15;
-  }
+    const value = map[key];
 
-  if (map["l/d"]?.includes("22")) {
-    stability -= 5;
-  }
+    // ===== 材料 =====
+    if (key.includes("current material")) {
+      if (value.includes("ldpe")) {
+        stability += 10;
+        risk -= 5;
+      }
+    }
 
-  if (map["primary concern"]?.includes("instability")) {
-    risk += 20;
+    // ===== 成形 =====
+    if (key.includes("processing method")) {
+      if (value.includes("film")) {
+        stability -= 10;
+        risk += 15;
+      }
+    }
+
+    // ===== L/D =====
+    if (key.includes("l/d")) {
+      if (value.includes("22")) {
+        stability -= 5;
+      }
+    }
+
+    // ===== 問題 =====
+    if (key.includes("primary concern")) {
+      if (value.includes("instability")) {
+        risk += 20;
+      }
+    }
   }
 
   stability = clamp(stability);
@@ -75,7 +96,7 @@ function clamp(val) {
 
 
 // =========================
-// 🔥 スコア生成（そのまま）
+// 🔥 スコア生成
 function calculateScores(body) {
 
   const map = extractFields(body);
@@ -90,7 +111,7 @@ function calculateScores(body) {
 
 
 // =========================
-// 🔥 Overlay（一切変更なし）
+// 🔥 Overlay（完全連動）
 function generateOverlay(scoreLeft = 80, scoreRight = 35) {
 
   const ampLeft = 4 + scoreLeft * 0.12;
@@ -104,9 +125,11 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
   return `
   <div style="position:absolute;top:0;left:0;width:700px;height:260px;pointer-events:none;z-index:10;">
 
+    <!-- 温度 -->
     <div style="position:absolute; left:235px; top:8px; font-size:32px;">230°C</div>
     <div style="position:absolute; left:470px; top:8px; font-size:32px; color:#dc2626;">180°C</div>
 
+    <!-- スコア -->
     <div style="position:absolute; left:285px; top:56px; font-size:18px;">
       ${scoreLeft} / 100
     </div>
@@ -115,6 +138,7 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
       ${scoreRight} / 100
     </div>
 
+    <!-- 🔵 青波 -->
     <svg style="position:absolute; left:255px; top:125px; width:70px; height:20px;"
       viewBox="0 0 80 20">
       <path stroke="#3B82A0" stroke-width="2" fill="none"
@@ -127,6 +151,7 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
       </path>
     </svg>
 
+    <!-- 🔴 赤波 -->
     <svg style="position:absolute; left:455px; top:140px; width:70px; height:20px;"
       viewBox="0 0 80 20">
       <path stroke="#dc2626" stroke-width="2" fill="none"
@@ -139,6 +164,7 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
       </path>
     </svg>
 
+    <!-- 🎯 メーター -->
     <svg viewBox="0 0 120 70"
       style="position:absolute; left:480px; top:170px; width:120px; height:70px;">
       <defs>
@@ -157,6 +183,7 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
           stroke="#111" stroke-width="2"/>
         <circle cx="60" cy="60" r="4" fill="#111"/>
       </g>
+
     </svg>
 
   </div>
@@ -185,6 +212,7 @@ app.post("/tally-pdf", async (req, res) => {
 
     const template = fs.readFileSync("template.html", "utf8");
 
+    // 🔥 完全自動計算
     const { scoreLeft, scoreRight } = calculateScores(req.body);
 
     const html = injectHtml(template, {
@@ -214,7 +242,7 @@ app.post("/tally-pdf", async (req, res) => {
 
     await browser.close();
 
-    // 🔥 追加（ここだけ新規）
+    // 保存
     fs.writeFileSync("/tmp/latest-report.pdf", pdf);
 
     res.set({
@@ -232,7 +260,7 @@ app.post("/tally-pdf", async (req, res) => {
 
 
 // =========================
-// 🔥 追加（これで直る）
+// PDF確認
 app.get("/latest-pdf", (req, res) => {
 
   const file = "/tmp/latest-report.pdf";
