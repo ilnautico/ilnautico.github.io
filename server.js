@@ -37,35 +37,30 @@ function extractFields(body) {
 
 
 // =========================
-// 🔥 評価ロジック（ここがコア）
+// 🔥 評価ロジック（触ってない）
 function evaluateMaterial(map) {
 
   let stability = 70;
   let risk = 40;
 
-  // ===== 材料 =====
   if (map["current material"]?.includes("ldpe")) {
     stability += 10;
     risk -= 5;
   }
 
-  // ===== 成形 =====
   if (map["processing method"]?.includes("film")) {
     stability -= 10;
     risk += 15;
   }
 
-  // ===== L/D =====
   if (map["l/d"]?.includes("22")) {
     stability -= 5;
   }
 
-  // ===== 問題 =====
   if (map["primary concern"]?.includes("instability")) {
     risk += 20;
   }
 
-  // ===== 最終補正 =====
   stability = clamp(stability);
   risk = clamp(risk);
 
@@ -74,14 +69,13 @@ function evaluateMaterial(map) {
 
 
 // =========================
-// 安全制御
 function clamp(val) {
   return Math.max(0, Math.min(100, val));
 }
 
 
 // =========================
-// 🔥 スコア生成（分離）
+// 🔥 スコア生成（そのまま）
 function calculateScores(body) {
 
   const map = extractFields(body);
@@ -96,7 +90,7 @@ function calculateScores(body) {
 
 
 // =========================
-// 🔥 Overlay（表示）
+// 🔥 Overlay（一切変更なし）
 function generateOverlay(scoreLeft = 80, scoreRight = 35) {
 
   const ampLeft = 4 + scoreLeft * 0.12;
@@ -121,7 +115,6 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
       ${scoreRight} / 100
     </div>
 
-    <!-- 青波 -->
     <svg style="position:absolute; left:255px; top:125px; width:70px; height:20px;"
       viewBox="0 0 80 20">
       <path stroke="#3B82A0" stroke-width="2" fill="none"
@@ -134,7 +127,6 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
       </path>
     </svg>
 
-    <!-- 赤波 -->
     <svg style="position:absolute; left:455px; top:140px; width:70px; height:20px;"
       viewBox="0 0 80 20">
       <path stroke="#dc2626" stroke-width="2" fill="none"
@@ -147,7 +139,6 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
       </path>
     </svg>
 
-    <!-- メーター -->
     <svg viewBox="0 0 120 70"
       style="position:absolute; left:480px; top:170px; width:120px; height:70px;">
       <defs>
@@ -223,6 +214,9 @@ app.post("/tally-pdf", async (req, res) => {
 
     await browser.close();
 
+    // 🔥 追加（ここだけ新規）
+    fs.writeFileSync("/tmp/latest-report.pdf", pdf);
+
     res.set({
       "Content-Type": "application/pdf",
       "Content-Disposition": "attachment; filename=report.pdf"
@@ -234,6 +228,20 @@ app.post("/tally-pdf", async (req, res) => {
     console.error(err);
     res.status(500).send("PDF generation failed");
   }
+});
+
+
+// =========================
+// 🔥 追加（これで直る）
+app.get("/latest-pdf", (req, res) => {
+
+  const file = "/tmp/latest-report.pdf";
+
+  if (!fs.existsSync(file)) {
+    return res.status(404).send("No PDF yet");
+  }
+
+  res.sendFile(file);
 });
 
 
