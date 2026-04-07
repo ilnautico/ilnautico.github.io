@@ -15,7 +15,7 @@ app.get("/", (req, res) => {
 
 
 // =========================
-// 🔥 スコア正規化（超重要：壊れない設計）
+// 🔥 スコア正規化（完全安全版）
 function normalizeScores(body) {
 
   // ① 手動テスト（最優先）
@@ -42,11 +42,20 @@ function normalizeScores(body) {
       const key = String(item?.label || item?.title || item?.key || "").toLowerCase();
       const value = item?.value;
 
-      if (key.includes("score") && key.includes("left")) {
+      // 🔥 ←ここ修正（耐性強化）
+      if (
+        key.includes("left") ||
+        key.includes("l score") ||
+        key.includes("score_left")
+      ) {
         scoreLeft = Number(value) || scoreLeft;
       }
 
-      if (key.includes("score") && key.includes("right")) {
+      if (
+        key.includes("right") ||
+        key.includes("r score") ||
+        key.includes("score_right")
+      ) {
         scoreRight = Number(value) || scoreRight;
       }
     }
@@ -205,7 +214,6 @@ app.post("/tally-pdf", async (req, res) => {
 
     const template = fs.readFileSync("template.html", "utf8");
 
-    // 🔥 ここが連動
     const { scoreLeft, scoreRight } = normalizeScores(req.body);
 
     const html = injectHtml(template, {
