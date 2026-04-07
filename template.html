@@ -520,31 +520,28 @@ body {
     <div class="viz-body">
 
       <div style="
-        position:relative;
-        width:700px;
-        height:260px;
-        margin:0 auto;
-      ">
+  position:relative;
+  width:700px;
+  margin:0 auto;
+">
 
-        <!-- 背景画像 -->
-        <img src="{{base_image}}" style="
-          width:700px;
-          height:260px;
-          display:block;
-        ">
+  <img src="{{base_image}}" style="
+    width:700px;
+    height:auto;
+    display:block;
+  ">
 
-        <!-- 動的レイヤー（土台だけ残す） -->
-        <div style="
-          position:absolute;
-          top:0;
-          left:0;
-          width:700px;
-          height:260px;
-        ">
-          {{dynamic_overlay}}
-        </div>
+  <div style="
+    position:absolute;
+    top:0;
+    left:0;
+    width:100%;
+    height:100%;
+  ">
+    {{dynamic_overlay}}
+  </div>
 
-      </div>
+</div>
 
     </div>
 
