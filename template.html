@@ -225,7 +225,14 @@ body {
 }
 .qa-dev-list li::before { content: '—'; color: var(--text-label); font-size: 10px; padding-top: 1px; flex-shrink: 0; }
 
-.viz-block { background: var(--block-light); border: 1px solid #D4E2EE; border-radius: 10px; overflow: hidden; }
+.viz-block {
+  width: 700px;
+  margin: 0 auto;
+  background: var(--block-light);
+  border: 1px solid #D4E2EE;
+  border-radius: 10px;
+  overflow: hidden;
+}
 .viz-header {
   background: linear-gradient(90deg, var(--block-mid), var(--block-deep));
   padding: 10px 20px; display: flex; align-items: center; gap: 10px;
