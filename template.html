@@ -514,115 +514,81 @@ body {
   <div class="viz-body">
 
     <!-- 描画エリア（これ1つだけ） -->
-    <div style="
-      position:relative;
-      width:700px;
-      height:260px;
-      margin:0 auto;
-    ">
+ <!-- 温度 -->
+<div style="
+  position:absolute;
+  left:235px;
+  top:8px;
+  font-size:32px;
+  color:#1f2937;
+">230°C</div>
 
-      <!-- 背景（絶対に歪まない） -->
-      <img src="{{base_image}}" style="
-        width:100%;
-        height:100%;
-        object-fit:contain;
-        display:block;
-      ">
+<div style="
+  position:absolute;
+  left:470px;
+  top:8px;
+  font-size:32px;
+  color:#dc2626;
+">180°C</div>
 
-      <!-- 🔵 青波 -->
-      <svg style="
-        position:absolute;
-        left:300px;
-        top:135px;
-        width:60px;
-        height:14px;
-      "
-      viewBox="0 0 80 20"
-      preserveAspectRatio="none">
-        <path
-          d="M0 10 Q20 2 40 10 T80 10"
-          stroke="#3B82A0"
-          stroke-width="2"
-          fill="none"
-          stroke-linecap="round">
-          <animate 
-            attributeName="d"
-            dur="1.2s"
-            repeatCount="indefinite"
-            values="
-              M0 10 Q20 2 40 10 T80 10;
-              M0 10 Q20 18 40 10 T80 10;
-              M0 10 Q20 2 40 10 T80 10"/>
-        </path>
-      </svg>
+<!-- スコア -->
+<div style="
+  position:absolute;
+  left:285px;
+  top:56px;
+  font-size:18px;
+  color:#047857;
+">80</div>
 
-      <!-- 🔴 赤波 -->
-      <svg style="
-        position:absolute;
-        left:470px;
-        top:155px;
-        width:60px;
-        height:14px;
-      "
-      viewBox="0 0 80 20"
-      preserveAspectRatio="none">
-        <path
-          d="M0 10 Q20 2 40 10 T80 10"
-          stroke="#dc2626"
-          stroke-width="2"
-          fill="none"
-          stroke-linecap="round">
-          <animate 
-            attributeName="d"
-            dur="1.2s"
-            repeatCount="indefinite"
-            values="
-              M0 10 Q20 2 40 10 T80 10;
-              M0 10 Q20 18 40 10 T80 10;
-              M0 10 Q20 2 40 10 T80 10"/>
-        </path>
-      </svg>
+<div style="
+  position:absolute;
+  left:520px;
+  top:56px;
+  font-size:18px;
+  color:#dc2626;
+">35</div>
 
-      <!-- 🎯 メーター -->
-      <svg style="
-        position:absolute;
-        left:480px;
-        top:170px;
-        width:120px;
-        height:70px;
-      "
-      viewBox="0 0 120 70">
+<!-- メーター -->
+<svg viewBox="0 0 120 70"
+     style="
+       position:absolute;
+       left:480px;
+       top:170px;
+       width:120px;
+       height:70px;
+     ">
 
-        <defs>
-          <linearGradient id="gaugeGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stop-color="#16a34a"/>
-            <stop offset="50%" stop-color="#f59e0b"/>
-            <stop offset="100%" stop-color="#dc2626"/>
-          </linearGradient>
-        </defs>
+  <defs>
+    <linearGradient id="gaugeGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#16a34a"/>
+      <stop offset="50%" stop-color="#f59e0b"/>
+      <stop offset="100%" stop-color="#dc2626"/>
+    </linearGradient>
+  </defs>
 
-        <path d="M10 60 A50 50 0 0 1 110 60"
-          fill="none"
-          stroke="#e5e7eb"
-          stroke-width="10"/>
+  <!-- 背景 -->
+  <path d="M10 60 A50 50 0 0 1 110 60"
+    fill="none"
+    stroke="#e5e7eb"
+    stroke-width="10"/>
 
-        <path d="M10 60 A50 50 0 0 1 110 60"
-          fill="none"
-          stroke="url(#gaugeGradient)"
-          stroke-width="10"
-          stroke-linecap="round"/>
+  <!-- グラデ -->
+  <path d="M10 60 A50 50 0 0 1 110 60"
+    fill="none"
+    stroke="url(#gaugeGradient)"
+    stroke-width="10"
+    stroke-linecap="round"/>
 
-        <g id="needle" transform="rotate(-20 60 60)">
-          <line x1="60" y1="60" x2="85" y2="30"
-            stroke="#111"
-            stroke-width="2"
-            stroke-linecap="round"/>
-          <circle cx="60" cy="60" r="4" fill="#111"/>
-        </g>
+  <!-- 針 -->
+  <g id="needle" transform="rotate(-20 60 60)">
+    <line x1="60" y1="60" x2="85" y2="30"
+      stroke="#111"
+      stroke-width="2"
+      stroke-linecap="round"/>
+    <circle cx="60" cy="60" r="4" fill="#111"/>
+  </g>
 
-      </svg>
-
-    </div>
+</svg>
 
     <div class="viz-caption">
       Conceptual representation — material behaviour interpretation (non-physical validation)
