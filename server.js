@@ -50,12 +50,12 @@ function generateOverlay() {
 <!-- 波（青・バブル中央） -->
 <svg style="
   position:absolute;
-  left:332px;
-  top:132px;
-  width:96px;
-  height:24px;
+  left:300px;
+  top:145px;
+  width:60px;
+  height:14px;
 "
-viewBox="0 0 96 24"
+viewBox="0 0 80 20"
 preserveAspectRatio="none"
 >
   <path
@@ -81,10 +81,10 @@ preserveAspectRatio="none"
 <!-- 波（赤） -->
 <svg style="
   position:absolute;
-  left:420px;
-  top:155px;
-  width:80px;
-  height:20px;
+ width:60px;
+height:14px;
+top:155px;
+left:470px;
   transform: translateX(-10px);
 "
 viewBox="0 0 80 20"
