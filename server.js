@@ -7,23 +7,67 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// =========================
+// ✅ ヘルスチェック
 app.get("/", (req, res) => {
   res.send("SERVER OK");
 });
 
 
 // =========================
-// 🔥 Overlay（完全連動版）
+// 🔥 スコア正規化（超重要：壊れない設計）
+function normalizeScores(body) {
+
+  // ① 手動テスト（最優先）
+  if (body.score_left !== undefined || body.score_right !== undefined) {
+    return {
+      scoreLeft: Number(body.score_left) || 80,
+      scoreRight: Number(body.score_right) || 35
+    };
+  }
+
+  // ② Tally payload 対応
+  const answers =
+    body?.data?.fields ||
+    body?.fields ||
+    body?.data?.answers ||
+    body?.answers ||
+    [];
+
+  let scoreLeft = 80;
+  let scoreRight = 35;
+
+  if (Array.isArray(answers)) {
+    for (const item of answers) {
+      const key = String(item?.label || item?.title || item?.key || "").toLowerCase();
+      const value = item?.value;
+
+      if (key.includes("score") && key.includes("left")) {
+        scoreLeft = Number(value) || scoreLeft;
+      }
+
+      if (key.includes("score") && key.includes("right")) {
+        scoreRight = Number(value) || scoreRight;
+      }
+    }
+  }
+
+  return { scoreLeft, scoreRight };
+}
+
+
+// =========================
+// 🔥 Overlay（完全連動）
 function generateOverlay(scoreLeft = 80, scoreRight = 35) {
 
-  // ===== 波ロジック =====
+  // 波ロジック
   const ampLeft = 4 + scoreLeft * 0.12;
   const ampRight = 4 + scoreRight * 0.12;
 
   const durLeft = 1.6 - scoreLeft * 0.01;
   const durRight = 1.6 - scoreRight * 0.01;
 
-  // ===== メーター角度 =====
+  // メーター
   const angle = -60 + (scoreRight / 100) * 120;
 
   return `
@@ -161,9 +205,8 @@ app.post("/tally-pdf", async (req, res) => {
 
     const template = fs.readFileSync("template.html", "utf8");
 
-    // 🔥 フォーム値取得（ここが連動）
-    const scoreLeft = Number(req.body.score_left) || 80;
-    const scoreRight = Number(req.body.score_right) || 35;
+    // 🔥 ここが連動
+    const { scoreLeft, scoreRight } = normalizeScores(req.body);
 
     const html = injectHtml(template, {
       base_image: "https://ilnautico.github.io/visual-base.png",
@@ -209,6 +252,7 @@ app.post("/tally-pdf", async (req, res) => {
 
 
 // =========================
+// PDF確認
 app.get("/latest-pdf", (req, res) => {
   const file = "/tmp/latest-report.pdf";
 
@@ -221,6 +265,7 @@ app.get("/latest-pdf", (req, res) => {
 
 
 // =========================
+// 起動
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
