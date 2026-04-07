@@ -519,114 +519,40 @@ body {
     </div>
 
     <div class="viz-body">
-
-      <!-- 🔥 これが唯一の基準 -->
+      <!-- ★ 唯一の描画エリア（これ1個だけ） -->
       <div style="
         position:relative;
         width:100%;
-height:auto;
+        max-width:700px;
+        aspect-ratio:700/260;
         margin:0 auto;
+        overflow:hidden;
       ">
 
-        <!-- 背景 -->
+        <!-- 背景（歪まない） -->
         <img src="{{base_image}}" style="
-          width:700px;
-          height:260px;
+          width:100%;
+          height:100%;
+          object-fit:contain;
           display:block;
         ">
 
-        <!-- 🔥 overlay（ここだけ） -->
+        <!-- ★ これ1個だけ（動的レイヤー） -->
         <div style="
           position:absolute;
-          top:0;
-          left:0;
-          width:700px;
-          height:260px;
+          inset:0;
         ">
-
-          <!-- 温度 -->
-          <div style="
-            position:absolute;
-            left:235px;
-            top:8px;
-            font-size:32px;
-            color:#1f2937;
-          ">230°C</div>
-
-          <div style="
-            position:absolute;
-            left:470px;
-            top:8px;
-            font-size:32px;
-            color:#dc2626;
-          ">180°C</div>
-
-          <!-- スコア -->
-          <div style="
-            position:absolute;
-            left:285px;
-            top:56px;
-            font-size:18px;
-            color:#047857;
-          ">80</div>
-
-          <div style="
-            position:absolute;
-            left:520px;
-            top:56px;
-            font-size:18px;
-            color:#dc2626;
-          ">35</div>
-
-          <!-- 波 -->
-          <svg style="
-            position:absolute;
-            left:290px;
-            top:150px;
-            width:80px;
-            height:24px;
-          ">
-            <path d="M0 12 Q20 0 40 12 T80 12"
-              stroke="#3B82A0"
-              stroke-width="2.5"
-              fill="none"/>
-          </svg>
-
-          <svg style="
-            position:absolute;
-            left:420px;
-            top:150px;
-            width:80px;
-            height:24px;
-          ">
-            <path d="M0 12 Q20 0 40 12 T80 12"
-              stroke="#dc2626"
-              stroke-width="2.5"
-              fill="none"/>
-          </svg>
-
-          <!-- メーター -->
-          <div style="
-            position:absolute;
-            left:450px;
-            top:180px;
-            width:110px;
-          ">
-            <svg viewBox="0 0 120 60">
-              <path d="M10 50 A50 50 0 0 1 110 50"
-                fill="none"
-                stroke="#ddd"
-                stroke-width="10"/>
-              <line x1="60" y1="50" x2="80" y2="20"
-                stroke="#111"
-                stroke-width="2"/>
-            </svg>
-          </div>
-
+          {{dynamic_overlay}}
         </div>
-      </div>
 
+      </div>
     </div>
+
+    <div class="viz-caption">
+      Conceptual representation — material behaviour interpretation (non-physical validation)
+    </div>
+
+    {{visual_description}}
   </div>
 </div>
     <!-- 07 Recommended Next Step -->
