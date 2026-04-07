@@ -511,8 +511,9 @@ body {
 <!-- 06 Conceptual Visualization -->
 <!-- ===== SECTION 06 完全版 ===== -->
 
-<div id="viz-root"
-     data-score="35">
+<!-- ===== SECTION 06 完全版 ===== -->
+
+<div id="viz-root" data-score="35">
 
   <div style="
     position:relative;
@@ -522,13 +523,13 @@ body {
     overflow:hidden;
   ">
 
-    <!-- 背景（絶対固定） -->
-   <img src="{{base_image}}" style="
-  width:100%;
-  height:100%;
-  object-fit:contain;
-  display:block;
-">
+    <!-- 背景（完全フィット＆歪みなし） -->
+    <img src="{{base_image}}" style="
+      width:100%;
+      height:100%;
+      object-fit:cover;
+      display:block;
+    ">
 
     <!-- ===== 温度 ===== -->
     <div style="position:absolute; left:235px; top:8px; font-size:32px; color:#1f2937;">
@@ -555,15 +556,12 @@ body {
       preserveAspectRatio="xMidYMid meet">
 
       <g transform="translate(40,10)">
-        <path
-          d="M-40 0 Q-20 -6 0 0 T40 0"
+        <path d="M-40 0 Q-20 -6 0 0 T40 0"
           stroke="#3B82A0"
           stroke-width="2"
           fill="none"
           stroke-linecap="round">
-
-          <animate
-            attributeName="d"
+          <animate attributeName="d"
             dur="1.2s"
             repeatCount="indefinite"
             values="
@@ -581,15 +579,12 @@ body {
       preserveAspectRatio="xMidYMid meet">
 
       <g transform="translate(40,10)">
-        <path
-          d="M-40 0 Q-20 -6 0 0 T40 0"
+        <path d="M-40 0 Q-20 -6 0 0 T40 0"
           stroke="#dc2626"
           stroke-width="2"
           fill="none"
           stroke-linecap="round">
-
-          <animate
-            attributeName="d"
+          <animate attributeName="d"
             dur="1.2s"
             repeatCount="indefinite"
             values="
@@ -612,17 +607,20 @@ body {
         </linearGradient>
       </defs>
 
+      <!-- 背景 -->
       <path d="M10 60 A50 50 0 0 1 110 60"
         fill="none"
         stroke="#e5e7eb"
         stroke-width="10"/>
 
+      <!-- グラデ -->
       <path d="M10 60 A50 50 0 0 1 110 60"
         fill="none"
         stroke="url(#gaugeGradient)"
         stroke-width="10"
         stroke-linecap="round"/>
 
+      <!-- 針 -->
       <g id="needle" transform="rotate(-20 60 60)">
         <line x1="60" y1="60" x2="85" y2="30"
           stroke="#111"
@@ -636,7 +634,7 @@ body {
   </div>
 </div>
 
-<!-- ===== 動的制御 ===== -->
+<!-- ===== 動的ロジック ===== -->
 <script>
   const root = document.getElementById('viz-root');
   const score = Number(root.dataset.score || 0);
@@ -646,7 +644,7 @@ body {
   document.getElementById("needle")
     .setAttribute("transform", `rotate(${angle} 60 60)`);
 
-  // ===== 波制御 =====
+  // ===== 波 =====
   const amp = 2 + (score / 100) * 8;
   const dur = 1.6 - (score / 100) * 0.8;
 
