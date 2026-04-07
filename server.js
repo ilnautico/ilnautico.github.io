@@ -8,125 +8,125 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // =========================
-// ✅ ヘルスチェック
+// ヘルスチェック
 app.get("/", (req, res) => {
   res.send("SERVER OK");
 });
 
 
 // =========================
-// 🔥 スコア正規化（完全安全版）
-function normalizeScores(body) {
+// 🔥 フィールド抽出（壊れない）
+function extractFields(body) {
 
-  // ① 手動テスト（最優先）
-  if (body.score_left !== undefined || body.score_right !== undefined) {
-    return {
-      scoreLeft: Number(body.score_left) || 80,
-      scoreRight: Number(body.score_right) || 35
-    };
-  }
-
-  // ② Tally payload 対応
   const answers =
     body?.data?.fields ||
     body?.fields ||
-    body?.data?.answers ||
-    body?.answers ||
     [];
 
-  let scoreLeft = 80;
-  let scoreRight = 35;
+  const map = {};
 
-  if (Array.isArray(answers)) {
-    for (const item of answers) {
-      const key = String(item?.label || item?.title || item?.key || "").toLowerCase();
-      const value = item?.value;
+  for (const item of answers) {
+    const key = String(item?.label || "").toLowerCase();
+    const value = String(item?.value || "").toLowerCase();
 
-      // 🔥 ←ここ修正（耐性強化）
-      if (
-        key.includes("left") ||
-        key.includes("l score") ||
-        key.includes("score_left")
-      ) {
-        scoreLeft = Number(value) || scoreLeft;
-      }
-
-      if (
-        key.includes("right") ||
-        key.includes("r score") ||
-        key.includes("score_right")
-      ) {
-        scoreRight = Number(value) || scoreRight;
-      }
-    }
+    map[key] = value;
   }
 
-  return { scoreLeft, scoreRight };
+  return map;
 }
 
 
 // =========================
-// 🔥 Overlay（完全連動）
+// 🔥 評価ロジック（ここがコア）
+function evaluateMaterial(map) {
+
+  let stability = 70;
+  let risk = 40;
+
+  // ===== 材料 =====
+  if (map["current material"]?.includes("ldpe")) {
+    stability += 10;
+    risk -= 5;
+  }
+
+  // ===== 成形 =====
+  if (map["processing method"]?.includes("film")) {
+    stability -= 10;
+    risk += 15;
+  }
+
+  // ===== L/D =====
+  if (map["l/d"]?.includes("22")) {
+    stability -= 5;
+  }
+
+  // ===== 問題 =====
+  if (map["primary concern"]?.includes("instability")) {
+    risk += 20;
+  }
+
+  // ===== 最終補正 =====
+  stability = clamp(stability);
+  risk = clamp(risk);
+
+  return { stability, risk };
+}
+
+
+// =========================
+// 安全制御
+function clamp(val) {
+  return Math.max(0, Math.min(100, val));
+}
+
+
+// =========================
+// 🔥 スコア生成（分離）
+function calculateScores(body) {
+
+  const map = extractFields(body);
+
+  const result = evaluateMaterial(map);
+
+  return {
+    scoreLeft: result.stability,
+    scoreRight: result.risk
+  };
+}
+
+
+// =========================
+// 🔥 Overlay（表示）
 function generateOverlay(scoreLeft = 80, scoreRight = 35) {
 
-  // 波ロジック
   const ampLeft = 4 + scoreLeft * 0.12;
   const ampRight = 4 + scoreRight * 0.12;
 
   const durLeft = 1.6 - scoreLeft * 0.01;
   const durRight = 1.6 - scoreRight * 0.01;
 
-  // メーター
   const angle = -60 + (scoreRight / 100) * 120;
 
   return `
-  <div style="
-    position:absolute;
-    top:0;
-    left:0;
-    width:700px;
-    height:260px;
-    pointer-events:none;
-    z-index:10;
-  ">
+  <div style="position:absolute;top:0;left:0;width:700px;height:260px;pointer-events:none;z-index:10;">
 
-    <!-- 温度 -->
-    <div style="position:absolute; left:235px; top:8px; font-size:32px; color:#1f2937;">
-      230°C
-    </div>
+    <div style="position:absolute; left:235px; top:8px; font-size:32px;">230°C</div>
+    <div style="position:absolute; left:470px; top:8px; font-size:32px; color:#dc2626;">180°C</div>
 
-    <div style="position:absolute; left:470px; top:8px; font-size:32px; color:#dc2626;">
-      180°C
-    </div>
-
-    <!-- スコア -->
-    <div style="position:absolute; left:285px; top:56px; font-size:18px; color:#047857;">
-      ${scoreLeft}
+    <div style="position:absolute; left:285px; top:56px; font-size:18px;">
+      ${scoreLeft} / 100
     </div>
 
     <div style="position:absolute; left:520px; top:56px; font-size:18px; color:#dc2626;">
-      ${scoreRight}
+      ${scoreRight} / 100
     </div>
 
-    <!-- 🔵 青波 -->
-    <svg style="
-      position:absolute;
-      left:255px;
-      top:125px;
-      width:70px;
-      height:20px;
-    "
-    viewBox="0 0 80 20"
-    preserveAspectRatio="xMidYMid meet">
-      <path
-        stroke="#3B82A0"
-        stroke-width="2"
-        fill="none"
-        stroke-linecap="round"
+    <!-- 青波 -->
+    <svg style="position:absolute; left:255px; top:125px; width:70px; height:20px;"
+      viewBox="0 0 80 20">
+      <path stroke="#3B82A0" stroke-width="2" fill="none"
         d="M0 10 Q20 ${10-ampLeft} 40 10 T80 10">
-        <animate attributeName="d"
-          dur="${durLeft}s"
-          repeatCount="indefinite"
+        <animate attributeName="d" dur="${durLeft}s" repeatCount="indefinite"
           values="
             M0 10 Q20 ${10-ampLeft} 40 10 T80 10;
             M0 10 Q20 ${10+ampLeft} 40 10 T80 10;
@@ -134,25 +134,12 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
       </path>
     </svg>
 
-    <!-- 🔴 赤波 -->
-    <svg style="
-      position:absolute;
-      left:455px;
-      top:140px;
-      width:70px;
-      height:20px;
-    "
-    viewBox="0 0 80 20"
-    preserveAspectRatio="xMidYMid meet">
-      <path
-        stroke="#dc2626"
-        stroke-width="2"
-        fill="none"
-        stroke-linecap="round"
+    <!-- 赤波 -->
+    <svg style="position:absolute; left:455px; top:140px; width:70px; height:20px;"
+      viewBox="0 0 80 20">
+      <path stroke="#dc2626" stroke-width="2" fill="none"
         d="M0 10 Q20 ${10-ampRight} 40 10 T80 10">
-        <animate attributeName="d"
-          dur="${durRight}s"
-          repeatCount="indefinite"
+        <animate attributeName="d" dur="${durRight}s" repeatCount="indefinite"
           values="
             M0 10 Q20 ${10-ampRight} 40 10 T80 10;
             M0 10 Q20 ${10+ampRight} 40 10 T80 10;
@@ -160,12 +147,11 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
       </path>
     </svg>
 
-    <!-- 🎯 メーター -->
+    <!-- メーター -->
     <svg viewBox="0 0 120 70"
       style="position:absolute; left:480px; top:170px; width:120px; height:70px;">
-
       <defs>
-        <linearGradient id="gaugeGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+        <linearGradient id="gaugeGradient" x1="0%" x2="100%">
           <stop offset="0%" stop-color="#16a34a"/>
           <stop offset="50%" stop-color="#f59e0b"/>
           <stop offset="100%" stop-color="#dc2626"/>
@@ -173,19 +159,13 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
       </defs>
 
       <path d="M10 60 A50 50 0 0 1 110 60"
-        fill="none"
-        stroke="url(#gaugeGradient)"
-        stroke-width="10"
-        stroke-linecap="round"/>
+        fill="none" stroke="url(#gaugeGradient)" stroke-width="10"/>
 
       <g transform="rotate(${angle} 60 60)">
         <line x1="60" y1="60" x2="85" y2="30"
-          stroke="#111"
-          stroke-width="2"
-          stroke-linecap="round"/>
+          stroke="#111" stroke-width="2"/>
         <circle cx="60" cy="60" r="4" fill="#111"/>
       </g>
-
     </svg>
 
   </div>
@@ -214,7 +194,7 @@ app.post("/tally-pdf", async (req, res) => {
 
     const template = fs.readFileSync("template.html", "utf8");
 
-    const { scoreLeft, scoreRight } = normalizeScores(req.body);
+    const { scoreLeft, scoreRight } = calculateScores(req.body);
 
     const html = injectHtml(template, {
       base_image: "https://ilnautico.github.io/visual-base.png",
@@ -243,8 +223,6 @@ app.post("/tally-pdf", async (req, res) => {
 
     await browser.close();
 
-    fs.writeFileSync("/tmp/latest-report.pdf", pdf);
-
     res.set({
       "Content-Type": "application/pdf",
       "Content-Disposition": "attachment; filename=report.pdf"
@@ -253,22 +231,9 @@ app.post("/tally-pdf", async (req, res) => {
     res.send(pdf);
 
   } catch (err) {
-    console.error("❌ ERROR:", err);
+    console.error(err);
     res.status(500).send("PDF generation failed");
   }
-});
-
-
-// =========================
-// PDF確認
-app.get("/latest-pdf", (req, res) => {
-  const file = "/tmp/latest-report.pdf";
-
-  if (!fs.existsSync(file)) {
-    return res.status(404).send("No PDF yet");
-  }
-
-  res.sendFile(file);
 });
 
 
