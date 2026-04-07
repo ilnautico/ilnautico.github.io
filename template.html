@@ -509,218 +509,163 @@ body {
 <!-- 06 Conceptual Visualization -->
 <!-- 06 Conceptual Visualization -->
 <!-- 06 Conceptual Visualization -->
-<div class="section">
-  <div class="section-header">
-    <span class="section-num">06</span>
-    <span class="section-title">Conceptual Visualization</span>
-  </div>
+<!-- ===== SECTION 06 完全版 ===== -->
 
-  <div class="viz-block">
-    <div class="viz-header">
-      <span class="viz-header-text">Visual Description — Indicative Only</span>
+<div id="viz-root"
+     data-score="35">
+
+  <div style="
+    position:relative;
+    width:700px;
+    height:260px;
+    margin:0 auto;
+    overflow:hidden;
+  ">
+
+    <!-- 背景（絶対固定） -->
+    <img src="{{base_image}}" style="
+      width:700px;
+      height:260px;
+      display:block;
+    ">
+
+    <!-- ===== 温度 ===== -->
+    <div style="position:absolute; left:235px; top:8px; font-size:32px; color:#1f2937;">
+      230°C
     </div>
 
-    <div class="viz-body">
-
-      <!-- 🎯 描画エリア -->
-      <div style="
-        position:relative;
-        width:700px;
-        height:260px;
-        margin:0 auto;
-      ">
-
-        <!-- 背景（絶対維持） -->
-        <img src="{{base_image}}" style="
-          width:100%;
-          height:100%;
-          object-fit:contain;
-          display:block;
-        ">
-
-        <!-- ===== 温度 ===== -->
-        <div style="
-          position:absolute;
-          left:235px;
-          top:8px;
-          font-size:32px;
-          color:#1f2937;
-        ">230°C</div>
-
-        <div style="
-          position:absolute;
-          left:470px;
-          top:8px;
-          font-size:32px;
-          color:#dc2626;
-        ">180°C</div>
-
-        <!-- ===== スコア ===== -->
-        <div style="
-          position:absolute;
-          left:285px;
-          top:56px;
-          font-size:18px;
-          color:#047857;
-        ">80</div>
-
-        <div style="
-          position:absolute;
-          left:520px;
-          top:56px;
-          font-size:18px;
-          color:#dc2626;
-        ">35</div>
-
-        <!-- ===== 青波 ===== -->
-       <svg style="
-  position:absolute;
-  left:305px;
-  top:125px;
-  width:70px;
-  height:18px;
-"
-viewBox="0 0 80 20"
-preserveAspectRatio="xMidYMid meet">
-
-  <g transform="translate(40,10)">
-    <path
-      d="M-40 0 Q-20 -6 0 0 T40 0"
-      stroke="#3B82A0"
-      stroke-width="2"
-      fill="none"
-      stroke-linecap="round">
-      <animate
-        attributeName="d"
-        dur="1.2s"
-        repeatCount="indefinite"
-        values="
-          M-40 0 Q-20 -6 0 0 T40 0;
-          M-40 0 Q-20 6 0 0 T40 0;
-          M-40 0 Q-20 -6 0 0 T40 0"/>
-    </path>
-  </g>
-</svg>
-        <!-- ===== 赤波 ===== -->
-        <svg style="
-  position:absolute;
-  left:455px;
-  top:140px;
-  width:65px;
-  height:18px;
-"
-viewBox="0 0 80 20"
-preserveAspectRatio="xMidYMid meet">
-
-  <!-- 中央基準 -->
-  <g transform="translate(40,10)">
-    <path
-      d="M-40 0 Q-20 -6 0 0 T40 0"
-      stroke="#dc2626"
-      stroke-width="2"
-      fill="none"
-      stroke-linecap="round">
-
-      <animate
-        attributeName="d"
-        dur="1.2s"
-        repeatCount="indefinite"
-        values="
-          M-40 0 Q-20 -6 0 0 T40 0;
-          M-40 0 Q-20 6 0 0 T40 0;
-          M-40 0 Q-20 -6 0 0 T40 0
-        "/>
-
-    </path>
-  </g>
-</svg>
-
-        <!-- ===== メーター ===== -->
-        <svg viewBox="0 0 120 70"
-             style="
-               position:absolute;
-               left:480px;
-               top:170px;
-               width:120px;
-               height:70px;
-             ">
-
-          <defs>
-            <linearGradient id="gaugeGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stop-color="#16a34a"/>
-              <stop offset="50%" stop-color="#f59e0b"/>
-              <stop offset="100%" stop-color="#dc2626"/>
-            </linearGradient>
-          </defs>
-
-          <path d="M10 60 A50 50 0 0 1 110 60"
-            fill="none"
-            stroke="#e5e7eb"
-            stroke-width="10"/>
-
-          <path d="M10 60 A50 50 0 0 1 110 60"
-            fill="none"
-            stroke="url(#gaugeGradient)"
-            stroke-width="10"
-            stroke-linecap="round"/>
-
-          <g id="needle">
-            <line x1="60" y1="60" x2="85" y2="30"
-              stroke="#111"
-              stroke-width="2"
-              stroke-linecap="round"/>
-            <circle cx="60" cy="60" r="4" fill="#111"/>
-          </g>
-
-        </svg>
-
-      </div>
-
-      <div class="viz-caption">
-        Conceptual representation — material behaviour interpretation (non-physical validation)
-      </div>
-
-      {{visual_description}}
-
+    <div style="position:absolute; left:470px; top:8px; font-size:32px; color:#dc2626;">
+      180°C
     </div>
+
+    <!-- ===== スコア ===== -->
+    <div style="position:absolute; left:285px; top:56px; font-size:18px; color:#047857;">
+      80
+    </div>
+
+    <div style="position:absolute; left:520px; top:56px; font-size:18px; color:#dc2626;">
+      35
+    </div>
+
+    <!-- ===== 青波（中央固定） ===== -->
+    <svg id="wave-blue"
+      style="position:absolute; left:305px; top:125px; width:70px; height:18px;"
+      viewBox="0 0 80 20"
+      preserveAspectRatio="xMidYMid meet">
+
+      <g transform="translate(40,10)">
+        <path
+          d="M-40 0 Q-20 -6 0 0 T40 0"
+          stroke="#3B82A0"
+          stroke-width="2"
+          fill="none"
+          stroke-linecap="round">
+
+          <animate
+            attributeName="d"
+            dur="1.2s"
+            repeatCount="indefinite"
+            values="
+              M-40 0 Q-20 -6 0 0 T40 0;
+              M-40 0 Q-20 6 0 0 T40 0;
+              M-40 0 Q-20 -6 0 0 T40 0"/>
+        </path>
+      </g>
+    </svg>
+
+    <!-- ===== 赤波（中央固定） ===== -->
+    <svg id="wave-red"
+      style="position:absolute; left:455px; top:140px; width:65px; height:18px;"
+      viewBox="0 0 80 20"
+      preserveAspectRatio="xMidYMid meet">
+
+      <g transform="translate(40,10)">
+        <path
+          d="M-40 0 Q-20 -6 0 0 T40 0"
+          stroke="#dc2626"
+          stroke-width="2"
+          fill="none"
+          stroke-linecap="round">
+
+          <animate
+            attributeName="d"
+            dur="1.2s"
+            repeatCount="indefinite"
+            values="
+              M-40 0 Q-20 -6 0 0 T40 0;
+              M-40 0 Q-20 6 0 0 T40 0;
+              M-40 0 Q-20 -6 0 0 T40 0"/>
+        </path>
+      </g>
+    </svg>
+
+    <!-- ===== メーター ===== -->
+    <svg viewBox="0 0 120 70"
+         style="position:absolute; left:480px; top:170px; width:120px; height:70px;">
+
+      <defs>
+        <linearGradient id="gaugeGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stop-color="#16a34a"/>
+          <stop offset="50%" stop-color="#f59e0b"/>
+          <stop offset="100%" stop-color="#dc2626"/>
+        </linearGradient>
+      </defs>
+
+      <path d="M10 60 A50 50 0 0 1 110 60"
+        fill="none"
+        stroke="#e5e7eb"
+        stroke-width="10"/>
+
+      <path d="M10 60 A50 50 0 0 1 110 60"
+        fill="none"
+        stroke="url(#gaugeGradient)"
+        stroke-width="10"
+        stroke-linecap="round"/>
+
+      <g id="needle" transform="rotate(-20 60 60)">
+        <line x1="60" y1="60" x2="85" y2="30"
+          stroke="#111"
+          stroke-width="2"
+          stroke-linecap="round"/>
+        <circle cx="60" cy="60" r="4" fill="#111"/>
+      </g>
+
+    </svg>
+
   </div>
 </div>
 
-<!-- 🔥 自動連動ロジック -->
+<!-- ===== 動的制御 ===== -->
 <script>
-function generateWave(score){
-  const amp = score / 10;
-  return `
-    M0 10 Q20 ${10 - amp} 40 10 T80 10;
-    M0 10 Q20 ${10 + amp} 40 10 T80 10;
-    M0 10 Q20 ${10 - amp} 40 10 T80 10
-  `;
-}
+  const root = document.getElementById('viz-root');
+  const score = Number(root.dataset.score || 0);
 
-function updateVisual(score){
+  // ===== メーター =====
+  const angle = -60 + (score / 100) * 120;
+  document.getElementById("needle")
+    .setAttribute("transform", `rotate(${angle} 60 60)`);
 
-  // メーター
-  const needle = document.querySelector("#needle");
-  if(needle){
-    const angle = -60 + (score / 100) * 120;
-    needle.setAttribute("transform", `rotate(${angle} 60 60)`);
-  }
+  // ===== 波制御 =====
+  const amp = 2 + (score / 100) * 8;
+  const dur = 1.6 - (score / 100) * 0.8;
 
-  // 青波
-  const blue = document.querySelector("#blueWave");
-  if(blue){
-    blue.setAttribute("values", generateWave(score));
-  }
+  const blueAnim = document.querySelector('#wave-blue animate');
+  const redAnim  = document.querySelector('#wave-red animate');
 
-  // 赤波
-  const red = document.querySelector("#redWave");
-  if(red){
-    red.setAttribute("values", generateWave(100 - score));
-  }
-}
+  blueAnim.setAttribute("dur", dur + "s");
+  redAnim.setAttribute("dur", dur + "s");
 
-// 初期表示
-updateVisual(80);
+  blueAnim.setAttribute("values", `
+    M-40 0 Q-20 ${-amp} 0 0 T40 0;
+    M-40 0 Q-20 ${amp} 0 0 T40 0;
+    M-40 0 Q-20 ${-amp} 0 0 T40 0
+  `);
+
+  redAnim.setAttribute("values", `
+    M-40 0 Q-20 ${-amp} 0 0 T40 0;
+    M-40 0 Q-20 ${amp} 0 0 T40 0;
+    M-40 0 Q-20 ${-amp} 0 0 T40 0
+  `);
 </script>
     <!-- 07 Recommended Next Step -->
     <div class="section">
