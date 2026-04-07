@@ -53,6 +53,7 @@ function generateOverlay() {
   top:155px;
   width:80px;
   height:20px;
+  transform: translateX(10px);
 "
 viewBox="0 0 80 20"
 preserveAspectRatio="none"
@@ -84,6 +85,7 @@ preserveAspectRatio="none"
   top:155px;
   width:80px;
   height:20px;
+  transform: translateX(-10px);
 "
 viewBox="0 0 80 20"
 preserveAspectRatio="none"
