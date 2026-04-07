@@ -79,7 +79,7 @@ function generateOverlay(score) {
     <!-- 青波 -->
     <svg style="
   position:absolute;
-  + left:270px;
+ + left:255px;
 + top:125px;
   width:70px;
   height:20px;
