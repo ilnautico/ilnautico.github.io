@@ -1,11 +1,16 @@
+
 import express from "express";
 import puppeteer from "puppeteer";
 import fs from "fs";
 
 const app = express();
 
+// =========================
+// 🔥 ここが最重要（Tally対策）
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(express.text({ type: "*/*" })); // ← これ追加
+
 
 // =========================
 // ヘルスチェック
@@ -15,7 +20,7 @@ app.get("/", (req, res) => {
 
 
 // =========================
-// 🔥 安全フィールド取得（これが核心）
+// 🔥 安全フィールド取得
 function getValue(fields, keyword) {
 
   for (const item of fields) {
@@ -37,7 +42,7 @@ function getValue(fields, keyword) {
 
 
 // =========================
-// 🔥 スコア算出（完全連動）
+// 🔥 スコア算出
 function calculateScores(body) {
 
   const fields =
@@ -53,29 +58,24 @@ function calculateScores(body) {
   let stability = 70;
   let risk = 40;
 
-  // 材料
   if (currentMaterial.includes("ldpe")) {
     stability += 10;
     risk -= 5;
   }
 
-  // 成形
   if (processing.includes("film")) {
     stability -= 10;
     risk += 15;
   }
 
-  // L/D
   if (ld.includes("22")) {
     stability -= 5;
   }
 
-  // 問題
   if (concern.includes("instability")) {
     risk += 20;
   }
 
-  // 範囲制限
   stability = Math.max(0, Math.min(100, stability));
   risk = Math.max(0, Math.min(100, risk));
 
@@ -87,7 +87,7 @@ function calculateScores(body) {
 
 
 // =========================
-// 🔥 Overlay（一切変更なし）
+// 🔥 Overlay（触ってない）
 function generateOverlay(scoreLeft = 80, scoreRight = 35) {
 
   const ampLeft = 4 + scoreLeft * 0.12;
@@ -101,11 +101,9 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
   return `
   <div style="position:absolute;top:0;left:0;width:700px;height:260px;pointer-events:none;z-index:10;">
 
-    <!-- 温度 -->
     <div style="position:absolute; left:235px; top:8px; font-size:32px;">230°C</div>
     <div style="position:absolute; left:470px; top:8px; font-size:32px; color:#dc2626;">180°C</div>
 
-    <!-- スコア -->
     <div style="position:absolute; left:285px; top:56px; font-size:18px;">
       ${scoreLeft}
     </div>
@@ -182,14 +180,26 @@ function injectHtml(template, data) {
 
 
 // =========================
-// PDF生成
+// 🔥 PDF生成（ここ修正）
 app.post("/tally-pdf", async (req, res) => {
   try {
 
+    // 🔥 body補正（Tally対策）
+    let parsed;
+
+    if (typeof req.body === "string") {
+      try {
+        parsed = JSON.parse(req.body);
+      } catch {
+        parsed = {};
+      }
+    } else {
+      parsed = req.body;
+    }
+
     const template = fs.readFileSync("template.html", "utf8");
 
-    // 🔥 完全連動ここ
-    const { scoreLeft, scoreRight } = calculateScores(req.body);
+    const { scoreLeft, scoreRight } = calculateScores(parsed);
 
     const html = injectHtml(template, {
       base_image: "https://ilnautico.github.io/visual-base.png",
@@ -218,7 +228,6 @@ app.post("/tally-pdf", async (req, res) => {
 
     await browser.close();
 
-    // 保存（/latest-pdf用）
     fs.writeFileSync("/tmp/latest-report.pdf", pdf);
 
     res.set({
