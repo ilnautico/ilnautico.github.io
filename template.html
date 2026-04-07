@@ -507,8 +507,7 @@ body {
 <!-- 06 Conceptual Visualization -->
 <!-- 06 Conceptual Visualization -->
 <!-- 06 Conceptual Visualization -->
-<!-- 06 Conceptual Visualization -->
-<!-- ===== SECTION 06 完全版 ===== -->
+<<!-- ===== SECTION 06 FINAL ===== -->
 
 <div id="viz-root" data-score="35">
 
@@ -520,12 +519,11 @@ body {
     overflow:hidden;
   ">
 
-    <!-- 背景（自然フィット＋ズーム調整済） -->
+    <!-- 背景（完全修正済：拡大しない） -->
     <img src="{{base_image}}" style="
       width:100%;
       height:100%;
-      object-fit:cover;
-      object-position:center 60%;
+      object-fit:contain;
       display:block;
     ">
 
@@ -547,50 +545,48 @@ body {
       35
     </div>
 
-    <!-- ===== 青波（中央調整済） ===== -->
+    <!-- ===== 青波（完全中央） ===== -->
     <svg id="wave-blue"
-      style="position:absolute; left:320px; top:125px; width:70px; height:18px;"
+      style="position:absolute; left:300px; top:125px; width:70px; height:18px;"
       viewBox="0 0 80 20"
       preserveAspectRatio="xMidYMid meet">
 
-      <g transform="translate(40,10)">
-        <path d="M-40 0 Q-20 -6 0 0 T40 0"
-          stroke="#3B82A0"
-          stroke-width="2"
-          fill="none"
-          stroke-linecap="round">
-          <animate attributeName="d"
-            dur="1.2s"
-            repeatCount="indefinite"
-            values="
-              M-40 0 Q-20 -6 0 0 T40 0;
-              M-40 0 Q-20 6 0 0 T40 0;
-              M-40 0 Q-20 -6 0 0 T40 0"/>
-        </path>
-      </g>
+      <path d="M0 10 Q20 2 40 10 T80 10"
+        stroke="#3B82A0"
+        stroke-width="2"
+        fill="none"
+        stroke-linecap="round">
+
+        <animate attributeName="d"
+          dur="1.2s"
+          repeatCount="indefinite"
+          values="
+            M0 10 Q20 2 40 10 T80 10;
+            M0 10 Q20 18 40 10 T80 10;
+            M0 10 Q20 2 40 10 T80 10"/>
+      </path>
     </svg>
 
-    <!-- ===== 赤波（中央調整済） ===== -->
+    <!-- ===== 赤波（完全中央） ===== -->
     <svg id="wave-red"
-      style="position:absolute; left:470px; top:135px; width:65px; height:18px;"
+      style="position:absolute; left:460px; top:135px; width:65px; height:18px;"
       viewBox="0 0 80 20"
       preserveAspectRatio="xMidYMid meet">
 
-      <g transform="translate(40,10)">
-        <path d="M-40 0 Q-20 -6 0 0 T40 0"
-          stroke="#dc2626"
-          stroke-width="2"
-          fill="none"
-          stroke-linecap="round">
-          <animate attributeName="d"
-            dur="1.2s"
-            repeatCount="indefinite"
-            values="
-              M-40 0 Q-20 -6 0 0 T40 0;
-              M-40 0 Q-20 6 0 0 T40 0;
-              M-40 0 Q-20 -6 0 0 T40 0"/>
-        </path>
-      </g>
+      <path d="M0 10 Q20 2 40 10 T80 10"
+        stroke="#dc2626"
+        stroke-width="2"
+        fill="none"
+        stroke-linecap="round">
+
+        <animate attributeName="d"
+          dur="1.2s"
+          repeatCount="indefinite"
+          values="
+            M0 10 Q20 2 40 10 T80 10;
+            M0 10 Q20 18 40 10 T80 10;
+            M0 10 Q20 2 40 10 T80 10"/>
+      </path>
     </svg>
 
     <!-- ===== メーター ===== -->
@@ -629,7 +625,7 @@ body {
   </div>
 </div>
 
-<!-- ===== 動的ロジック ===== -->
+<!-- ===== 動作ロジック ===== -->
 <script>
   const root = document.getElementById('viz-root');
   const score = Number(root.dataset.score || 0);
@@ -650,15 +646,15 @@ body {
   redAnim.setAttribute("dur", dur + "s");
 
   blueAnim.setAttribute("values", `
-    M-40 0 Q-20 ${-amp} 0 0 T40 0;
-    M-40 0 Q-20 ${amp} 0 0 T40 0;
-    M-40 0 Q-20 ${-amp} 0 0 T40 0
+    M0 10 Q20 ${10-amp} 40 10 T80 10;
+    M0 10 Q20 ${10+amp} 40 10 T80 10;
+    M0 10 Q20 ${10-amp} 40 10 T80 10
   `);
 
   redAnim.setAttribute("values", `
-    M-40 0 Q-20 ${-amp} 0 0 T40 0;
-    M-40 0 Q-20 ${amp} 0 0 T40 0;
-    M-40 0 Q-20 ${-amp} 0 0 T40 0
+    M0 10 Q20 ${10-amp} 40 10 T80 10;
+    M0 10 Q20 ${10+amp} 40 10 T80 10;
+    M0 10 Q20 ${10-amp} 40 10 T80 10
   `);
 </script>
     <!-- 07 Recommended Next Step -->
