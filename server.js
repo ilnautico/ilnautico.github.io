@@ -51,7 +51,7 @@ function generateOverlay() {
 <svg style="
   position:absolute;
   left:300px;
-  top:145px;
+  top:135px;
   width:60px;
   height:14px;
 "
