@@ -78,52 +78,64 @@ function generateOverlay(score) {
 
     <!-- 青波 -->
     <svg style="
-      position:absolute;
-      left:300px;
-      top:135px;
-      width:60px;
-      height:14px;
-    ">
-      <path
-        stroke="#3B82A0"
-        stroke-width="2"
-        fill="none"
-        d="M0 10 Q20 ${10-amp} 40 10 T80 10">
-        <animate attributeName="d"
-          dur="${dur}s"
-          repeatCount="indefinite"
-          values="
-            M0 10 Q20 ${10-amp} 40 10 T80 10;
-            M0 10 Q20 ${10+amp} 40 10 T80 10;
-            M0 10 Q20 ${10-amp} 40 10 T80 10
-          "/>
-      </path>
-    </svg>
-
+  position:absolute;
+  left:300px;
+  top:135px;
+  width:70px;
+  height:20px;
+"
+viewBox="0 0 80 20"
+preserveAspectRatio="xMidYMid meet"
+>
+  <path
+    stroke="#3B82A0"
+    stroke-width="2"
+    fill="none"
+    stroke-linecap="round"
+    d="M0 10 Q20 ${10-amp} 40 10 T80 10"
+  >
+    <animate 
+      attributeName="d"
+      dur="${dur}s"
+      repeatCount="indefinite"
+      values="
+        M0 10 Q20 ${10-amp} 40 10 T80 10;
+        M0 10 Q20 ${10+amp} 40 10 T80 10;
+        M0 10 Q20 ${10-amp} 40 10 T80 10
+      "
+    />
+  </path>
+</svg>
     <!-- 赤波 -->
     <svg style="
-      position:absolute;
-      left:470px;
-      top:155px;
-      width:60px;
-      height:14px;
-    ">
-      <path
-        stroke="#dc2626"
-        stroke-width="2"
-        fill="none"
-        d="M0 10 Q20 ${10-amp} 40 10 T80 10">
-        <animate attributeName="d"
-          dur="${dur}s"
-          repeatCount="indefinite"
-          values="
-            M0 10 Q20 ${10-amp} 40 10 T80 10;
-            M0 10 Q20 ${10+amp} 40 10 T80 10;
-            M0 10 Q20 ${10-amp} 40 10 T80 10
-          "/>
-      </path>
-    </svg>
-
+  position:absolute;
+  left:455px;
+  top:155px;
+  width:70px;
+  height:20px;
+"
+viewBox="0 0 80 20"
+preserveAspectRatio="xMidYMid meet"
+>
+  <path
+    stroke="#dc2626"
+    stroke-width="2"
+    fill="none"
+    stroke-linecap="round"
+    d="M0 10 Q20 ${10-amp} 40 10 T80 10"
+  >
+    <animate 
+      attributeName="d"
+      dur="${dur}s"
+      repeatCount="indefinite"
+      values="
+        M0 10 Q20 ${10-amp} 40 10 T80 10;
+        M0 10 Q20 ${10+amp} 40 10 T80 10;
+        M0 10 Q20 ${10-amp} 40 10 T80 10
+      "
+    />
+  </path>
+</svg>
     <!-- メーター -->
     <div style="position:absolute; left:560px; top:185px;">
       <svg viewBox="0 0 120 60">
