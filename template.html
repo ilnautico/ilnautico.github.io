@@ -519,13 +519,26 @@ body {
 
     <div class="viz-body">
 
-     <div style="
-  position:relative;
-  width:700px;
-  height:260px;
-  margin:0 auto;
-">
+     <div class="viz-body">
 
+  <div style="
+    position:relative;
+    width:700px;
+    height:260px;
+    margin:0 auto;
+  ">
+
+    <img src="{{base_image}}" style="
+      width:700px;
+      height:260px;
+      display:block;
+    ">
+
+    {{dynamic_overlay}}
+
+  </div>
+
+</div>
   <!-- 背景 -->
   <img src="{{base_image}}" style="
     width:700px;
