@@ -509,102 +509,171 @@ body {
 <div class="section">
   <div class="section-header">
     <span class="section-num">06</span>
+    <span class="section-title">Conceptual Visualization</span>
   </div>
 
-  <div class="viz-body">
-
-    <!-- 描画エリア（これ1つだけ） -->
- <!-- 温度 -->
-<div style="
-  position:absolute;
-  left:235px;
-  top:8px;
-  font-size:32px;
-  color:#1f2937;
-">230°C</div>
-
-<div style="
-  position:absolute;
-  left:470px;
-  top:8px;
-  font-size:32px;
-  color:#dc2626;
-">180°C</div>
-
-<!-- スコア -->
-<div style="
-  position:absolute;
-  left:285px;
-  top:56px;
-  font-size:18px;
-  color:#047857;
-">80</div>
-
-<div style="
-  position:absolute;
-  left:520px;
-  top:56px;
-  font-size:18px;
-  color:#dc2626;
-">35</div>
-
-<!-- メーター -->
-<svg viewBox="0 0 120 70"
-     style="
-       position:absolute;
-       left:480px;
-       top:170px;
-       width:120px;
-       height:70px;
-     ">
-
-  <defs>
-    <linearGradient id="gaugeGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="#16a34a"/>
-      <stop offset="50%" stop-color="#f59e0b"/>
-      <stop offset="100%" stop-color="#dc2626"/>
-    </linearGradient>
-  </defs>
-
-  <!-- 背景 -->
-  <path d="M10 60 A50 50 0 0 1 110 60"
-    fill="none"
-    stroke="#e5e7eb"
-    stroke-width="10"/>
-
-  <!-- グラデ -->
-  <path d="M10 60 A50 50 0 0 1 110 60"
-    fill="none"
-    stroke="url(#gaugeGradient)"
-    stroke-width="10"
-    stroke-linecap="round"/>
-
-  <!-- 針 -->
-  <g id="needle" transform="rotate(-20 60 60)">
-    <line x1="60" y1="60" x2="85" y2="30"
-      stroke="#111"
-      stroke-width="2"
-      stroke-linecap="round"/>
-    <circle cx="60" cy="60" r="4" fill="#111"/>
-  </g>
-
-</svg>
-
-    <div class="viz-caption">
-      Conceptual representation — material behaviour interpretation (non-physical validation)
+  <div class="viz-block">
+    <div class="viz-header">
+      <span class="viz-header-text">Visual Description — Indicative Only</span>
     </div>
 
-    {{visual_description}}
+    <div class="viz-body">
 
+      <!-- 🎯 唯一の描画エリア -->
+      <div style="
+        position:relative;
+        width:700px;
+        height:260px;
+        margin:0 auto;
+        overflow:hidden;
+      ">
+
+        <!-- 背景（絶対に歪まない） -->
+        <img src="{{base_image}}" style="
+          width:700px;
+          height:260px;
+          display:block;
+        ">
+
+        <!-- ===== 温度 ===== -->
+        <div style="
+          position:absolute;
+          left:235px;
+          top:8px;
+          font-size:32px;
+          color:#1f2937;
+        ">230°C</div>
+
+        <div style="
+          position:absolute;
+          left:470px;
+          top:8px;
+          font-size:32px;
+          color:#dc2626;
+        ">180°C</div>
+
+        <!-- ===== スコア ===== -->
+        <div style="
+          position:absolute;
+          left:285px;
+          top:56px;
+          font-size:18px;
+          color:#047857;
+        ">80</div>
+
+        <div style="
+          position:absolute;
+          left:520px;
+          top:56px;
+          font-size:18px;
+          color:#dc2626;
+        ">35</div>
+
+        <!-- ===== 青波（バブル中央） ===== -->
+        <svg style="
+          position:absolute;
+          left:270px;
+          top:120px;
+          width:70px;
+          height:18px;
+        "
+        viewBox="0 0 80 20"
+        preserveAspectRatio="none">
+          <path
+            d="M0 10 Q20 2 40 10 T80 10"
+            stroke="#3B82A0"
+            stroke-width="2"
+            fill="none"
+            stroke-linecap="round">
+            <animate attributeName="d"
+              dur="1.2s"
+              repeatCount="indefinite"
+              values="
+                M0 10 Q20 2 40 10 T80 10;
+                M0 10 Q20 18 40 10 T80 10;
+                M0 10 Q20 2 40 10 T80 10"/>
+          </path>
+        </svg>
+
+        <!-- ===== 赤波（バブル中央） ===== -->
+        <svg style="
+          position:absolute;
+          left:455px;
+          top:140px;
+          width:65px;
+          height:18px;
+        "
+        viewBox="0 0 80 20"
+        preserveAspectRatio="none">
+          <path
+            d="M0 10 Q20 2 40 10 T80 10"
+            stroke="#dc2626"
+            stroke-width="2"
+            fill="none"
+            stroke-linecap="round">
+            <animate attributeName="d"
+              dur="1.2s"
+              repeatCount="indefinite"
+              values="
+                M0 10 Q20 2 40 10 T80 10;
+                M0 10 Q20 18 40 10 T80 10;
+                M0 10 Q20 2 40 10 T80 10"/>
+          </path>
+        </svg>
+
+        <!-- ===== メーター ===== -->
+        <svg viewBox="0 0 120 70"
+             style="
+               position:absolute;
+               left:480px;
+               top:170px;
+               width:120px;
+               height:70px;
+             ">
+
+          <defs>
+            <linearGradient id="gaugeGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stop-color="#16a34a"/>
+              <stop offset="50%" stop-color="#f59e0b"/>
+              <stop offset="100%" stop-color="#dc2626"/>
+            </linearGradient>
+          </defs>
+
+          <!-- 背景 -->
+          <path d="M10 60 A50 50 0 0 1 110 60"
+            fill="none"
+            stroke="#e5e7eb"
+            stroke-width="10"/>
+
+          <!-- グラデ -->
+          <path d="M10 60 A50 50 0 0 1 110 60"
+            fill="none"
+            stroke="url(#gaugeGradient)"
+            stroke-width="10"
+            stroke-linecap="round"/>
+
+          <!-- 針 -->
+          <g id="needle" transform="rotate(-20 60 60)">
+            <line x1="60" y1="60" x2="85" y2="30"
+              stroke="#111"
+              stroke-width="2"
+              stroke-linecap="round"/>
+            <circle cx="60" cy="60" r="4" fill="#111"/>
+          </g>
+
+        </svg>
+
+      </div>
+
+      <div class="viz-caption">
+        Conceptual representation — material behaviour interpretation (non-physical validation)
+      </div>
+
+      {{visual_description}}
+
+    </div>
   </div>
 </div>
-
-<script>
-  const score = 35;
-  const angle = -60 + (score / 100) * 120;
-  document.getElementById("needle")
-    .setAttribute("transform", `rotate(${angle} 60 60)`);
-</script>
     <!-- 07 Recommended Next Step -->
     <div class="section">
       <div class="section-header">
