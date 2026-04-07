@@ -15,103 +15,79 @@ app.get("/", (req, res) => {
 
 
 // =========================
-// 🔥 フィールド抽出（完全耐性）
-function extractFields(body) {
+// 🔥 安全フィールド取得（これが核心）
+function getValue(fields, keyword) {
 
-  const answers =
-    body?.data?.fields ||
-    body?.fields ||
-    [];
+  for (const item of fields) {
 
-  const map = {};
-
-  for (const item of answers) {
     const key = String(item?.label || "")
       .toLowerCase()
-      .replace(/\s+/g, " ")   // ←空白統一（重要）
+      .replace(/\s+/g, " ")
       .trim();
 
     const value = String(item?.value || "").toLowerCase();
 
-    map[key] = value;
+    if (key.includes(keyword)) {
+      return value;
+    }
   }
 
-  return map;
+  return "";
 }
 
 
 // =========================
-// 🔥 評価ロジック（完全一致依存しない）
-function evaluateMaterial(map) {
+// 🔥 スコア算出（完全連動）
+function calculateScores(body) {
+
+  const fields =
+    body?.data?.fields ||
+    body?.fields ||
+    [];
+
+  const currentMaterial = getValue(fields, "current material");
+  const processing = getValue(fields, "processing method");
+  const concern = getValue(fields, "primary concern");
+  const ld = getValue(fields, "l/d");
 
   let stability = 70;
   let risk = 40;
 
-  for (const key in map) {
-
-    const value = map[key];
-
-    // ===== 材料 =====
-    if (key.includes("current material")) {
-      if (value.includes("ldpe")) {
-        stability += 10;
-        risk -= 5;
-      }
-    }
-
-    // ===== 成形 =====
-    if (key.includes("processing method")) {
-      if (value.includes("film")) {
-        stability -= 10;
-        risk += 15;
-      }
-    }
-
-    // ===== L/D =====
-    if (key.includes("l/d")) {
-      if (value.includes("22")) {
-        stability -= 5;
-      }
-    }
-
-    // ===== 問題 =====
-    if (key.includes("primary concern")) {
-      if (value.includes("instability")) {
-        risk += 20;
-      }
-    }
+  // 材料
+  if (currentMaterial.includes("ldpe")) {
+    stability += 10;
+    risk -= 5;
   }
 
-  stability = clamp(stability);
-  risk = clamp(risk);
+  // 成形
+  if (processing.includes("film")) {
+    stability -= 10;
+    risk += 15;
+  }
 
-  return { stability, risk };
-}
+  // L/D
+  if (ld.includes("22")) {
+    stability -= 5;
+  }
 
+  // 問題
+  if (concern.includes("instability")) {
+    risk += 20;
+  }
 
-// =========================
-function clamp(val) {
-  return Math.max(0, Math.min(100, val));
-}
-
-
-// =========================
-// 🔥 スコア生成
-function calculateScores(body) {
-
-  const map = extractFields(body);
-
-  const result = evaluateMaterial(map);
+  // 範囲制限
+  stability = Math.max(0, Math.min(100, stability));
+  risk = Math.max(0, Math.min(100, risk));
 
   return {
-    scoreLeft: result.stability,
-    scoreRight: result.risk
+    scoreLeft: stability,
+    scoreRight: risk
   };
 }
 
 
 // =========================
-// 🔥 Overlay（完全連動）
+// 🔥 Overlay（一切変更なし）
 function generateOverlay(scoreLeft = 80, scoreRight = 35) {
 
   const ampLeft = 4 + scoreLeft * 0.12;
@@ -131,14 +107,14 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
 
     <!-- スコア -->
     <div style="position:absolute; left:285px; top:56px; font-size:18px;">
-      ${scoreLeft} / 100
+      ${scoreLeft}
     </div>
 
     <div style="position:absolute; left:520px; top:56px; font-size:18px; color:#dc2626;">
-      ${scoreRight} / 100
+      ${scoreRight}
     </div>
 
-    <!-- 🔵 青波 -->
+    <!-- 青波 -->
     <svg style="position:absolute; left:255px; top:125px; width:70px; height:20px;"
       viewBox="0 0 80 20">
       <path stroke="#3B82A0" stroke-width="2" fill="none"
@@ -151,7 +127,7 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
       </path>
     </svg>
 
-    <!-- 🔴 赤波 -->
+    <!-- 赤波 -->
     <svg style="position:absolute; left:455px; top:140px; width:70px; height:20px;"
       viewBox="0 0 80 20">
       <path stroke="#dc2626" stroke-width="2" fill="none"
@@ -164,7 +140,7 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
       </path>
     </svg>
 
-    <!-- 🎯 メーター -->
+    <!-- メーター -->
     <svg viewBox="0 0 120 70"
       style="position:absolute; left:480px; top:170px; width:120px; height:70px;">
       <defs>
@@ -212,7 +188,7 @@ app.post("/tally-pdf", async (req, res) => {
 
     const template = fs.readFileSync("template.html", "utf8");
 
-    // 🔥 完全自動計算
+    // 🔥 完全連動ここ
     const { scoreLeft, scoreRight } = calculateScores(req.body);
 
     const html = injectHtml(template, {
@@ -242,7 +218,7 @@ app.post("/tally-pdf", async (req, res) => {
 
     await browser.close();
 
-    // 保存
+    // 保存（/latest-pdf用）
     fs.writeFileSync("/tmp/latest-report.pdf", pdf);
 
     res.set({
