@@ -574,59 +574,70 @@ body {
 
         <!-- ===== 青波 ===== -->
         <svg style="
-          position:absolute;
-          left:300px;
-          top:135px;
-          width:65px;
-          height:16px;
-          transform:translateX(-50%);
-        "
-        viewBox="0 0 80 20"
-        preserveAspectRatio="none">
-          <path
-            d="M0 10 Q20 2 40 10 T80 10"
-            stroke="#3B82A0"
-            stroke-width="2"
-            fill="none"
-            stroke-linecap="round">
-            <animate id="blueWave"
-              attributeName="d"
-              dur="1.2s"
-              repeatCount="indefinite"
-              values="
-                M0 10 Q20 2 40 10 T80 10;
-                M0 10 Q20 18 40 10 T80 10;
-                M0 10 Q20 2 40 10 T80 10"/>
-          </path>
-        </svg>
+  position:absolute;
+  left:270px;
+  top:120px;
+  width:70px;
+  height:18px;
+"
+viewBox="0 0 80 20"
+preserveAspectRatio="xMidYMid meet">
 
+  <!-- 中央基準 -->
+  <g transform="translate(40,10)">
+    <path
+      d="M-40 0 Q-20 -6 0 0 T40 0"
+      stroke="#3B82A0"
+      stroke-width="2"
+      fill="none"
+      stroke-linecap="round">
+
+      <animate
+        attributeName="d"
+        dur="1.2s"
+        repeatCount="indefinite"
+        values="
+          M-40 0 Q-20 -6 0 0 T40 0;
+          M-40 0 Q-20 6 0 0 T40 0;
+          M-40 0 Q-20 -6 0 0 T40 0
+        "/>
+
+    </path>
+  </g>
+</svg>
         <!-- ===== 赤波 ===== -->
         <svg style="
-          position:absolute;
-          left:520px;
-          top:145px;
-          width:60px;
-          height:16px;
-          transform:translateX(-50%);
-        "
-        viewBox="0 0 80 20"
-        preserveAspectRatio="none">
-          <path
-            d="M0 10 Q20 2 40 10 T80 10"
-            stroke="#dc2626"
-            stroke-width="2"
-            fill="none"
-            stroke-linecap="round">
-            <animate id="redWave"
-              attributeName="d"
-              dur="1.2s"
-              repeatCount="indefinite"
-              values="
-                M0 10 Q20 2 40 10 T80 10;
-                M0 10 Q20 18 40 10 T80 10;
-                M0 10 Q20 2 40 10 T80 10"/>
-          </path>
-        </svg>
+  position:absolute;
+  left:455px;
+  top:140px;
+  width:65px;
+  height:18px;
+"
+viewBox="0 0 80 20"
+preserveAspectRatio="xMidYMid meet">
+
+  <!-- 中央基準 -->
+  <g transform="translate(40,10)">
+    <path
+      d="M-40 0 Q-20 -6 0 0 T40 0"
+      stroke="#dc2626"
+      stroke-width="2"
+      fill="none"
+      stroke-linecap="round">
+
+      <animate
+        attributeName="d"
+        dur="1.2s"
+        repeatCount="indefinite"
+        values="
+          M-40 0 Q-20 -6 0 0 T40 0;
+          M-40 0 Q-20 6 0 0 T40 0;
+          M-40 0 Q-20 -6 0 0 T40 0
+        "/>
+
+    </path>
+  </g>
+</svg>
 
         <!-- ===== メーター ===== -->
         <svg viewBox="0 0 120 70"
