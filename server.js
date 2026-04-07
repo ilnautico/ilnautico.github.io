@@ -45,15 +45,34 @@ function generateOverlay() {
     </div>
 
     <!-- 波（ここが効く） -->
-    <svg style="position:absolute; left:350px; top:170px; width:90px; height:30px;">
-      <path d="M0 20 Q20 0 40 20 T80 20"
-        stroke="#3B82A0" stroke-width="2.5" fill="none"/>
-    </svg>
+   <!-- 波（動く） -->
+<svg style="
+  position:absolute;
+  left:280px;
+  top:150px;
+  width:120px;
+  height:40px;
+  overflow:visible;
+">
+  <path
+    d="M0 20 Q30 0 60 20 T120 20"
+    stroke="#3B82A0"
+    stroke-width="3"
+    fill="none"
+    stroke-linecap="round">
 
-    <svg style="position:absolute; left:520px; top:175px; width:100px; height:30px;">
-      <path d="M0 20 Q20 10 40 20 T80 5"
-        stroke="#dc2626" stroke-width="3" fill="none"/>
-    </svg>
+    <animate 
+      attributeName="d"
+      dur="1.2s"
+      repeatCount="indefinite"
+      values="
+        M0 20 Q30 0 60 20 T120 20;
+        M0 20 Q30 40 60 20 T120 20;
+        M0 20 Q30 0 60 20 T120 20
+      "
+    />
+  </path>
+</svg>
 
     <!-- メーター -->
     <div style="position:absolute; left:560px; top:185px; width:120px; height:60px;">
