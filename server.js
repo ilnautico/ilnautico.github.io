@@ -48,27 +48,29 @@ function generateOverlay() {
    <!-- 波（動く） -->
 <svg style="
   position:absolute;
-  left:280px;
-  top:150px;
-  width:120px;
-  height:40px;
-  overflow:visible;
-">
+  left:290px;
+  top:155px;
+  width:80px;
+  height:20px;
+"
+viewBox="0 0 80 20"
+preserveAspectRatio="none"
+>
   <path
-    d="M0 20 Q30 0 60 20 T120 20"
+    d="M0 10 Q20 2 40 10 T80 10"
     stroke="#3B82A0"
-    stroke-width="3"
+    stroke-width="2"
     fill="none"
-    stroke-linecap="round">
-
+    stroke-linecap="round"
+  >
     <animate 
       attributeName="d"
       dur="1.2s"
       repeatCount="indefinite"
       values="
-        M0 20 Q30 0 60 20 T120 20;
-        M0 20 Q30 40 60 20 T120 20;
-        M0 20 Q30 0 60 20 T120 20
+        M0 10 Q20 2 40 10 T80 10;
+        M0 10 Q20 18 40 10 T80 10;
+        M0 10 Q20 2 40 10 T80 10
       "
     />
   </path>
