@@ -7,45 +7,24 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// =========================
-// ヘルスチェック
 app.get("/", (req, res) => {
   res.send("SERVER OK");
 });
 
-// =========================
-// スコア計算（プロ仕様・固定）
-function calculateScore(input) {
-
-  let thermal = 25;
-  let flow = 25;
-  let restart = 25;
-  let equipment = 25;
-
-  if (input.temp_gap > 40) thermal -= 15;
-  if (input.degradation) thermal -= 10;
-
-  if (input.flow_issue === "high") flow -= 15;
-  if (input.viscosity_mismatch) flow -= 10;
-
-  if (input.restart_instability) restart -= 15;
-  if (input.purge_required) restart -= 10;
-
-  if (input.non_standard_machine) equipment -= 15;
-  if (input.screw_mismatch) equipment -= 10;
-
-  const total = thermal + flow + restart + equipment;
-
-  return Math.max(0, Math.min(100, total));
-}
 
 // =========================
-// Overlay（完全連動版）
-function generateOverlay(score) {
+// 🔥 Overlay（完全連動版）
+function generateOverlay(scoreLeft = 80, scoreRight = 35) {
 
-  const angle = -60 + (score / 100) * 120;
-  const amp = 2 + (score / 100) * 8;
-  const dur = 1.6 - (score / 100) * 0.8;
+  // ===== 波ロジック =====
+  const ampLeft = 4 + scoreLeft * 0.12;
+  const ampRight = 4 + scoreRight * 0.12;
+
+  const durLeft = 1.6 - scoreLeft * 0.01;
+  const durRight = 1.6 - scoreRight * 0.01;
+
+  // ===== メーター角度 =====
+  const angle = -60 + (scoreRight / 100) * 120;
 
   return `
   <div style="
@@ -59,114 +38,107 @@ function generateOverlay(score) {
   ">
 
     <!-- 温度 -->
-    <div style="position:absolute; left:240px; top:10px; font-size:32px; color:#1f2937;">
+    <div style="position:absolute; left:235px; top:8px; font-size:32px; color:#1f2937;">
       230°C
     </div>
 
-    <div style="position:absolute; left:500px; top:10px; font-size:32px; color:#dc2626;">
+    <div style="position:absolute; left:470px; top:8px; font-size:32px; color:#dc2626;">
       180°C
     </div>
 
     <!-- スコア -->
-    <div style="position:absolute; left:275px; top:55px; font-size:18px; color:#166534;">
-      80
+    <div style="position:absolute; left:285px; top:56px; font-size:18px; color:#047857;">
+      ${scoreLeft}
     </div>
 
-    <div style="position:absolute; left:530px; top:55px; font-size:18px; color:#dc2626;">
-      ${score}
+    <div style="position:absolute; left:520px; top:56px; font-size:18px; color:#dc2626;">
+      ${scoreRight}
     </div>
 
-    <!-- 青波 -->
+    <!-- 🔵 青波 -->
     <svg style="
-  position:absolute;
- + left:255px;
-+ top:125px;
-  width:70px;
-  height:20px;
-"
-viewBox="0 0 80 20"
-preserveAspectRatio="xMidYMid meet"
->
-  <path
-    stroke="#3B82A0"
-    stroke-width="2"
-    fill="none"
-    stroke-linecap="round"
-    d="M0 10 Q20 ${10-amp} 40 10 T80 10"
-  >
-    <animate 
-      attributeName="d"
-      dur="${dur}s"
-      repeatCount="indefinite"
-      values="
-        M0 10 Q20 ${10-amp} 40 10 T80 10;
-        M0 10 Q20 ${10+amp} 40 10 T80 10;
-        M0 10 Q20 ${10-amp} 40 10 T80 10
-      "
-    />
-  </path>
-</svg>
-    <!-- 赤波 -->
+      position:absolute;
+      left:255px;
+      top:125px;
+      width:70px;
+      height:20px;
+    "
+    viewBox="0 0 80 20"
+    preserveAspectRatio="xMidYMid meet">
+      <path
+        stroke="#3B82A0"
+        stroke-width="2"
+        fill="none"
+        stroke-linecap="round"
+        d="M0 10 Q20 ${10-ampLeft} 40 10 T80 10">
+        <animate attributeName="d"
+          dur="${durLeft}s"
+          repeatCount="indefinite"
+          values="
+            M0 10 Q20 ${10-ampLeft} 40 10 T80 10;
+            M0 10 Q20 ${10+ampLeft} 40 10 T80 10;
+            M0 10 Q20 ${10-ampLeft} 40 10 T80 10"/>
+      </path>
+    </svg>
+
+    <!-- 🔴 赤波 -->
     <svg style="
-  position:absolute;
-  left:455px;
-  top:155px;
-  width:70px;
-  height:20px;
-"
-viewBox="0 0 80 20"
-preserveAspectRatio="xMidYMid meet"
->
-  <path
-    stroke="#dc2626"
-    stroke-width="2"
-    fill="none"
-    stroke-linecap="round"
-    d="M0 10 Q20 ${10-amp} 40 10 T80 10"
-  >
-    <animate 
-      attributeName="d"
-      dur="${dur}s"
-      repeatCount="indefinite"
-      values="
-        M0 10 Q20 ${10-amp} 40 10 T80 10;
-        M0 10 Q20 ${10+amp} 40 10 T80 10;
-        M0 10 Q20 ${10-amp} 40 10 T80 10
-      "
-    />
-  </path>
-</svg>
-    <!-- メーター -->
-    <div style="position:absolute; left:560px; top:185px;">
-      <svg viewBox="0 0 120 60">
+      position:absolute;
+      left:455px;
+      top:140px;
+      width:70px;
+      height:20px;
+    "
+    viewBox="0 0 80 20"
+    preserveAspectRatio="xMidYMid meet">
+      <path
+        stroke="#dc2626"
+        stroke-width="2"
+        fill="none"
+        stroke-linecap="round"
+        d="M0 10 Q20 ${10-ampRight} 40 10 T80 10">
+        <animate attributeName="d"
+          dur="${durRight}s"
+          repeatCount="indefinite"
+          values="
+            M0 10 Q20 ${10-ampRight} 40 10 T80 10;
+            M0 10 Q20 ${10+ampRight} 40 10 T80 10;
+            M0 10 Q20 ${10-ampRight} 40 10 T80 10"/>
+      </path>
+    </svg>
 
-        <defs>
-          <linearGradient id="g" x1="0" x2="1">
-            <stop offset="0%" stop-color="#16a34a"/>
-            <stop offset="50%" stop-color="#facc15"/>
-            <stop offset="100%" stop-color="#dc2626"/>
-          </linearGradient>
-        </defs>
+    <!-- 🎯 メーター -->
+    <svg viewBox="0 0 120 70"
+      style="position:absolute; left:480px; top:170px; width:120px; height:70px;">
 
-        <path d="M10 50 A50 50 0 0 1 110 50"
-          fill="none"
-          stroke="url(#g)"
-          stroke-width="10"
+      <defs>
+        <linearGradient id="gaugeGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stop-color="#16a34a"/>
+          <stop offset="50%" stop-color="#f59e0b"/>
+          <stop offset="100%" stop-color="#dc2626"/>
+        </linearGradient>
+      </defs>
+
+      <path d="M10 60 A50 50 0 0 1 110 60"
+        fill="none"
+        stroke="url(#gaugeGradient)"
+        stroke-width="10"
+        stroke-linecap="round"/>
+
+      <g transform="rotate(${angle} 60 60)">
+        <line x1="60" y1="60" x2="85" y2="30"
+          stroke="#111"
+          stroke-width="2"
           stroke-linecap="round"/>
+        <circle cx="60" cy="60" r="4" fill="#111"/>
+      </g>
 
-        <g transform="rotate(${angle} 60 50)">
-          <line x1="60" y1="50" x2="90" y2="30"
-            stroke="#111"
-            stroke-width="2"/>
-        </g>
-
-        <circle cx="60" cy="50" r="3" fill="#111"/>
-      </svg>
-    </div>
+    </svg>
 
   </div>
   `;
 }
+
 
 // =========================
 // HTML差し込み
@@ -181,6 +153,7 @@ function injectHtml(template, data) {
   return html;
 }
 
+
 // =========================
 // PDF生成
 app.post("/tally-pdf", async (req, res) => {
@@ -188,23 +161,13 @@ app.post("/tally-pdf", async (req, res) => {
 
     const template = fs.readFileSync("template.html", "utf8");
 
-    // 🔥 仮入力（あとでフォーム接続）
-    const input = {
-      temp_gap: 30,
-      degradation: false,
-      flow_issue: "medium",
-      viscosity_mismatch: false,
-      restart_instability: false,
-      purge_required: false,
-      non_standard_machine: false,
-      screw_mismatch: false
-    };
-
-    const score = calculateScore(input);
+    // 🔥 フォーム値取得（ここが連動）
+    const scoreLeft = Number(req.body.score_left) || 80;
+    const scoreRight = Number(req.body.score_right) || 35;
 
     const html = injectHtml(template, {
       base_image: "https://ilnautico.github.io/visual-base.png",
-      dynamic_overlay: generateOverlay(score)
+      dynamic_overlay: generateOverlay(scoreLeft, scoreRight)
     });
 
     const browser = await puppeteer.launch({
@@ -244,8 +207,8 @@ app.post("/tally-pdf", async (req, res) => {
   }
 });
 
+
 // =========================
-// PDF確認
 app.get("/latest-pdf", (req, res) => {
   const file = "/tmp/latest-report.pdf";
 
@@ -256,8 +219,8 @@ app.get("/latest-pdf", (req, res) => {
   res.sendFile(file);
 });
 
+
 // =========================
-// 起動
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
