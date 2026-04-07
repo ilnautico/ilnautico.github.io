@@ -507,6 +507,7 @@ body {
 <!-- 06 Conceptual Visualization -->
 <!-- 06 Conceptual Visualization -->
 <!-- 06 Conceptual Visualization -->
+<!-- 06 Conceptual Visualization -->
 <div class="section">
   <div class="section-header">
     <span class="section-num">06</span>
@@ -526,15 +527,16 @@ body {
         width:700px;
         height:260px;
         margin:0 auto;
-        overflow:hidden;
       ">
 
-        <!-- 背景（絶対に歪まない） -->
+        <!-- 背景（絶対歪まない） -->
         <img src="{{base_image}}" style="
-  width:700px;
-  height:260px;
-  display:block;
-">
+          width:100%;
+          height:100%;
+          object-fit:contain;
+          display:block;
+        ">
+
         <!-- ===== 温度 ===== -->
         <div style="
           position:absolute;
@@ -572,10 +574,10 @@ body {
         <!-- ===== 青波（バブル中央） ===== -->
         <svg style="
           position:absolute;
-          left:270px;
-          top:120px;
-          width:70px;
-          height:18px;
+          left:255px;
+          top:125px;
+          width:65px;
+          height:16px;
         "
         viewBox="0 0 80 20"
         preserveAspectRatio="none">
@@ -598,10 +600,10 @@ body {
         <!-- ===== 赤波（バブル中央） ===== -->
         <svg style="
           position:absolute;
-          left:455px;
+          left:490px;
           top:140px;
-          width:65px;
-          height:18px;
+          width:60px;
+          height:16px;
         "
         viewBox="0 0 80 20"
         preserveAspectRatio="none">
@@ -653,7 +655,7 @@ body {
             stroke-linecap="round"/>
 
           <!-- 針 -->
-          <g id="needle" transform="rotate(-20 60 60)">
+          <g id="needle">
             <line x1="60" y1="60" x2="85" y2="30"
               stroke="#111"
               stroke-width="2"
@@ -674,6 +676,15 @@ body {
     </div>
   </div>
 </div>
+
+<!-- 🎯 メーター制御 -->
+<script>
+  const score = 35; // ←ここ変える
+  const angle = -60 + (score / 100) * 120;
+
+  document.querySelector("#needle")
+    .setAttribute("transform", `rotate(${angle} 60 60)`);
+</script>
     <!-- 07 Recommended Next Step -->
     <div class="section">
       <div class="section-header">
