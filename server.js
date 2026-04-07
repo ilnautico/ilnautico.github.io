@@ -47,19 +47,19 @@ function generateOverlay() {
     <!-- 波（ここが効く） -->
    <!-- 波（動く） -->
 <!-- 波（青） -->
+<!-- 波（青・バブル中央） -->
 <svg style="
   position:absolute;
-  left:290px;
-  top:155px;
-  width:80px;
-  height:20px;
-  transform: translateX(10px);
+  left:332px;
+  top:132px;
+  width:96px;
+  height:24px;
 "
-viewBox="0 0 80 20"
+viewBox="0 0 96 24"
 preserveAspectRatio="none"
 >
   <path
-    d="M0 10 Q20 2 40 10 T80 10"
+    d="M0 12 Q24 4 48 12 T96 12"
     stroke="#3B82A0"
     stroke-width="2"
     fill="none"
@@ -70,9 +70,9 @@ preserveAspectRatio="none"
       dur="1.2s"
       repeatCount="indefinite"
       values="
-        M0 10 Q20 2 40 10 T80 10;
-        M0 10 Q20 18 40 10 T80 10;
-        M0 10 Q20 2 40 10 T80 10
+        M0 12 Q24 4 48 12 T96 12;
+        M0 12 Q24 20 48 12 T96 12;
+        M0 12 Q24 4 48 12 T96 12
       "
     />
   </path>
