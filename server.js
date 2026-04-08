@@ -83,7 +83,6 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
     <div style="position:absolute; left:40%; top:22%; font-size:18px;">${scoreLeft}</div>
     <div style="position:absolute; left:72%; top:22%; font-size:18px; color:#dc2626;">${scoreRight}</div>
 
-    <!-- 青波 -->
     <svg style="position:absolute;left:46.8%;top:57.2%;width:11%;height:8%;transform:translate(-50%,-50%);" viewBox="0 0 80 20">
       <path stroke="#3B82A0" stroke-width="2" fill="none"
         d="M0 10 Q20 ${10-ampLeft} 40 10 T80 10">
@@ -94,7 +93,6 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
       </path>
     </svg>
 
-    <!-- 赤波 -->
     <svg style="position:absolute;left:71.5%;top:66.8%;width:11%;height:8%;transform:translate(-50%,-50%);" viewBox="0 0 80 20">
       <path stroke="#dc2626" stroke-width="2" fill="none"
         d="M0 10 Q20 ${10-ampRight} 40 10 T80 10">
@@ -105,52 +103,39 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
       </path>
     </svg>
 
-    <!-- メーター -->
     <svg viewBox="0 0 200 120"
-  style="position:absolute; left:70%; top:68%; width:150px; height:100px;">
+      style="position:absolute; left:70%; top:68%; width:150px; height:100px;">
 
-  <defs>
-    <linearGradient id="gaugeGrad" x1="0%" x2="100%">
-      <stop offset="0%" stop-color="#22c55e"/>
-      <stop offset="50%" stop-color="#f59e0b"/>
-      <stop offset="100%" stop-color="#ef4444"/>
-    </linearGradient>
-  </defs>
+      <defs>
+        <linearGradient id="gaugeGrad" x1="0%" x2="100%">
+          <stop offset="0%" stop-color="#22c55e"/>
+          <stop offset="50%" stop-color="#f59e0b"/>
+          <stop offset="100%" stop-color="#ef4444"/>
+        </linearGradient>
+      </defs>
 
-  <!-- 🔵 ベース（グレーの半月プレート） -->
-  <path
-    d="M20 100 A80 80 0 0 1 180 100 L180 100 L20 100 Z"
-    fill="#e5e7eb"
-  />
+      <path d="M20 100 A80 80 0 0 1 180 100 L180 100 L20 100 Z"
+        fill="#e5e7eb"/>
 
-  <!-- 🔥 カラー（半月そのもの） -->
-  <path
-    d="M20 100 A80 80 0 0 1 180 100 L180 100 L20 100 Z"
-    fill="url(#gaugeGrad)"
-    opacity="0.85"
-  />
+      <path d="M20 100 A80 80 0 0 1 180 100 L180 100 L20 100 Z"
+        fill="url(#gaugeGrad)" opacity="0.85"/>
 
-  <!-- 🔥 内側くり抜き（厚み出す） -->
-  <path
-    d="M40 100 A60 60 0 0 1 160 100 L160 100 L40 100 Z"
-    fill="#f9fafb"
-  />
+      <path d="M40 100 A60 60 0 0 1 160 100 L160 100 L40 100 Z"
+        fill="#f9fafb"/>
 
-  <!-- 針（絶対固定） -->
-  <g transform="rotate(${ -90 + (scoreRight / 100) * 180 } 100 100)">
-    <line
-      x1="100"
-      y1="100"
-      x2="145"
-      y2="60"
-      stroke="#111"
-      stroke-width="3"
-      stroke-linecap="round"
-    />
-    <circle cx="100" cy="100" r="5" fill="#111"/>
-  </g>
+      <g transform="rotate(${ -90 + (scoreRight / 100) * 180 } 100 100)">
+        <line x1="100" y1="100" x2="145" y2="60"
+          stroke="#111"
+          stroke-width="3"
+          stroke-linecap="round"/>
+        <circle cx="100" cy="100" r="5" fill="#111"/>
+      </g>
 
-</svg>
+    </svg>
+
+  </div>
+  `;
+}
 
 // =========================
 // HTML差し込み
