@@ -509,17 +509,27 @@ body {
 <!-- 06 Conceptual Visualization -->
 <<!-- ===== SECTION 06 FINAL ===== -->
 <!-- ===== SECTION 06 FINAL（完全連動版） ===== -->
-<div style="position:relative; width:700px; height:260px;">
+<!-- 青波 FIX -->
+<svg id="wave-blue"
+  style="position:absolute; left:290px; top:125px; width:80px; height:20px;"
+  viewBox="0 0 80 20"
+  preserveAspectRatio="xMidYMid meet">
 
-  <img src="{{base_image}}" style="
-    width:100%;
-    height:100%;
-    object-fit:contain;
-  ">
+  <path d="M0 10 Q20 2 40 10 T80 10"
+    stroke="#3B82A0"
+    stroke-width="2"
+    fill="none"
+    stroke-linecap="round">
 
-  {{dynamic_overlay}}
-
-</div>
+    <animate attributeName="d"
+      dur="1.2s"
+      repeatCount="indefinite"
+      values="
+        M0 10 Q20 2 40 10 T80 10;
+        M0 10 Q20 18 40 10 T80 10;
+        M0 10 Q20 2 40 10 T80 10"/>
+  </path>
+</svg>
     <!-- 07 Recommended Next Step -->
     <div class="section">
       <div class="section-header">
