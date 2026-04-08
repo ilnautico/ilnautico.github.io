@@ -172,50 +172,42 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
     </svg>
 
     <!-- ===== メーター（完全リアル版） ===== -->
-    <svg viewBox="0 0 200 140"
-      style="position:absolute; left:460px; top:170px; width:170px; height:120px;">
+<svg viewBox="0 0 200 140"
+  style="position:absolute; left:470px; top:175px; width:150px; height:100px;">
 
-      <defs>
-        <linearGradient id="gaugeFill" x1="0%" x2="100%">
-          <stop offset="0%" stop-color="#22c55e"/>
-          <stop offset="50%" stop-color="#f59e0b"/>
-          <stop offset="100%" stop-color="#ef4444"/>
-        </linearGradient>
+  <defs>
+    <linearGradient id="gaugeFill" x1="0%" x2="100%">
+      <stop offset="0%" stop-color="#22c55e"/>
+      <stop offset="50%" stop-color="#f59e0b"/>
+      <stop offset="100%" stop-color="#ef4444"/>
+    </linearGradient>
 
-        <radialGradient id="innerGlow" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stop-color="#ffffff" stop-opacity="0.9"/>
-          <stop offset="100%" stop-color="#e5e7eb" stop-opacity="0.4"/>
-        </radialGradient>
+    <radialGradient id="innerShadow" cx="50%" cy="50%" r="60%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#e5e7eb"/>
+    </radialGradient>
+  </defs>
 
-        <filter id="shadow">
-          <feDropShadow dx="0" dy="6" stdDeviation="6" flood-opacity="0.25"/>
-        </filter>
-      </defs>
+  <circle cx="100" cy="100" r="75"
+    fill="url(#innerShadow)"
+    stroke="#d1d5db"
+    stroke-width="2"/>
 
-      <!-- 外枠 -->
-      <circle cx="100" cy="100" r="80"
-        fill="url(#innerGlow)"
-        stroke="#d1d5db"
-        stroke-width="2"/>
+  <path d="M25 100 A75 75 0 0 1 175 100"
+    fill="none"
+    stroke="url(#gaugeFill)"
+    stroke-width="14"
+    stroke-linecap="round"/>
 
-      <!-- メーター -->
-      <path d="M20 100 A80 80 0 0 1 180 100"
-        fill="none"
-        stroke="url(#gaugeFill)"
-        stroke-width="18"
-        stroke-linecap="round"
-        filter="url(#shadow)"/>
+  <g transform="rotate(${ -90 + (scoreRight / 100) * 180 } 100 100)">
+    <line x1="100" y1="100" x2="155" y2="45"
+      stroke="#111"
+      stroke-width="3"
+      stroke-linecap="round"/>
+    <circle cx="100" cy="100" r="5" fill="#111"/>
+  </g>
 
-      <!-- 針 -->
-      <g transform="rotate(${angle} 100 100)">
-        <line x1="100" y1="100" x2="160" y2="40"
-          stroke="#111"
-          stroke-width="4"
-          stroke-linecap="round"/>
-        <circle cx="100" cy="100" r="7" fill="#111"/>
-      </g>
-
-    </svg>
+</svg>
 
   </div>
   `;
