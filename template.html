@@ -512,26 +512,27 @@ body {
 <!-- 青波 FIX -->
 <!-- ===== SECTION 06 FINAL SAFE ===== -->
 
-<div style="
-  position:relative;
-  width:700px;
-  height:260px;
-  margin:0 auto;
-  overflow:hidden;
-">
-
-  <!-- 背景 -->
-  <img src="{{base_image}}" style="
-    width:100%;
-    height:100%;
-    object-fit:contain;
-    display:block;
-  ">
-
-  <!-- Overlay（サーバー生成） -->
-  {{dynamic_overlay}}
-
-</div>
+<!-- 青波 -->
+<svg style="
+  position:absolute;
+  left:300px;
+  top:138px;
+  width:82px;
+  height:18px;
+"
+viewBox="0 0 80 20">
+  <path
+    stroke="#3B82A0"
+    stroke-width="2"
+    fill="none"
+    d="M0 10 Q20 ${10-ampLeft} 40 10 T80 10">
+    <animate attributeName="d" dur="${durLeft}s" repeatCount="indefinite"
+      values="
+        M0 10 Q20 ${10-ampLeft} 40 10 T80 10;
+        M0 10 Q20 ${10+ampLeft} 40 10 T80 10;
+        M0 10 Q20 ${10-ampLeft} 40 10 T80 10"/>
+  </path>
+</svg>
     <!-- 07 Recommended Next Step -->
     <div class="section">
       <div class="section-header">
