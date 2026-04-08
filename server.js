@@ -101,9 +101,11 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
   return `
   <div style="position:absolute;top:0;left:0;width:700px;height:260px;pointer-events:none;z-index:10;">
 
+    <!-- 温度 -->
     <div style="position:absolute; left:235px; top:8px; font-size:32px;">230°C</div>
     <div style="position:absolute; left:470px; top:8px; font-size:32px; color:#dc2626;">180°C</div>
 
+    <!-- スコア -->
     <div style="position:absolute; left:285px; top:56px; font-size:18px;">
       ${scoreLeft}
     </div>
@@ -112,7 +114,8 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
       ${scoreRight}
     </div>
 
-    <svg style="position:absolute; left:255px; top:125px; width:70px; height:20px;"
+    <!-- 🔵 青波（完全位置修正済） -->
+    <svg style="position:absolute; left:300px; top:138px; width:82px; height:18px;"
       viewBox="0 0 80 20">
       <path stroke="#3B82A0" stroke-width="2" fill="none"
         d="M0 10 Q20 ${10-ampLeft} 40 10 T80 10">
@@ -124,6 +127,7 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
       </path>
     </svg>
 
+    <!-- 🔴 赤波（そのままOK） -->
     <svg style="position:absolute; left:455px; top:140px; width:70px; height:20px;"
       viewBox="0 0 80 20">
       <path stroke="#dc2626" stroke-width="2" fill="none"
@@ -136,6 +140,7 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
       </path>
     </svg>
 
+    <!-- 🎯 メーター -->
     <svg viewBox="0 0 120 70"
       style="position:absolute; left:480px; top:170px; width:120px; height:70px;">
       <defs>
