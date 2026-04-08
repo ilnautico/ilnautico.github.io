@@ -4,13 +4,10 @@ import fs from "fs";
 
 const app = express();
 
-// =========================
-// Body
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.text({ type: "*/*" }));
 
-// =========================
 app.get("/", (req, res) => {
   res.send("SERVER OK");
 });
@@ -68,7 +65,7 @@ function calculateScores(body) {
 }
 
 // =========================
-// Overlay（ここだけHTML）
+// Overlay（完全修正版）
 function generateOverlay(scoreLeft = 80, scoreRight = 35) {
 
   const ampLeft = 4 + scoreLeft * 0.12;
@@ -76,8 +73,6 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
 
   const durLeft = 1.6 - scoreLeft * 0.01;
   const durRight = 1.6 - scoreRight * 0.01;
-
-  const angle = -60 + (scoreRight / 100) * 120;
 
   return `
   <div style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:10;">
@@ -88,7 +83,7 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
     <div style="position:absolute; left:40%; top:22%; font-size:18px;">${scoreLeft}</div>
     <div style="position:absolute; left:72%; top:22%; font-size:18px; color:#dc2626;">${scoreRight}</div>
 
-    <!-- 青 -->
+    <!-- 青波 -->
     <svg style="position:absolute;left:46.8%;top:57.2%;width:11%;height:8%;transform:translate(-50%,-50%);" viewBox="0 0 80 20">
       <path stroke="#3B82A0" stroke-width="2" fill="none"
         d="M0 10 Q20 ${10-ampLeft} 40 10 T80 10">
@@ -99,60 +94,49 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
       </path>
     </svg>
 
-    <!-- 赤 -->
-    <svg style="
-  position:absolute;
-  left:71.5%;
-  top:66.8%;
-  width:11%;
-  height:8%;
-  transform:translate(-50%, -50%);
-" viewBox="0 0 80 20">
-  <path stroke="#dc2626" stroke-width="2" fill="none"
-    d="M0 10 Q20 ${10-ampRight} 40 10 T80 10">
-    <animate attributeName="d" dur="${durRight}s" repeatCount="indefinite"
-      values="
-        M0 10 Q20 ${10-ampRight} 40 10 T80 10;
-        M0 10 Q20 ${10+ampRight} 40 10 T80 10;
-        M0 10 Q20 ${10-ampRight} 40 10 T80 10"/>
-  </path>
-</svg>
+    <!-- 赤波 -->
+    <svg style="position:absolute;left:71.5%;top:66.8%;width:11%;height:8%;transform:translate(-50%,-50%);" viewBox="0 0 80 20">
+      <path stroke="#dc2626" stroke-width="2" fill="none"
+        d="M0 10 Q20 ${10-ampRight} 40 10 T80 10">
+        <animate attributeName="d" dur="${durRight}s" repeatCount="indefinite"
+          values="M0 10 Q20 ${10-ampRight} 40 10 T80 10;
+                  M0 10 Q20 ${10+ampRight} 40 10 T80 10;
+                  M0 10 Q20 ${10-ampRight} 40 10 T80 10"/>
+      </path>
+    </svg>
 
     <!-- メーター -->
-   <svg viewBox="0 0 200 120"
-  style="position:absolute; left:70%; top:68%; width:150px; height:100px;">
+    <svg viewBox="0 0 200 120"
+      style="position:absolute; left:70%; top:68%; width:150px; height:100px;">
 
-  <defs>
-    <linearGradient id="rainbowFill" x1="0%" x2="100%">
-      <stop offset="0%" stop-color="#22c55e"/>
-      <stop offset="50%" stop-color="#f59e0b"/>
-      <stop offset="100%" stop-color="#ef4444"/>
-    </linearGradient>
-  </defs>
+      <defs>
+        <linearGradient id="rainbowFill" x1="0%" x2="100%">
+          <stop offset="0%" stop-color="#22c55e"/>
+          <stop offset="50%" stop-color="#f59e0b"/>
+          <stop offset="100%" stop-color="#ef4444"/>
+        </linearGradient>
+      </defs>
 
-  <!-- 半円の塗り（ここが重要） -->
-  <path
-    d="M20 100 A80 80 0 0 1 180 100 L180 100 L20 100 Z"
-    fill="url(#rainbowFill)"
-  />
+      <path d="M20 100 A80 80 0 0 1 180 100 L180 100 L20 100 Z"
+        fill="url(#rainbowFill)"/>
 
-  <!-- 内側 -->
-  <path
-    d="M35 100 A65 65 0 0 1 165 100 L165 100 L35 100 Z"
-    fill="#f3f4f6"
-  />
+      <path d="M35 100 A65 65 0 0 1 165 100 L165 100 L35 100 Z"
+        fill="#f3f4f6"/>
 
-  <!-- 針 -->
-  <g transform="rotate(${ -90 + (scoreRight / 100) * 180 } 100 100)">
-    <line x1="100" y1="100" x2="145" y2="60"
-      stroke="#111"
-      stroke-width="3"/>
-    <circle cx="100" cy="100" r="5" fill="#111"/>
-  </g>
+      <g transform="rotate(${ -90 + (scoreRight / 100) * 180 } 100 100)">
+        <line x1="100" y1="100" x2="145" y2="60"
+          stroke="#111" stroke-width="3"/>
+        <circle cx="100" cy="100" r="5" fill="#111"/>
+      </g>
 
-</svg>
+    </svg>
+
+  </div>
+  `;
+}
 
 // =========================
+// HTML差し込み
 function injectHtml(template, data) {
   let html = template;
   Object.keys(data).forEach((key) => {
@@ -198,9 +182,7 @@ app.post("/tally-pdf", async (req, res) => {
 
     const page = await browser.newPage();
 
-    await page.setContent(html, {
-      waitUntil: "networkidle0"
-    });
+    await page.setContent(html, { waitUntil: "networkidle0" });
 
     const pdf = await page.pdf({
       format: "A4",
