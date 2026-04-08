@@ -82,7 +82,7 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
      height="100%"
      style="position:absolute; top:0; left:0; pointer-events:none;">
 
-  <!-- ===== 背景（固定）===== -->
+  <!-- ===== 背景 ===== -->
   <image href="https://ilnautico.github.io/visual-base.png"
          x="0" y="0"
          width="720"
@@ -97,12 +97,11 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
   <text x="300" y="70" font-size="16" fill="#1f2937">${scoreLeft}</text>
   <text x="540" y="70" font-size="16" fill="#dc2626">${scoreRight}</text>
 
-  <!-- ===== 🔵 青波（完全固定位置）===== -->
+  <!-- ===== 🔵 青波（完全固定・触るな） ===== -->
   <path stroke="#3B82A0"
         stroke-width="2"
         fill="none"
         d="M330 150 Q350 ${150-ampLeft} 370 150 T410 150">
-
     <animate attributeName="d"
       dur="${durLeft}s"
       repeatCount="indefinite"
@@ -112,12 +111,11 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
         M330 150 Q350 ${150-ampLeft} 370 150 T410 150"/>
   </path>
 
-  <!-- ===== 🔴 赤波（中央固定）===== -->
+  <!-- ===== 🔴 赤波（中央固定・触るな） ===== -->
   <path stroke="#dc2626"
         stroke-width="2"
         fill="none"
         d="M470 180 Q500 ${180-ampRight} 530 180 T570 180">
-
     <animate attributeName="d"
       dur="${durRight}s"
       repeatCount="indefinite"
@@ -127,10 +125,9 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
         M470 180 Q500 ${180-ampRight} 530 180 T570 180"/>
   </path>
 
-  <!-- ===== メーター（半月・中身あり）===== -->
+  <!-- ===== メーター（最終：外周なし・中身のみ） ===== -->
   <g transform="translate(520,160)">
 
-    <!-- グラデ -->
     <defs>
       <linearGradient id="gaugeGrad" x1="0%" x2="100%">
         <stop offset="0%" stop-color="#22c55e"/>
@@ -139,20 +136,20 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
       </linearGradient>
     </defs>
 
-    <!-- 外側リング -->
-    <path d="M0 80 A80 80 0 0 1 160 80"
-      stroke="url(#gaugeGrad)"
-      stroke-width="16"
-      fill="none"
-      stroke-linecap="round"/>
-
-    <!-- 内側グラフィック -->
-    <path d="M10 80 A70 70 0 0 1 150 80 L150 80 L10 80 Z"
+    <!-- 半月の中身 -->
+    <path
+      d="M0 80 A80 80 0 0 1 160 80 L160 80 L0 80 Z"
       fill="url(#gaugeGrad)"
-      opacity="0.25"/>
+    />
+
+    <!-- 内側カット -->
+    <path
+      d="M15 80 A65 65 0 0 1 145 80 L145 80 L15 80 Z"
+      fill="#ffffff"
+    />
 
     <!-- 中心 -->
-    <circle cx="80" cy="80" r="6" fill="#111"/>
+    <circle cx="80" cy="80" r="5" fill="#111"/>
 
     <!-- 針 -->
     <g transform="rotate(${needleAngle} 80 80)">
