@@ -128,12 +128,12 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
     </div>
 
     <!-- ===== 青波（完全固定補正） ===== -->
-   <svg style="
+  <svg style="
   position:absolute;
-  left:340px;
-  top:155px;
-  width:90px;
-  height:22px;
+  left:360px;
+  top:150px;
+  width:80px;
+  height:20px;
 " viewBox="0 0 80 20">
 
       <path stroke="#3B82A0" stroke-width="2.6" fill="none"
@@ -151,10 +151,10 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
     <!-- ===== 赤波 ===== -->
     <svg style="
   position:absolute;
-  left:540px;
-  top:165px;
-  width:90px;
-  height:22px;
+  left:560px;
+  top:160px;
+  width:80px;
+  height:20px;
 " viewBox="0 0 80 20">
 
       <path stroke="#dc2626" stroke-width="2.6" fill="none"
@@ -179,19 +179,38 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
       <stop offset="50%" stop-color="#f59e0b"/>
       <stop offset="100%" stop-color="#ef4444"/>
     </linearGradient>
+
+    <radialGradient id="innerBg" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#e5e7eb"/>
+    </radialGradient>
   </defs>
 
-  <!-- フル円 -->
+  <!-- 中身（これが今なかった部分） -->
+  <circle cx="100" cy="100" r="70"
+    fill="url(#innerBg)" />
+
+  <!-- 外枠 -->
+  <circle cx="100" cy="100" r="75"
+    fill="none"
+    stroke="#d1d5db"
+    stroke-width="2"/>
+
+  <!-- レインボーリング -->
   <circle cx="100" cy="100" r="75"
     fill="none"
     stroke="url(#gaugeFill)"
-    stroke-width="14"/>
+    stroke-width="14"
+    stroke-linecap="round"
+    stroke-dasharray="470"
+    stroke-dashoffset="120"/>
 
-  <!-- 針 -->
-  <g transform="rotate(${ -90 + (scoreRight / 100) * 360 } 100 100)">
-    <line x1="100" y1="100" x2="160" y2="40"
+  <!-- 針（修正済：正常角度） -->
+  <g transform="rotate(${ -90 + (scoreRight / 100) * 180 } 100 100)">
+    <line x1="100" y1="100" x2="150" y2="60"
       stroke="#111"
-      stroke-width="3"/>
+      stroke-width="3"
+      stroke-linecap="round"/>
     <circle cx="100" cy="100" r="5" fill="#111"/>
   </g>
 
