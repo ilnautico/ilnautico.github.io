@@ -104,42 +104,37 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
     </svg>
 
   <svg viewBox="0 0 200 120"
-  style="position:absolute; left:70%; top:68%; width:150px; height:100px;">
+      style="position:absolute; left:70%; top:68%; width:150px; height:100px;">
 
-  <defs>
-    <linearGradient id="gaugeGrad" x1="0%" x2="100%">
-      <stop offset="0%" stop-color="#22c55e"/>
-      <stop offset="50%" stop-color="#f59e0b"/>
-      <stop offset="100%" stop-color="#ef4444"/>
-    </linearGradient>
-  </defs>
+      <defs>
+        <linearGradient id="gaugeGrad" x1="0%" x2="100%">
+          <stop offset="0%" stop-color="#22c55e"/>
+          <stop offset="50%" stop-color="#f59e0b"/>
+          <stop offset="100%" stop-color="#ef4444"/>
+        </linearGradient>
+      </defs>
 
-  <!-- ★ 外側の面（ここが本体） -->
-  <path
-    d="M20 100 A80 80 0 0 1 180 100 L180 100 L20 100 Z"
-    fill="url(#gaugeGrad)"
-  />
+      <!-- 半月プレート -->
+      <path
+        d="M20 100 A80 80 0 0 1 180 100 L180 100 L20 100 Z"
+        fill="url(#gaugeGrad)"
+      />
 
-  <!-- ★ 内側を削る（これでリングになる） -->
-  <path
-    d="M45 100 A55 55 0 0 1 155 100 L155 100 L45 100 Z"
-    fill="#ffffff"
-  />
+      <!-- 針 -->
+      <g transform="rotate(${ -90 + (scoreRight / 100) * 180 } 100 100)">
+        <line x1="100" y1="100" x2="145" y2="60"
+          stroke="#111"
+          stroke-width="3"
+          stroke-linecap="round"/>
+        <circle cx="100" cy="100" r="5" fill="#111"/>
+      </g>
 
-  <!-- ★ 針 -->
-  <g transform="rotate(${ -90 + (scoreRight / 100) * 180 } 100 100)">
-    <line x1="100" y1="100" x2="145" y2="60"
-      stroke="#111"
-      stroke-width="3"
-      stroke-linecap="round"/>
-    <circle cx="100" cy="100" r="5" fill="#111"/>
-  </g>
-
-</svg>
+    </svg>
 
   </div>
   `;
 }
+ 
 
 // =========================
 // HTML差し込み
