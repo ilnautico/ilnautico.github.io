@@ -90,13 +90,13 @@ function calculateScores(body) {
 // 🔥 Overlay（変更なし）
 function generateOverlay(scoreLeft = 80, scoreRight = 35) {
 
-  const ampLeft = 4 + scoreLeft * 0.12;
-  const ampRight = 4 + scoreRight * 0.12;
+  const ampLeft = 3 + scoreLeft * 0.10;
+  const ampRight = 3 + scoreRight * 0.10;
 
-  const durLeft = 1.6 - scoreLeft * 0.01;
-  const durRight = 1.6 - scoreRight * 0.01;
+  const durLeft = 1.6 - scoreLeft * 0.008;
+  const durRight = 1.6 - scoreRight * 0.008;
 
-  const angle = -60 + (scoreRight / 100) * 120;
+  const angle = -90 + (scoreRight / 100) * 180;
 
   return `
   <div style="
@@ -110,34 +110,34 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
   ">
 
     <!-- 温度 -->
-    <div style="position:absolute; left:245px; top:12px; font-size:34px; color:#1f2937;">
+    <div style="position:absolute; left:250px; top:10px; font-size:34px; color:#1f2937;">
       230°C
     </div>
 
-    <div style="position:absolute; left:485px; top:12px; font-size:34px; color:#dc2626;">
+    <div style="position:absolute; left:485px; top:10px; font-size:34px; color:#dc2626;">
       180°C
     </div>
 
     <!-- スコア -->
-    <div style="position:absolute; left:300px; top:64px; font-size:18px; color:#374151;">
+    <div style="position:absolute; left:305px; top:62px; font-size:18px;">
       ${scoreLeft}
     </div>
 
-    <div style="position:absolute; left:540px; top:64px; font-size:18px; color:#dc2626;">
+    <div style="position:absolute; left:545px; top:62px; font-size:18px; color:#dc2626;">
       ${scoreRight}
     </div>
 
-    <!-- ===== 青波 ===== -->
+    <!-- ===== 青波（完全固定補正） ===== -->
     <svg style="
       position:absolute;
-      left:318px;
-      top:150px;
-      width:80px;
-      height:20px;
+      left:355px;
+      top:158px;
+      width:90px;
+      height:22px;
       transform:translateX(-50%);
     " viewBox="0 0 80 20">
 
-      <path stroke="#3B82A0" stroke-width="2.4" fill="none"
+      <path stroke="#3B82A0" stroke-width="2.6" fill="none"
         d="M0 10 Q20 ${10-ampLeft} 40 10 T80 10">
 
         <animate attributeName="d" dur="${durLeft}s" repeatCount="indefinite"
@@ -152,14 +152,14 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
     <!-- ===== 赤波 ===== -->
     <svg style="
       position:absolute;
-      left:520px;
-      top:160px;
-      width:80px;
-      height:20px;
+      left:555px;
+      top:165px;
+      width:90px;
+      height:22px;
       transform:translateX(-50%);
     " viewBox="0 0 80 20">
 
-      <path stroke="#dc2626" stroke-width="2.4" fill="none"
+      <path stroke="#dc2626" stroke-width="2.6" fill="none"
         d="M0 10 Q20 ${10-ampRight} 40 10 T80 10">
 
         <animate attributeName="d" dur="${durRight}s" repeatCount="indefinite"
@@ -171,45 +171,48 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
 
     </svg>
 
-    <!-- ===== メーター（完全強化版） ===== -->
-    <svg viewBox="0 0 180 110"
-      style="position:absolute; left:470px; top:185px; width:150px; height:100px;">
+    <!-- ===== メーター（完全リアル版） ===== -->
+    <svg viewBox="0 0 200 140"
+      style="position:absolute; left:460px; top:170px; width:170px; height:120px;">
 
       <defs>
-        <!-- グラデ -->
-        <linearGradient id="gaugeGradient" x1="0%" x2="100%">
+        <linearGradient id="gaugeFill" x1="0%" x2="100%">
           <stop offset="0%" stop-color="#22c55e"/>
           <stop offset="50%" stop-color="#f59e0b"/>
           <stop offset="100%" stop-color="#ef4444"/>
         </linearGradient>
 
-        <!-- 強い影 -->
-        <filter id="softShadow" x="-50%" y="-50%" width="200%" height="200%">
-          <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#000" flood-opacity="0.25"/>
+        <radialGradient id="innerGlow" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stop-color="#ffffff" stop-opacity="0.9"/>
+          <stop offset="100%" stop-color="#e5e7eb" stop-opacity="0.4"/>
+        </radialGradient>
+
+        <filter id="shadow">
+          <feDropShadow dx="0" dy="6" stdDeviation="6" flood-opacity="0.25"/>
         </filter>
       </defs>
 
-      <!-- 背景トラック -->
-      <path d="M20 90 A70 70 0 0 1 160 90"
-        fill="none"
-        stroke="#e5e7eb"
-        stroke-width="16"/>
+      <!-- 外枠 -->
+      <circle cx="100" cy="100" r="80"
+        fill="url(#innerGlow)"
+        stroke="#d1d5db"
+        stroke-width="2"/>
 
-      <!-- メイン -->
-      <path d="M20 90 A70 70 0 0 1 160 90"
+      <!-- メーター -->
+      <path d="M20 100 A80 80 0 0 1 180 100"
         fill="none"
-        stroke="url(#gaugeGradient)"
-        stroke-width="16"
+        stroke="url(#gaugeFill)"
+        stroke-width="18"
         stroke-linecap="round"
-        filter="url(#softShadow)"/>
+        filter="url(#shadow)"/>
 
       <!-- 針 -->
-      <g transform="rotate(${angle} 90 90)">
-        <line x1="90" y1="90" x2="140" y2="45"
+      <g transform="rotate(${angle} 100 100)">
+        <line x1="100" y1="100" x2="160" y2="40"
           stroke="#111"
-          stroke-width="3.5"
+          stroke-width="4"
           stroke-linecap="round"/>
-        <circle cx="90" cy="90" r="6" fill="#111"/>
+        <circle cx="100" cy="100" r="7" fill="#111"/>
       </g>
 
     </svg>
@@ -217,7 +220,6 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
   </div>
   `;
 }
-
 
 // =========================
 // HTML差し込み
