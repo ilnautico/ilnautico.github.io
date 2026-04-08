@@ -515,23 +515,26 @@ body {
 <!-- 青波 -->
 <!-- ===== SECTION 06 FINAL SAFE ===== -->
 
+<!-- ===== SECTION 06 FINAL COMPLETE ===== -->
+
 <div style="
   position:relative;
-  width:700px;
-  height:260px;
-  margin:0 auto;
+  width:720px;
+  height:280px;
+  margin:20px auto 0;
   overflow:hidden;
 ">
 
-  <!-- 背景 -->
+  <!-- 背景画像（微調整済） -->
   <img src="{{base_image}}" style="
-    width:100%;
-    height:100%;
+    width:102%;
+    height:102%;
     object-fit:contain;
     display:block;
+    transform:translateY(6px);
   ">
 
-  <!-- Overlay（サーバー生成） -->
+  <!-- 動的Overlay（サーバー側描画） -->
   {{dynamic_overlay}}
 
 </div>
