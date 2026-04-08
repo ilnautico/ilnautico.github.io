@@ -119,26 +119,51 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
 </svg>
 
     <!-- メーター -->
-    <svg viewBox="0 0 120 70"
-      style="position:absolute; left:70%; top:70%; width:120px; height:70px;">
-      <defs>
-        <linearGradient id="gaugeGradient" x1="0%" x2="100%">
-          <stop offset="0%" stop-color="#16a34a"/>
-          <stop offset="50%" stop-color="#f59e0b"/>
-          <stop offset="100%" stop-color="#dc2626"/>
-        </linearGradient>
-      </defs>
+   <svg viewBox="0 0 200 120"
+  style="position:absolute; left:70%; top:70%; width:140px; height:90px;">
 
-      <path d="M10 60 A50 50 0 0 1 110 60"
-        fill="none" stroke="url(#gaugeGradient)" stroke-width="10"/>
+  <!-- 半円マスク -->
+  <defs>
+    <linearGradient id="rainbowFill" x1="0%" x2="100%">
+      <stop offset="0%" stop-color="#22c55e"/>
+      <stop offset="50%" stop-color="#f59e0b"/>
+      <stop offset="100%" stop-color="#ef4444"/>
+    </linearGradient>
 
-      <g transform="rotate(${angle} 60 60)">
-        <line x1="60" y1="60" x2="85" y2="30"
-          stroke="#111"
-          stroke-width="2"/>
-        <circle cx="60" cy="60" r="4" fill="#111"/>
-      </g>
-    </svg>
+    <clipPath id="halfClip">
+      <rect x="0" y="0" width="200" height="100"/>
+    </clipPath>
+  </defs>
+
+  <!-- 背景（薄） -->
+  <circle cx="100" cy="100" r="70"
+    fill="#e5e7eb"
+    clip-path="url(#halfClip)"/>
+
+  <!-- レインボー中身 -->
+  <circle cx="100" cy="100" r="70"
+    fill="none"
+    stroke="url(#rainbowFill)"
+    stroke-width="18"
+    stroke-linecap="round"
+    clip-path="url(#halfClip)"/>
+
+  <!-- 内側ぼかし（質感） -->
+  <circle cx="100" cy="100" r="52"
+    fill="#ffffff"
+    opacity="0.85"
+    clip-path="url(#halfClip)"/>
+
+  <!-- 針 -->
+  <g transform="rotate(${ -90 + (scoreRight / 100) * 180 } 100 100)">
+    <line x1="100" y1="100" x2="145" y2="60"
+      stroke="#111"
+      stroke-width="3"
+      stroke-linecap="round"/>
+    <circle cx="100" cy="100" r="5" fill="#111"/>
+  </g>
+
+</svg>
 
   </div>
   `;
