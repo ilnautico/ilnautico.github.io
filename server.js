@@ -43,65 +43,14 @@ function getValue(fields, keyword) {
 
 // =========================
 // 🔥 スコア算出
-function calculateScores(body) {
-
-  const fields =
-    body?.data?.fields ||
-    body?.fields ||
-    [];
-
-  const currentMaterial = getValue(fields, "current material");
-  const processing = getValue(fields, "processing method");
-  const concern = getValue(fields, "primary concern");
-  const ld = getValue(fields, "l/d");
-
-  let stability = 70;
-  let risk = 40;
-
-  if (currentMaterial.includes("ldpe")) {
-    stability += 10;
-    risk -= 5;
-  }
-
-  if (processing.includes("film")) {
-    stability -= 10;
-    risk += 15;
-  }
-
-  if (ld.includes("22")) {
-    stability -= 5;
-  }
-
-  if (concern.includes("instability")) {
-    risk += 20;
-  }
-
-  stability = Math.max(0, Math.min(100, stability));
-  risk = Math.max(0, Math.min(100, risk));
-
-  return {
-    scoreLeft: stability,
-    scoreRight: risk
-  };
-}
-
-
-// =========================
-// 🔥 Overlay（変更なし）
-
 function generateOverlay(scoreLeft = 80, scoreRight = 35) {
 
-  const ampLeft = 3 + scoreLeft * 0.10;
-  const ampRight = 3 + scoreRight * 0.10;
   const ampLeft = 4 + scoreLeft * 0.12;
   const ampRight = 4 + scoreRight * 0.12;
 
-  const durLeft = 1.6 - scoreLeft * 0.008;
-  const durRight = 1.6 - scoreRight * 0.008;
   const durLeft = 1.6 - scoreLeft * 0.01;
   const durRight = 1.6 - scoreRight * 0.01;
 
-  const angle = -90 + (scoreRight / 100) * 180;
   const angle = -60 + (scoreRight / 100) * 120;
 
   return `
@@ -109,8 +58,6 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
     position:absolute;
     top:0;
     left:0;
-    width:720px;
-    height:280px;
     width:100%;
     height:100%;
     pointer-events:none;
@@ -118,38 +65,19 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
   ">
 
     <!-- 温度 -->
-    <div style="position:absolute; left:250px; top:10px; font-size:34px; color:#1f2937;">
-      230°C
-    </div>
-
-    <div style="position:absolute; left:485px; top:10px; font-size:34px; color:#dc2626;">
-      180°C
-    </div>
     <div style="position:absolute; left:33.5%; top:4%; font-size:32px;">230°C</div>
     <div style="position:absolute; left:66%; top:4%; font-size:32px; color:#dc2626;">180°C</div>
 
     <!-- スコア -->
-    <div style="position:absolute; left:305px; top:62px; font-size:18px;">
     <div style="position:absolute; left:40%; top:22%; font-size:18px;">
       ${scoreLeft}
     </div>
 
-    <div style="position:absolute; left:545px; top:62px; font-size:18px; color:#dc2626;">
     <div style="position:absolute; left:72%; top:22%; font-size:18px; color:#dc2626;">
       ${scoreRight}
     </div>
 
-    <!-- ===== 青波（完全固定補正） ===== -->
-<svg style="
-  position:absolute;
-  left:49.2%;
-  top:63.5%;
-  width:10%;
-  height:8%;
-  transform:translate(-50%, -50%);
-" viewBox="0 0 80 20">
-      <path stroke="#3B82A0" stroke-width="2.6" fill="none"
-    <!-- 🔵 青波（最終FIX：上げ＋左戻し） -->
+    <!-- 🔵 青波 -->
     <svg style="
       position:absolute;
       left:46.8%;
@@ -160,39 +88,25 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
     " viewBox="0 0 80 20">
       <path stroke="#3B82A0" stroke-width="2" fill="none"
         d="M0 10 Q20 ${10-ampLeft} 40 10 T80 10">
-
         <animate attributeName="d" dur="${durLeft}s" repeatCount="indefinite"
           values="
             M0 10 Q20 ${10-ampLeft} 40 10 T80 10;
             M0 10 Q20 ${10+ampLeft} 40 10 T80 10;
             M0 10 Q20 ${10-ampLeft} 40 10 T80 10"/>
       </path>
-
     </svg>
 
-    <!-- ===== 赤波 ===== -->
-<svg style="
-  position:absolute;
-  left:81.8%;
-  top:70.5%;
-  width:10%;
-  height:8%;
-  transform:translate(-50%, -50%);
-" viewBox="0 0 80 20">
-
-      <path stroke="#dc2626" stroke-width="2.6" fill="none"
-    <!-- 🔴 赤波（最終FIX：左戻し） -->
+    <!-- 🔴 赤波 -->
     <svg style="
       position:absolute;
-      left:76.2%;
-      top:69.5%;
+      left:74.8%;
+      top:66.8%;
       width:11%;
       height:8%;
       transform:translate(-50%, -50%);
     " viewBox="0 0 80 20">
       <path stroke="#dc2626" stroke-width="2" fill="none"
         d="M0 10 Q20 ${10-ampRight} 40 10 T80 10">
-
         <animate attributeName="d" dur="${durRight}s" repeatCount="indefinite"
           values="
             M0 10 Q20 ${10-ampRight} 40 10 T80 10;
@@ -201,7 +115,7 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
       </path>
     </svg>
 
-    <!-- メーター（触ってない＝現状維持） -->
+    <!-- メーター（シンプル固定） -->
     <svg viewBox="0 0 120 70"
       style="position:absolute; left:70%; top:70%; width:120px; height:70px;">
       <defs>
@@ -217,46 +131,16 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
 
       <g transform="rotate(${angle} 60 60)">
         <line x1="60" y1="60" x2="85" y2="30"
-          stroke="#111" stroke-width="2"/>
+          stroke="#111"
+          stroke-width="2"/>
         <circle cx="60" cy="60" r="4" fill="#111"/>
       </g>
     </svg>
 
-<svg viewBox="0 0 200 200"
-  style="position:absolute; left:470px; top:185px; width:140px; height:140px;">
-
-  <defs>
-    <conicGradient id="gaugeFill"
-      gradientUnits="userSpaceOnUse"
-      cx="100" cy="100" r="75">
-      <stop offset="0%" stop-color="#22c55e"/>
-      <stop offset="50%" stop-color="#f59e0b"/>
-      <stop offset="100%" stop-color="#ef4444"/>
-    </conicGradient>
-  </defs>
-
-  <!-- 背景 -->
-  <circle cx="100" cy="100" r="75"
-    fill="#f3f4f6" />
-
-  <!-- フルリング -->
-  <circle cx="100" cy="100" r="75"
-    fill="none"
-    stroke="url(#gaugeFill)"
-    stroke-width="14"/>
-
-  <!-- 針 -->
-  <g transform="rotate(${ -90 + (scoreRight / 100) * 360 } 100 100)">
-    <line x1="100" y1="100" x2="150" y2="60"
-      stroke="#111"
-      stroke-width="3"/>
-    <circle cx="100" cy="100" r="5" fill="#111"/>
-  </g>
-
-</svg>
   </div>
   `;
 }
+
   
 
 // =========================
