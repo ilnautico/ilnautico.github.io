@@ -128,14 +128,13 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
     </div>
 
     <!-- ===== 青波（完全固定補正） ===== -->
-  <svg style="
+ <svg style="
   position:absolute;
-  left:360px;
-  top:150px;
+  left:330px;
+  top:165px;
   width:80px;
   height:20px;
 " viewBox="0 0 80 20">
-
       <path stroke="#3B82A0" stroke-width="2.6" fill="none"
         d="M0 10 Q20 ${10-ampLeft} 40 10 T80 10">
 
@@ -149,10 +148,10 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
     </svg>
 
     <!-- ===== 赤波 ===== -->
-    <svg style="
+   <svg style="
   position:absolute;
-  left:560px;
-  top:160px;
+  left:555px;
+  top:175px;
   width:80px;
   height:20px;
 " viewBox="0 0 80 20">
@@ -169,53 +168,38 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
 
     </svg>
 
-    <!-- ===== メーター（完全リアル版） ===== -->
 <svg viewBox="0 0 200 200"
-  style="position:absolute; left:470px; top:175px; width:150px; height:150px;">
+  style="position:absolute; left:470px; top:185px; width:140px; height:140px;">
 
   <defs>
-    <linearGradient id="gaugeFill" x1="0%" y1="0%" x2="100%" y2="0%">
+    <conicGradient id="gaugeFill"
+      gradientUnits="userSpaceOnUse"
+      cx="100" cy="100" r="75">
       <stop offset="0%" stop-color="#22c55e"/>
       <stop offset="50%" stop-color="#f59e0b"/>
       <stop offset="100%" stop-color="#ef4444"/>
-    </linearGradient>
-
-    <radialGradient id="innerBg" cx="50%" cy="50%" r="50%">
-      <stop offset="0%" stop-color="#ffffff"/>
-      <stop offset="100%" stop-color="#e5e7eb"/>
-    </radialGradient>
+    </conicGradient>
   </defs>
 
-  <!-- 中身（これが今なかった部分） -->
-  <circle cx="100" cy="100" r="70"
-    fill="url(#innerBg)" />
-
-  <!-- 外枠 -->
+  <!-- 背景 -->
   <circle cx="100" cy="100" r="75"
-    fill="none"
-    stroke="#d1d5db"
-    stroke-width="2"/>
+    fill="#f3f4f6" />
 
-  <!-- レインボーリング -->
+  <!-- フルリング -->
   <circle cx="100" cy="100" r="75"
     fill="none"
     stroke="url(#gaugeFill)"
-    stroke-width="14"
-    stroke-linecap="round"
-    stroke-dasharray="470"
-    stroke-dashoffset="120"/>
+    stroke-width="14"/>
 
-  <!-- 針（修正済：正常角度） -->
-  <g transform="rotate(${ -90 + (scoreRight / 100) * 180 } 100 100)">
+  <!-- 針 -->
+  <g transform="rotate(${ -90 + (scoreRight / 100) * 360 } 100 100)">
     <line x1="100" y1="100" x2="150" y2="60"
       stroke="#111"
-      stroke-width="3"
-      stroke-linecap="round"/>
+      stroke-width="3"/>
     <circle cx="100" cy="100" r="5" fill="#111"/>
   </g>
 
 </svg>
-
   </div>
   `;
 }
