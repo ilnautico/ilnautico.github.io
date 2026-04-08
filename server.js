@@ -115,8 +115,14 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
     </div>
 
     <!-- 🔵 青波（完全位置修正済） -->
-    <svg style="position:absolute; left:300px; top:138px; width:82px; height:18px;"
-      viewBox="0 0 80 20">
+    <svg style="
+  position:absolute;
+  left:292px;
+  top:138px;
+  width:82px;
+  height:18px;
+"
+viewBox="0 0 80 20">
       <path stroke="#3B82A0" stroke-width="2" fill="none"
         d="M0 10 Q20 ${10-ampLeft} 40 10 T80 10">
         <animate attributeName="d" dur="${durLeft}s" repeatCount="indefinite"
