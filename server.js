@@ -144,8 +144,8 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
     <!-- 🔴 赤波（最終FIX：左戻し） -->
     <svg style="
       position:absolute;
-      left:76.2%;
-      top:69.5%;
+      left:74.8%;
+      top:66.8%;
       width:11%;
       height:8%;
       transform:translate(-50%, -50%);
@@ -161,27 +161,46 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
     </svg>
 
     <!-- メーター（触ってない＝現状維持） -->
-    <svg viewBox="0 0 120 70"
-      style="position:absolute; left:70%; top:70%; width:120px; height:70px;">
-      <defs>
-        <linearGradient id="gaugeGradient" x1="0%" x2="100%">
-          <stop offset="0%" stop-color="#16a34a"/>
-          <stop offset="50%" stop-color="#f59e0b"/>
-          <stop offset="100%" stop-color="#dc2626"/>
-        </linearGradient>
-      </defs>
+   <svg viewBox="0 0 200 120"
+  style="position:absolute; left:68%; top:66%; width:180px; height:110px;">
 
-      <path d="M10 60 A50 50 0 0 1 110 60"
-        fill="none" stroke="url(#gaugeGradient)" stroke-width="10"/>
+  <defs>
+    <!-- レインボー -->
+    <linearGradient id="gaugeFull" x1="0%" x2="100%">
+      <stop offset="0%" stop-color="#22c55e"/>
+      <stop offset="40%" stop-color="#eab308"/>
+      <stop offset="75%" stop-color="#f97316"/>
+      <stop offset="100%" stop-color="#dc2626"/>
+    </linearGradient>
 
-      <g transform="rotate(${angle} 60 60)">
-        <line x1="60" y1="60" x2="85" y2="30"
-          stroke="#111" stroke-width="2"/>
-        <circle cx="60" cy="60" r="4" fill="#111"/>
-      </g>
-    </svg>
+    <!-- 中身塗り -->
+    <radialGradient id="gaugeFill" cx="50%" cy="80%" r="80%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#e5e7eb"/>
+    </radialGradient>
+  </defs>
 
-  </div>
+  <!-- 半円の中身 -->
+  <path d="M20 100 A80 80 0 0 1 180 100 L180 110 L20 110 Z"
+    fill="url(#gaugeFill)" />
+
+  <!-- レインボー帯（太め） -->
+  <path d="M20 100 A80 80 0 0 1 180 100"
+    fill="none"
+    stroke="url(#gaugeFull)"
+    stroke-width="16"
+    stroke-linecap="round"/>
+
+  <!-- 針 -->
+  <g transform="rotate(${angle} 100 100)">
+    <line x1="100" y1="100" x2="145" y2="55"
+      stroke="#111"
+      stroke-width="3"
+      stroke-linecap="round"/>
+    <circle cx="100" cy="100" r="5" fill="#111"/>
+  </g>
+
+</svg>
   `;
 }
 
