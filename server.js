@@ -128,12 +128,13 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
     </div>
 
     <!-- ===== 青波（完全固定補正） ===== -->
- <svg style="
+<svg style="
   position:absolute;
-  left:360px;
-  top:180px;
-  width:80px;
-  height:20px;
+  left:49%;
+  top:61%;
+  width:11%;
+  height:8%;
+  transform:translate(-50%, -50%);
 " viewBox="0 0 80 20">
       <path stroke="#3B82A0" stroke-width="2.6" fill="none"
         d="M0 10 Q20 ${10-ampLeft} 40 10 T80 10">
@@ -148,12 +149,13 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
     </svg>
 
     <!-- ===== 赤波 ===== -->
- <svg style="
+<svg style="
   position:absolute;
-  left:565px;
-  top:195px;
-  width:80px;
-  height:20px;
+  left:80%;
+  top:68%;
+  width:11%;
+  height:8%;
+  transform:translate(-50%, -50%);
 " viewBox="0 0 80 20">
 
       <path stroke="#dc2626" stroke-width="2.6" fill="none"
