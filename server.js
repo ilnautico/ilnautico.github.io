@@ -103,63 +103,63 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
     position:absolute;
     top:0;
     left:0;
-    width:700px;
-    height:260px;
+    width:720px;
+    height:280px;
     pointer-events:none;
     z-index:10;
   ">
 
     <!-- 温度 -->
-    <div style="position:absolute; left:235px; top:8px; font-size:32px;">
+    <div style="position:absolute; left:245px; top:12px; font-size:34px; color:#1f2937;">
       230°C
     </div>
 
-    <div style="position:absolute; left:470px; top:8px; font-size:32px; color:#dc2626;">
+    <div style="position:absolute; left:485px; top:12px; font-size:34px; color:#dc2626;">
       180°C
     </div>
 
     <!-- スコア -->
-    <div style="position:absolute; left:285px; top:56px; font-size:18px;">
+    <div style="position:absolute; left:300px; top:64px; font-size:18px; color:#374151;">
       ${scoreLeft}
     </div>
 
-    <div style="position:absolute; left:520px; top:56px; font-size:18px; color:#dc2626;">
+    <div style="position:absolute; left:540px; top:64px; font-size:18px; color:#dc2626;">
       ${scoreRight}
     </div>
 
-    <!-- 青波 -->
-   <!-- 青波 -->
-<svg style="
-  position:absolute;
-  left:312px;
-  top:138px;
-  width:80px;
-  height:20px;
-  transform:translateX(-50%);
-" viewBox="0 0 80 20">
-
-  <path stroke="#3B82A0" stroke-width="2.2" fill="none"
-    d="M0 10 Q20 ${10-ampLeft} 40 10 T80 10">
-
-    <animate attributeName="d" dur="${durLeft}s" repeatCount="indefinite"
-      values="
-        M0 10 Q20 ${10-ampLeft} 40 10 T80 10;
-        M0 10 Q20 ${10+ampLeft} 40 10 T80 10;
-        M0 10 Q20 ${10-ampLeft} 40 10 T80 10"/>
-  </path>
-
-</svg>
-    <!-- 赤波 -->
+    <!-- ===== 青波 ===== -->
     <svg style="
       position:absolute;
-      left:500px;
+      left:318px;
       top:150px;
       width:80px;
       height:20px;
       transform:translateX(-50%);
     " viewBox="0 0 80 20">
 
-      <path stroke="#dc2626" stroke-width="2" fill="none"
+      <path stroke="#3B82A0" stroke-width="2.4" fill="none"
+        d="M0 10 Q20 ${10-ampLeft} 40 10 T80 10">
+
+        <animate attributeName="d" dur="${durLeft}s" repeatCount="indefinite"
+          values="
+            M0 10 Q20 ${10-ampLeft} 40 10 T80 10;
+            M0 10 Q20 ${10+ampLeft} 40 10 T80 10;
+            M0 10 Q20 ${10-ampLeft} 40 10 T80 10"/>
+      </path>
+
+    </svg>
+
+    <!-- ===== 赤波 ===== -->
+    <svg style="
+      position:absolute;
+      left:520px;
+      top:160px;
+      width:80px;
+      height:20px;
+      transform:translateX(-50%);
+    " viewBox="0 0 80 20">
+
+      <path stroke="#dc2626" stroke-width="2.4" fill="none"
         d="M0 10 Q20 ${10-ampRight} 40 10 T80 10">
 
         <animate attributeName="d" dur="${durRight}s" repeatCount="indefinite"
@@ -171,25 +171,45 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
 
     </svg>
 
-    <!-- メーター -->
-    <svg viewBox="0 0 120 70"
-      style="position:absolute; left:480px; top:180px; width:120px; height:70px;">
+    <!-- ===== メーター（完全強化版） ===== -->
+    <svg viewBox="0 0 180 110"
+      style="position:absolute; left:470px; top:185px; width:150px; height:100px;">
 
       <defs>
+        <!-- グラデ -->
         <linearGradient id="gaugeGradient" x1="0%" x2="100%">
-          <stop offset="0%" stop-color="#16a34a"/>
+          <stop offset="0%" stop-color="#22c55e"/>
           <stop offset="50%" stop-color="#f59e0b"/>
-          <stop offset="100%" stop-color="#dc2626"/>
+          <stop offset="100%" stop-color="#ef4444"/>
         </linearGradient>
+
+        <!-- 強い影 -->
+        <filter id="softShadow" x="-50%" y="-50%" width="200%" height="200%">
+          <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#000" flood-opacity="0.25"/>
+        </filter>
       </defs>
 
-      <path d="M10 60 A50 50 0 0 1 110 60"
-        fill="none" stroke="url(#gaugeGradient)" stroke-width="10"/>
+      <!-- 背景トラック -->
+      <path d="M20 90 A70 70 0 0 1 160 90"
+        fill="none"
+        stroke="#e5e7eb"
+        stroke-width="16"/>
 
-      <g transform="rotate(${angle} 60 60)">
-        <line x1="60" y1="60" x2="85" y2="30"
-          stroke="#111" stroke-width="2"/>
-        <circle cx="60" cy="60" r="4" fill="#111"/>
+      <!-- メイン -->
+      <path d="M20 90 A70 70 0 0 1 160 90"
+        fill="none"
+        stroke="url(#gaugeGradient)"
+        stroke-width="16"
+        stroke-linecap="round"
+        filter="url(#softShadow)"/>
+
+      <!-- 針 -->
+      <g transform="rotate(${angle} 90 90)">
+        <line x1="90" y1="90" x2="140" y2="45"
+          stroke="#111"
+          stroke-width="3.5"
+          stroke-linecap="round"/>
+        <circle cx="90" cy="90" r="6" fill="#111"/>
       </g>
 
     </svg>
