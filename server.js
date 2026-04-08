@@ -1,4 +1,3 @@
-
 import express from "express";
 import puppeteer from "puppeteer";
 import fs from "fs";
@@ -6,43 +5,29 @@ import fs from "fs";
 const app = express();
 
 // =========================
-// 🔥 Tally対策（重要）
+// Body
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.text({ type: "*/*" }));
 
-
 // =========================
-// ヘルスチェック
 app.get("/", (req, res) => {
   res.send("SERVER OK");
 });
 
-
 // =========================
-// 🔥 安全フィールド取得
+// 値取得
 function getValue(fields, keyword) {
-
   for (const item of fields) {
-
-    const key = String(item?.label || "")
-      .toLowerCase()
-      .replace(/\s+/g, " ")
-      .trim();
-
+    const key = String(item?.label || "").toLowerCase();
     const value = String(item?.value || "").toLowerCase();
-
-    if (key.includes(keyword)) {
-      return value;
-    }
+    if (key.includes(keyword)) return value;
   }
-
   return "";
 }
 
-
 // =========================
-// 🔥 スコア算出
+// スコア
 function calculateScores(body) {
 
   const fields =
@@ -50,19 +35,10 @@ function calculateScores(body) {
     body?.fields ||
     [];
 
-  const getValue = (keyword) => {
-    for (const item of fields) {
-      const key = String(item?.label || "").toLowerCase();
-      const value = String(item?.value || "").toLowerCase();
-      if (key.includes(keyword)) return value;
-    }
-    return "";
-  };
-
-  const currentMaterial = getValue("current material");
-  const processing = getValue("processing method");
-  const concern = getValue("primary concern");
-  const ld = getValue("l/d");
+  const currentMaterial = getValue(fields, "current material");
+  const processing = getValue(fields, "processing method");
+  const concern = getValue(fields, "primary concern");
+  const ld = getValue(fields, "l/d");
 
   let stability = 70;
   let risk = 40;
@@ -91,58 +67,50 @@ function calculateScores(body) {
   };
 }
 
-    <!-- 温度 -->
+// =========================
+// Overlay（ここだけHTML）
+function generateOverlay(scoreLeft = 80, scoreRight = 35) {
+
+  const ampLeft = 4 + scoreLeft * 0.12;
+  const ampRight = 4 + scoreRight * 0.12;
+
+  const durLeft = 1.6 - scoreLeft * 0.01;
+  const durRight = 1.6 - scoreRight * 0.01;
+
+  const angle = -60 + (scoreRight / 100) * 120;
+
+  return `
+  <div style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:10;">
+
     <div style="position:absolute; left:33.5%; top:4%; font-size:32px;">230°C</div>
     <div style="position:absolute; left:66%; top:4%; font-size:32px; color:#dc2626;">180°C</div>
 
-    <!-- スコア -->
-    <div style="position:absolute; left:40%; top:22%; font-size:18px;">
-      ${scoreLeft}
-    </div>
+    <div style="position:absolute; left:40%; top:22%; font-size:18px;">${scoreLeft}</div>
+    <div style="position:absolute; left:72%; top:22%; font-size:18px; color:#dc2626;">${scoreRight}</div>
 
-    <div style="position:absolute; left:72%; top:22%; font-size:18px; color:#dc2626;">
-      ${scoreRight}
-    </div>
-
-    <!-- 🔵 青波 -->
-    <svg style="
-      position:absolute;
-      left:46.8%;
-      top:57.2%;
-      width:11%;
-      height:8%;
-      transform:translate(-50%, -50%);
-    " viewBox="0 0 80 20">
+    <!-- 青 -->
+    <svg style="position:absolute;left:46.8%;top:57.2%;width:11%;height:8%;transform:translate(-50%,-50%);" viewBox="0 0 80 20">
       <path stroke="#3B82A0" stroke-width="2" fill="none"
         d="M0 10 Q20 ${10-ampLeft} 40 10 T80 10">
         <animate attributeName="d" dur="${durLeft}s" repeatCount="indefinite"
-          values="
-            M0 10 Q20 ${10-ampLeft} 40 10 T80 10;
-            M0 10 Q20 ${10+ampLeft} 40 10 T80 10;
-            M0 10 Q20 ${10-ampLeft} 40 10 T80 10"/>
+          values="M0 10 Q20 ${10-ampLeft} 40 10 T80 10;
+                  M0 10 Q20 ${10+ampLeft} 40 10 T80 10;
+                  M0 10 Q20 ${10-ampLeft} 40 10 T80 10"/>
       </path>
     </svg>
 
-    <!-- 🔴 赤波 -->
-    <svg style="
-      position:absolute;
-      left:74.8%;
-      top:66.8%;
-      width:11%;
-      height:8%;
-      transform:translate(-50%, -50%);
-    " viewBox="0 0 80 20">
+    <!-- 赤 -->
+    <svg style="position:absolute;left:74.8%;top:66.8%;width:11%;height:8%;transform:translate(-50%,-50%);" viewBox="0 0 80 20">
       <path stroke="#dc2626" stroke-width="2" fill="none"
         d="M0 10 Q20 ${10-ampRight} 40 10 T80 10">
         <animate attributeName="d" dur="${durRight}s" repeatCount="indefinite"
-          values="
-            M0 10 Q20 ${10-ampRight} 40 10 T80 10;
-            M0 10 Q20 ${10+ampRight} 40 10 T80 10;
-            M0 10 Q20 ${10-ampRight} 40 10 T80 10"/>
+          values="M0 10 Q20 ${10-ampRight} 40 10 T80 10;
+                  M0 10 Q20 ${10+ampRight} 40 10 T80 10;
+                  M0 10 Q20 ${10-ampRight} 40 10 T80 10"/>
       </path>
     </svg>
 
-    <!-- メーター（シンプル固定） -->
+    <!-- メーター -->
     <svg viewBox="0 0 120 70"
       style="position:absolute; left:70%; top:70%; width:120px; height:70px;">
       <defs>
@@ -168,29 +136,19 @@ function calculateScores(body) {
   `;
 }
 
-  
-
 // =========================
-// HTML差し込み
 function injectHtml(template, data) {
   let html = template;
-
   Object.keys(data).forEach((key) => {
     const regex = new RegExp(`{{\\s*${key}\\s*}}`, "g");
     html = html.replace(regex, data[key] || "");
   });
-
   return html;
 }
 
-
 // =========================
-// 🔥 PDF生成（ログ付き）
 app.post("/tally-pdf", async (req, res) => {
   try {
-
-    console.log("===== RAW BODY =====");
-    console.log(req.body);
 
     let parsed;
 
@@ -198,25 +156,15 @@ app.post("/tally-pdf", async (req, res) => {
       try {
         parsed = JSON.parse(req.body);
       } catch {
-        console.log("⚠️ JSON parse failed");
         parsed = {};
       }
     } else {
       parsed = req.body;
     }
 
-    console.log("===== PARSED =====");
-    console.log(parsed);
-
-    console.log("===== FIELDS =====");
-    console.log(parsed?.data?.fields);
-
     const template = fs.readFileSync("template.html", "utf8");
 
     const { scoreLeft, scoreRight } = calculateScores(parsed);
-
-    console.log("===== SCORES =====");
-    console.log(scoreLeft, scoreRight);
 
     const html = injectHtml(template, {
       base_image: "https://ilnautico.github.io/visual-base.png",
@@ -255,28 +203,19 @@ app.post("/tally-pdf", async (req, res) => {
     res.send(pdf);
 
   } catch (err) {
-    console.error("❌ ERROR:", err);
+    console.error(err);
     res.status(500).send("PDF generation failed");
   }
 });
 
-
 // =========================
-// PDF確認
 app.get("/latest-pdf", (req, res) => {
-
   const file = "/tmp/latest-report.pdf";
-
-  if (!fs.existsSync(file)) {
-    return res.status(404).send("No PDF yet");
-  }
-
+  if (!fs.existsSync(file)) return res.status(404).send("No PDF yet");
   res.sendFile(file);
 });
 
-
 // =========================
-// 起動
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
