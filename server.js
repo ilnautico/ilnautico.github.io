@@ -88,7 +88,7 @@ function calculateScores(body) {
 
 // =========================
 // 🔥 Overlay（変更なし）
- 🔥 Overlay（変更なし）
+
 function generateOverlay(scoreLeft = 80, scoreRight = 35) {
 
   const ampLeft = 3 + scoreLeft * 0.10;
