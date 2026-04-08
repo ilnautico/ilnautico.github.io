@@ -127,47 +127,44 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
       ${scoreRight}
     </div>
 
-    <!-- ===== 青波（中央固定） ===== -->
-   <!-- 青波 -->
-<svg style="
-  position:absolute;
-  left:330px;
-  top:135px;
-  width:80px;
-  height:20px;
-  transform:translateX(-50%);
-" viewBox="0 0 80 20">
+    <!-- ===== 青波（完全中央固定） ===== -->
+    <svg style="
+      position:absolute;
+      left:330px;
+      top:135px;
+      width:70px;
+      height:20px;
+    " viewBox="0 0 70 20">
 
       <path stroke="#3B82A0" stroke-width="2" fill="none"
-        d="M0 10 Q20 ${10-ampLeft} 40 10 T80 10">
+        d="M0 10 Q17 ${10-ampLeft} 35 10 T70 10">
 
         <animate attributeName="d" dur="${durLeft}s" repeatCount="indefinite"
           values="
-            M0 10 Q20 ${10-ampLeft} 40 10 T80 10;
-            M0 10 Q20 ${10+ampLeft} 40 10 T80 10;
-            M0 10 Q20 ${10-ampLeft} 40 10 T80 10"/>
+            M0 10 Q17 ${10-ampLeft} 35 10 T70 10;
+            M0 10 Q17 ${10+ampLeft} 35 10 T70 10;
+            M0 10 Q17 ${10-ampLeft} 35 10 T70 10"/>
       </path>
 
     </svg>
 
-    <!-- ===== 赤波（中央固定） ===== -->
+    <!-- ===== 赤波（完全中央固定） ===== -->
     <svg style="
       position:absolute;
       left:505px;
       top:145px;
-      width:80px;
+      width:70px;
       height:20px;
-      transform:translateX(-50%);
-    " viewBox="0 0 80 20">
+    " viewBox="0 0 70 20">
 
       <path stroke="#dc2626" stroke-width="2" fill="none"
-        d="M0 10 Q20 ${10-ampRight} 40 10 T80 10">
+        d="M0 10 Q17 ${10-ampRight} 35 10 T70 10">
 
         <animate attributeName="d" dur="${durRight}s" repeatCount="indefinite"
           values="
-            M0 10 Q20 ${10-ampRight} 40 10 T80 10;
-            M0 10 Q20 ${10+ampRight} 40 10 T80 10;
-            M0 10 Q20 ${10-ampRight} 40 10 T80 10"/>
+            M0 10 Q17 ${10-ampRight} 35 10 T70 10;
+            M0 10 Q17 ${10+ampRight} 35 10 T70 10;
+            M0 10 Q17 ${10-ampRight} 35 10 T70 10"/>
       </path>
 
     </svg>
