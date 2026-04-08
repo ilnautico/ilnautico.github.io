@@ -128,14 +128,13 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
     </div>
 
     <!-- ===== 青波（完全固定補正） ===== -->
-    <svg style="
-      position:absolute;
-      left:355px;
-      top:158px;
-      width:90px;
-      height:22px;
-      transform:translateX(-50%);
-    " viewBox="0 0 80 20">
+   <svg style="
+  position:absolute;
+  left:340px;
+  top:155px;
+  width:90px;
+  height:22px;
+" viewBox="0 0 80 20">
 
       <path stroke="#3B82A0" stroke-width="2.6" fill="none"
         d="M0 10 Q20 ${10-ampLeft} 40 10 T80 10">
@@ -151,13 +150,12 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
 
     <!-- ===== 赤波 ===== -->
     <svg style="
-      position:absolute;
-      left:555px;
-      top:165px;
-      width:90px;
-      height:22px;
-      transform:translateX(-50%);
-    " viewBox="0 0 80 20">
+  position:absolute;
+  left:540px;
+  top:165px;
+  width:90px;
+  height:22px;
+" viewBox="0 0 80 20">
 
       <path stroke="#dc2626" stroke-width="2.6" fill="none"
         d="M0 10 Q20 ${10-ampRight} 40 10 T80 10">
@@ -172,38 +170,28 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
     </svg>
 
     <!-- ===== メーター（完全リアル版） ===== -->
-<svg viewBox="0 0 200 140"
-  style="position:absolute; left:470px; top:175px; width:150px; height:100px;">
+<svg viewBox="0 0 200 200"
+  style="position:absolute; left:470px; top:175px; width:150px; height:150px;">
 
   <defs>
-    <linearGradient id="gaugeFill" x1="0%" x2="100%">
+    <linearGradient id="gaugeFill" x1="0%" y1="0%" x2="100%" y2="0%">
       <stop offset="0%" stop-color="#22c55e"/>
       <stop offset="50%" stop-color="#f59e0b"/>
       <stop offset="100%" stop-color="#ef4444"/>
     </linearGradient>
-
-    <radialGradient id="innerShadow" cx="50%" cy="50%" r="60%">
-      <stop offset="0%" stop-color="#ffffff"/>
-      <stop offset="100%" stop-color="#e5e7eb"/>
-    </radialGradient>
   </defs>
 
+  <!-- フル円 -->
   <circle cx="100" cy="100" r="75"
-    fill="url(#innerShadow)"
-    stroke="#d1d5db"
-    stroke-width="2"/>
-
-  <path d="M25 100 A75 75 0 0 1 175 100"
     fill="none"
     stroke="url(#gaugeFill)"
-    stroke-width="14"
-    stroke-linecap="round"/>
+    stroke-width="14"/>
 
-  <g transform="rotate(${ -90 + (scoreRight / 100) * 180 } 100 100)">
-    <line x1="100" y1="100" x2="155" y2="45"
+  <!-- 針 -->
+  <g transform="rotate(${ -90 + (scoreRight / 100) * 360 } 100 100)">
+    <line x1="100" y1="100" x2="160" y2="40"
       stroke="#111"
-      stroke-width="3"
-      stroke-linecap="round"/>
+      stroke-width="3"/>
     <circle cx="100" cy="100" r="5" fill="#111"/>
   </g>
 
