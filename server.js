@@ -74,95 +74,74 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
   const durLeft = 1.6 - scoreLeft * 0.01;
   const durRight = 1.6 - scoreRight * 0.01;
 
-  const needleAngle = -90 + (scoreRight / 100) * 180;
-
   return `
-<svg viewBox="0 0 720 280"
-     width="100%"
-     height="100%"
-     style="position:absolute; top:0; left:0; pointer-events:none;">
+  <div style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:10;">
 
-  <!-- ===== 背景 ===== -->
-  <image href="https://ilnautico.github.io/visual-base.png"
-         x="0" y="0"
-         width="720"
-         height="280"
-         preserveAspectRatio="xMidYMid meet" />
+    <div style="position:absolute; left:33.5%; top:4%; font-size:32px;">230°C</div>
+    <div style="position:absolute; left:66%; top:4%; font-size:32px; color:#dc2626;">180°C</div>
 
-  <!-- ===== 温度 ===== -->
-  <text x="240" y="35" font-size="28" fill="#1f2937">230°C</text>
-  <text x="470" y="35" font-size="28" fill="#dc2626">180°C</text>
+    <div style="position:absolute; left:40%; top:22%; font-size:18px;">${scoreLeft}</div>
+    <div style="position:absolute; left:72%; top:22%; font-size:18px; color:#dc2626;">${scoreRight}</div>
 
-  <!-- ===== スコア ===== -->
-  <text x="300" y="70" font-size="16" fill="#1f2937">${scoreLeft}</text>
-  <text x="540" y="70" font-size="16" fill="#dc2626">${scoreRight}</text>
+    <!-- 青波 -->
+    <svg style="position:absolute;left:46.8%;top:57.2%;width:11%;height:8%;transform:translate(-50%,-50%);" viewBox="0 0 80 20">
+      <path stroke="#3B82A0" stroke-width="2" fill="none"
+        d="M0 10 Q20 ${10-ampLeft} 40 10 T80 10">
+        <animate attributeName="d" dur="${durLeft}s" repeatCount="indefinite"
+          values="M0 10 Q20 ${10-ampLeft} 40 10 T80 10;
+                  M0 10 Q20 ${10+ampLeft} 40 10 T80 10;
+                  M0 10 Q20 ${10-ampLeft} 40 10 T80 10"/>
+      </path>
+    </svg>
 
-  <!-- ===== 🔵 青波（完全固定・触るな） ===== -->
-  <path stroke="#3B82A0"
-        stroke-width="2"
-        fill="none"
-        d="M330 150 Q350 ${150-ampLeft} 370 150 T410 150">
-    <animate attributeName="d"
-      dur="${durLeft}s"
-      repeatCount="indefinite"
-      values="
-        M330 150 Q350 ${150-ampLeft} 370 150 T410 150;
-        M330 150 Q350 ${150+ampLeft} 370 150 T410 150;
-        M330 150 Q350 ${150-ampLeft} 370 150 T410 150"/>
-  </path>
+    <!-- 赤波 -->
+    <svg style="position:absolute;left:71.5%;top:66.8%;width:11%;height:8%;transform:translate(-50%,-50%);" viewBox="0 0 80 20">
+      <path stroke="#dc2626" stroke-width="2" fill="none"
+        d="M0 10 Q20 ${10-ampRight} 40 10 T80 10">
+        <animate attributeName="d" dur="${durRight}s" repeatCount="indefinite"
+          values="M0 10 Q20 ${10-ampRight} 40 10 T80 10;
+                  M0 10 Q20 ${10+ampRight} 40 10 T80 10;
+                  M0 10 Q20 ${10-ampRight} 40 10 T80 10"/>
+      </path>
+    </svg>
 
-  <!-- ===== 🔴 赤波（中央固定・触るな） ===== -->
-  <path stroke="#dc2626"
-        stroke-width="2"
-        fill="none"
-        d="M470 180 Q500 ${180-ampRight} 530 180 T570 180">
-    <animate attributeName="d"
-      dur="${durRight}s"
-      repeatCount="indefinite"
-      values="
-        M470 180 Q500 ${180-ampRight} 530 180 T570 180;
-        M470 180 Q500 ${180+ampRight} 530 180 T570 180;
-        M470 180 Q500 ${180-ampRight} 530 180 T570 180"/>
-  </path>
+    <!-- メーター -->
+    <svg viewBox="0 0 200 120"
+      style="position:absolute; left:70%; top:68%; width:150px; height:100px;">
 
-  <!-- ===== メーター（最終：外周なし・中身のみ） ===== -->
-  <g transform="translate(520,160)">
+      <defs>
+        <linearGradient id="gaugeFill" x1="0%" x2="100%">
+          <stop offset="0%" stop-color="#22c55e"/>
+          <stop offset="50%" stop-color="#f59e0b"/>
+          <stop offset="100%" stop-color="#ef4444"/>
+        </linearGradient>
+      </defs>
 
-    <defs>
-      <linearGradient id="gaugeGrad" x1="0%" x2="100%">
-        <stop offset="0%" stop-color="#22c55e"/>
-        <stop offset="50%" stop-color="#f59e0b"/>
-        <stop offset="100%" stop-color="#ef4444"/>
-      </linearGradient>
-    </defs>
+      <!-- 中身 -->
+      <path
+        d="M20 100 A80 80 0 0 1 180 100 L180 100 L20 100 Z"
+        fill="url(#gaugeFill)"
+      />
 
-    <!-- 半月の中身 -->
-    <path
-      d="M0 80 A80 80 0 0 1 160 80 L160 80 L0 80 Z"
-      fill="url(#gaugeGrad)"
-    />
+      <!-- 内側 -->
+      <path
+        d="M35 100 A65 65 0 0 1 165 100 L165 100 L35 100 Z"
+        fill="#f3f4f6"
+      />
 
-    <!-- 内側カット -->
-    <path
-      d="M15 80 A65 65 0 0 1 145 80 L145 80 L15 80 Z"
-      fill="#ffffff"
-    />
+      <!-- 針 -->
+      <g transform="rotate(${ -90 + (scoreRight / 100) * 180 } 100 100)">
+        <line x1="100" y1="100" x2="145" y2="60"
+          stroke="#111"
+          stroke-width="3"
+          stroke-linecap="round"/>
+        <circle cx="100" cy="100" r="5" fill="#111"/>
+      </g>
 
-    <!-- 中心 -->
-    <circle cx="80" cy="80" r="5" fill="#111"/>
+    </svg>
 
-    <!-- 針 -->
-    <g transform="rotate(${needleAngle} 80 80)">
-      <line x1="80" y1="80" x2="130" y2="45"
-        stroke="#111"
-        stroke-width="3"
-        stroke-linecap="round"/>
-    </g>
-
-  </g>
-
-</svg>
-`;
+  </div>
+  `;
 }
 
 // =========================
