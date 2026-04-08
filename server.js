@@ -100,15 +100,23 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
     </svg>
 
     <!-- 赤 -->
-    <svg style="position:absolute;left:74.8%;top:66.8%;width:11%;height:8%;transform:translate(-50%,-50%);" viewBox="0 0 80 20">
-      <path stroke="#dc2626" stroke-width="2" fill="none"
-        d="M0 10 Q20 ${10-ampRight} 40 10 T80 10">
-        <animate attributeName="d" dur="${durRight}s" repeatCount="indefinite"
-          values="M0 10 Q20 ${10-ampRight} 40 10 T80 10;
-                  M0 10 Q20 ${10+ampRight} 40 10 T80 10;
-                  M0 10 Q20 ${10-ampRight} 40 10 T80 10"/>
-      </path>
-    </svg>
+    <svg style="
+  position:absolute;
+  left:71.5%;
+  top:66.8%;
+  width:11%;
+  height:8%;
+  transform:translate(-50%, -50%);
+" viewBox="0 0 80 20">
+  <path stroke="#dc2626" stroke-width="2" fill="none"
+    d="M0 10 Q20 ${10-ampRight} 40 10 T80 10">
+    <animate attributeName="d" dur="${durRight}s" repeatCount="indefinite"
+      values="
+        M0 10 Q20 ${10-ampRight} 40 10 T80 10;
+        M0 10 Q20 ${10+ampRight} 40 10 T80 10;
+        M0 10 Q20 ${10-ampRight} 40 10 T80 10"/>
+  </path>
+</svg>
 
     <!-- メーター -->
     <svg viewBox="0 0 120 70"
