@@ -9,7 +9,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.text({ type: "*/*" }));
 
 app.get("/", (req, res) => {
-  res.send("SERVER OK");
+  res.send("SERVER OK"); 
 });
 
 // =========================
