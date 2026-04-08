@@ -43,26 +43,53 @@ function getValue(fields, keyword) {
 
 // =========================
 // 🔥 スコア算出
-function generateOverlay(scoreLeft = 80, scoreRight = 35) {
+function calculateScores(body) {
 
-  const ampLeft = 4 + scoreLeft * 0.12;
-  const ampRight = 4 + scoreRight * 0.12;
+  const fields =
+    body?.data?.fields ||
+    body?.fields ||
+    [];
 
-  const durLeft = 1.6 - scoreLeft * 0.01;
-  const durRight = 1.6 - scoreRight * 0.01;
+  const getValue = (keyword) => {
+    for (const item of fields) {
+      const key = String(item?.label || "").toLowerCase();
+      const value = String(item?.value || "").toLowerCase();
+      if (key.includes(keyword)) return value;
+    }
+    return "";
+  };
 
-  const angle = -60 + (scoreRight / 100) * 120;
+  const currentMaterial = getValue("current material");
+  const processing = getValue("processing method");
+  const concern = getValue("primary concern");
+  const ld = getValue("l/d");
 
-  return `
-  <div style="
-    position:absolute;
-    top:0;
-    left:0;
-    width:100%;
-    height:100%;
-    pointer-events:none;
-    z-index:10;
-  ">
+  let stability = 70;
+  let risk = 40;
+
+  if (currentMaterial.includes("ldpe")) {
+    stability += 10;
+    risk -= 5;
+  }
+
+  if (processing.includes("film")) {
+    stability -= 10;
+    risk += 15;
+  }
+
+  if (ld.includes("22")) {
+    stability -= 5;
+  }
+
+  if (concern.includes("instability")) {
+    risk += 20;
+  }
+
+  return {
+    scoreLeft: Math.max(0, Math.min(100, stability)),
+    scoreRight: Math.max(0, Math.min(100, risk))
+  };
+}
 
     <!-- 温度 -->
     <div style="position:absolute; left:33.5%; top:4%; font-size:32px;">230°C</div>
