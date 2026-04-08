@@ -6,10 +6,10 @@ import fs from "fs";
 const app = express();
 
 // =========================
-// 🔥 ここが最重要（Tally対策）
+// 🔥 Tally対策（重要）
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(express.text({ type: "*/*" })); // ← これ追加
+app.use(express.text({ type: "*/*" }));
 
 
 // =========================
@@ -87,7 +87,7 @@ function calculateScores(body) {
 
 
 // =========================
-// 🔥 Overlay（触ってない）
+// 🔥 Overlay（変更なし）
 function generateOverlay(scoreLeft = 80, scoreRight = 35) {
 
   const ampLeft = 4 + scoreLeft * 0.12;
@@ -112,7 +112,6 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
       ${scoreRight}
     </div>
 
-    <!-- 青波 -->
     <svg style="position:absolute; left:255px; top:125px; width:70px; height:20px;"
       viewBox="0 0 80 20">
       <path stroke="#3B82A0" stroke-width="2" fill="none"
@@ -125,7 +124,6 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
       </path>
     </svg>
 
-    <!-- 赤波 -->
     <svg style="position:absolute; left:455px; top:140px; width:70px; height:20px;"
       viewBox="0 0 80 20">
       <path stroke="#dc2626" stroke-width="2" fill="none"
@@ -138,7 +136,6 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
       </path>
     </svg>
 
-    <!-- メーター -->
     <svg viewBox="0 0 120 70"
       style="position:absolute; left:480px; top:170px; width:120px; height:70px;">
       <defs>
@@ -180,26 +177,38 @@ function injectHtml(template, data) {
 
 
 // =========================
-// 🔥 PDF生成（ここ修正）
+// 🔥 PDF生成（ログ付き）
 app.post("/tally-pdf", async (req, res) => {
   try {
 
-    // 🔥 body補正（Tally対策）
+    console.log("===== RAW BODY =====");
+    console.log(req.body);
+
     let parsed;
 
     if (typeof req.body === "string") {
       try {
         parsed = JSON.parse(req.body);
       } catch {
+        console.log("⚠️ JSON parse failed");
         parsed = {};
       }
     } else {
       parsed = req.body;
     }
 
+    console.log("===== PARSED =====");
+    console.log(parsed);
+
+    console.log("===== FIELDS =====");
+    console.log(parsed?.data?.fields);
+
     const template = fs.readFileSync("template.html", "utf8");
 
     const { scoreLeft, scoreRight } = calculateScores(parsed);
+
+    console.log("===== SCORES =====");
+    console.log(scoreLeft, scoreRight);
 
     const html = injectHtml(template, {
       base_image: "https://ilnautico.github.io/visual-base.png",
@@ -238,7 +247,7 @@ app.post("/tally-pdf", async (req, res) => {
     res.send(pdf);
 
   } catch (err) {
-    console.error(err);
+    console.error("❌ ERROR:", err);
     res.status(500).send("PDF generation failed");
   }
 });
