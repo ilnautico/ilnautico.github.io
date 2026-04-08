@@ -130,9 +130,9 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
     <!-- ===== 青波（完全固定補正） ===== -->
 <svg style="
   position:absolute;
-  left:49%;
-  top:61%;
-  width:11%;
+  left:49.2%;
+  top:63.5%;
+  width:10%;
   height:8%;
   transform:translate(-50%, -50%);
 " viewBox="0 0 80 20">
@@ -151,9 +151,9 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
     <!-- ===== 赤波 ===== -->
 <svg style="
   position:absolute;
-  left:80%;
-  top:68%;
-  width:11%;
+  left:81.8%;
+  top:70.5%;
+  width:10%;
   height:8%;
   transform:translate(-50%, -50%);
 " viewBox="0 0 80 20">
