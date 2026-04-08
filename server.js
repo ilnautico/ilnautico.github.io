@@ -90,118 +90,97 @@ function calculateScores(body) {
 // 🔥 Overlay（変更なし）
 function generateOverlay(scoreLeft = 80, scoreRight = 35) {
 
-  const ampLeft = 3 + scoreLeft * 0.10;
-  const ampRight = 3 + scoreRight * 0.10;
+  const ampLeft = 4 + scoreLeft * 0.12;
+  const ampRight = 4 + scoreRight * 0.12;
 
-  const durLeft = 1.6 - scoreLeft * 0.008;
-  const durRight = 1.6 - scoreRight * 0.008;
+  const durLeft = 1.6 - scoreLeft * 0.01;
+  const durRight = 1.6 - scoreRight * 0.01;
 
-  const angle = -90 + (scoreRight / 100) * 180;
+  const angle = -60 + (scoreRight / 100) * 120;
 
   return `
   <div style="
     position:absolute;
     top:0;
     left:0;
-    width:720px;
-    height:280px;
+    width:100%;
+    height:100%;
     pointer-events:none;
     z-index:10;
   ">
 
     <!-- 温度 -->
-    <div style="position:absolute; left:250px; top:10px; font-size:34px; color:#1f2937;">
-      230°C
-    </div>
-
-    <div style="position:absolute; left:485px; top:10px; font-size:34px; color:#dc2626;">
-      180°C
-    </div>
+    <div style="position:absolute; left:33.5%; top:4%; font-size:32px;">230°C</div>
+    <div style="position:absolute; left:66%; top:4%; font-size:32px; color:#dc2626;">180°C</div>
 
     <!-- スコア -->
-    <div style="position:absolute; left:305px; top:62px; font-size:18px;">
+    <div style="position:absolute; left:40%; top:22%; font-size:18px;">
       ${scoreLeft}
     </div>
 
-    <div style="position:absolute; left:545px; top:62px; font-size:18px; color:#dc2626;">
+    <div style="position:absolute; left:72%; top:22%; font-size:18px; color:#dc2626;">
       ${scoreRight}
     </div>
 
-    <!-- ===== 青波（完全固定補正） ===== -->
-<svg style="
-  position:absolute;
-  left:49.2%;
-  top:63.5%;
-  width:10%;
-  height:8%;
-  transform:translate(-50%, -50%);
-" viewBox="0 0 80 20">
-      <path stroke="#3B82A0" stroke-width="2.6" fill="none"
+    <!-- 🔵 青波（最終FIX：上げ＋左戻し） -->
+    <svg style="
+      position:absolute;
+      left:46.8%;
+      top:57.2%;
+      width:11%;
+      height:8%;
+      transform:translate(-50%, -50%);
+    " viewBox="0 0 80 20">
+      <path stroke="#3B82A0" stroke-width="2" fill="none"
         d="M0 10 Q20 ${10-ampLeft} 40 10 T80 10">
-
         <animate attributeName="d" dur="${durLeft}s" repeatCount="indefinite"
           values="
             M0 10 Q20 ${10-ampLeft} 40 10 T80 10;
             M0 10 Q20 ${10+ampLeft} 40 10 T80 10;
             M0 10 Q20 ${10-ampLeft} 40 10 T80 10"/>
       </path>
-
     </svg>
 
-    <!-- ===== 赤波 ===== -->
-<svg style="
-  position:absolute;
-  left:81.8%;
-  top:70.5%;
-  width:10%;
-  height:8%;
-  transform:translate(-50%, -50%);
-" viewBox="0 0 80 20">
-
-      <path stroke="#dc2626" stroke-width="2.6" fill="none"
+    <!-- 🔴 赤波（最終FIX：左戻し） -->
+    <svg style="
+      position:absolute;
+      left:76.2%;
+      top:69.5%;
+      width:11%;
+      height:8%;
+      transform:translate(-50%, -50%);
+    " viewBox="0 0 80 20">
+      <path stroke="#dc2626" stroke-width="2" fill="none"
         d="M0 10 Q20 ${10-ampRight} 40 10 T80 10">
-
         <animate attributeName="d" dur="${durRight}s" repeatCount="indefinite"
           values="
             M0 10 Q20 ${10-ampRight} 40 10 T80 10;
             M0 10 Q20 ${10+ampRight} 40 10 T80 10;
             M0 10 Q20 ${10-ampRight} 40 10 T80 10"/>
       </path>
-
     </svg>
 
-<svg viewBox="0 0 200 200"
-  style="position:absolute; left:470px; top:185px; width:140px; height:140px;">
+    <!-- メーター（触ってない＝現状維持） -->
+    <svg viewBox="0 0 120 70"
+      style="position:absolute; left:70%; top:70%; width:120px; height:70px;">
+      <defs>
+        <linearGradient id="gaugeGradient" x1="0%" x2="100%">
+          <stop offset="0%" stop-color="#16a34a"/>
+          <stop offset="50%" stop-color="#f59e0b"/>
+          <stop offset="100%" stop-color="#dc2626"/>
+        </linearGradient>
+      </defs>
 
-  <defs>
-    <conicGradient id="gaugeFill"
-      gradientUnits="userSpaceOnUse"
-      cx="100" cy="100" r="75">
-      <stop offset="0%" stop-color="#22c55e"/>
-      <stop offset="50%" stop-color="#f59e0b"/>
-      <stop offset="100%" stop-color="#ef4444"/>
-    </conicGradient>
-  </defs>
+      <path d="M10 60 A50 50 0 0 1 110 60"
+        fill="none" stroke="url(#gaugeGradient)" stroke-width="10"/>
 
-  <!-- 背景 -->
-  <circle cx="100" cy="100" r="75"
-    fill="#f3f4f6" />
+      <g transform="rotate(${angle} 60 60)">
+        <line x1="60" y1="60" x2="85" y2="30"
+          stroke="#111" stroke-width="2"/>
+        <circle cx="60" cy="60" r="4" fill="#111"/>
+      </g>
+    </svg>
 
-  <!-- フルリング -->
-  <circle cx="100" cy="100" r="75"
-    fill="none"
-    stroke="url(#gaugeFill)"
-    stroke-width="14"/>
-
-  <!-- 針 -->
-  <g transform="rotate(${ -90 + (scoreRight / 100) * 360 } 100 100)">
-    <line x1="100" y1="100" x2="150" y2="60"
-      stroke="#111"
-      stroke-width="3"/>
-    <circle cx="100" cy="100" r="5" fill="#111"/>
-  </g>
-
-</svg>
   </div>
   `;
 }
