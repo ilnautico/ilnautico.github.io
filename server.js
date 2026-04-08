@@ -99,11 +99,24 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
   const angle = -60 + (scoreRight / 100) * 120;
 
   return `
-  <div style="position:absolute;top:0;left:0;width:700px;height:260px;pointer-events:none;z-index:10;">
+  <div style="
+    position:absolute;
+    top:0;
+    left:0;
+    width:700px;
+    height:260px;
+    pointer-events:none;
+    z-index:10;
+  ">
 
     <!-- 温度 -->
-    <div style="position:absolute; left:235px; top:8px; font-size:32px;">230°C</div>
-    <div style="position:absolute; left:470px; top:8px; font-size:32px; color:#dc2626;">180°C</div>
+    <div style="position:absolute; left:235px; top:8px; font-size:32px;">
+      230°C
+    </div>
+
+    <div style="position:absolute; left:470px; top:8px; font-size:32px; color:#dc2626;">
+      180°C
+    </div>
 
     <!-- スコア -->
     <div style="position:absolute; left:285px; top:56px; font-size:18px;">
@@ -114,41 +127,54 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
       ${scoreRight}
     </div>
 
-    <!-- 🔵 青波（完全位置修正済） -->
+    <!-- ===== 青波（中央固定） ===== -->
     <svg style="
-  position:absolute;
-  left:292px;
-  top:138px;
-  width:82px;
-  height:18px;
-"
-viewBox="0 0 80 20">
+      position:absolute;
+      left:300px;
+      top:135px;
+      width:80px;
+      height:20px;
+      transform:translateX(-50%);
+    " viewBox="0 0 80 20">
+
       <path stroke="#3B82A0" stroke-width="2" fill="none"
         d="M0 10 Q20 ${10-ampLeft} 40 10 T80 10">
+
         <animate attributeName="d" dur="${durLeft}s" repeatCount="indefinite"
           values="
             M0 10 Q20 ${10-ampLeft} 40 10 T80 10;
             M0 10 Q20 ${10+ampLeft} 40 10 T80 10;
             M0 10 Q20 ${10-ampLeft} 40 10 T80 10"/>
       </path>
+
     </svg>
 
-    <!-- 🔴 赤波（そのままOK） -->
-    <svg style="position:absolute; left:455px; top:140px; width:70px; height:20px;"
-      viewBox="0 0 80 20">
+    <!-- ===== 赤波（中央固定） ===== -->
+    <svg style="
+      position:absolute;
+      left:505px;
+      top:145px;
+      width:80px;
+      height:20px;
+      transform:translateX(-50%);
+    " viewBox="0 0 80 20">
+
       <path stroke="#dc2626" stroke-width="2" fill="none"
         d="M0 10 Q20 ${10-ampRight} 40 10 T80 10">
+
         <animate attributeName="d" dur="${durRight}s" repeatCount="indefinite"
           values="
             M0 10 Q20 ${10-ampRight} 40 10 T80 10;
             M0 10 Q20 ${10+ampRight} 40 10 T80 10;
             M0 10 Q20 ${10-ampRight} 40 10 T80 10"/>
       </path>
+
     </svg>
 
-    <!-- 🎯 メーター -->
+    <!-- ===== メーター ===== -->
     <svg viewBox="0 0 120 70"
-      style="position:absolute; left:480px; top:170px; width:120px; height:70px;">
+      style="position:absolute; left:480px; top:180px; width:120px; height:70px;">
+
       <defs>
         <linearGradient id="gaugeGradient" x1="0%" x2="100%">
           <stop offset="0%" stop-color="#16a34a"/>
