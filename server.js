@@ -103,35 +103,39 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
       </path>
     </svg>
 
-    <svg viewBox="0 0 200 120"
-      style="position:absolute; left:70%; top:68%; width:150px; height:100px;">
+  <svg viewBox="0 0 200 120"
+  style="position:absolute; left:70%; top:68%; width:150px; height:100px;">
 
-      <defs>
-        <linearGradient id="gaugeGrad" x1="0%" x2="100%">
-          <stop offset="0%" stop-color="#22c55e"/>
-          <stop offset="50%" stop-color="#f59e0b"/>
-          <stop offset="100%" stop-color="#ef4444"/>
-        </linearGradient>
-      </defs>
+  <defs>
+    <linearGradient id="gaugeGrad" x1="0%" x2="100%">
+      <stop offset="0%" stop-color="#22c55e"/>
+      <stop offset="50%" stop-color="#f59e0b"/>
+      <stop offset="100%" stop-color="#ef4444"/>
+    </linearGradient>
+  </defs>
 
-      <path d="M20 100 A80 80 0 0 1 180 100 L180 100 L20 100 Z"
-        fill="#e5e7eb"/>
+  <!-- ★ 外側の面（ここが本体） -->
+  <path
+    d="M20 100 A80 80 0 0 1 180 100 L180 100 L20 100 Z"
+    fill="url(#gaugeGrad)"
+  />
 
-      <path d="M20 100 A80 80 0 0 1 180 100 L180 100 L20 100 Z"
-        fill="url(#gaugeGrad)" opacity="0.85"/>
+  <!-- ★ 内側を削る（これでリングになる） -->
+  <path
+    d="M45 100 A55 55 0 0 1 155 100 L155 100 L45 100 Z"
+    fill="#ffffff"
+  />
 
-      <path d="M40 100 A60 60 0 0 1 160 100 L160 100 L40 100 Z"
-        fill="#f9fafb"/>
+  <!-- ★ 針 -->
+  <g transform="rotate(${ -90 + (scoreRight / 100) * 180 } 100 100)">
+    <line x1="100" y1="100" x2="145" y2="60"
+      stroke="#111"
+      stroke-width="3"
+      stroke-linecap="round"/>
+    <circle cx="100" cy="100" r="5" fill="#111"/>
+  </g>
 
-      <g transform="rotate(${ -90 + (scoreRight / 100) * 180 } 100 100)">
-        <line x1="100" y1="100" x2="145" y2="60"
-          stroke="#111"
-          stroke-width="3"
-          stroke-linecap="round"/>
-        <circle cx="100" cy="100" r="5" fill="#111"/>
-      </g>
-
-    </svg>
+</svg>
 
   </div>
   `;
