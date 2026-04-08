@@ -505,37 +505,138 @@ body {
         <!-- 06 Conceptual Visualization -->
 
 <!-- 06 Conceptual Visualization -->
-<!-- 06 Conceptual Visualization -->
-<!-- 06 Conceptual Visualization -->
 <!-- ===== SECTION 06 FINAL ===== -->
-<!-- ===== SECTION 06 FINAL（完全連動版） ===== -->
-<!-- 青波 FIX -->
-<!-- ===== SECTION 06 FINAL SAFE ===== -->
-
-<!-- 青波 -->
-<!-- ===== SECTION 06 FINAL SAFE ===== -->
-
-<!-- ===== SECTION 06 FINAL COMPLETE ===== -->
 
 <div style="
   position:relative;
-  width:720px;
-  height:280px;
-  margin:20px auto 0;
+  width:700px;
+  height:260px;
+  margin:0 auto;
   overflow:hidden;
 ">
 
-  <!-- 背景画像（微調整済） -->
+  <!-- 背景 -->
   <img src="{{base_image}}" style="
-    width:102%;
-    height:102%;
+    width:100%;
+    height:100%;
     object-fit:contain;
     display:block;
-    transform:translateY(6px);
   ">
 
-  <!-- 動的Overlay（サーバー側描画） -->
-  {{dynamic_overlay}}
+  <!-- ===== オーバーレイ ===== -->
+  <div style="
+    position:absolute;
+    top:0;
+    left:0;
+    width:700px;
+    height:260px;
+    pointer-events:none;
+  ">
+
+    <!-- 温度 -->
+    <div style="position:absolute; left:235px; top:8px; font-size:32px;">
+      230°C
+    </div>
+
+    <div style="position:absolute; left:470px; top:8px; font-size:32px; color:#dc2626;">
+      180°C
+    </div>
+
+    <!-- スコア -->
+    <div style="position:absolute; left:285px; top:56px; font-size:18px;">
+      {{score_left}}
+    </div>
+
+    <div style="position:absolute; left:520px; top:56px; font-size:18px; color:#dc2626;">
+      {{score_right}}
+    </div>
+
+    <!-- ===== 青波（完全修正） ===== -->
+    <svg style="
+      position:absolute;
+      left:312px;
+      top:138px;
+      width:80px;
+      height:20px;
+      transform:translateX(-50%);
+    " viewBox="0 0 80 20">
+
+      <path stroke="#3B82A0" stroke-width="2.2" fill="none"
+        d="M0 10 Q20 6 40 10 T80 10">
+
+        <animate attributeName="d" dur="1.2s" repeatCount="indefinite"
+          values="
+            M0 10 Q20 6 40 10 T80 10;
+            M0 10 Q20 14 40 10 T80 10;
+            M0 10 Q20 6 40 10 T80 10"/>
+      </path>
+
+    </svg>
+
+    <!-- ===== 赤波 ===== -->
+    <svg style="
+      position:absolute;
+      left:505px;
+      top:148px;
+      width:80px;
+      height:20px;
+      transform:translateX(-50%);
+    " viewBox="0 0 80 20">
+
+      <path stroke="#dc2626" stroke-width="2.2" fill="none"
+        d="M0 10 Q20 6 40 10 T80 10">
+
+        <animate attributeName="d" dur="1.2s" repeatCount="indefinite"
+          values="
+            M0 10 Q20 6 40 10 T80 10;
+            M0 10 Q20 14 40 10 T80 10;
+            M0 10 Q20 6 40 10 T80 10"/>
+      </path>
+
+    </svg>
+
+    <!-- ===== メーター（強化版） ===== -->
+    <svg viewBox="0 0 160 100"
+      style="position:absolute; left:465px; top:175px; width:140px; height:90px;">
+
+      <defs>
+        <linearGradient id="gaugeGradient" x1="0%" x2="100%">
+          <stop offset="0%" stop-color="#16a34a"/>
+          <stop offset="50%" stop-color="#f59e0b"/>
+          <stop offset="100%" stop-color="#dc2626"/>
+        </linearGradient>
+
+        <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
+          <feDropShadow dx="0" dy="3" stdDeviation="3" flood-color="#000" flood-opacity="0.25"/>
+        </filter>
+      </defs>
+
+      <!-- 背景 -->
+      <path d="M20 80 A60 60 0 0 1 140 80"
+        fill="none"
+        stroke="#e5e7eb"
+        stroke-width="14"/>
+
+      <!-- メイン -->
+      <path d="M20 80 A60 60 0 0 1 140 80"
+        fill="none"
+        stroke="url(#gaugeGradient)"
+        stroke-width="14"
+        stroke-linecap="round"
+        filter="url(#shadow)"/>
+
+      <!-- 針 -->
+      <g transform="rotate({{gauge_angle}} 80 80)">
+        <line x1="80" y1="80" x2="120" y2="40"
+          stroke="#111"
+          stroke-width="3"
+          stroke-linecap="round"/>
+        <circle cx="80" cy="80" r="5" fill="#111"/>
+      </g>
+
+    </svg>
+
+  </div>
 
 </div>
     <!-- 07 Recommended Next Step -->
