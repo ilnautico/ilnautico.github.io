@@ -128,14 +128,15 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
     </div>
 
     <!-- ===== 青波（中央固定） ===== -->
-    <svg style="
-      position:absolute;
-      left:300px;
-      top:135px;
-      width:80px;
-      height:20px;
-      transform:translateX(-50%);
-    " viewBox="0 0 80 20">
+   <!-- 青波 -->
+<svg style="
+  position:absolute;
+  left:330px;
+  top:135px;
+  width:80px;
+  height:20px;
+  transform:translateX(-50%);
+" viewBox="0 0 80 20">
 
       <path stroke="#3B82A0" stroke-width="2" fill="none"
         d="M0 10 Q20 ${10-ampLeft} 40 10 T80 10">
