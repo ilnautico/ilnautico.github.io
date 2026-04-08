@@ -510,26 +510,28 @@ body {
 <!-- ===== SECTION 06 FINAL ===== -->
 <!-- ===== SECTION 06 FINAL（完全連動版） ===== -->
 <!-- 青波 FIX -->
-<svg id="wave-blue"
-  style="position:absolute; left:290px; top:125px; width:80px; height:20px;"
-  viewBox="0 0 80 20"
-  preserveAspectRatio="xMidYMid meet">
+<!-- ===== SECTION 06 FINAL SAFE ===== -->
 
-  <path d="M0 10 Q20 2 40 10 T80 10"
-    stroke="#3B82A0"
-    stroke-width="2"
-    fill="none"
-    stroke-linecap="round">
+<div style="
+  position:relative;
+  width:700px;
+  height:260px;
+  margin:0 auto;
+  overflow:hidden;
+">
 
-    <animate attributeName="d"
-      dur="1.2s"
-      repeatCount="indefinite"
-      values="
-        M0 10 Q20 2 40 10 T80 10;
-        M0 10 Q20 18 40 10 T80 10;
-        M0 10 Q20 2 40 10 T80 10"/>
-  </path>
-</svg>
+  <!-- 背景 -->
+  <img src="{{base_image}}" style="
+    width:100%;
+    height:100%;
+    object-fit:contain;
+    display:block;
+  ">
+
+  <!-- Overlay（サーバー生成） -->
+  {{dynamic_overlay}}
+
+</div>
     <!-- 07 Recommended Next Step -->
     <div class="section">
       <div class="section-header">
