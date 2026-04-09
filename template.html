@@ -507,10 +507,6 @@ body {
 <!-- 06 Conceptual Visualization -->
 <!-- ===== SECTION 06 FINAL ===== -->
 
-<!-- ===== SECTION 06 ===== -->
-
-<!-- ===== 05の終わり ===== -->
-
 </div>
 
 <!-- ===== ページ分離（ここ重要） ===== -->
@@ -529,6 +525,7 @@ body {
 <!-- ===== SECTION 06（風船）===== -->
 <!-- ============================= -->
 
+<!-- ===== SECTION 06 ===== -->
 <div style="
   width:700px;
   margin:40px auto;
@@ -540,7 +537,6 @@ body {
     height:300px;
   ">
 
-    <!-- 背景（絶対いじらない） -->
     <img src="{{base_image}}" style="
       width:100%;
       height:100%;
@@ -548,7 +544,6 @@ body {
       display:block;
     ">
 
-    <!-- 波・数字・メーター完全復元 -->
     {{dynamic_overlay}}
 
   </div>
@@ -556,20 +551,15 @@ body {
 </div>
 
 
-<!-- ============================= -->
-<!-- ===== PAGE BREAK（グラフ）===== -->
-<!-- ============================= -->
+<!-- ===== ページ分離（ここが超重要） ===== -->
 <div class="page-break"></div>
 <div class="page-top-bar"></div>
 
 
-<!-- ============================= -->
-<!-- ===== GRAPH PAGE（単独）===== -->
-<!-- ============================= -->
-
+<!-- ===== グラフ（完全独立） ===== -->
 <div style="
   width:700px;
-  margin:60px auto 20px;
+  margin:80px auto;
   padding:0 50px;
 ">
 
@@ -578,45 +568,21 @@ body {
     color:#6b7280;
     margin-bottom:14px;
     font-family:'IBM Plex Mono', monospace;
-    letter-spacing:0.12em;
-    text-transform:uppercase;
   ">
     Performance Comparison
   </div>
 
-  <!-- LDPE -->
   <div style="margin-bottom:14px;">
     <div style="font-size:12px;">LDPE</div>
-    <div style="
-      height:10px;
-      background:rgba(0,0,0,0.08);
-      border-radius:6px;
-      overflow:hidden;
-    ">
-      <div style="
-        width:85%;
-        height:100%;
-        background:linear-gradient(90deg,#9ca3af,#6b7280);
-        border-radius:6px;
-      "></div>
+    <div style="height:10px;background:rgba(0,0,0,0.08);border-radius:6px;">
+      <div style="width:85%;height:100%;background:#6b7280;border-radius:6px;"></div>
     </div>
   </div>
 
-  <!-- PHA -->
   <div>
     <div style="font-size:12px;">PHA</div>
-    <div style="
-      height:10px;
-      background:rgba(0,0,0,0.08);
-      border-radius:6px;
-      overflow:hidden;
-    ">
-      <div style="
-        width:{{pha_score}}%;
-        height:100%;
-        background:linear-gradient(90deg,#22c55e,#f59e0b);
-        border-radius:6px;
-      "></div>
+    <div style="height:10px;background:rgba(0,0,0,0.08);border-radius:6px;">
+      <div style="width:{{pha_score}}%;height:100%;background:linear-gradient(90deg,#22c55e,#f59e0b);border-radius:6px;"></div>
     </div>
   </div>
 
