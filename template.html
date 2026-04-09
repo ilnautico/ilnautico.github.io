@@ -504,19 +504,18 @@ body {
 
     <div class="page4-wrap">
         <!-- 06 Conceptual Visualization -->
-
-<!-- 06 Conceptual Visualization -->
-<!-- ===== SECTION 06 FINAL ===== -->
-
 </div>
 
-<!-- ===== ページ分離（ここ重要） ===== -->
+
 <!-- ===== 05 END ===== -->
 </div>
 <!-- ============================= -->
 <!-- ===== PAGE BREAK（06へ）===== -->
 <!-- ============================= -->
    <!-- ===== PAGE BREAK（ここ1つだけ）===== -->
+<!-- ============================= -->
+<!-- ===== PAGE BREAK（06へ）===== -->
+<!-- ============================= -->
 <div class="page-break"></div>
 <div class="page-top-bar"></div>
 
@@ -539,10 +538,9 @@ body {
       overflow:hidden;
     ">
 
-      <!-- 中身 -->
       <div style="position:relative; width:100%; height:260px;">
 
-        <!-- ✅ 背景（完全復元） -->
+        <!-- 背景（戻し済） -->
         <img src="{{base_image}}" style="
           width:100%;
           height:100%;
@@ -550,7 +548,7 @@ body {
           display:block;
         ">
 
-        <!-- ✅ overlay（風船＋波＋メーター） -->
+        <!-- overlay -->
         {{dynamic_overlay}}
 
       </div>
@@ -558,63 +556,41 @@ body {
     </div>
   </div>
 
-</div>
-      <!-- 07 Recommended Next Step -->
-      <div class="section">
-        <div class="section-header">
-          <span class="section-num">07</span>
-          <span class="section-title">Recommended Next Step</span>
-        </div>
-        <div class="nextstep-card">
+  <!-- ===== 07 Recommended Next Step ===== -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-num">07</span>
+      <span class="section-title">Recommended Next Step</span>
+    </div>
 
-          <p class="nextstep-lead">
-            {{next_step}}
-          </p>
+    <div class="nextstep-card">
 
-          <div style="
-            margin-top:14px;
-            padding-top:14px;
-            border-top:1px solid var(--sep);
-          ">
-            <div style="
-              font-family: 'IBM Plex Mono', monospace;
-              font-size:9px;
-              letter-spacing:0.12em;
-              text-transform:uppercase;
-              color:var(--text-label);
-              margin-bottom:8px;
-            "></div>
+      <p class="nextstep-lead">
+        {{next_step}}
+      </p>
 
-            <div style="
-              font-size:11.5px;
-              line-height:1.7;
-              color:var(--text-body);
-            "></div>
-          </div>
+      <div class="nextstep-path">
+        <div class="nextstep-path-label">Recommended Pathway</div>
+        <ul class="nextstep-list">
+          <li><span class="nextstep-num">01</span><span>Technical hypothesis screening</span></li>
+          <li><span class="nextstep-num">02</span><span>Engineering compatibility assessment</span></li>
+          <li><span class="nextstep-num">03</span><span>Controlled pilot validation</span></li>
+        </ul>
+      </div>
 
-          <div class="nextstep-path">
-            <div class="nextstep-path">
-              <div class="nextstep-path-label">Recommended Pathway</div>
-              <ul class="nextstep-list">
-                <li><span class="nextstep-num">01</span><span>Technical hypothesis screening</span></li>
-                <li><span class="nextstep-num">02</span><span>Engineering compatibility assessment</span></li>
-                <li><span class="nextstep-num">03</span><span>Controlled pilot validation</span></li>
-              </ul>
-            </div>
-
-            <div class="nextstep-support">
-              <div class="nextstep-support-label">FairVia Support Coverage</div>
-              <div class="nextstep-support-stages">
-                <span><strong>Stage 01</strong>Feasibility screening and technical hypothesis development</span>
-                <span><strong>Stage 02</strong>Engineering compatibility review and structured assessment</span>
-                <span><strong>Stage 03</strong>Pilot validation planning and implementation support</span>
-              </div>
-            </div>
-          </div>
-
+      <div class="nextstep-support">
+        <div class="nextstep-support-label">FairVia Support Coverage</div>
+        <div class="nextstep-support-stages">
+          <span><strong>Stage 01</strong>Feasibility screening and technical hypothesis development</span>
+          <span><strong>Stage 02</strong>Engineering compatibility review and structured assessment</span>
+          <span><strong>Stage 03</strong>Pilot validation planning and implementation support</span>
         </div>
       </div>
 
+    </div>
+  </div>
+
+</div>
 
     <!-- 08 Closing Note -->
     <div class="section">
