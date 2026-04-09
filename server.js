@@ -121,14 +121,11 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
       </linearGradient>
     </defs>
 
-    <path d="M20 100 A80 80 0 0 1 180 100 L180 100 L20 100 Z"
+    <path d="M20 100 A80 80 0 0 1 180 100 L20 100 Z"
       fill="url(#gaugeFill)" />
 
-    <path d="M35 100 A65 65 0 0 1 165 100 L165 100 L35 100 Z"
+    <path d="M35 100 A65 65 0 0 1 165 100 L35 100 Z"
       fill="rgba(255,255,255,0.15)" />
-
-    <ellipse cx="100" cy="78" rx="65" ry="20"
-      fill="white" opacity="0.05"/>
 
     <ellipse cx="100" cy="102" rx="48" ry="8"
       fill="black" opacity="0.05"/>
@@ -140,31 +137,6 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
     </g>
 
   </svg>
-
-  <!-- ===== 比較グラフ（ここ追加） ===== -->
-  <div style="position:absolute; left:8%; top:72%; width:55%;">
-
-    <div style="font-size:13px; color:#6b7280; margin-bottom:6px;">
-      Performance Comparison
-    </div>
-
-    <!-- LDPE -->
-    <div style="margin-bottom:10px;">
-      <div style="font-size:12px;">LDPE</div>
-      <div style="height:10px;background:rgba(0,0,0,0.08);border-radius:6px;overflow:hidden;">
-        <div style="width:85%;height:100%;background:linear-gradient(90deg,#9ca3af,#6b7280);border-radius:6px;"></div>
-      </div>
-    </div>
-
-    <!-- PHA -->
-    <div>
-      <div style="font-size:12px;">PHA</div>
-      <div style="height:10px;background:rgba(0,0,0,0.08);border-radius:6px;overflow:hidden;">
-        <div style="width:${scoreLeft}%;height:100%;background:linear-gradient(90deg,#22c55e,#f59e0b);border-radius:6px;"></div>
-      </div>
-    </div>
-
-  </div>
 
 </div>
 `;
