@@ -511,29 +511,38 @@ body {
 
 <!-- ===== SECTION 06（触らない・完全復元） ===== -->
 
+<!-- ===== SECTION 06（ここは絶対維持） ===== -->
+
 <div style="
   position:relative;
   width:700px;
-  margin:20px auto 0;
+  height:260px;
+  margin:0 auto;
+  overflow:hidden;
 ">
 
+  <!-- 背景画像 -->
   <img src="{{base_image}}" style="
-    width:100%;
-    height:auto;
+    width:102%;
+    height:102%;
+    object-fit:contain;
     display:block;
+    transform:translateY(6px);
   ">
 
+  <!-- Overlay（ここが風船＋メーター） -->
   {{dynamic_overlay}}
 
 </div>
+<!-- ↑↑↑ ここで完全に閉じる（超重要） -->
 
 
-<!-- ===== ページ分離（これが最重要） ===== -->
+<!-- ===== ページ分離（これが風船復元の鍵） ===== -->
 <div class="page-break"></div>
 <div class="page-top-bar"></div>
 
 
-<!-- ===== グラフ（新ページ） ===== -->
+<!-- ===== グラフ（完全別ページ） ===== -->
 
 <div style="
   width:700px;
@@ -591,7 +600,7 @@ body {
 </div>
 
 
-<!-- ===== SECTION 07（同じ新ページに続く） ===== -->
+<!-- ===== SECTION 07（同じページに続く） ===== -->
 
 <div class="section">
   <div class="section-header">
