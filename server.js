@@ -107,57 +107,43 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
   style="position:absolute; left:70%; top:68%; width:150px; height:100px;">
 
   <defs>
-
-    <!-- ベース -->
-    <linearGradient id="gaugeGrad" x1="0%" x2="100%">
+    <linearGradient id="gaugeFill" x1="0%" y1="0%" x2="100%" y2="0%">
       <stop offset="0%" stop-color="#22c55e"/>
-      <stop offset="50%" stop-color="#f59e0b"/>
+      <stop offset="20%" stop-color="#4ade80"/>
+      <stop offset="40%" stop-color="#84cc16"/>
+      <stop offset="55%" stop-color="#facc15"/>
+      <stop offset="70%" stop-color="#f59e0b"/>
+      <stop offset="85%" stop-color="#f97316"/>
       <stop offset="100%" stop-color="#ef4444"/>
     </linearGradient>
-
-    <!-- ガラス用（中心明るい） -->
-    <radialGradient id="glassGrad" cx="50%" cy="40%" r="70%">
-      <stop offset="0%" stop-color="white" stop-opacity="0.35"/>
-      <stop offset="50%" stop-color="white" stop-opacity="0.12"/>
-      <stop offset="100%" stop-color="white" stop-opacity="0"/>
-    </radialGradient>
-
   </defs>
 
-  <!-- ベース -->
+  <!-- 半月プレート（塗り） -->
   <path
     d="M20 100 A80 80 0 0 1 180 100 L180 100 L20 100 Z"
-    fill="url(#gaugeGrad)"
+    fill="url(#gaugeFill)"
   />
 
-  <!-- ★ ガラス（これが本質） -->
+  <!-- 内側の抜き（透明感キープ） -->
   <path
-    d="M20 100 A80 80 0 0 1 180 100 L180 100 L20 100 Z"
-    fill="url(#glassGrad)"
+    d="M35 100 A65 65 0 0 1 165 100 L165 100 L35 100 Z"
+    fill="#f3f4f6"
   />
 
-  <!-- 下影 -->
-  <ellipse
-  cx="100"
-  cy="108"
-  rx="60"
-  ry="8"
-  fill="black"
-  opacity="0.12"
-  style="filter: blur(6px);"
-/>
+  <!-- ほんのりハイライト（透け感UP） -->
+  <ellipse cx="100" cy="78" rx="65" ry="22"
+    fill="white" opacity="0.12"/>
+
+  <!-- 接地影（自然） -->
+  <ellipse cx="100" cy="102" rx="55" ry="10"
+    fill="black" opacity="0.08"/>
 
   <!-- 針 -->
   <g transform="rotate(${ -90 + (scoreRight / 100) * 180 } 100 100)">
-    <line
-      x1="100"
-      y1="100"
-      x2="145"
-      y2="60"
+    <line x1="100" y1="100" x2="145" y2="60"
       stroke="#111"
       stroke-width="3"
-      stroke-linecap="round"
-    />
+      stroke-linecap="round"/>
     <circle cx="100" cy="100" r="5" fill="#111"/>
   </g>
 
