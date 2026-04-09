@@ -138,13 +138,14 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
 
   <!-- 下影 -->
   <ellipse
-    cx="100"
-    cy="105"
-    rx="65"
-    ry="10"
-    fill="black"
-    opacity="0.08"
-  />
+  cx="100"
+  cy="108"
+  rx="60"
+  ry="8"
+  fill="black"
+  opacity="0.12"
+  style="filter: blur(6px);"
+/>
 
   <!-- 針 -->
   <g transform="rotate(${ -90 + (scoreRight / 100) * 180 } 100 100)">
