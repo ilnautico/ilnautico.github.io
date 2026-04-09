@@ -109,34 +109,34 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
   <defs>
     <linearGradient id="gaugeFill" x1="0%" y1="0%" x2="100%" y2="0%">
       <stop offset="0%" stop-color="#22c55e"/>
-      <stop offset="20%" stop-color="#4ade80"/>
-      <stop offset="40%" stop-color="#84cc16"/>
-      <stop offset="55%" stop-color="#facc15"/>
-      <stop offset="70%" stop-color="#f59e0b"/>
-      <stop offset="85%" stop-color="#f97316"/>
+      <stop offset="25%" stop-color="#4ade80"/>
+      <stop offset="45%" stop-color="#a3e635"/>
+      <stop offset="60%" stop-color="#fde047"/>
+      <stop offset="75%" stop-color="#f59e0b"/>
+      <stop offset="90%" stop-color="#f97316"/>
       <stop offset="100%" stop-color="#ef4444"/>
     </linearGradient>
   </defs>
 
-  <!-- 半月プレート（塗り） -->
+  <!-- 半月 -->
   <path
     d="M20 100 A80 80 0 0 1 180 100 L180 100 L20 100 Z"
     fill="url(#gaugeFill)"
   />
 
-  <!-- 内側の抜き（透明感キープ） -->
+  <!-- 内側 -->
   <path
     d="M35 100 A65 65 0 0 1 165 100 L165 100 L35 100 Z"
     fill="#f3f4f6"
   />
 
-  <!-- ほんのりハイライト（透け感UP） -->
-  <ellipse cx="100" cy="78" rx="65" ry="22"
-    fill="white" opacity="0.12"/>
+  <!-- ハイライト（弱め） -->
+  <ellipse cx="100" cy="78" rx="65" ry="20"
+    fill="white" opacity="0.05"/>
 
-  <!-- 接地影（自然） -->
-  <ellipse cx="100" cy="102" rx="55" ry="10"
-    fill="black" opacity="0.08"/>
+  <!-- 影（軽く） -->
+  <ellipse cx="100" cy="102" rx="48" ry="8"
+    fill="black" opacity="0.05"/>
 
   <!-- 針 -->
   <g transform="rotate(${ -90 + (scoreRight / 100) * 180 } 100 100)">
