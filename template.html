@@ -496,7 +496,8 @@ body {
           <li>Noticeable differences in clarity depending on cooling conditions</li>
         </ul>
       </div>
-    </div><!-- /section 05 -->
+    </div>
+    <!-- /section 05 -->
 
     <div class="page-break"></div>
     <div class="page-top-bar"></div>
@@ -512,8 +513,6 @@ body {
 <!-- ===== ページ分離（ここ重要） ===== -->
 <!-- ===== 05 END ===== -->
 </div>
-
-
 <!-- ============================= -->
 <!-- ===== PAGE BREAK（06へ）===== -->
 <!-- ============================= -->
@@ -527,6 +526,7 @@ body {
 
 <!-- ===== SECTION 06 ===== -->
 <!-- ===== SECTION06 ===== -->
+<!-- ===== SECTION 06 ===== -->
 <div style="
   width:700px;
   margin:40px auto;
@@ -535,7 +535,7 @@ body {
   <div style="
     position:relative;
     width:100%;
-    height:300px;
+    height:420px; /* ←これが重要（足りてなかった） */
   ">
 
     <img src="{{base_image}}" style="
@@ -547,43 +547,74 @@ body {
 
     {{dynamic_overlay}}
 
-  </div> <!-- ←🔥これ絶対必要 -->
+  </div>
 
-</div> <!-- ←🔥これも必要 -->
+</div>
 
 
-<!-- ===== ここで初めて切る ===== -->
+<!-- ===== ページ分離（完全に外に出す） ===== -->
 <div class="page-break"></div>
 <div class="page-top-bar"></div>
 
 
-<!-- ===== グラフ ===== -->
+<!-- ===== グラフ（完全独立） ===== -->
 <div style="
   width:700px;
   margin:80px auto;
   padding:0 50px;
 ">
 
-  <div style="font-size:13px;color:#6b7280;margin-bottom:14px;">
+  <div style="
+    font-size:13px;
+    color:#6b7280;
+    margin-bottom:14px;
+    font-family:'IBM Plex Mono', monospace;
+  ">
     Performance Comparison
   </div>
 
+  <!-- LDPE -->
   <div style="margin-bottom:14px;">
     <div style="font-size:12px;">LDPE</div>
-    <div style="height:10px;background:rgba(0,0,0,0.08);border-radius:6px;">
-      <div style="width:85%;height:100%;background:#6b7280;border-radius:6px;"></div>
+    <div style="
+      height:10px;
+      background:rgba(0,0,0,0.08);
+      border-radius:6px;
+      overflow:hidden;
+    ">
+      <div style="
+        width:85%;
+        height:100%;
+        background:#6b7280;
+        border-radius:6px;
+      "></div>
     </div>
   </div>
 
+  <!-- PHA -->
   <div>
     <div style="font-size:12px;">PHA</div>
-    <div style="height:10px;background:rgba(0,0,0,0.08);border-radius:6px;">
-      <div style="width:{{pha_score}}%;height:100%;background:linear-gradient(90deg,#22c55e,#f59e0b);border-radius:6px;"></div>
+    <div style="
+      height:10px;
+      background:rgba(0,0,0,0.08);
+      border-radius:6px;
+      overflow:hidden;
+    ">
+      <div style="
+        width:{{pha_score}}%;
+        height:100%;
+        background:linear-gradient(90deg,#22c55e,#f59e0b);
+        border-radius:6px;
+      "></div>
     </div>
   </div>
 
 </div>
 
+
+<!-- ===== 次ページ（07へ） ===== -->
+<div class="page-break"></div>
+<div class="page-top-bar"></div>
 <!-- ============================= -->
 <!-- ===== PAGE BREAK（07へ）===== -->
 <!-- ============================= -->
