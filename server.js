@@ -18,7 +18,7 @@ app.get("/", (req, res) => {
 });
 
 // =========================
-// 値取得
+// 値取得（当初のまま）
 function getValue(fields, keyword) {
   for (const item of fields) {
     const key = String(item?.label || "").toLowerCase();
@@ -29,9 +29,13 @@ function getValue(fields, keyword) {
 }
 
 // =========================
-// スコア
+// スコア（当初そのまま）
 function calculateScores(body) {
-  const fields = body?.data?.fields || body?.fields || [];
+
+  const fields =
+    body?.data?.fields ||
+    body?.fields ||
+    [];
 
   const currentMaterial = getValue(fields, "current material").toLowerCase();
   const processing = getValue(fields, "processing method").toLowerCase();
@@ -66,38 +70,53 @@ function calculateScores(body) {
 }
 
 // =========================
-// 🔥 AIレポート（完全安定版）
+// 🔥 AI（当初仕様：高密度コンサル）
 async function generateAIReport(inputs) {
 
   const prompt = `
-Return ONLY valid JSON.
-Do NOT include markdown.
-Do NOT include explanation.
+You are a senior polymer processing consultant.
+
+Generate a HIGH-DENSITY engineering assessment.
+
+STRICT RULES:
+- No generic explanation
+- No short sentences
+- Explain mechanisms (thermal behavior, rheology, degradation)
+- Include cause-effect relationships
+- Write like a paid consulting report
+
+Return ONLY JSON. No markdown.
 
 {
   "application": "",
   "material_transition": "",
   "assessment_type": "",
   "report_date": "",
+
   "compatibility_level": "",
   "executive_summary": "",
   "key_risk": "",
+
   "processing_window": "",
   "thermal_behavior": "",
   "flow_characteristics": "",
+
   "mechanical_behavior": "",
   "surface_quality": "",
   "structural_consistency": "",
   "application_implication": "",
+
   "primary_risk_title": "",
   "primary_risk": "",
   "secondary_risk_title": "",
   "secondary_risk": "",
   "mechanism": "",
+
   "stability": "",
   "stability_note": "",
   "consistency": "",
   "consistency_note": "",
+
   "next_step": ""
 }
 
@@ -111,39 +130,76 @@ Concern: ${inputs.concern}
   const res = await openai.chat.completions.create({
     model: "gpt-4o",
     messages: [{ role: "user", content: prompt }],
-    temperature: 0.3
+    temperature: 0.4
   });
 
   let content = res.choices[0].message.content;
 
-  // 🔥 ここが今回の核心修正
+  // JSON崩壊防止（必須）
   content = content
     .replace(/```json/g, "")
     .replace(/```/g, "")
     .trim();
 
-  try {
-    return JSON.parse(content);
-  } catch (err) {
-    console.error("❌ JSON PARSE ERROR");
-    console.log(content);
-    throw err;
-  }
+  return JSON.parse(content);
 }
 
 // =========================
-// overlay
-function generateOverlay(scoreLeft, scoreRight) {
+// 🔥 overlay（当初デザイン完全復元）
+function generateOverlay(scoreLeft = 80, scoreRight = 35) {
+
+  const ampLeft = 4 + scoreLeft * 0.12;
+  const ampRight = 4 + scoreRight * 0.12;
+
   return `
 <div style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:10;">
+
+  <div style="position:absolute; left:33.5%; top:4%; font-size:32px;">230°C</div>
+  <div style="position:absolute; left:66%; top:4%; font-size:32px; color:#dc2626;">180°C</div>
+
   <div style="position:absolute; left:40%; top:22%; font-size:18px;">${scoreLeft}</div>
   <div style="position:absolute; left:72%; top:22%; font-size:18px; color:#dc2626;">${scoreRight}</div>
+
+  <!-- 青波 -->
+  <svg style="position:absolute;left:46.8%;top:57.2%;width:11%;height:8%;transform:translate(-50%,-50%);" viewBox="0 0 80 20">
+    <path stroke="#3B82A0" stroke-width="2" fill="none"
+      d="M0 10 Q20 ${10-ampLeft} 40 10 T80 10"/>
+  </svg>
+
+  <!-- 赤波 -->
+  <svg style="position:absolute;left:71.5%;top:66.8%;width:11%;height:8%;transform:translate(-50%,-50%);" viewBox="0 0 80 20">
+    <path stroke="#dc2626" stroke-width="2" fill="none"
+      d="M0 10 Q20 ${10-ampRight} 40 10 T80 10"/>
+  </svg>
+
+  <!-- メーター -->
+  <svg viewBox="0 0 200 120"
+    style="position:absolute; left:70%; top:68%; width:150px; height:100px;">
+
+    <defs>
+      <linearGradient id="gaugeFill" x1="0%" y1="0%" x2="100%" y2="0%">
+        <stop offset="0%" stop-color="#22c55e"/>
+        <stop offset="100%" stop-color="#ef4444"/>
+      </linearGradient>
+    </defs>
+
+    <path d="M20 100 A80 80 0 0 1 180 100 L20 100 Z"
+      fill="url(#gaugeFill)" />
+
+    <g transform="rotate(${ -90 + (scoreRight / 100) * 180 } 100 100)">
+      <line x1="100" y1="100" x2="145" y2="60"
+        stroke="#111" stroke-width="3" stroke-linecap="round"/>
+      <circle cx="100" cy="100" r="5" fill="#111"/>
+    </g>
+
+  </svg>
+
 </div>
 `;
 }
 
 // =========================
-// HTML差し込み
+// HTML差し込み（当初そのまま）
 function injectHtml(template, data) {
   let html = template;
   Object.keys(data).forEach((key) => {
@@ -154,6 +210,7 @@ function injectHtml(template, data) {
 }
 
 // =========================
+// メイン処理
 app.post("/tally-pdf", async (req, res) => {
   try {
 
@@ -185,10 +242,16 @@ app.post("/tally-pdf", async (req, res) => {
     });
 
     const browser = await puppeteer.launch({
-      args: ["--no-sandbox","--disable-setuid-sandbox"]
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-gpu"
+      ]
     });
 
     const page = await browser.newPage();
+
     await page.setContent(html, { waitUntil: "networkidle0" });
 
     const pdf = await page.pdf({
@@ -220,7 +283,9 @@ app.get("/latest-pdf", (req, res) => {
   res.sendFile(file);
 });
 
+// =========================
 const PORT = process.env.PORT || 3000;
+
 app.listen(PORT, () => {
   console.log("🚀 Server running on", PORT);
 });
