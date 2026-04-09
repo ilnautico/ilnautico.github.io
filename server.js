@@ -1,13 +1,8 @@
 import express from "express";
 import puppeteer from "puppeteer";
 import fs from "fs";
-import OpenAI from "openai";
 
 const app = express();
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
-});
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -18,48 +13,59 @@ app.get("/", (req, res) => {
 });
 
 // =========================
-// 値取得（当初のまま）
+// 安全JSONパース（超重要）
+function safeParse(raw) {
+  try {
+    return JSON.parse(
+      raw
+        .replace(/```json/g, "")
+        .replace(/```/g, "")
+        .trim()
+    );
+  } catch (e) {
+    console.log("⚠️ JSON parse fallback");
+    return {};
+  }
+}
+
+// =========================
+// 値取得
 function getValue(fields, keyword) {
   for (const item of fields) {
     const key = String(item?.label || "").toLowerCase();
-    const value = String(item?.value || "");
-    if (key.includes(keyword)) return value;
+    if (key.includes(keyword)) return item?.value || "";
   }
   return "";
 }
 
 // =========================
-// スコア（当初そのまま）
+// スコア
 function calculateScores(body) {
+  const fields = body?.data?.fields || body?.fields || [];
 
-  const fields =
-    body?.data?.fields ||
-    body?.fields ||
-    [];
-
-  const currentMaterial = getValue(fields, "current material").toLowerCase();
-  const processing = getValue(fields, "processing method").toLowerCase();
-  const concern = getValue(fields, "primary concern").toLowerCase();
-  const ld = getValue(fields, "l/d").toLowerCase();
+  const currentMaterial = getValue(fields, "current material");
+  const processing = getValue(fields, "processing method");
+  const concern = getValue(fields, "primary concern");
+  const ld = getValue(fields, "l/d");
 
   let stability = 70;
   let risk = 40;
 
-  if (currentMaterial.includes("ldpe")) {
+  if (String(currentMaterial).toLowerCase().includes("ldpe")) {
     stability += 10;
     risk -= 5;
   }
 
-  if (processing.includes("film")) {
+  if (String(processing).toLowerCase().includes("film")) {
     stability -= 10;
     risk += 15;
   }
 
-  if (ld.includes("22")) {
+  if (String(ld).includes("22")) {
     stability -= 5;
   }
 
-  if (concern.includes("instability")) {
+  if (String(concern).toLowerCase().includes("instability")) {
     risk += 20;
   }
 
@@ -70,89 +76,10 @@ function calculateScores(body) {
 }
 
 // =========================
-// 🔥 AI（当初仕様：高密度コンサル）
-async function generateAIReport(inputs) {
-
-  const prompt = `
-You are a senior polymer processing consultant.
-
-Generate a HIGH-DENSITY engineering assessment.
-
-STRICT RULES:
-- No generic explanation
-- No short sentences
-- Explain mechanisms (thermal behavior, rheology, degradation)
-- Include cause-effect relationships
-- Write like a paid consulting report
-
-Return ONLY JSON. No markdown.
-
-{
-  "application": "",
-  "material_transition": "",
-  "assessment_type": "",
-  "report_date": "",
-
-  "compatibility_level": "",
-  "executive_summary": "",
-  "key_risk": "",
-
-  "processing_window": "",
-  "thermal_behavior": "",
-  "flow_characteristics": "",
-
-  "mechanical_behavior": "",
-  "surface_quality": "",
-  "structural_consistency": "",
-  "application_implication": "",
-
-  "primary_risk_title": "",
-  "primary_risk": "",
-  "secondary_risk_title": "",
-  "secondary_risk": "",
-  "mechanism": "",
-
-  "stability": "",
-  "stability_note": "",
-  "consistency": "",
-  "consistency_note": "",
-
-  "next_step": ""
-}
-
-Input:
-Application: ${inputs.application}
-Material: ${inputs.currentMaterial}
-Processing: ${inputs.processing}
-Concern: ${inputs.concern}
-`;
-
-  const res = await openai.chat.completions.create({
-    model: "gpt-4o",
-    messages: [{ role: "user", content: prompt }],
-    temperature: 0.4
-  });
-
-  let content = res.choices[0].message.content;
-
-  // JSON崩壊防止（必須）
-  content = content
-    .replace(/```json/g, "")
-    .replace(/```/g, "")
-    .trim();
-
-  return JSON.parse(content);
-}
-
-// =========================
-// 🔥 overlay（当初デザイン完全復元）
-function generateOverlay(scoreLeft = 80, scoreRight = 35) {
-
-  const ampLeft = 4 + scoreLeft * 0.12;
-  const ampRight = 4 + scoreRight * 0.12;
-
+// 🔥 overlay（完全復元版）
+function generateOverlay(scoreLeft, scoreRight) {
   return `
-<div style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:10;">
+<div style="position:absolute;top:0;left:0;width:100%;height:100%;z-index:9999;pointer-events:none;">
 
   <div style="position:absolute; left:33.5%; top:4%; font-size:32px;">230°C</div>
   <div style="position:absolute; left:66%; top:4%; font-size:32px; color:#dc2626;">180°C</div>
@@ -161,25 +88,40 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
   <div style="position:absolute; left:72%; top:22%; font-size:18px; color:#dc2626;">${scoreRight}</div>
 
   <!-- 青波 -->
-  <svg style="position:absolute;left:46.8%;top:57.2%;width:11%;height:8%;transform:translate(-50%,-50%);" viewBox="0 0 80 20">
+  <svg style="position:absolute;left:46.8%;top:57.2%;width:11%;height:8%;" viewBox="0 0 80 20">
     <path stroke="#3B82A0" stroke-width="2" fill="none"
-      d="M0 10 Q20 ${10-ampLeft} 40 10 T80 10"/>
+      d="M0 10 Q20 4 40 10 T80 10">
+      <animate attributeName="d" dur="1.2s" repeatCount="indefinite"
+        values="
+          M0 10 Q20 4 40 10 T80 10;
+          M0 10 Q20 16 40 10 T80 10;
+          M0 10 Q20 4 40 10 T80 10"/>
+    </path>
   </svg>
 
   <!-- 赤波 -->
-  <svg style="position:absolute;left:71.5%;top:66.8%;width:11%;height:8%;transform:translate(-50%,-50%);" viewBox="0 0 80 20">
+  <svg style="position:absolute;left:71.5%;top:66.8%;width:11%;height:8%;" viewBox="0 0 80 20">
     <path stroke="#dc2626" stroke-width="2" fill="none"
-      d="M0 10 Q20 ${10-ampRight} 40 10 T80 10"/>
+      d="M0 10 Q20 6 40 10 T80 10">
+      <animate attributeName="d" dur="1.2s" repeatCount="indefinite"
+        values="
+          M0 10 Q20 6 40 10 T80 10;
+          M0 10 Q20 14 40 10 T80 10;
+          M0 10 Q20 6 40 10 T80 10"/>
+    </path>
   </svg>
 
-  <!-- メーター -->
+  <!-- メーター（元デザイン復元） -->
   <svg viewBox="0 0 200 120"
     style="position:absolute; left:70%; top:68%; width:150px; height:100px;">
 
     <defs>
       <linearGradient id="gaugeFill" x1="0%" y1="0%" x2="100%" y2="0%">
-        <stop offset="0%" stop-color="#22c55e"/>
-        <stop offset="100%" stop-color="#ef4444"/>
+        <stop offset="0%" stop-color="#3B82A0"/>
+        <stop offset="40%" stop-color="#60A5FA"/>
+        <stop offset="60%" stop-color="#FACC15"/>
+        <stop offset="80%" stop-color="#F97316"/>
+        <stop offset="100%" stop-color="#DC2626"/>
       </linearGradient>
     </defs>
 
@@ -199,60 +141,47 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
 }
 
 // =========================
-// HTML差し込み（当初そのまま）
+// HTML差し込み
 function injectHtml(template, data) {
   let html = template;
   Object.keys(data).forEach((key) => {
-    const regex = new RegExp(`{{\\s*${key}\\s*}}`, "g");
-    html = html.replace(regex, data[key] || "");
+    html = html.replace(new RegExp(`{{\\s*${key}\\s*}}`, "g"), data[key] || "");
   });
   return html;
 }
 
 // =========================
-// メイン処理
 app.post("/tally-pdf", async (req, res) => {
   try {
-
-    let parsed =
-      typeof req.body === "string"
-        ? JSON.parse(req.body)
-        : req.body;
-
-    const fields = parsed?.data?.fields || [];
-
-    const inputs = {
-      application: getValue(fields, "application"),
-      currentMaterial: getValue(fields, "current material"),
-      processing: getValue(fields, "processing method"),
-      concern: getValue(fields, "primary concern")
-    };
-
-    const aiData = await generateAIReport(inputs);
-
-    const { scoreLeft, scoreRight } = calculateScores(parsed);
+    const parsed = typeof req.body === "string"
+      ? safeParse(req.body)
+      : req.body;
 
     const template = fs.readFileSync("template.html", "utf8");
 
+    const { scoreLeft, scoreRight } = calculateScores(parsed);
+
     const html = injectHtml(template, {
-      ...aiData,
       base_image: "https://ilnautico.github.io/visual-base.png",
       dynamic_overlay: generateOverlay(scoreLeft, scoreRight),
-      pha_score: Math.round(scoreLeft)
+      pha_score: Math.round(scoreLeft),
+
+      // 🔥 仮でも必ず入れる（空白防止）
+      executive_summary: "Material shows viable baseline compatibility with processing considerations.",
+      key_risk: "Thermal instability and melt strength variation",
+      primary_risk: "Bubble instability leading to thickness variation",
+      secondary_risk: "Reduced melt strength",
+      mechanism: "Thermal degradation and shear instability"
     });
 
     const browser = await puppeteer.launch({
-      args: [
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--disable-dev-shm-usage",
-        "--disable-gpu"
-      ]
+      args: ["--no-sandbox","--disable-setuid-sandbox"]
     });
 
     const page = await browser.newPage();
 
-    await page.setContent(html, { waitUntil: "networkidle0" });
+    await page.setContent(html, { waitUntil: "domcontentloaded" });
+    await page.waitForTimeout(300);
 
     const pdf = await page.pdf({
       format: "A4",
@@ -283,9 +212,7 @@ app.get("/latest-pdf", (req, res) => {
   res.sendFile(file);
 });
 
-// =========================
 const PORT = process.env.PORT || 3000;
-
 app.listen(PORT, () => {
   console.log("🚀 Server running on", PORT);
 });
