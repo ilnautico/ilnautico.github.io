@@ -103,7 +103,7 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
       </path>
     </svg>
 
- <svg viewBox="0 0 200 120"
+<svg viewBox="0 0 200 120"
   style="position:absolute; left:70%; top:68%; width:150px; height:100px;">
 
   <defs>
@@ -115,7 +115,7 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
       <stop offset="100%" stop-color="#ef4444"/>
     </linearGradient>
 
-    <!-- 光（強化版） -->
+    <!-- ハイライト -->
     <linearGradient id="shineGrad" x1="0%" y1="0%" x2="0%" y2="80%">
       <stop offset="0%" stop-color="white" stop-opacity="0.8"/>
       <stop offset="50%" stop-color="white" stop-opacity="0.25"/>
@@ -124,24 +124,43 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
 
   </defs>
 
-  <!-- ===== ベース（半月プレート） ===== -->
+  <!-- ===== 半月プレート（本体） ===== -->
   <path
     d="M20 100 A80 80 0 0 1 180 100 L180 100 L20 100 Z"
     fill="url(#gaugeGrad)"
   />
 
-  <!-- ===== ガラス感（少し強め） ===== -->
+  <!-- ===== ガラス膜 ===== -->
   <path
     d="M20 100 A80 80 0 0 1 180 100 L180 100 L20 100 Z"
     fill="white"
     opacity="0.18"
   />
 
-  <!-- ===== ハイライト（立体感の核） ===== -->
+  <!-- ===== 光の層 ===== -->
   <path
     d="M20 100 A80 80 0 0 1 180 100 L180 100 L20 100 Z"
     fill="url(#shineGrad)"
     opacity="0.55"
+  />
+
+  <!-- ===== 反射ライン（これが決定打） ===== -->
+  <path
+    d="M30 85 A70 70 0 0 1 170 85"
+    stroke="white"
+    stroke-width="2"
+    opacity="0.35"
+    fill="none"
+  />
+
+  <!-- ===== 影 ===== -->
+  <ellipse
+    cx="100"
+    cy="105"
+    rx="70"
+    ry="10"
+    fill="black"
+    opacity="0.08"
   />
 
   <!-- ===== 針 ===== -->
@@ -159,7 +178,6 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
   </g>
 
 </svg>
-
   </div>
   `;
 }
