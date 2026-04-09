@@ -75,84 +75,74 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
   const durRight = 1.6 - scoreRight * 0.01;
 
   return `
-  <div style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:10;">
+<div style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:10;">
 
-    <div style="position:absolute; left:33.5%; top:4%; font-size:32px;">230°C</div>
-    <div style="position:absolute; left:66%; top:4%; font-size:32px; color:#dc2626;">180°C</div>
+  <div style="position:absolute; left:33.5%; top:4%; font-size:32px;">230°C</div>
+  <div style="position:absolute; left:66%; top:4%; font-size:32px; color:#dc2626;">180°C</div>
 
-    <div style="position:absolute; left:40%; top:22%; font-size:18px;">${scoreLeft}</div>
-    <div style="position:absolute; left:72%; top:22%; font-size:18px; color:#dc2626;">${scoreRight}</div>
+  <div style="position:absolute; left:40%; top:22%; font-size:18px;">${scoreLeft}</div>
+  <div style="position:absolute; left:72%; top:22%; font-size:18px; color:#dc2626;">${scoreRight}</div>
 
-    <svg style="position:absolute;left:46.8%;top:57.2%;width:11%;height:8%;transform:translate(-50%,-50%);" viewBox="0 0 80 20">
-      <path stroke="#3B82A0" stroke-width="2" fill="none"
-        d="M0 10 Q20 ${10-ampLeft} 40 10 T80 10">
-        <animate attributeName="d" dur="${durLeft}s" repeatCount="indefinite"
-          values="M0 10 Q20 ${10-ampLeft} 40 10 T80 10;
-                  M0 10 Q20 ${10+ampLeft} 40 10 T80 10;
-                  M0 10 Q20 ${10-ampLeft} 40 10 T80 10"/>
-      </path>
-    </svg>
+  <!-- 青波 -->
+  <svg style="position:absolute;left:46.8%;top:57.2%;width:11%;height:8%;transform:translate(-50%,-50%);" viewBox="0 0 80 20">
+    <path stroke="#3B82A0" stroke-width="2" fill="none"
+      d="M0 10 Q20 ${10-ampLeft} 40 10 T80 10">
+      <animate attributeName="d" dur="${durLeft}s" repeatCount="indefinite"
+        values="M0 10 Q20 ${10-ampLeft} 40 10 T80 10;
+                M0 10 Q20 ${10+ampLeft} 40 10 T80 10;
+                M0 10 Q20 ${10-ampLeft} 40 10 T80 10"/>
+    </path>
+  </svg>
 
-    <svg style="position:absolute;left:71.5%;top:66.8%;width:11%;height:8%;transform:translate(-50%,-50%);" viewBox="0 0 80 20">
-      <path stroke="#dc2626" stroke-width="2" fill="none"
-        d="M0 10 Q20 ${10-ampRight} 40 10 T80 10">
-        <animate attributeName="d" dur="${durRight}s" repeatCount="indefinite"
-          values="M0 10 Q20 ${10-ampRight} 40 10 T80 10;
-                  M0 10 Q20 ${10+ampRight} 40 10 T80 10;
-                  M0 10 Q20 ${10-ampRight} 40 10 T80 10"/>
-      </path>
-    </svg>
-<svg viewBox="0 0 200 120"
-  style="position:absolute; left:70%; top:68%; width:150px; height:100px;">
+  <!-- 赤波 -->
+  <svg style="position:absolute;left:71.5%;top:66.8%;width:11%;height:8%;transform:translate(-50%,-50%);" viewBox="0 0 80 20">
+    <path stroke="#dc2626" stroke-width="2" fill="none"
+      d="M0 10 Q20 ${10-ampRight} 40 10 T80 10">
+      <animate attributeName="d" dur="${durRight}s" repeatCount="indefinite"
+        values="M0 10 Q20 ${10-ampRight} 40 10 T80 10;
+                M0 10 Q20 ${10+ampRight} 40 10 T80 10;
+                M0 10 Q20 ${10-ampRight} 40 10 T80 10"/>
+    </path>
+  </svg>
 
-  <defs>
-    <linearGradient id="gaugeFill" x1="0%" y1="0%" x2="100%" y2="0%">
-      <!-- 緑（軽め） -->
-      <stop offset="0%" stop-color="#22c55e"/>
-      <stop offset="30%" stop-color="#4ade80"/>
+  <!-- メーター -->
+  <svg viewBox="0 0 200 120"
+    style="position:absolute; left:70%; top:68%; width:150px; height:100px;">
 
-      <!-- 黄（中心強め） -->
-      <stop offset="45%" stop-color="#fde047"/>
-      <stop offset="60%" stop-color="#facc15"/>
+    <defs>
+      <linearGradient id="gaugeFill" x1="0%" y1="0%" x2="100%" y2="0%">
+        <stop offset="0%" stop-color="#22c55e"/>
+        <stop offset="30%" stop-color="#4ade80"/>
+        <stop offset="45%" stop-color="#fde047"/>
+        <stop offset="60%" stop-color="#facc15"/>
+        <stop offset="75%" stop-color="#f59e0b"/>
+        <stop offset="90%" stop-color="#f97316"/>
+        <stop offset="100%" stop-color="#ef4444"/>
+      </linearGradient>
+    </defs>
 
-      <!-- 赤 -->
-      <stop offset="75%" stop-color="#f59e0b"/>
-      <stop offset="90%" stop-color="#f97316"/>
-      <stop offset="100%" stop-color="#ef4444"/>
-    </linearGradient>
-  </defs>
+    <path d="M20 100 A80 80 0 0 1 180 100 L180 100 L20 100 Z"
+      fill="url(#gaugeFill)" />
 
-  <!-- 半月プレート -->
-  <path
-    d="M20 100 A80 80 0 0 1 180 100 L180 100 L20 100 Z"
-    fill="url(#gaugeFill)"
-  />
+    <path d="M35 100 A65 65 0 0 1 165 100 L165 100 L35 100 Z"
+      fill="rgba(255,255,255,0.15)" />
 
-  <!-- 内側（透け感） -->
-  <path
-    d="M35 100 A65 65 0 0 1 165 100 L165 100 L35 100 Z"
-    fill="rgba(255,255,255,0.15)"
-  />
+    <ellipse cx="100" cy="78" rx="65" ry="20"
+      fill="white" opacity="0.05"/>
 
-  <!-- ガラスハイライト（弱め） -->
-  <ellipse cx="100" cy="78" rx="65" ry="20"
-    fill="white" opacity="0.05"/>
+    <ellipse cx="100" cy="102" rx="48" ry="8"
+      fill="black" opacity="0.05"/>
 
-  <!-- 接地影（自然） -->
-  <ellipse cx="100" cy="102" rx="48" ry="8"
-    fill="black" opacity="0.05"/>
+    <g transform="rotate(${ -90 + (scoreRight / 100) * 180 } 100 100)">
+      <line x1="100" y1="100" x2="145" y2="60"
+        stroke="#111" stroke-width="3" stroke-linecap="round"/>
+      <circle cx="100" cy="100" r="5" fill="#111"/>
+    </g>
 
-  <!-- 針 -->
-  <g transform="rotate(${ -90 + (scoreRight / 100) * 180 } 100 100)">
-    <line x1="100" y1="100" x2="145" y2="60"
-      stroke="#111"
-      stroke-width="3"
-      stroke-linecap="round"/>
-    <circle cx="100" cy="100" r="5" fill="#111"/>
-  </g>
+  </svg>
 
-</svg>
-  `;
+</div>
+`;
 }
  
 
