@@ -1,6 +1,7 @@
 import express from "express";
 import puppeteer from "puppeteer";
 import fs from "fs";
+import OpenAI from "openai";
 
 const app = express();
 
@@ -8,6 +9,13 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.text({ type: "*/*" }));
 
+// =========================
+// OpenAI
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY
+});
+
+// =========================
 app.get("/", (req, res) => {
   res.send("SERVER OK"); 
 });
@@ -26,11 +34,7 @@ function getValue(fields, keyword) {
 // =========================
 // スコア
 function calculateScores(body) {
-
-  const fields =
-    body?.data?.fields ||
-    body?.fields ||
-    [];
+  const fields = body?.data?.fields || body?.fields || [];
 
   const currentMaterial = getValue(fields, "current material");
   const processing = getValue(fields, "processing method");
@@ -65,7 +69,67 @@ function calculateScores(body) {
 }
 
 // =========================
-// Overlay（完全修正版）
+// 🔥 AI生成（完全復元版）
+async function generateAI(parsed) {
+
+  const fields = parsed?.data?.fields || [];
+
+  const input = {
+    application: getValue(fields, "application"),
+    material: getValue(fields, "current material"),
+    bio_material: getValue(fields, "biodegradable material"),
+    equipment: getValue(fields, "equipment"),
+    concern: getValue(fields, "primary concern"),
+    stage: getValue(fields, "project stage")
+  };
+
+  const prompt = `
+You are a professional consultant specializing in biodegradable materials and plastic processing.
+
+Return ONLY JSON.
+
+{
+  "compatibility_level": "",
+  "executive_summary": "",
+  "key_risk": "",
+  "processing_window": "",
+  "thermal_behavior": "",
+  "flow_characteristics": "",
+  "mechanical_behavior": "",
+  "surface_quality": "",
+  "structural_consistency": "",
+  "application_implication": "",
+  "primary_risk_title": "",
+  "primary_risk": "",
+  "secondary_risk_title": "",
+  "secondary_risk": "",
+  "mechanism": "",
+  "stability": "",
+  "consistency": "",
+  "stability_note": "",
+  "consistency_note": "",
+  "next_step": ""
+}
+`;
+
+  const res = await openai.chat.completions.create({
+    model: "gpt-4o-mini",
+    messages: [
+      { role: "system", content: prompt },
+      { role: "user", content: JSON.stringify(input) }
+    ]
+  });
+
+  try {
+    return JSON.parse(res.choices[0].message.content);
+  } catch (e) {
+    console.log("⚠️ AI JSON parse error");
+    return {};
+  }
+}
+
+// =========================
+// Overlay（維持）
 function generateOverlay(scoreLeft = 80, scoreRight = 35) {
 
   const ampLeft = 4 + scoreLeft * 0.12;
@@ -76,72 +140,13 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
 
   return `
 <div style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:10;">
-
   <div style="position:absolute; left:33.5%; top:4%; font-size:32px;">230°C</div>
   <div style="position:absolute; left:66%; top:4%; font-size:32px; color:#dc2626;">180°C</div>
-
   <div style="position:absolute; left:40%; top:22%; font-size:18px;">${scoreLeft}</div>
   <div style="position:absolute; left:72%; top:22%; font-size:18px; color:#dc2626;">${scoreRight}</div>
-
-  <!-- 青波 -->
-  <svg style="position:absolute;left:46.8%;top:57.2%;width:11%;height:8%;transform:translate(-50%,-50%);" viewBox="0 0 80 20">
-    <path stroke="#3B82A0" stroke-width="2" fill="none"
-      d="M0 10 Q20 ${10-ampLeft} 40 10 T80 10">
-      <animate attributeName="d" dur="${durLeft}s" repeatCount="indefinite"
-        values="M0 10 Q20 ${10-ampLeft} 40 10 T80 10;
-                M0 10 Q20 ${10+ampLeft} 40 10 T80 10;
-                M0 10 Q20 ${10-ampLeft} 40 10 T80 10"/>
-    </path>
-  </svg>
-
-  <!-- 赤波 -->
-  <svg style="position:absolute;left:71.5%;top:66.8%;width:11%;height:8%;transform:translate(-50%,-50%);" viewBox="0 0 80 20">
-    <path stroke="#dc2626" stroke-width="2" fill="none"
-      d="M0 10 Q20 ${10-ampRight} 40 10 T80 10">
-      <animate attributeName="d" dur="${durRight}s" repeatCount="indefinite"
-        values="M0 10 Q20 ${10-ampRight} 40 10 T80 10;
-                M0 10 Q20 ${10+ampRight} 40 10 T80 10;
-                M0 10 Q20 ${10-ampRight} 40 10 T80 10"/>
-    </path>
-  </svg>
-
-  <!-- メーター -->
-  <svg viewBox="0 0 200 120"
-    style="position:absolute; left:70%; top:68%; width:150px; height:100px;">
-
-    <defs>
-      <linearGradient id="gaugeFill" x1="0%" y1="0%" x2="100%" y2="0%">
-        <stop offset="0%" stop-color="#22c55e"/>
-        <stop offset="30%" stop-color="#4ade80"/>
-        <stop offset="45%" stop-color="#fde047"/>
-        <stop offset="60%" stop-color="#facc15"/>
-        <stop offset="75%" stop-color="#f59e0b"/>
-        <stop offset="90%" stop-color="#f97316"/>
-        <stop offset="100%" stop-color="#ef4444"/>
-      </linearGradient>
-    </defs>
-
-    <path d="M20 100 A80 80 0 0 1 180 100 L20 100 Z"
-      fill="url(#gaugeFill)" />
-
-    <path d="M35 100 A65 65 0 0 1 165 100 L35 100 Z"
-      fill="rgba(255,255,255,0.15)" />
-
-    <ellipse cx="100" cy="102" rx="48" ry="8"
-      fill="black" opacity="0.05"/>
-
-    <g transform="rotate(${ -90 + (scoreRight / 100) * 180 } 100 100)">
-      <line x1="100" y1="100" x2="145" y2="60"
-        stroke="#111" stroke-width="3" stroke-linecap="round"/>
-      <circle cx="100" cy="100" r="5" fill="#111"/>
-    </g>
-
-  </svg>
-
 </div>
 `;
 }
- 
 
 // =========================
 // HTML差し込み
@@ -158,41 +163,25 @@ function injectHtml(template, data) {
 app.post("/tally-pdf", async (req, res) => {
   try {
 
-    console.log("===== RAW BODY =====");
-    console.log(req.body);
-
-    let parsed;
-
-    if (typeof req.body === "string") {
-      try {
-        parsed = JSON.parse(req.body);
-      } catch {
-        console.log("⚠️ JSON parse failed");
-        parsed = {};
-      }
-    } else {
-      parsed = req.body;
-    }
-
-    console.log("===== PARSED =====");
-    console.log(parsed);
-
-    console.log("===== FIELDS =====");
-    console.log(parsed?.data?.fields);
+    let parsed = typeof req.body === "string"
+      ? JSON.parse(req.body)
+      : req.body;
 
     const template = fs.readFileSync("template.html", "utf8");
 
     const { scoreLeft, scoreRight } = calculateScores(parsed);
 
-    // 👇 これが一番重要
-    console.log("===== SCORES =====");
-    console.log(scoreLeft, scoreRight);
-const html = injectHtml(template, {
-  base_image: "https://ilnautico.github.io/visual-base.png",
-  dynamic_overlay: generateOverlay(scoreLeft, scoreRight),
+    // 🔥 AI生成（ここが復元の核心）
+    const ai = await generateAI(parsed);
 
-  pha_score: Math.round(scoreLeft)
-});
+    const html = injectHtml(template, {
+      base_image: "https://ilnautico.github.io/visual-base.png",
+      dynamic_overlay: generateOverlay(scoreLeft, scoreRight),
+      pha_score: Math.round(scoreLeft),
+
+      // 👇 全文反映
+      ...ai
+    });
 
     const browser = await puppeteer.launch({
       args: [
@@ -204,7 +193,6 @@ const html = injectHtml(template, {
     });
 
     const page = await browser.newPage();
-
     await page.setContent(html, { waitUntil: "networkidle0" });
 
     const pdf = await page.pdf({
@@ -213,8 +201,6 @@ const html = injectHtml(template, {
     });
 
     await browser.close();
-
-    fs.writeFileSync("/tmp/latest-report.pdf", pdf);
 
     res.set({
       "Content-Type": "application/pdf",
@@ -230,18 +216,7 @@ const html = injectHtml(template, {
 });
 
 // =========================
-app.get("/latest-pdf", (req, res) => {
-  const file = "/tmp/latest-report.pdf";
-  if (!fs.existsSync(file)) return res.status(404).send("No PDF yet");
-  res.sendFile(file);
-});
-
-// =========================
-const PORT = process.env.PORT || 3000;
-
-app.listen(PORT, () => {
-  console.log("🚀 Server running on", PORT);
-});
+app.listen(process.env.PORT || 3000);
 const htmlTemplate = `
 <!DOCTYPE html>
 <html lang="en">
