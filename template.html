@@ -533,7 +533,62 @@ body {
   <!-- Overlay（サーバー生成） -->
   <!-- 動的Overlay（サーバー側描画） -->
   {{dynamic_overlay}}
+<!-- ===== Comparison Graph（安全追加版） ===== -->
+<div style="
+  position:absolute;
+  left:18%;
+  top:78%;
+  width:42%;
+  opacity:0.9;
+">
 
+  <div style="
+    font-size:13px;
+    color:#6b7280;
+    margin-bottom:6px;
+    font-family:'IBM Plex Mono', monospace;
+    letter-spacing:0.04em;
+  ">
+    Performance Comparison
+  </div>
+
+  <!-- LDPE -->
+  <div style="margin-bottom:10px;">
+    <div style="font-size:12px;">LDPE</div>
+    <div style="
+      height:8px;
+      background:rgba(0,0,0,0.08);
+      border-radius:6px;
+      overflow:hidden;
+    ">
+      <div style="
+        width:70%;
+        height:100%;
+        background:linear-gradient(90deg,#9ca3af,#6b7280);
+        border-radius:6px;
+      "></div>
+    </div>
+  </div>
+
+  <!-- PHA -->
+  <div>
+    <div style="font-size:12px;">PHA</div>
+    <div style="
+      height:8px;
+      background:rgba(0,0,0,0.08);
+      border-radius:6px;
+      overflow:hidden;
+    ">
+      <div style="
+        width:55%;
+        height:100%;
+        background:linear-gradient(90deg,#22c55e,#f59e0b);
+        border-radius:6px;
+      "></div>
+    </div>
+  </div>
+
+</div>
 </div>
     <!-- 07 Recommended Next Step -->
     <div class="section">
