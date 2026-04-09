@@ -466,53 +466,95 @@ body {
 
     <!-- 05 Quality Assessment -->
     <div class="section">
-      <div class="section-header">
-        <span class="section-num">05</span>
-        <span class="section-title">Quality Assessment</span>
+  <div class="section-header">
+    <span class="section-num">05</span>
+    <span class="section-title">Quality Assessment</span>
+  </div>
+
+  <div class="qa-top">
+    <div class="qa-cell">
+      <div class="qa-cell-label">Stability</div>
+      <div class="qa-rating">
+        <span class="qa-dot" style="background:#CFAE5D;"></span>
+        {{stability}}
       </div>
-      <div class="qa-top">
-        <div class="qa-cell">
-          <div class="qa-cell-label">Stability</div>
-          <div class="qa-rating">
-            <span class="qa-dot" style="background:#CFAE5D;"></span>
-            {{stability}}
-          </div>
-          <div class="qa-note">{{stability_note}}</div>
-        </div>
-        <div class="qa-cell" style="border-left:1px solid var(--sep);">
-          <div class="qa-cell-label">Consistency</div>
-          <div class="qa-rating">
-            <span class="qa-dot" style="background:var(--accent-low);"></span>
-            {{consistency}}
-          </div>
-          <div class="qa-note">{{consistency_note}}</div>
-        </div>
+      <div class="qa-note">{{stability_note}}</div>
+    </div>
+
+    <div class="qa-cell" style="border-left:1px solid var(--sep);">
+      <div class="qa-cell-label">Consistency</div>
+      <div class="qa-rating">
+        <span class="qa-dot" style="background:var(--accent-low);"></span>
+        {{consistency}}
       </div>
-      <div class="qa-deviations">
-        <div class="qa-dev-header">Expected Deviations</div>
-        <ul class="qa-dev-list">
-          <li>Increased gauge variation across the film width</li>
-          <li>Higher variability in seal performance</li>
-          <li>Noticeable differences in clarity depending on cooling conditions</li>
-        </ul>
+      <div class="qa-note">{{consistency_note}}</div>
+    </div>
+  </div>
+
+  <div class="qa-deviations">
+    <div class="qa-dev-header">Expected Deviations</div>
+    <ul class="qa-dev-list">
+      <li>Increased gauge variation across the film width</li>
+      <li>Higher variability in seal performance</li>
+      <li>Noticeable differences in clarity depending on cooling conditions</li>
+    </ul>
+  </div>
+
+  <!-- ===== グラフ（ここに入れる） ===== -->
+  <div style="margin-top:28px;">
+
+    <div style="
+      font-size:12px;
+      color:#6b7280;
+      margin-bottom:10px;
+      font-family:'IBM Plex Mono', monospace;
+      letter-spacing:0.04em;
+    ">
+      Performance Comparison
+    </div>
+
+    <!-- LDPE -->
+    <div style="margin-bottom:14px;">
+      <div style="font-size:12px; margin-bottom:6px;">LDPE</div>
+      <div style="
+        height:10px;
+        background:rgba(0,0,0,0.08);
+        border-radius:6px;
+        overflow:hidden;
+      ">
+        <div style="
+          width:85%;
+          height:100%;
+          background:linear-gradient(90deg,#9ca3af,#6b7280);
+        "></div>
       </div>
     </div>
-    <!-- /section 05 -->
 
-    <div class="page-break"></div>
-    <div class="page-top-bar"></div>
+    <!-- PHA -->
+    <div>
+      <div style="font-size:12px; margin-bottom:6px;">PHA</div>
+      <div style="
+        height:10px;
+        background:rgba(0,0,0,0.08);
+        border-radius:6px;
+        overflow:hidden;
+      ">
+        <div style="
+          width:{{pha_score}}%;
+          height:100%;
+          background:linear-gradient(90deg,#22c55e,#f59e0b);
+        "></div>
+      </div>
+    </div>
 
-    <div class="page4-wrap">
-        <!-- 06 Conceptual Visualization -->
+  </div>
+
 </div>
+<!-- /section 05 -->
 
-
-<!-- ===== 05 END ===== -->
-</div>
-<!-- ============================= -->
-<!-- ===== PAGE BREAK（06へ）===== -->
-<!-- ============================= -->
-   <!-- ===== PAGE BREAK（ここ1つだけ）===== -->
+<!-- ===== 次ページへ（これ1つだけ） ===== -->
+<div class="page-break"></div>
+<div class="page-top-bar"></div>
 <!-- ============================= -->
 <!-- ===== PAGE BREAK（06へ）===== -->
 <!-- ============================= -->
