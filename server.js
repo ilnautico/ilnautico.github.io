@@ -108,62 +108,45 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
 
   <defs>
 
-    <!-- ベースグラデーション -->
+    <!-- ベース -->
     <linearGradient id="gaugeGrad" x1="0%" x2="100%">
       <stop offset="0%" stop-color="#22c55e"/>
       <stop offset="50%" stop-color="#f59e0b"/>
       <stop offset="100%" stop-color="#ef4444"/>
     </linearGradient>
 
-    <!-- ハイライト -->
-    <linearGradient id="shineGrad" x1="0%" y1="0%" x2="0%" y2="80%">
-      <stop offset="0%" stop-color="white" stop-opacity="0.8"/>
-      <stop offset="50%" stop-color="white" stop-opacity="0.25"/>
+    <!-- ガラス用（中心明るい） -->
+    <radialGradient id="glassGrad" cx="50%" cy="40%" r="70%">
+      <stop offset="0%" stop-color="white" stop-opacity="0.35"/>
+      <stop offset="50%" stop-color="white" stop-opacity="0.12"/>
       <stop offset="100%" stop-color="white" stop-opacity="0"/>
-    </linearGradient>
+    </radialGradient>
 
   </defs>
 
-  <!-- ===== 半月プレート（本体） ===== -->
+  <!-- ベース -->
   <path
     d="M20 100 A80 80 0 0 1 180 100 L180 100 L20 100 Z"
     fill="url(#gaugeGrad)"
   />
 
-  <!-- ===== ガラス膜 ===== -->
+  <!-- ★ ガラス（これが本質） -->
   <path
     d="M20 100 A80 80 0 0 1 180 100 L180 100 L20 100 Z"
-    fill="white"
-    opacity="0.18"
+    fill="url(#glassGrad)"
   />
 
-  <!-- ===== 光の層 ===== -->
-  <path
-    d="M20 100 A80 80 0 0 1 180 100 L180 100 L20 100 Z"
-    fill="url(#shineGrad)"
-    opacity="0.55"
-  />
-
-  <!-- ===== 反射ライン（これが決定打） ===== -->
-  <path
-    d="M30 85 A70 70 0 0 1 170 85"
-    stroke="white"
-    stroke-width="2"
-    opacity="0.35"
-    fill="none"
-  />
-
-  <!-- ===== 影 ===== -->
+  <!-- 下影 -->
   <ellipse
     cx="100"
     cy="105"
-    rx="70"
+    rx="65"
     ry="10"
     fill="black"
     opacity="0.08"
   />
 
-  <!-- ===== 針 ===== -->
+  <!-- 針 -->
   <g transform="rotate(${ -90 + (scoreRight / 100) * 180 } 100 100)">
     <line
       x1="100"
