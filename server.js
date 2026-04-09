@@ -218,7 +218,7 @@ app.post("/tally-pdf", async (req, res) => {
 
     const html = injectHtml(template, {
       base_image: "https://ilnautico.github.io/visual-base.png",
-      dynamic_overlay: generateOverlay(scoreLeft, scoreRight)
+      dynamic_overlay: generateOverlay(scoreLeft, scoreRight),
        pha_score: scoreLeft
     });
 
