@@ -1,8 +1,13 @@
 import express from "express";
 import puppeteer from "puppeteer";
 import fs from "fs";
+import OpenAI from "openai";
 
 const app = express();
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY
+});
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -13,27 +18,12 @@ app.get("/", (req, res) => {
 });
 
 // =========================
-// 安全JSONパース（超重要）
-function safeParse(raw) {
-  try {
-    return JSON.parse(
-      raw
-        .replace(/```json/g, "")
-        .replace(/```/g, "")
-        .trim()
-    );
-  } catch (e) {
-    console.log("⚠️ JSON parse fallback");
-    return {};
-  }
-}
-
-// =========================
 // 値取得
 function getValue(fields, keyword) {
   for (const item of fields) {
     const key = String(item?.label || "").toLowerCase();
-    if (key.includes(keyword)) return item?.value || "";
+    const value = String(item?.value || "");
+    if (key.includes(keyword)) return value;
   }
   return "";
 }
@@ -43,29 +33,29 @@ function getValue(fields, keyword) {
 function calculateScores(body) {
   const fields = body?.data?.fields || body?.fields || [];
 
-  const currentMaterial = getValue(fields, "current material");
-  const processing = getValue(fields, "processing method");
-  const concern = getValue(fields, "primary concern");
-  const ld = getValue(fields, "l/d");
+  const currentMaterial = getValue(fields, "current material").toLowerCase();
+  const processing = getValue(fields, "processing method").toLowerCase();
+  const concern = getValue(fields, "primary concern").toLowerCase();
+  const ld = getValue(fields, "l/d").toLowerCase();
 
   let stability = 70;
   let risk = 40;
 
-  if (String(currentMaterial).toLowerCase().includes("ldpe")) {
+  if (currentMaterial.includes("ldpe")) {
     stability += 10;
     risk -= 5;
   }
 
-  if (String(processing).toLowerCase().includes("film")) {
+  if (processing.includes("film")) {
     stability -= 10;
     risk += 15;
   }
 
-  if (String(ld).includes("22")) {
+  if (ld.includes("22")) {
     stability -= 5;
   }
 
-  if (String(concern).toLowerCase().includes("instability")) {
+  if (concern.includes("instability")) {
     risk += 20;
   }
 
@@ -76,64 +66,179 @@ function calculateScores(body) {
 }
 
 // =========================
-// 🔥 overlay（完全復元版）
-function generateOverlay(scoreLeft, scoreRight) {
-  return `
-<div style="position:absolute;top:0;left:0;width:100%;height:100%;z-index:9999;pointer-events:none;">
+// AI応答のクリーン処理
+function cleanAIResponse(raw) {
+  return String(raw || "")
+    .replace(/```json/gi, "")
+    .replace(/```/g, "")
+    .trim();
+}
 
-  <div style="position:absolute; left:33.5%; top:4%; font-size:32px;">230°C</div>
+// =========================
+// AIレポート生成
+async function generateAIReport(inputs) {
+  const prompt = `
+You are a senior polymer processing consultant.
+
+Generate a HIGH-DENSITY engineering assessment for a paid consulting report.
+
+STRICT RULES:
+- Return ONLY valid JSON
+- Do NOT include markdown
+- Do NOT include explanation outside JSON
+- No generic explanation
+- No short bullet-style fragments
+- Explain mechanisms such as thermal sensitivity, rheology, degradation, melt behavior, and process consistency where relevant
+- Use professional consulting tone
+- Keep statements realistic and non-hallucinatory
+- If information is limited, write cautious but useful engineering language
+
+Return this exact JSON structure:
+{
+  "application": "",
+  "material_transition": "",
+  "assessment_type": "",
+  "report_date": "",
+  "compatibility_level": "",
+  "executive_summary": "",
+  "key_risk": "",
+  "processing_window": "",
+  "thermal_behavior": "",
+  "flow_characteristics": "",
+  "mechanical_behavior": "",
+  "surface_quality": "",
+  "structural_consistency": "",
+  "application_implication": "",
+  "primary_risk_title": "",
+  "primary_risk": "",
+  "secondary_risk_title": "",
+  "secondary_risk": "",
+  "mechanism": "",
+  "stability": "",
+  "stability_note": "",
+  "consistency": "",
+  "consistency_note": "",
+  "next_step": ""
+}
+
+Input:
+Application: ${inputs.application}
+Current Material: ${inputs.currentMaterial}
+Biodegradable Material Considered: ${inputs.bioMaterial}
+Processing Method: ${inputs.processing}
+Equipment: ${inputs.equipment}
+Primary Concern: ${inputs.concern}
+Project Stage: ${inputs.stage}
+`;
+
+  const res = await openai.chat.completions.create({
+    model: "gpt-4o",
+    messages: [{ role: "user", content: prompt }],
+    temperature: 0.4
+  });
+
+  const cleaned = cleanAIResponse(res.choices?.[0]?.message?.content || "");
+
+  try {
+    return JSON.parse(cleaned);
+  } catch (err) {
+    console.error("❌ JSON PARSE ERROR");
+    console.log(cleaned);
+    throw err;
+  }
+}
+
+// =========================
+// Overlay（元デザイン復元版）
+function generateOverlay(scoreLeft = 80, scoreRight = 35) {
+  const ampLeft = 4 + scoreLeft * 0.12;
+  const ampRight = 4 + scoreRight * 0.12;
+
+  return `
+<div style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:9999;">
+
+  <!-- 温度 -->
+  <div style="position:absolute; left:33.5%; top:4%; font-size:32px; color:#374151;">230°C</div>
   <div style="position:absolute; left:66%; top:4%; font-size:32px; color:#dc2626;">180°C</div>
 
-  <div style="position:absolute; left:40%; top:22%; font-size:18px;">${scoreLeft}</div>
+  <!-- 数字 -->
+  <div style="position:absolute; left:40%; top:22%; font-size:18px; color:#374151;">${scoreLeft}</div>
   <div style="position:absolute; left:72%; top:22%; font-size:18px; color:#dc2626;">${scoreRight}</div>
 
   <!-- 青波 -->
-  <svg style="position:absolute;left:46.8%;top:57.2%;width:11%;height:8%;" viewBox="0 0 80 20">
-    <path stroke="#3B82A0" stroke-width="2" fill="none"
-      d="M0 10 Q20 4 40 10 T80 10">
-      <animate attributeName="d" dur="1.2s" repeatCount="indefinite"
-        values="
-          M0 10 Q20 4 40 10 T80 10;
-          M0 10 Q20 16 40 10 T80 10;
-          M0 10 Q20 4 40 10 T80 10"/>
-    </path>
+  <svg
+    style="position:absolute;left:46.8%;top:57.2%;width:11%;height:8%;transform:translate(-50%,-50%);"
+    viewBox="0 0 80 20"
+  >
+    <path
+      stroke="#3B82A0"
+      stroke-width="2"
+      fill="none"
+      d="M0 10 Q20 ${10 - ampLeft} 40 10 T80 10"
+    />
   </svg>
 
   <!-- 赤波 -->
-  <svg style="position:absolute;left:71.5%;top:66.8%;width:11%;height:8%;" viewBox="0 0 80 20">
-    <path stroke="#dc2626" stroke-width="2" fill="none"
-      d="M0 10 Q20 6 40 10 T80 10">
-      <animate attributeName="d" dur="1.2s" repeatCount="indefinite"
-        values="
-          M0 10 Q20 6 40 10 T80 10;
-          M0 10 Q20 14 40 10 T80 10;
-          M0 10 Q20 6 40 10 T80 10"/>
-    </path>
+  <svg
+    style="position:absolute;left:71.5%;top:66.8%;width:11%;height:8%;transform:translate(-50%,-50%);"
+    viewBox="0 0 80 20"
+  >
+    <path
+      stroke="#dc2626"
+      stroke-width="2"
+      fill="none"
+      d="M0 10 Q20 ${10 - ampRight} 40 10 T80 10"
+    />
   </svg>
 
-  <!-- メーター（元デザイン復元） -->
-  <svg viewBox="0 0 200 120"
-    style="position:absolute; left:70%; top:68%; width:150px; height:100px;">
-
+  <!-- メーター（元色に復元） -->
+  <svg
+    viewBox="0 0 200 120"
+    style="position:absolute; left:70%; top:68%; width:150px; height:100px;"
+  >
     <defs>
       <linearGradient id="gaugeFill" x1="0%" y1="0%" x2="100%" y2="0%">
-        <stop offset="0%" stop-color="#3B82A0"/>
-        <stop offset="40%" stop-color="#60A5FA"/>
-        <stop offset="60%" stop-color="#FACC15"/>
-        <stop offset="80%" stop-color="#F97316"/>
-        <stop offset="100%" stop-color="#DC2626"/>
+        <stop offset="0%" stop-color="#22c55e"/>
+        <stop offset="30%" stop-color="#4ade80"/>
+        <stop offset="45%" stop-color="#fde047"/>
+        <stop offset="60%" stop-color="#facc15"/>
+        <stop offset="75%" stop-color="#f59e0b"/>
+        <stop offset="90%" stop-color="#f97316"/>
+        <stop offset="100%" stop-color="#ef4444"/>
       </linearGradient>
     </defs>
 
-    <path d="M20 100 A80 80 0 0 1 180 100 L20 100 Z"
-      fill="url(#gaugeFill)" />
+    <path
+      d="M20 100 A80 80 0 0 1 180 100 L180 100 L20 100 Z"
+      fill="url(#gaugeFill)"
+    />
+
+    <path
+      d="M35 100 A65 65 0 0 1 165 100 L165 100 L35 100 Z"
+      fill="rgba(255,255,255,0.15)"
+    />
+
+    <ellipse
+      cx="100"
+      cy="102"
+      rx="48"
+      ry="8"
+      fill="black"
+      opacity="0.05"
+    />
 
     <g transform="rotate(${ -90 + (scoreRight / 100) * 180 } 100 100)">
-      <line x1="100" y1="100" x2="145" y2="60"
-        stroke="#111" stroke-width="3" stroke-linecap="round"/>
+      <line
+        x1="100"
+        y1="100"
+        x2="145"
+        y2="60"
+        stroke="#111"
+        stroke-width="3"
+        stroke-linecap="round"
+      />
       <circle cx="100" cy="100" r="5" fill="#111"/>
     </g>
-
   </svg>
 
 </div>
@@ -145,43 +250,76 @@ function generateOverlay(scoreLeft, scoreRight) {
 function injectHtml(template, data) {
   let html = template;
   Object.keys(data).forEach((key) => {
-    html = html.replace(new RegExp(`{{\\s*${key}\\s*}}`, "g"), data[key] || "");
+    const regex = new RegExp(`{{\\s*${key}\\s*}}`, "g");
+    html = html.replace(regex, data[key] || "");
   });
   return html;
 }
 
 // =========================
+// メイン処理
 app.post("/tally-pdf", async (req, res) => {
   try {
-    const parsed = typeof req.body === "string"
-      ? safeParse(req.body)
-      : req.body;
+    let parsed;
+
+    if (typeof req.body === "string") {
+      try {
+        parsed = JSON.parse(req.body);
+      } catch {
+        parsed = {};
+      }
+    } else {
+      parsed = req.body;
+    }
+
+    const fields = parsed?.data?.fields || parsed?.fields || [];
+
+    const inputs = {
+      application: getValue(fields, "application"),
+      currentMaterial: getValue(fields, "current material"),
+      bioMaterial: getValue(fields, "biodegradable material"),
+      processing: getValue(fields, "processing method"),
+      equipment: getValue(fields, "equipment"),
+      concern: getValue(fields, "primary concern"),
+      stage: getValue(fields, "project stage")
+    };
+
+    const aiData = await generateAIReport(inputs);
+    const { scoreLeft, scoreRight } = calculateScores(parsed);
 
     const template = fs.readFileSync("template.html", "utf8");
 
-    const { scoreLeft, scoreRight } = calculateScores(parsed);
-
     const html = injectHtml(template, {
+      // AI本文
+      ...aiData,
+
+      // 表紙などの不足防止
+      application: aiData.application || inputs.application || "",
+      material_transition:
+        aiData.material_transition ||
+        [inputs.currentMaterial, inputs.bioMaterial].filter(Boolean).join(" → "),
+      assessment_type: aiData.assessment_type || inputs.processing || "Technical hypothesis assessment",
+      report_date:
+        aiData.report_date ||
+        new Date().toISOString().slice(0, 10),
+
+      // デザイン用
       base_image: "https://ilnautico.github.io/visual-base.png",
       dynamic_overlay: generateOverlay(scoreLeft, scoreRight),
-      pha_score: Math.round(scoreLeft),
-
-      // 🔥 仮でも必ず入れる（空白防止）
-      executive_summary: "Material shows viable baseline compatibility with processing considerations.",
-      key_risk: "Thermal instability and melt strength variation",
-      primary_risk: "Bubble instability leading to thickness variation",
-      secondary_risk: "Reduced melt strength",
-      mechanism: "Thermal degradation and shear instability"
+      pha_score: Math.round(scoreLeft)
     });
 
     const browser = await puppeteer.launch({
-      args: ["--no-sandbox","--disable-setuid-sandbox"]
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-gpu"
+      ]
     });
 
     const page = await browser.newPage();
-
-    await page.setContent(html, { waitUntil: "domcontentloaded" });
-    await page.waitForTimeout(300);
+    await page.setContent(html, { waitUntil: "networkidle0" });
 
     const pdf = await page.pdf({
       format: "A4",
@@ -206,12 +344,16 @@ app.post("/tally-pdf", async (req, res) => {
 });
 
 // =========================
+// 最新PDF取得
 app.get("/latest-pdf", (req, res) => {
   const file = "/tmp/latest-report.pdf";
-  if (!fs.existsSync(file)) return res.status(404).send("No PDF yet");
+  if (!fs.existsSync(file)) {
+    return res.status(404).send("No PDF yet");
+  }
   res.sendFile(file);
 });
 
+// =========================
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log("🚀 Server running on", PORT);
