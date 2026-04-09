@@ -141,6 +141,31 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
 
   </svg>
 
+  <!-- ===== 比較グラフ（ここ追加） ===== -->
+  <div style="position:absolute; left:8%; top:72%; width:55%;">
+
+    <div style="font-size:13px; color:#6b7280; margin-bottom:6px;">
+      Performance Comparison
+    </div>
+
+    <!-- LDPE -->
+    <div style="margin-bottom:10px;">
+      <div style="font-size:12px;">LDPE</div>
+      <div style="height:10px;background:rgba(0,0,0,0.08);border-radius:6px;overflow:hidden;">
+        <div style="width:85%;height:100%;background:linear-gradient(90deg,#9ca3af,#6b7280);border-radius:6px;"></div>
+      </div>
+    </div>
+
+    <!-- PHA -->
+    <div>
+      <div style="font-size:12px;">PHA</div>
+      <div style="height:10px;background:rgba(0,0,0,0.08);border-radius:6px;overflow:hidden;">
+        <div style="width:${scoreLeft}%;height:100%;background:linear-gradient(90deg,#22c55e,#f59e0b);border-radius:6px;"></div>
+      </div>
+    </div>
+
+  </div>
+
 </div>
 `;
 }
