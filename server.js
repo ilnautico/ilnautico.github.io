@@ -17,7 +17,7 @@ const openai = new OpenAI({
 
 // =========================
 app.get("/", (req, res) => {
-  res.send("SERVER OK"); 
+  res.send("SERVER OK");
 });
 
 // =========================
@@ -69,9 +69,8 @@ function calculateScores(body) {
 }
 
 // =========================
-// 🔥 AI生成（完全復元版）
+// 🔥 AI生成（完全復元）
 async function generateAI(parsed) {
-
   const fields = parsed?.data?.fields || [];
 
   const input = {
@@ -131,17 +130,11 @@ Return ONLY JSON.
 // =========================
 // Overlay（維持）
 function generateOverlay(scoreLeft = 80, scoreRight = 35) {
-
-  const ampLeft = 4 + scoreLeft * 0.12;
-  const ampRight = 4 + scoreRight * 0.12;
-
-  const durLeft = 1.6 - scoreLeft * 0.01;
-  const durRight = 1.6 - scoreRight * 0.01;
-
   return `
 <div style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:10;">
   <div style="position:absolute; left:33.5%; top:4%; font-size:32px;">230°C</div>
   <div style="position:absolute; left:66%; top:4%; font-size:32px; color:#dc2626;">180°C</div>
+
   <div style="position:absolute; left:40%; top:22%; font-size:18px;">${scoreLeft}</div>
   <div style="position:absolute; left:72%; top:22%; font-size:18px; color:#dc2626;">${scoreRight}</div>
 </div>
@@ -160,18 +153,26 @@ function injectHtml(template, data) {
 }
 
 // =========================
+// PDF生成
 app.post("/tally-pdf", async (req, res) => {
   try {
+    let parsed;
 
-    let parsed = typeof req.body === "string"
-      ? JSON.parse(req.body)
-      : req.body;
+    if (typeof req.body === "string") {
+      try {
+        parsed = JSON.parse(req.body);
+      } catch {
+        parsed = {};
+      }
+    } else {
+      parsed = req.body;
+    }
 
     const template = fs.readFileSync("template.html", "utf8");
 
     const { scoreLeft, scoreRight } = calculateScores(parsed);
 
-    // 🔥 AI生成（ここが復元の核心）
+    // 🔥 AI生成
     const ai = await generateAI(parsed);
 
     const html = injectHtml(template, {
@@ -179,8 +180,29 @@ app.post("/tally-pdf", async (req, res) => {
       dynamic_overlay: generateOverlay(scoreLeft, scoreRight),
       pha_score: Math.round(scoreLeft),
 
-      // 👇 全文反映
-      ...ai
+      // 安全補完（重要）
+      compatibility_level: ai.compatibility_level || "Moderate",
+      executive_summary: ai.executive_summary || "Assessment based on provided input.",
+      key_risk: ai.key_risk || "Thermal instability risk remains.",
+      processing_window: ai.processing_window || "",
+      thermal_behavior: ai.thermal_behavior || "",
+      flow_characteristics: ai.flow_characteristics || "",
+      mechanical_behavior: ai.mechanical_behavior || "",
+      surface_quality: ai.surface_quality || "",
+      structural_consistency: ai.structural_consistency || "",
+      application_implication: ai.application_implication || "",
+      primary_risk_title: ai.primary_risk_title || "",
+      primary_risk: ai.primary_risk || "",
+      secondary_risk_title: ai.secondary_risk_title || "",
+      secondary_risk: ai.secondary_risk || "",
+      mechanism: ai.mechanism || "",
+      stability: ai.stability || "Moderate",
+      consistency: ai.consistency || "Variable",
+      stability_note: ai.stability_note || "",
+      consistency_note: ai.consistency_note || "",
+      next_step:
+        ai.next_step ||
+        "A structured engineering compatibility assessment is required before any commercial implementation decision can be made."
     });
 
     const browser = await puppeteer.launch({
@@ -202,6 +224,9 @@ app.post("/tally-pdf", async (req, res) => {
 
     await browser.close();
 
+    // ✅ 保存（これが /latest-pdf の鍵）
+    fs.writeFileSync("/tmp/latest-report.pdf", pdf);
+
     res.set({
       "Content-Type": "application/pdf",
       "Content-Disposition": "attachment; filename=report.pdf"
@@ -216,7 +241,22 @@ app.post("/tally-pdf", async (req, res) => {
 });
 
 // =========================
-app.listen(process.env.PORT || 3000);
+// 最新PDF取得
+app.get("/latest-pdf", (req, res) => {
+  const file = "/tmp/latest-report.pdf";
+
+  if (!fs.existsSync(file)) {
+    return res.status(404).send("No PDF yet");
+  }
+
+  res.sendFile(file);
+});
+
+// =========================
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log("🚀 Server running on", PORT);
+});
 const htmlTemplate = `
 <!DOCTYPE html>
 <html lang="en">
