@@ -108,17 +108,17 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
 
   <defs>
 
-    <!-- ベースカラー -->
+    <!-- ベースグラデーション -->
     <linearGradient id="gaugeGrad" x1="0%" x2="100%">
       <stop offset="0%" stop-color="#22c55e"/>
       <stop offset="50%" stop-color="#f59e0b"/>
       <stop offset="100%" stop-color="#ef4444"/>
     </linearGradient>
 
-    <!-- 光（上からのハイライト） -->
-    <linearGradient id="shineGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%" stop-color="white" stop-opacity="0.65"/>
-      <stop offset="50%" stop-color="white" stop-opacity="0.18"/>
+    <!-- 光（強化版） -->
+    <linearGradient id="shineGrad" x1="0%" y1="0%" x2="0%" y2="80%">
+      <stop offset="0%" stop-color="white" stop-opacity="0.8"/>
+      <stop offset="50%" stop-color="white" stop-opacity="0.25"/>
       <stop offset="100%" stop-color="white" stop-opacity="0"/>
     </linearGradient>
 
@@ -130,18 +130,18 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
     fill="url(#gaugeGrad)"
   />
 
-  <!-- ===== 透け（ガラス感） ===== -->
+  <!-- ===== ガラス感（少し強め） ===== -->
   <path
     d="M20 100 A80 80 0 0 1 180 100 L180 100 L20 100 Z"
     fill="white"
-    opacity="0.08"
+    opacity="0.18"
   />
 
-  <!-- ===== ハイライト ===== -->
+  <!-- ===== ハイライト（立体感の核） ===== -->
   <path
     d="M20 100 A80 80 0 0 1 180 100 L180 100 L20 100 Z"
     fill="url(#shineGrad)"
-    opacity="0.35"
+    opacity="0.55"
   />
 
   <!-- ===== 針 ===== -->
