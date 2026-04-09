@@ -102,40 +102,43 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
                   M0 10 Q20 ${10-ampRight} 40 10 T80 10"/>
       </path>
     </svg>
-
 <svg viewBox="0 0 200 120"
   style="position:absolute; left:70%; top:68%; width:150px; height:100px;">
 
   <defs>
     <linearGradient id="gaugeFill" x1="0%" y1="0%" x2="100%" y2="0%">
-  <stop offset="0%" stop-color="#22c55e"/>
-  <stop offset="30%" stop-color="#4ade80"/>
+      <!-- 緑（軽め） -->
+      <stop offset="0%" stop-color="#22c55e"/>
+      <stop offset="30%" stop-color="#4ade80"/>
 
-  <stop offset="45%" stop-color="#fde047"/>
-  <stop offset="60%" stop-color="#facc15"/>
+      <!-- 黄（中心強め） -->
+      <stop offset="45%" stop-color="#fde047"/>
+      <stop offset="60%" stop-color="#facc15"/>
 
-  <stop offset="75%" stop-color="#f59e0b"/>
-  <stop offset="90%" stop-color="#f97316"/>
-  <stop offset="100%" stop-color="#ef4444"/>
-</linearGradient>
+      <!-- 赤 -->
+      <stop offset="75%" stop-color="#f59e0b"/>
+      <stop offset="90%" stop-color="#f97316"/>
+      <stop offset="100%" stop-color="#ef4444"/>
+    </linearGradient>
+  </defs>
 
-  <!-- 半月 -->
+  <!-- 半月プレート -->
   <path
     d="M20 100 A80 80 0 0 1 180 100 L180 100 L20 100 Z"
     fill="url(#gaugeFill)"
   />
 
-  <!-- 内側 -->
- <path
-  d="M35 100 A65 65 0 0 1 165 100 L165 100 L35 100 Z"
-  fill="rgba(255,255,255,0.15)"
-/>
+  <!-- 内側（透け感） -->
+  <path
+    d="M35 100 A65 65 0 0 1 165 100 L165 100 L35 100 Z"
+    fill="rgba(255,255,255,0.15)"
+  />
 
-  <!-- ハイライト（弱め） -->
+  <!-- ガラスハイライト（弱め） -->
   <ellipse cx="100" cy="78" rx="65" ry="20"
     fill="white" opacity="0.05"/>
 
-  <!-- 影（軽く） -->
+  <!-- 接地影（自然） -->
   <ellipse cx="100" cy="102" rx="48" ry="8"
     fill="black" opacity="0.05"/>
 
@@ -149,7 +152,6 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
   </g>
 
 </svg>
-  </div>
   `;
 }
  
