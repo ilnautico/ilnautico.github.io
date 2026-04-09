@@ -516,171 +516,150 @@ body {
 <!-- ============================= -->
 <!-- ===== PAGE BREAK（06へ）===== -->
 <!-- ============================= -->
-<div class="page-break"></div>
-<div class="page-top-bar"></div>
+    <div class="page-break"></div>
+    <div class="page-top-bar"></div>
 
+    <div class="page4-wrap">
+      <!-- 06 Conceptual Visualization -->
+      <div class="section">
+        <div class="section-header">
+          <span class="section-num">06</span>
+          <span class="section-title">Conceptual Visualization</span>
+        </div>
 
-<!-- ============================= -->
-<!-- ===== SECTION 06（風船）===== -->
-<!-- ============================= -->
+        <div style="
+          width:700px;
+          margin:20px auto 0;
+        ">
+          <div style="
+            position:relative;
+            width:100%;
+            height:420px;
+          ">
+            <img src="{{base_image}}" style="
+              width:100%;
+              height:100%;
+              object-fit:contain;
+              display:block;
+            ">
 
-<!-- ===== SECTION 06 ===== -->
-<!-- ===== SECTION06 ===== -->
-<!-- ===== SECTION 06 ===== -->
-<div style="
-  width:700px;
-  margin:40px auto;
-">
-
-  <div style="
-    position:relative;
-    width:100%;
-    height:420px; /* ←これが重要（足りてなかった） */
-  ">
-
-    <img src="{{base_image}}" style="
-      width:100%;
-      height:100%;
-      object-fit:contain;
-      display:block;
-    ">
-
-    {{dynamic_overlay}}
-
-  </div>
-
-</div>
-
-
-<!-- ===== ページ分離（完全に外に出す） ===== -->
-<div class="page-break"></div>
-<div class="page-top-bar"></div>
-
-
-<!-- ===== グラフ（完全独立） ===== -->
-<div style="
-  width:700px;
-  margin:80px auto;
-  padding:0 50px;
-">
-
-  <div style="
-    font-size:13px;
-    color:#6b7280;
-    margin-bottom:14px;
-    font-family:'IBM Plex Mono', monospace;
-  ">
-    Performance Comparison
-  </div>
-
-  <!-- LDPE -->
-  <div style="margin-bottom:14px;">
-    <div style="font-size:12px;">LDPE</div>
-    <div style="
-      height:10px;
-      background:rgba(0,0,0,0.08);
-      border-radius:6px;
-      overflow:hidden;
-    ">
-      <div style="
-        width:85%;
-        height:100%;
-        background:#6b7280;
-        border-radius:6px;
-      "></div>
-    </div>
-  </div>
-
-  <!-- PHA -->
-  <div>
-    <div style="font-size:12px;">PHA</div>
-    <div style="
-      height:10px;
-      background:rgba(0,0,0,0.08);
-      border-radius:6px;
-      overflow:hidden;
-    ">
-      <div style="
-        width:{{pha_score}}%;
-        height:100%;
-        background:linear-gradient(90deg,#22c55e,#f59e0b);
-        border-radius:6px;
-      "></div>
-    </div>
-  </div>
-
-</div>
-
-
-<!-- ===== 次ページ（07へ） ===== -->
-<div class="page-break"></div>
-<div class="page-top-bar"></div>
-<!-- ============================= -->
-<!-- ===== PAGE BREAK（07へ）===== -->
-<!-- ============================= -->
-<div class="page-break"></div>
-<div class="page-top-bar"></div>
-
-
-<!-- ============================= -->
-<!-- ===== SECTION 07 ===== -->
-<!-- ============================= -->
-
-<div class="section">
-  <div class="section-header">
-    <span class="section-num">07</span>
-    <span class="section-title">Recommended Next Step</span>
-  </div>
-
-  <div class="nextstep-card">
-
-    <p class="nextstep-lead">
-      {{next_step}}
-    </p>
-
-    <div style="
-      margin-top:14px;
-      padding-top:14px;
-      border-top:1px solid var(--sep);
-    ">
-      <div style="
-        font-family: 'IBM Plex Mono', monospace;
-        font-size:9px;
-        letter-spacing:0.12em;
-        text-transform:uppercase;
-        color:var(--text-label);
-        margin-bottom:8px;
-      "></div>
-
-      <div style="
-        font-size:11.5px;
-        line-height:1.7;
-        color:var(--text-body);
-      "></div>
-    </div>
-
-    <div class="nextstep-path">
-      <div class="nextstep-path">
-        <div class="nextstep-path-label">Recommended Pathway</div>
-        <ul class="nextstep-list">
-          <li><span class="nextstep-num">01</span><span>Technical hypothesis screening</span></li>
-          <li><span class="nextstep-num">02</span><span>Engineering compatibility assessment</span></li>
-          <li><span class="nextstep-num">03</span><span>Controlled pilot validation</span></li>
-        </ul>
-      </div>
-
-      <div class="nextstep-support">
-        <div class="nextstep-support-label">FairVia Support Coverage</div>
-        <div class="nextstep-support-stages">
-          <span><strong>Stage 01</strong>Feasibility screening and technical hypothesis development</span>
-          <span><strong>Stage 02</strong>Engineering compatibility review and structured assessment</span>
-          <span><strong>Stage 03</strong>Pilot validation planning and implementation support</span>
+            {{dynamic_overlay}}
+          </div>
         </div>
       </div>
-    </div>
+    </div><!-- /page4-wrap -->
 
-  </div>
-</div>
+
+    <!-- ここで 06 を完全に終わらせてから改ページ -->
+    <div class="page-break"></div>
+    <div class="page-top-bar"></div>
+
+
+    <!-- グラフページ -->
+    <div class="body-wrap">
+      <div class="section">
+        <div class="section-header">
+          <span class="section-num">06A</span>
+          <span class="section-title">Performance Comparison</span>
+        </div>
+
+        <div style="
+          width:100%;
+        ">
+          <!-- LDPE -->
+          <div style="margin-bottom:14px;">
+            <div style="font-size:12px; color:#374151; margin-bottom:6px;">LDPE</div>
+            <div style="
+              height:10px;
+              background:rgba(0,0,0,0.08);
+              border-radius:6px;
+              overflow:hidden;
+            ">
+              <div style="
+                width:85%;
+                height:100%;
+                background:linear-gradient(90deg,#9ca3af,#6b7280);
+                border-radius:6px;
+              "></div>
+            </div>
+          </div>
+
+          <!-- PHA -->
+          <div>
+            <div style="font-size:12px; color:#374151; margin-bottom:6px;">PHA</div>
+            <div style="
+              height:10px;
+              background:rgba(0,0,0,0.08);
+              border-radius:6px;
+              overflow:hidden;
+            ">
+              <div style="
+                width:{{pha_score}}%;
+                height:100%;
+                background:linear-gradient(90deg,#22c55e,#f59e0b);
+                border-radius:6px;
+              "></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 07 Recommended Next Step -->
+      <div class="section">
+        <div class="section-header">
+          <span class="section-num">07</span>
+          <span class="section-title">Recommended Next Step</span>
+        </div>
+        <div class="nextstep-card">
+
+          <p class="nextstep-lead">
+            {{next_step}}
+          </p>
+
+          <div style="
+            margin-top:14px;
+            padding-top:14px;
+            border-top:1px solid var(--sep);
+          ">
+            <div style="
+              font-family: 'IBM Plex Mono', monospace;
+              font-size:9px;
+              letter-spacing:0.12em;
+              text-transform:uppercase;
+              color:var(--text-label);
+              margin-bottom:8px;
+            "></div>
+
+            <div style="
+              font-size:11.5px;
+              line-height:1.7;
+              color:var(--text-body);
+            "></div>
+          </div>
+
+          <div class="nextstep-path">
+            <div class="nextstep-path">
+              <div class="nextstep-path-label">Recommended Pathway</div>
+              <ul class="nextstep-list">
+                <li><span class="nextstep-num">01</span><span>Technical hypothesis screening</span></li>
+                <li><span class="nextstep-num">02</span><span>Engineering compatibility assessment</span></li>
+                <li><span class="nextstep-num">03</span><span>Controlled pilot validation</span></li>
+              </ul>
+            </div>
+
+            <div class="nextstep-support">
+              <div class="nextstep-support-label">FairVia Support Coverage</div>
+              <div class="nextstep-support-stages">
+                <span><strong>Stage 01</strong>Feasibility screening and technical hypothesis development</span>
+                <span><strong>Stage 02</strong>Engineering compatibility review and structured assessment</span>
+                <span><strong>Stage 03</strong>Pilot validation planning and implementation support</span>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
 
     <!-- 08 Closing Note -->
     <div class="section">
