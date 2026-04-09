@@ -108,15 +108,16 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
 
   <defs>
     <linearGradient id="gaugeFill" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="#22c55e"/>
-      <stop offset="25%" stop-color="#4ade80"/>
-      <stop offset="45%" stop-color="#a3e635"/>
-      <stop offset="60%" stop-color="#fde047"/>
-      <stop offset="75%" stop-color="#f59e0b"/>
-      <stop offset="90%" stop-color="#f97316"/>
-      <stop offset="100%" stop-color="#ef4444"/>
-    </linearGradient>
-  </defs>
+  <stop offset="0%" stop-color="#22c55e"/>
+  <stop offset="30%" stop-color="#4ade80"/>
+
+  <stop offset="45%" stop-color="#fde047"/>
+  <stop offset="60%" stop-color="#facc15"/>
+
+  <stop offset="75%" stop-color="#f59e0b"/>
+  <stop offset="90%" stop-color="#f97316"/>
+  <stop offset="100%" stop-color="#ef4444"/>
+</linearGradient>
 
   <!-- 半月 -->
   <path
