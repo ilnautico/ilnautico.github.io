@@ -187,12 +187,12 @@ app.post("/tally-pdf", async (req, res) => {
     // 👇 これが一番重要
     console.log("===== SCORES =====");
     console.log(scoreLeft, scoreRight);
+const html = injectHtml(template, {
+  base_image: "https://ilnautico.github.io/visual-base.png",
+  dynamic_overlay: generateOverlay(scoreLeft, scoreRight),
 
-    const html = injectHtml(template, {
-      base_image: "https://ilnautico.github.io/visual-base.png",
-      dynamic_overlay: generateOverlay(scoreLeft, scoreRight),
-       pha_score: scoreLeft
-    });
+  pha_score: Math.round(scoreLeft)
+});
 
     const browser = await puppeteer.launch({
       args: [
