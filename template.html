@@ -509,45 +509,51 @@ body {
 
 <!-- ===== SECTION 06 ===== -->
 
+<!-- ===== SECTION 06（触らない・完全復元） ===== -->
+
 <div style="
   position:relative;
   width:700px;
   margin:20px auto 0;
 ">
 
-  <!-- 背景画像 -->
   <img src="{{base_image}}" style="
-    width:102%;
-    height:102%;
-    object-fit:contain;
+    width:100%;
+    height:auto;
     display:block;
-    transform:translateY(6px);
   ">
 
-  <!-- Overlay -->
   {{dynamic_overlay}}
 
 </div>
 
 
-<!-- ===== Performance Comparison（完全に外） ===== -->
+<!-- ===== ページ分離（これが最重要） ===== -->
+<div class="page-break"></div>
+<div class="page-top-bar"></div>
+
+
+<!-- ===== グラフ（新ページ） ===== -->
+
 <div style="
   width:700px;
-  margin:30px auto 10px;
+  margin:40px auto 20px;
   padding:0 50px;
 ">
 
   <div style="
     font-size:13px;
     color:#6b7280;
-    margin-bottom:10px;
+    margin-bottom:12px;
     font-family:'IBM Plex Mono', monospace;
+    letter-spacing:0.12em;
+    text-transform:uppercase;
   ">
     Performance Comparison
   </div>
 
   <!-- LDPE -->
-  <div style="margin-bottom:12px;">
+  <div style="margin-bottom:14px;">
     <div style="font-size:12px;">LDPE</div>
     <div style="
       height:10px;
@@ -585,7 +591,8 @@ body {
 </div>
 
 
-<!-- ===== SECTION 07（既存そのまま） ===== -->
+<!-- ===== SECTION 07（同じ新ページに続く） ===== -->
+
 <div class="section">
   <div class="section-header">
     <span class="section-num">07</span>
