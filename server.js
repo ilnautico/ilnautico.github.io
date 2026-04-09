@@ -29,7 +29,7 @@ function getValue(fields, keyword) {
 }
 
 // =========================
-// スコア（そのまま維持）
+// スコア
 function calculateScores(body) {
   const fields = body?.data?.fields || body?.fields || [];
 
@@ -66,95 +66,78 @@ function calculateScores(body) {
 }
 
 // =========================
-// 🔥 AIコンサル（完全復元）
+// 🔥 AIレポート（完全安定版）
 async function generateAIReport(inputs) {
 
   const prompt = `
-You are a senior polymer processing consultant.
+Return ONLY valid JSON.
+Do NOT include markdown.
+Do NOT include explanation.
 
-Generate a HIGH-DENSITY technical report.
-
-Rules:
-- No generic explanation
-- No short sentences
-- Explain mechanisms (thermal, rheology, degradation)
-- Include cause-effect relationships
-- Write like a paid engineering report (NOT marketing)
-
-Return ONLY JSON.
-
-Structure:
 {
   "application": "",
   "material_transition": "",
   "assessment_type": "",
   "report_date": "",
-
   "compatibility_level": "",
   "executive_summary": "",
   "key_risk": "",
-
   "processing_window": "",
   "thermal_behavior": "",
   "flow_characteristics": "",
-
   "mechanical_behavior": "",
   "surface_quality": "",
   "structural_consistency": "",
   "application_implication": "",
-
   "primary_risk_title": "",
   "primary_risk": "",
   "secondary_risk_title": "",
   "secondary_risk": "",
   "mechanism": "",
-
   "stability": "",
   "stability_note": "",
   "consistency": "",
   "consistency_note": "",
-
   "next_step": ""
 }
 
 Input:
 Application: ${inputs.application}
-Current Material: ${inputs.currentMaterial}
+Material: ${inputs.currentMaterial}
 Processing: ${inputs.processing}
 Concern: ${inputs.concern}
 `;
 
   const res = await openai.chat.completions.create({
-    model: "gpt-4o", // ←ここ超重要
+    model: "gpt-4o",
     messages: [{ role: "user", content: prompt }],
-    temperature: 0.4
+    temperature: 0.3
   });
 
-  return JSON.parse(res.choices[0].message.content);
+  let content = res.choices[0].message.content;
+
+  // 🔥 ここが今回の核心修正
+  content = content
+    .replace(/```json/g, "")
+    .replace(/```/g, "")
+    .trim();
+
+  try {
+    return JSON.parse(content);
+  } catch (err) {
+    console.error("❌ JSON PARSE ERROR");
+    console.log(content);
+    throw err;
+  }
 }
 
 // =========================
-// Overlay（静的＝PDF対応）
+// overlay
 function generateOverlay(scoreLeft, scoreRight) {
   return `
 <div style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:10;">
-
-  <div style="position:absolute; left:33.5%; top:4%; font-size:32px;">230°C</div>
-  <div style="position:absolute; left:66%; top:4%; font-size:32px; color:#dc2626;">180°C</div>
-
   <div style="position:absolute; left:40%; top:22%; font-size:18px;">${scoreLeft}</div>
   <div style="position:absolute; left:72%; top:22%; font-size:18px; color:#dc2626;">${scoreRight}</div>
-
-  <svg style="position:absolute;left:46.8%;top:57.2%;width:11%;" viewBox="0 0 80 20">
-    <path stroke="#3B82A0" stroke-width="2" fill="none"
-      d="M0 10 Q20 ${10-scoreLeft*0.1} 40 10 T80 10"/>
-  </svg>
-
-  <svg style="position:absolute;left:71.5%;top:66.8%;width:11%;" viewBox="0 0 80 20">
-    <path stroke="#dc2626" stroke-width="2" fill="none"
-      d="M0 10 Q20 ${10-scoreRight*0.1} 40 10 T80 10"/>
-  </svg>
-
 </div>
 `;
 }
@@ -171,7 +154,6 @@ function injectHtml(template, data) {
 }
 
 // =========================
-// メイン
 app.post("/tally-pdf", async (req, res) => {
   try {
 
