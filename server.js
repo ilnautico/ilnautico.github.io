@@ -161,21 +161,35 @@ function injectHtml(template, data) {
 app.post("/tally-pdf", async (req, res) => {
   try {
 
+    console.log("===== RAW BODY =====");
+    console.log(req.body);
+
     let parsed;
 
     if (typeof req.body === "string") {
       try {
         parsed = JSON.parse(req.body);
       } catch {
+        console.log("⚠️ JSON parse failed");
         parsed = {};
       }
     } else {
       parsed = req.body;
     }
 
+    console.log("===== PARSED =====");
+    console.log(parsed);
+
+    console.log("===== FIELDS =====");
+    console.log(parsed?.data?.fields);
+
     const template = fs.readFileSync("template.html", "utf8");
 
     const { scoreLeft, scoreRight } = calculateScores(parsed);
+
+    // 👇 これが一番重要
+    console.log("===== SCORES =====");
+    console.log(scoreLeft, scoreRight);
 
     const html = injectHtml(template, {
       base_image: "https://ilnautico.github.io/visual-base.png",
