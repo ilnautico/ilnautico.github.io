@@ -13,7 +13,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.text({ type: "*/*" }));
 
-app.get("/", (req, res) => {
+app.get("/", (req, res) => { 
   res.send("SERVER OK");
 });
 
