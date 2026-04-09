@@ -125,10 +125,10 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
   />
 
   <!-- 内側 -->
-  <path
-    d="M35 100 A65 65 0 0 1 165 100 L165 100 L35 100 Z"
-    fill="#f3f4f6"
-  />
+ <path
+  d="M35 100 A65 65 0 0 1 165 100 L165 100 L35 100 Z"
+  fill="rgba(255,255,255,0.15)"
+/>
 
   <!-- ハイライト（弱め） -->
   <ellipse cx="100" cy="78" rx="65" ry="20"
