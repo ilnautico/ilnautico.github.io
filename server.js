@@ -8,6 +8,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.text({ type: "*/*" }));
@@ -35,8 +36,8 @@ function calculateScores() {
 
 // =========================
 // Overlay（元の安定版）
+// =========================
 function generateOverlay(scoreLeft, scoreRight) {
-
   const ampLeft = 4 + scoreLeft * 0.12;
   const ampRight = 4 + scoreRight * 0.12;
 
@@ -51,12 +52,12 @@ function generateOverlay(scoreLeft, scoreRight) {
 
   <svg style="position:absolute;left:46.8%;top:57.2%;width:11%;height:8%;transform:translate(-50%,-50%);" viewBox="0 0 80 20">
     <path stroke="#3B82A0" stroke-width="2" fill="none"
-      d="M0 10 Q20 ${10-ampLeft} 40 10 T80 10"/>
+      d="M0 10 Q20 ${10 - ampLeft} 40 10 T80 10"/>
   </svg>
 
   <svg style="position:absolute;left:71.5%;top:66.8%;width:11%;height:8%;transform:translate(-50%,-50%);" viewBox="0 0 80 20">
     <path stroke="#dc2626" stroke-width="2" fill="none"
-      d="M0 10 Q20 ${10-ampRight} 40 10 T80 10"/>
+      d="M0 10 Q20 ${10 - ampRight} 40 10 T80 10"/>
   </svg>
 
   <svg viewBox="0 0 200 120"
@@ -93,7 +94,6 @@ function injectHtml(template, data) {
 // =========================
 app.post("/tally-pdf", async (req, res) => {
   try {
-
     const { scoreLeft, scoreRight } = calculateScores();
 
     const template = fs.readFileSync(
@@ -107,12 +107,22 @@ app.post("/tally-pdf", async (req, res) => {
       pha_score: scoreLeft
     });
 
+    // ✅ Railway対応 安定版
     const browser = await puppeteer.launch({
-      args: ["--no-sandbox","--disable-setuid-sandbox"]
+      headless: "new",
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-gpu"
+      ]
     });
 
     const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: "networkidle0" });
+
+    await page.setContent(html, {
+      waitUntil: "networkidle0"
+    });
 
     const pdf = await page.pdf({
       format: "A4",
@@ -121,7 +131,8 @@ app.post("/tally-pdf", async (req, res) => {
 
     await browser.close();
 
-    fs.writeFileSync("/tmp/latest.pdf", pdf);
+    const filePath = "/tmp/latest.pdf";
+    fs.writeFileSync(filePath, pdf);
 
     res.set({
       "Content-Type": "application/pdf",
@@ -131,7 +142,7 @@ app.post("/tally-pdf", async (req, res) => {
     res.send(pdf);
 
   } catch (err) {
-    console.error(err);
+    console.error("❌ ERROR:", err);
     res.status(500).send("PDF generation failed");
   }
 });
@@ -141,15 +152,19 @@ app.post("/tally-pdf", async (req, res) => {
 // =========================
 app.get("/latest-pdf", (req, res) => {
   const file = "/tmp/latest.pdf";
+
   if (!fs.existsSync(file)) {
-    return res.status(404).send("No PDF");
+    return res.status(404).send("No PDF yet");
   }
+
   res.sendFile(file);
 });
 
 // =========================
-app.listen(3000, () => {
-  console.log("🚀 Server running");
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, () => {
+  console.log(`🚀 Server running on ${PORT}`);
 });
 const html = `
 <!DOCTYPE html>
