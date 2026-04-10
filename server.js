@@ -1,41 +1,24 @@
 import express from "express";
 import puppeteer from "puppeteer";
 import fs from "fs";
-import OpenAI from "openai";
+import path from "path";
 
 const app = express();
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
-});
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.text({ type: "*/*" }));
 
-app.get("/", (req, res) => {
-  res.send("SERVER OK");
-});
+const PDF_PATH = "/tmp/latest-report.pdf";
 
 // =========================
-// 値取得
-function getValue(fields, keyword) {
-  for (const item of fields) {
-    const key = String(item?.label || "").toLowerCase();
-    const value = String(item?.value || "");
-    if (key.includes(keyword)) return value;
-  }
-  return "";
-}
-
+// スコア（温度ベース固定）
 // =========================
-// スコア（温度連動）
 function calculateScores() {
   const optimalTemp = 180;
 
   function calc(temp) {
     const diff = Math.abs(temp - optimalTemp);
-
     if (diff <= 5) return 95;
     if (diff <= 10) return 90;
     if (diff <= 20) return 75;
@@ -50,57 +33,9 @@ function calculateScores() {
 }
 
 // =========================
-// AI（完全版プロンプト）
-function cleanAIResponse(raw) {
-  return String(raw || "")
-    .replace(/```json/gi, "")
-    .replace(/```/g, "")
-    .trim();
-}
-
-async function generateAIReport(inputs) {
-
-  const prompt = `
-You are a senior polymer processing consultant.
-
-Generate a HIGH-DENSITY, PROFESSIONAL consulting report.
-
-STRICT:
-- Return ONLY JSON
-- No markdown
-- No explanation outside JSON
-- Use engineering-level detail
-- Include mechanism-based reasoning
-
-{
-  "executive_summary": "",
-  "processing_window": "",
-  "thermal_behavior": "",
-  "flow_characteristics": "",
-  "mechanical_behavior": "",
-  "surface_quality": "",
-  "structural_consistency": "",
-  "primary_risk": "",
-  "mechanism": "",
-  "next_step": ""
-}
-
-INPUT:
-${JSON.stringify(inputs)}
-`;
-
-  const res = await openai.chat.completions.create({
-    model: "gpt-4o",
-    messages: [{ role: "user", content: prompt }],
-    temperature: 0.4
-  });
-
-  return JSON.parse(cleanAIResponse(res.choices[0].message.content));
-}
-
+// Overlay（モヤ削除済み完全版）
 // =========================
-// overlay（完全復元）
-function generateOverlay(scoreLeft, scoreRight) {
+function generateOverlay(scoreLeft = 80, scoreRight = 35) {
 
   const ampLeft = 4 + scoreLeft * 0.12;
   const ampRight = 4 + scoreRight * 0.12;
@@ -108,130 +43,195 @@ function generateOverlay(scoreLeft, scoreRight) {
   return `
 <div style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:9999;">
 
+  <!-- 温度 -->
   <div style="position:absolute; left:33.5%; top:4%; font-size:32px;">230°C</div>
   <div style="position:absolute; left:66%; top:4%; font-size:32px; color:#dc2626;">180°C</div>
 
+  <!-- 数値 -->
   <div style="position:absolute; left:40%; top:22%; font-size:18px;">${scoreLeft}</div>
   <div style="position:absolute; left:72%; top:22%; font-size:18px; color:#dc2626;">${scoreRight}</div>
 
-  <!-- 波 -->
-  <svg style="position:absolute;left:46.8%;top:57.2%;width:11%;height:8%;">
+  <!-- 青波 -->
+  <svg style="position:absolute;left:46.8%;top:57.2%;width:11%;height:8%;transform:translate(-50%,-50%);" viewBox="0 0 80 20">
     <path stroke="#3B82A0" stroke-width="2" fill="none"
       d="M0 10 Q20 ${10-ampLeft} 40 10 T80 10"/>
   </svg>
 
-  <svg style="position:absolute;left:71.5%;top:66.8%;width:11%;height:8%;">
+  <!-- 赤波 -->
+  <svg style="position:absolute;left:71.5%;top:66.8%;width:11%;height:8%;transform:translate(-50%,-50%);" viewBox="0 0 80 20">
     <path stroke="#dc2626" stroke-width="2" fill="none"
       d="M0 10 Q20 ${10-ampRight} 40 10 T80 10"/>
   </svg>
 
-  <!-- メーター（完全復元） -->
-  <svg viewBox="0 0 200 120"
-    style="position:absolute; left:70%; top:68%; width:150px; height:100px;">
+  <!-- メーター -->
+  <div style="
+    position:absolute;
+    right:6%;
+    bottom:4%;
+    width:120px;
+    height:60px;
+    border-radius:100px 100px 0 0;
+    background:linear-gradient(
+      90deg,
+      #34d399 0%,
+      #fde047 45%,
+      #f59e0b 70%,
+      #ef4444 100%
+    );
+    overflow:hidden;
+    opacity:0.95;
+  ">
 
-    <defs>
-      <linearGradient id="gaugeFill">
-        <stop offset="0%" stop-color="#22c55e"/>
-        <stop offset="40%" stop-color="#fde047"/>
-        <stop offset="70%" stop-color="#f59e0b"/>
-        <stop offset="100%" stop-color="#ef4444"/>
-      </linearGradient>
-    </defs>
-
-    <path d="M20 100 A80 80 0 0 1 180 100 L20 100 Z"
-      fill="url(#gaugeFill)" />
-
-    <path d="M35 100 A65 65 0 0 1 165 100 L35 100 Z"
-      fill="rgba(255,255,255,0.08)" />
-
-    <ellipse cx="100" cy="102" rx="50" ry="8"
-      fill="black" opacity="0.08"/>
+    <!-- 下影 -->
+    <div style="
+      position:absolute;
+      left:50%;
+      bottom:-8px;
+      width:70px;
+      height:12px;
+      background:black;
+      opacity:0.12;
+      border-radius:50%;
+      transform:translateX(-50%);
+    "></div>
 
     <!-- 針 -->
-    <g transform="rotate(${ -90 + (scoreRight / 100) * 180 } 100 100)">
-      <line x1="100" y1="100" x2="150" y2="60"
-        stroke="#111" stroke-width="3"/>
-      <circle cx="100" cy="100" r="5" fill="#111"/>
-    </g>
+    <div style="
+      position:absolute;
+      left:50%;
+      bottom:0;
+      width:2px;
+      height:48px;
+      background:#111;
+      transform-origin:bottom center;
+      transform:rotate(${ -90 + (scoreRight / 100) * 180 }deg);
+    "></div>
 
-  </svg>
+    <!-- 中心点 -->
+    <div style="
+      position:absolute;
+      left:50%;
+      bottom:-2px;
+      width:7px;
+      height:7px;
+      background:#111;
+      border-radius:50%;
+      transform:translateX(-50%);
+    "></div>
+
+  </div>
 
 </div>
 `;
 }
 
 // =========================
-// HTML差し込み
-function injectHtml(template, data) {
-  let html = template;
-  Object.keys(data).forEach((key) => {
-    html = html.replace(new RegExp(`{{${key}}}`, "g"), data[key] || "");
-  });
-  return html;
+// HTML
+// =========================
+function generateHTML(scoreLeft, scoreRight) {
+
+  const overlay = generateOverlay(scoreLeft, scoreRight);
+
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+body {
+  font-family: Arial;
+  margin:0;
+  padding:40px;
+}
+.container {
+  position:relative;
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+
+  <img src="https://ilnautico.github.io/visual-base.png" style="width:100%;" />
+
+  ${overlay}
+
+</div>
+
+</body>
+</html>
+`;
 }
 
 // =========================
-// メイン
+// PDF生成
+// =========================
+async function generatePDF(html) {
+  const browser = await puppeteer.launch({
+    args: [
+      "--no-sandbox",
+      "--disable-setuid-sandbox",
+      "--disable-dev-shm-usage",
+      "--disable-gpu"
+    ]
+  });
+
+  const page = await browser.newPage();
+  await page.setContent(html, { waitUntil: "networkidle0" });
+
+  const pdf = await page.pdf({
+    format: "A4",
+    printBackground: true
+  });
+
+  await browser.close();
+  return pdf;
+}
+
+// =========================
+// メインAPI
+// =========================
 app.post("/tally-pdf", async (req, res) => {
   try {
 
-    const parsed = req.body;
-    const fields = parsed?.data?.fields || [];
-
-    const inputs = {
-      application: getValue(fields, "application"),
-      material: getValue(fields, "current material"),
-      bio: getValue(fields, "biodegradable"),
-      process: getValue(fields, "processing"),
-      concern: getValue(fields, "concern")
-    };
-
-    const aiData = await generateAIReport(inputs);
     const { scoreLeft, scoreRight } = calculateScores();
 
-    const template = fs.readFileSync("template.html", "utf8");
+    const html = generateHTML(scoreLeft, scoreRight);
+    const pdf = await generatePDF(html);
 
-    const html = injectHtml(template, {
-      ...aiData,
-      base_image: "https://ilnautico.github.io/visual-base.png",
-      dynamic_overlay: generateOverlay(scoreLeft, scoreRight)
+    fs.writeFileSync(PDF_PATH, pdf);
+
+    res.set({
+      "Content-Type": "application/pdf",
+      "Content-Disposition": "attachment; filename=report.pdf"
     });
-
-    const browser = await puppeteer.launch({
-      args: ["--no-sandbox", "--disable-setuid-sandbox"]
-    });
-
-    const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: "networkidle0" });
-
-    const pdf = await page.pdf({
-      format: "A4",
-      printBackground: true
-    });
-
-    await browser.close();
-
-    fs.writeFileSync("/tmp/latest-report.pdf", pdf);
 
     res.send(pdf);
 
   } catch (err) {
     console.error(err);
-    res.status(500).send("fail");
+    res.status(500).send("PDF generation failed");
   }
 });
 
 // =========================
+// PDF取得
+// =========================
 app.get("/latest-pdf", (req, res) => {
-  const file = "/tmp/latest-report.pdf";
-  if (!fs.existsSync(file)) return res.status(404).send("No PDF yet");
-  res.sendFile(file);
+  if (!fs.existsSync(PDF_PATH)) {
+    return res.status(404).send("No PDF yet");
+  }
+  res.sendFile(PDF_PATH);
 });
 
 // =========================
+app.get("/", (req, res) => {
+  res.send("SERVER OK");
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log("🚀 Server running");
+  console.log("🚀 Server running on", PORT);
 });
 const html = `
 <!DOCTYPE html>
