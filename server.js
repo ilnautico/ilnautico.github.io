@@ -6,9 +6,6 @@ const path = require("path");
 const app = express();
 app.use(express.json());
 
-// ==============================
-// 設定
-// ==============================
 const PDF_PATH = path.join(__dirname, "latest.pdf");
 
 // ==============================
@@ -27,12 +24,11 @@ function normalizeInput(data) {
 }
 
 // ==============================
-// ② 判定ロジック（AIに任せない）
+// ② 判定ロジック
 // ==============================
 function evaluateCompatibility(input) {
   let score = 0;
 
-  // 材料相性
   if (input.material.includes("pe") || input.material.includes("pp")) {
     score += 2;
   }
@@ -41,24 +37,21 @@ function evaluateCompatibility(input) {
     score += 0;
   }
 
-  // 工法
   if (input.application.includes("film")) {
     score += 1;
   }
 
-  // ステージ
-  if (input.stage.includes("testing")) {
+  if (input.stage.includes("test")) {
     score += 1;
   }
 
-  // 判定
   if (score >= 3) return "High";
   if (score === 2) return "Moderate";
   return "Low";
 }
 
 // ==============================
-// ③ HTMLテンプレ（固定）
+// ③ HTMLテンプレ（※虹なしに戻した）
 // ==============================
 function generateHTML(result, input) {
   return `
@@ -67,12 +60,21 @@ function generateHTML(result, input) {
   <head>
     <meta charset="UTF-8">
     <style>
-      body { font-family: Arial; padding:40px; }
-      h1 { color:#162D48; }
-      .section { margin-top:20px; }
+      body {
+        font-family: Arial;
+        padding: 40px;
+        color: #333;
+      }
+      h1 {
+        color: #162D48;
+      }
+      .section {
+        margin-top: 20px;
+      }
     </style>
   </head>
   <body>
+
     <h1>FairVia™ Screening Report</h1>
 
     <div class="section">
@@ -101,15 +103,13 @@ function generateHTML(result, input) {
 }
 
 // ==============================
-// ④ PDF生成
+// ④ PDF生成（元の安定版）
 // ==============================
 async function generatePDF(html) {
   const browser = await puppeteer.launch({
     args: [
       "--no-sandbox",
-      "--disable-setuid-sandbox",
-      "--disable-dev-shm-usage",
-      "--disable-gpu"
+      "--disable-setuid-sandbox"
     ]
   });
 
@@ -132,16 +132,12 @@ app.post("/generate", async (req, res) => {
   try {
     const input = normalizeInput(req.body);
 
-    // 判定
     const result = evaluateCompatibility(input);
 
-    // HTML生成
     const html = generateHTML(result, input);
 
-    // PDF生成
     const pdfBuffer = await generatePDF(html);
 
-    // 保存
     fs.writeFileSync(PDF_PATH, pdfBuffer);
 
     res.json({
@@ -169,7 +165,12 @@ app.get("/latest-pdf", (req, res) => {
 });
 
 // ==============================
-// 起動
+// 動作確認
+// ==============================
+app.get("/", (req, res) => {
+  res.send("Server is running");
+});
+
 // ==============================
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
