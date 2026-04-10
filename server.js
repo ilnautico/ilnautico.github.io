@@ -1,112 +1,208 @@
 import express from "express";
 import puppeteer from "puppeteer";
 import fs from "fs";
-import path from "path";
-import { fileURLToPath } from "url";
+import OpenAI from "openai";
 
 const app = express();
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY
+});
+
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(express.text({ type: "*/*" }));
 
-// __dirname対応（ESM用）
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+app.get("/", (req, res) => {
+  res.send("SERVER OK");
+});
 
-const PDF_PATH = path.join(__dirname, "latest.pdf");
+// =========================
+// 値取得
+function getValue(fields, keyword) {
+  for (const item of fields) {
+    const key = String(item?.label || "").toLowerCase();
+    const value = String(item?.value || "");
+    if (key.includes(keyword)) return value;
+  }
+  return "";
+}
 
-// ==============================
-// 入力
-function normalizeInput(data) {
+// =========================
+// スコア
+function calculateScores(body) {
+  const optimalTemp = 180;
+
+  function calc(temp) {
+    const diff = Math.abs(temp - optimalTemp);
+
+    if (diff <= 5) return 95;
+    if (diff <= 10) return 90;
+    if (diff <= 20) return 75;
+    if (diff <= 30) return 60;
+    return 40;
+  }
+
   return {
-    application: (data.application || "").toLowerCase(),
-    material: (data.material || "").toLowerCase(),
-    bio_material: (data.bio_material || "").toLowerCase(),
-    concern: data.concern || ""
+    scoreLeft: calc(230),
+    scoreRight: calc(180)
   };
 }
 
-// ==============================
-// 判定
-function evaluateCompatibility(input) {
-  let score = 0;
-
-  if (input.material.includes("pe")) score += 2;
-  if (input.application.includes("film")) score += 1;
-
-  if (score >= 3) return "High";
-  if (score === 2) return "Moderate";
-  return "Low";
+// =========================
+// AI
+function cleanAIResponse(raw) {
+  return String(raw || "")
+    .replace(/```json/gi, "")
+    .replace(/```/g, "")
+    .trim();
 }
 
-// ==============================
-// HTML（虹なし＝元状態）
-function generateHTML(result, input) {
+async function generateAIReport(inputs) {
+  const prompt = `
+You are a senior polymer processing consultant.
+Return ONLY JSON.
+
+{
+  "executive_summary": "",
+  "key_risk": "",
+  "processing_window": "",
+  "next_step": ""
+}
+
+Input:
+${JSON.stringify(inputs)}
+`;
+
+  const res = await openai.chat.completions.create({
+    model: "gpt-4o",
+    messages: [{ role: "user", content: prompt }],
+    temperature: 0.4
+  });
+
+  return JSON.parse(cleanAIResponse(res.choices[0].message.content));
+}
+
+// =========================
+// overlay（完全元に戻した）
+function generateOverlay(scoreLeft, scoreRight) {
+
+  const ampLeft = 4 + scoreLeft * 0.12;
+  const ampRight = 4 + scoreRight * 0.12;
+
   return `
-  <html>
-    <body>
-      <h1>Report</h1>
-      <p>Compatibility: ${result}</p>
-      <p>Material: ${input.material}</p>
-    </body>
-  </html>
-  `;
+<div style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:9999;">
+
+  <div style="position:absolute; left:33.5%; top:4%; font-size:32px;">230°C</div>
+  <div style="position:absolute; left:66%; top:4%; font-size:32px; color:#dc2626;">180°C</div>
+
+  <div style="position:absolute; left:40%; top:22%; font-size:18px;">${scoreLeft}</div>
+  <div style="position:absolute; left:72%; top:22%; font-size:18px; color:#dc2626;">${scoreRight}</div>
+
+  <svg style="position:absolute;left:46.8%;top:57.2%;width:11%;height:8%;transform:translate(-50%,-50%);" viewBox="0 0 80 20">
+    <path stroke="#3B82A0" stroke-width="2" fill="none"
+      d="M0 10 Q20 ${10-ampLeft} 40 10 T80 10"/>
+  </svg>
+
+  <svg style="position:absolute;left:71.5%;top:66.8%;width:11%;height:8%;transform:translate(-50%,-50%);" viewBox="0 0 80 20">
+    <path stroke="#dc2626" stroke-width="2" fill="none"
+      d="M0 10 Q20 ${10-ampRight} 40 10 T80 10"/>
+  </svg>
+
+  <!-- 元のレインボー復元 -->
+  <svg viewBox="0 0 200 120"
+    style="position:absolute; left:70%; top:68%; width:150px; height:100px;">
+    <defs>
+      <linearGradient id="gaugeFill">
+        <stop offset="0%" stop-color="#22c55e"/>
+        <stop offset="40%" stop-color="#fde047"/>
+        <stop offset="70%" stop-color="#f59e0b"/>
+        <stop offset="100%" stop-color="#ef4444"/>
+      </linearGradient>
+    </defs>
+
+    <path d="M20 100 A80 80 0 0 1 180 100 L20 100 Z"
+      fill="url(#gaugeFill)" />
+
+    <g transform="rotate(${ -90 + (scoreRight / 100) * 180 } 100 100)">
+      <line x1="100" y1="100" x2="150" y2="60"
+        stroke="#111" stroke-width="3"/>
+    </g>
+  </svg>
+
+</div>
+`;
 }
 
-// ==============================
-// PDF
-async function generatePDF(html) {
-  const browser = await puppeteer.launch({
-    args: ["--no-sandbox", "--disable-setuid-sandbox"]
+// =========================
+// HTML
+function injectHtml(template, data) {
+  let html = template;
+  Object.keys(data).forEach((key) => {
+    html = html.replace(new RegExp(`{{${key}}}`, "g"), data[key] || "");
   });
-
-  const page = await browser.newPage();
-  await page.setContent(html);
-
-  const pdf = await page.pdf({
-    format: "A4",
-    printBackground: true
-  });
-
-  await browser.close();
-  return pdf;
+  return html;
 }
 
-// ==============================
-// API
-app.post("/generate", async (req, res) => {
+// =========================
+// メイン（ここ元に戻した）
+app.post("/tally-pdf", async (req, res) => {
   try {
-    const input = normalizeInput(req.body);
-    const result = evaluateCompatibility(input);
 
-    const html = generateHTML(result, input);
-    const pdf = await generatePDF(html);
+    const parsed = req.body;
+    const fields = parsed?.data?.fields || [];
 
-    fs.writeFileSync(PDF_PATH, pdf);
+    const inputs = {
+      application: getValue(fields, "application"),
+      currentMaterial: getValue(fields, "current material"),
+      bioMaterial: getValue(fields, "biodegradable material"),
+      processing: getValue(fields, "processing method"),
+      concern: getValue(fields, "primary concern")
+    };
 
-    res.json({
-      status: "ok",
-      download: "/latest-pdf"
+    const aiData = await generateAIReport(inputs);
+    const { scoreLeft, scoreRight } = calculateScores(parsed);
+
+    const template = fs.readFileSync("template.html", "utf8");
+
+    const html = injectHtml(template, {
+      ...aiData,
+      base_image: "https://ilnautico.github.io/visual-base.png",
+      dynamic_overlay: generateOverlay(scoreLeft, scoreRight)
     });
+
+    const browser = await puppeteer.launch({
+      args: ["--no-sandbox", "--disable-setuid-sandbox"]
+    });
+
+    const page = await browser.newPage();
+    await page.setContent(html, { waitUntil: "networkidle0" });
+
+    const pdf = await page.pdf({
+      format: "A4",
+      printBackground: true
+    });
+
+    await browser.close();
+
+    fs.writeFileSync("/tmp/latest-report.pdf", pdf);
+
+    res.send(pdf);
 
   } catch (err) {
     console.error(err);
-    res.status(500).send("error");
+    res.status(500).send("fail");
   }
 });
 
-// ==============================
+// =========================
 app.get("/latest-pdf", (req, res) => {
-  if (!fs.existsSync(PDF_PATH)) {
-    return res.status(404).send("no pdf");
-  }
-  res.sendFile(PDF_PATH);
+  const file = "/tmp/latest-report.pdf";
+  if (!fs.existsSync(file)) return res.status(404).send("No PDF yet");
+  res.sendFile(file);
 });
 
-// ==============================
-app.get("/", (req, res) => {
-  res.send("Server OK");
-});
-
-// ==============================
+// =========================
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log("🚀 Server running");
