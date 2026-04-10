@@ -8,6 +8,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.text({ type: "*/*" }));
 
+// Railway用（絶対これ）
 const PDF_PATH = "/tmp/latest-report.pdf";
 
 // =========================
@@ -20,7 +21,7 @@ function calculateScores() {
 }
 
 // =========================
-// Overlay（そのまま）
+// Overlay（当初状態に完全一致）
 function generateOverlay(scoreLeft = 65, scoreRight = 70) {
 
   const ampLeft = 4 + scoreLeft * 0.12;
@@ -29,22 +30,27 @@ function generateOverlay(scoreLeft = 65, scoreRight = 70) {
   return `
 <div style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:10;">
 
+  <!-- 温度 -->
   <div style="position:absolute; left:33.5%; top:4%; font-size:32px;">230°C</div>
   <div style="position:absolute; left:66%; top:4%; font-size:32px; color:#dc2626;">180°C</div>
 
+  <!-- 数値 -->
   <div style="position:absolute; left:40%; top:22%; font-size:18px;">${scoreLeft}</div>
   <div style="position:absolute; left:72%; top:22%; font-size:18px; color:#dc2626;">${scoreRight}</div>
 
-  <svg style="position:absolute;left:46.8%;top:57.2%;width:11%;height:8%;" viewBox="0 0 80 20">
+  <!-- 青波 -->
+  <svg style="position:absolute;left:46.8%;top:57.2%;width:11%;height:8%;transform:translate(-50%,-50%);" viewBox="0 0 80 20">
     <path stroke="#3B82A0" stroke-width="2" fill="none"
       d="M0 10 Q20 ${10-ampLeft} 40 10 T80 10"/>
   </svg>
 
-  <svg style="position:absolute;left:71.5%;top:66.8%;width:11%;height:8%;" viewBox="0 0 80 20">
+  <!-- 赤波 -->
+  <svg style="position:absolute;left:71.5%;top:66.8%;width:11%;height:8%;transform:translate(-50%,-50%);" viewBox="0 0 80 20">
     <path stroke="#dc2626" stroke-width="2" fill="none"
       d="M0 10 Q20 ${10-ampRight} 40 10 T80 10"/>
   </svg>
 
+  <!-- メーター -->
   <svg viewBox="0 0 200 120"
     style="position:absolute; right:6%; bottom:4%; width:140px; height:90px;">
 
@@ -53,12 +59,17 @@ function generateOverlay(scoreLeft = 65, scoreRight = 70) {
     <path d="M100 20 A80 80 0 0 1 140 30 L140 100 Z" fill="#f59e0b"/>
     <path d="M140 30 A80 80 0 0 1 180 100 L140 100 Z" fill="#ef4444"/>
 
-    <ellipse cx="100" cy="104" rx="46" ry="8" fill="black" opacity="0.08"/>
+    <path d="M35 100 A65 65 0 0 1 165 100 L35 100 Z"
+      fill="rgba(255,255,255,0.12)" />
+
+    <ellipse cx="100" cy="104" rx="46" ry="8"
+      fill="black" opacity="0.08"/>
 
     <g transform="rotate(${ -90 + (scoreRight / 100) * 180 } 100 100)">
       <line x1="100" y1="100" x2="145" y2="62"
         stroke="#111"
-        stroke-width="2.5"/>
+        stroke-width="2.5"
+        stroke-linecap="round"/>
       <circle cx="100" cy="100" r="4.5" fill="#111"/>
     </g>
 
@@ -69,24 +80,31 @@ function generateOverlay(scoreLeft = 65, scoreRight = 70) {
 }
 
 // =========================
-// MAIN
+// メイン
 app.post("/tally-pdf", async (req, res) => {
   try {
 
     const { scoreLeft, scoreRight } = calculateScores();
 
+    // HTML読み込み（必須）
     const template = fs.readFileSync("template.html", "utf8");
 
     const html = template
       .replace("{{dynamic_overlay}}", generateOverlay(scoreLeft, scoreRight))
-      .replace("{{base_image}}", "https://ilnautico.github.io/visual-base.png");
+      .replace("{{base_image}}", "https://ilnautico.github.io/visual-base.png")
+      .replace("{{pha_score}}", scoreLeft);
 
     const browser = await puppeteer.launch({
-      args: ["--no-sandbox"]
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-gpu"
+      ]
     });
 
     const page = await browser.newPage();
-    await page.setContent(html);
+    await page.setContent(html, { waitUntil: "networkidle0" });
 
     const pdf = await page.pdf({
       format: "A4",
@@ -95,7 +113,7 @@ app.post("/tally-pdf", async (req, res) => {
 
     await browser.close();
 
-    // ★ここが重要
+    // ★これが最重要
     fs.writeFileSync(PDF_PATH, pdf);
 
     res.send(pdf);
@@ -107,7 +125,7 @@ app.post("/tally-pdf", async (req, res) => {
 });
 
 // =========================
-// GET PDF
+// PDF取得
 app.get("/latest-pdf", (req, res) => {
   if (!fs.existsSync(PDF_PATH)) {
     return res.status(404).send("No PDF yet");
@@ -115,6 +133,7 @@ app.get("/latest-pdf", (req, res) => {
   res.sendFile(PDF_PATH);
 });
 
+// =========================
 app.listen(3000, () => {
   console.log("🚀 Server running");
 });
