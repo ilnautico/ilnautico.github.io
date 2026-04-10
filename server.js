@@ -1,56 +1,64 @@
 import express from "express";
 import puppeteer from "puppeteer";
 import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
-
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.text({ type: "*/*" }));
 
-// Railway用（絶対これ）
-const PDF_PATH = "/tmp/latest-report.pdf";
-
 // =========================
-// スコア（固定）
+// スコア
+// =========================
 function calculateScores() {
+  const optimalTemp = 180;
+
+  function calc(temp) {
+    const diff = Math.abs(temp - optimalTemp);
+    if (diff <= 5) return 95;
+    if (diff <= 10) return 90;
+    if (diff <= 20) return 75;
+    if (diff <= 30) return 60;
+    return 40;
+  }
+
   return {
-    scoreLeft: 65,
-    scoreRight: 70
+    scoreLeft: calc(230),
+    scoreRight: calc(180)
   };
 }
 
 // =========================
-// Overlay（当初状態に完全一致）
-function generateOverlay(scoreLeft = 65, scoreRight = 70) {
+// Overlay（元の安定版）
+function generateOverlay(scoreLeft, scoreRight) {
 
   const ampLeft = 4 + scoreLeft * 0.12;
   const ampRight = 4 + scoreRight * 0.12;
 
   return `
-<div style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:10;">
+<div style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:9999;">
 
-  <!-- 温度 -->
   <div style="position:absolute; left:33.5%; top:4%; font-size:32px;">230°C</div>
   <div style="position:absolute; left:66%; top:4%; font-size:32px; color:#dc2626;">180°C</div>
 
-  <!-- 数値 -->
   <div style="position:absolute; left:40%; top:22%; font-size:18px;">${scoreLeft}</div>
   <div style="position:absolute; left:72%; top:22%; font-size:18px; color:#dc2626;">${scoreRight}</div>
 
-  <!-- 青波 -->
   <svg style="position:absolute;left:46.8%;top:57.2%;width:11%;height:8%;transform:translate(-50%,-50%);" viewBox="0 0 80 20">
     <path stroke="#3B82A0" stroke-width="2" fill="none"
       d="M0 10 Q20 ${10-ampLeft} 40 10 T80 10"/>
   </svg>
 
-  <!-- 赤波 -->
   <svg style="position:absolute;left:71.5%;top:66.8%;width:11%;height:8%;transform:translate(-50%,-50%);" viewBox="0 0 80 20">
     <path stroke="#dc2626" stroke-width="2" fill="none"
       d="M0 10 Q20 ${10-ampRight} 40 10 T80 10"/>
   </svg>
 
-  <!-- メーター -->
   <svg viewBox="0 0 200 120"
     style="position:absolute; right:6%; bottom:4%; width:140px; height:90px;">
 
@@ -59,48 +67,48 @@ function generateOverlay(scoreLeft = 65, scoreRight = 70) {
     <path d="M100 20 A80 80 0 0 1 140 30 L140 100 Z" fill="#f59e0b"/>
     <path d="M140 30 A80 80 0 0 1 180 100 L140 100 Z" fill="#ef4444"/>
 
-    <path d="M35 100 A65 65 0 0 1 165 100 L35 100 Z"
-      fill="rgba(255,255,255,0.12)" />
-
-    <ellipse cx="100" cy="104" rx="46" ry="8"
-      fill="black" opacity="0.08"/>
-
     <g transform="rotate(${ -90 + (scoreRight / 100) * 180 } 100 100)">
       <line x1="100" y1="100" x2="145" y2="62"
-        stroke="#111"
-        stroke-width="2.5"
-        stroke-linecap="round"/>
+        stroke="#111" stroke-width="2.5"/>
       <circle cx="100" cy="100" r="4.5" fill="#111"/>
     </g>
-
   </svg>
 
-</div>
-`;
+</div>`;
 }
 
 // =========================
-// メイン
+// HTML差し込み
+// =========================
+function injectHtml(template, data) {
+  let html = template;
+  Object.keys(data).forEach((key) => {
+    html = html.replace(new RegExp(`{{\\s*${key}\\s*}}`, "g"), data[key] || "");
+  });
+  return html;
+}
+
+// =========================
+// API
+// =========================
 app.post("/tally-pdf", async (req, res) => {
   try {
 
     const { scoreLeft, scoreRight } = calculateScores();
 
-    // HTML読み込み（必須）
-    const template = fs.readFileSync("template.html", "utf8");
+    const template = fs.readFileSync(
+      path.join(__dirname, "template.html"),
+      "utf8"
+    );
 
-    const html = template
-      .replace("{{dynamic_overlay}}", generateOverlay(scoreLeft, scoreRight))
-      .replace("{{base_image}}", "https://ilnautico.github.io/visual-base.png")
-      .replace("{{pha_score}}", scoreLeft);
+    const html = injectHtml(template, {
+      base_image: "https://ilnautico.github.io/visual-base.png",
+      dynamic_overlay: generateOverlay(scoreLeft, scoreRight),
+      pha_score: scoreLeft
+    });
 
     const browser = await puppeteer.launch({
-      args: [
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--disable-dev-shm-usage",
-        "--disable-gpu"
-      ]
+      args: ["--no-sandbox","--disable-setuid-sandbox"]
     });
 
     const page = await browser.newPage();
@@ -113,8 +121,12 @@ app.post("/tally-pdf", async (req, res) => {
 
     await browser.close();
 
-    // ★これが最重要
-    fs.writeFileSync(PDF_PATH, pdf);
+    fs.writeFileSync("/tmp/latest.pdf", pdf);
+
+    res.set({
+      "Content-Type": "application/pdf",
+      "Content-Disposition": "attachment; filename=report.pdf"
+    });
 
     res.send(pdf);
 
@@ -125,12 +137,14 @@ app.post("/tally-pdf", async (req, res) => {
 });
 
 // =========================
-// PDF取得
+// GET
+// =========================
 app.get("/latest-pdf", (req, res) => {
-  if (!fs.existsSync(PDF_PATH)) {
-    return res.status(404).send("No PDF yet");
+  const file = "/tmp/latest.pdf";
+  if (!fs.existsSync(file)) {
+    return res.status(404).send("No PDF");
   }
-  res.sendFile(PDF_PATH);
+  res.sendFile(file);
 });
 
 // =========================
