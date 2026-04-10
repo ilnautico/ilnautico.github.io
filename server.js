@@ -1,24 +1,17 @@
 import express from "express";
 import puppeteer from "puppeteer";
 import fs from "fs";
-import OpenAI from "openai";
 
 const app = express();
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
-});
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.text({ type: "*/*" }));
 
-app.get("/", (req, res) => { 
-  res.send("SERVER OK");
-});
+const PDF_PATH = "/tmp/latest-report.pdf";
 
 // =========================
-// スコア（固定：元状態）
+// スコア（固定）
 function calculateScores() {
   return {
     scoreLeft: 65,
@@ -27,7 +20,7 @@ function calculateScores() {
 }
 
 // =========================
-// Overlay（完全復元）
+// Overlay（そのまま）
 function generateOverlay(scoreLeft = 65, scoreRight = 70) {
 
   const ampLeft = 4 + scoreLeft * 0.12;
@@ -36,50 +29,36 @@ function generateOverlay(scoreLeft = 65, scoreRight = 70) {
   return `
 <div style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:10;">
 
-  <!-- 温度 -->
   <div style="position:absolute; left:33.5%; top:4%; font-size:32px;">230°C</div>
   <div style="position:absolute; left:66%; top:4%; font-size:32px; color:#dc2626;">180°C</div>
 
-  <!-- 数値 -->
   <div style="position:absolute; left:40%; top:22%; font-size:18px;">${scoreLeft}</div>
   <div style="position:absolute; left:72%; top:22%; font-size:18px; color:#dc2626;">${scoreRight}</div>
 
-  <!-- 青波 -->
-  <svg style="position:absolute;left:46.8%;top:57.2%;width:11%;height:8%;transform:translate(-50%,-50%);" viewBox="0 0 80 20">
+  <svg style="position:absolute;left:46.8%;top:57.2%;width:11%;height:8%;" viewBox="0 0 80 20">
     <path stroke="#3B82A0" stroke-width="2" fill="none"
       d="M0 10 Q20 ${10-ampLeft} 40 10 T80 10"/>
   </svg>
 
-  <!-- 赤波 -->
-  <svg style="position:absolute;left:71.5%;top:66.8%;width:11%;height:8%;transform:translate(-50%,-50%);" viewBox="0 0 80 20">
+  <svg style="position:absolute;left:71.5%;top:66.8%;width:11%;height:8%;" viewBox="0 0 80 20">
     <path stroke="#dc2626" stroke-width="2" fill="none"
       d="M0 10 Q20 ${10-ampRight} 40 10 T80 10"/>
   </svg>
 
-  <!-- メーター（完全復元） -->
   <svg viewBox="0 0 200 120"
     style="position:absolute; right:6%; bottom:4%; width:140px; height:90px;">
 
-    <!-- グラデーション -->
     <path d="M20 100 A80 80 0 0 1 60 30 L60 100 Z" fill="#22c55e"/>
     <path d="M60 30 A80 80 0 0 1 100 20 L100 100 Z" fill="#fde047"/>
     <path d="M100 20 A80 80 0 0 1 140 30 L140 100 Z" fill="#f59e0b"/>
     <path d="M140 30 A80 80 0 0 1 180 100 L140 100 Z" fill="#ef4444"/>
 
-    <!-- 内側 -->
-    <path d="M35 100 A65 65 0 0 1 165 100 L35 100 Z"
-      fill="rgba(255,255,255,0.08)" />
+    <ellipse cx="100" cy="104" rx="46" ry="8" fill="black" opacity="0.08"/>
 
-    <!-- 影 -->
-    <ellipse cx="100" cy="104" rx="46" ry="8"
-      fill="black" opacity="0.08"/>
-
-    <!-- 針 -->
     <g transform="rotate(${ -90 + (scoreRight / 100) * 180 } 100 100)">
       <line x1="100" y1="100" x2="145" y2="62"
         stroke="#111"
-        stroke-width="2.5"
-        stroke-linecap="round"/>
+        stroke-width="2.5"/>
       <circle cx="100" cy="100" r="4.5" fill="#111"/>
     </g>
 
@@ -90,7 +69,7 @@ function generateOverlay(scoreLeft = 65, scoreRight = 70) {
 }
 
 // =========================
-// メイン処理
+// MAIN
 app.post("/tally-pdf", async (req, res) => {
   try {
 
@@ -103,11 +82,11 @@ app.post("/tally-pdf", async (req, res) => {
       .replace("{{base_image}}", "https://ilnautico.github.io/visual-base.png");
 
     const browser = await puppeteer.launch({
-      args: ["--no-sandbox","--disable-setuid-sandbox"]
+      args: ["--no-sandbox"]
     });
 
     const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: "networkidle0" });
+    await page.setContent(html);
 
     const pdf = await page.pdf({
       format: "A4",
@@ -116,10 +95,8 @@ app.post("/tally-pdf", async (req, res) => {
 
     await browser.close();
 
-    res.set({
-      "Content-Type": "application/pdf",
-      "Content-Disposition": "attachment; filename=report.pdf"
-    });
+    // ★ここが重要
+    fs.writeFileSync(PDF_PATH, pdf);
 
     res.send(pdf);
 
@@ -129,9 +106,17 @@ app.post("/tally-pdf", async (req, res) => {
   }
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log("🚀 Server running on", PORT);
+// =========================
+// GET PDF
+app.get("/latest-pdf", (req, res) => {
+  if (!fs.existsSync(PDF_PATH)) {
+    return res.status(404).send("No PDF yet");
+  }
+  res.sendFile(PDF_PATH);
+});
+
+app.listen(3000, () => {
+  console.log("🚀 Server running");
 });
 const html = `
 <!DOCTYPE html>
