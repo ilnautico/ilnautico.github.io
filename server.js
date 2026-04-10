@@ -31,37 +31,23 @@ function getValue(fields, keyword) {
 // =========================
 // スコア
 function calculateScores(body) {
-  const fields = body?.data?.fields || body?.fields || [];
+  // 温度ベースに完全修正
 
-  const currentMaterial = getValue(fields, "current material").toLowerCase();
-  const processing = getValue(fields, "processing method").toLowerCase();
-  const concern = getValue(fields, "primary concern").toLowerCase();
-  const ld = getValue(fields, "l/d").toLowerCase();
+  const optimalTemp = 180;
 
-  let stability = 70;
-  let risk = 40;
+  function calc(temp) {
+    const diff = Math.abs(temp - optimalTemp);
 
-  if (currentMaterial.includes("ldpe")) {
-    stability += 10;
-    risk -= 5;
-  }
-
-  if (processing.includes("film")) {
-    stability -= 10;
-    risk += 15;
-  }
-
-  if (ld.includes("22")) {
-    stability -= 5;
-  }
-
-  if (concern.includes("instability")) {
-    risk += 20;
+    if (diff <= 5) return 95;
+    if (diff <= 10) return 90;
+    if (diff <= 20) return 75;
+    if (diff <= 30) return 60;
+    return 40;
   }
 
   return {
-    scoreLeft: Math.max(0, Math.min(100, stability)),
-    scoreRight: Math.max(0, Math.min(100, risk))
+    scoreLeft: calc(230),  // ← 左は230°C
+    scoreRight: calc(180)  // ← 右は180°C
   };
 }
 
