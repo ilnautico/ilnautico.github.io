@@ -181,50 +181,51 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
   position:absolute;
   right:6%;
   bottom:4%;
-  width:140px;
-  height:70px;
+  width:120px;
+  height:60px;
   border-radius:100px 100px 0 0;
   background:linear-gradient(
     90deg,
-    #22c55e 0%,
+    #34d399 0%,
     #fde047 45%,
     #f59e0b 70%,
     #ef4444 100%
   );
   overflow:hidden;
+  opacity:0.95;
 ">
 
-  <!-- 内側（ガラス感：薄くする） -->
+  <!-- 内側ガラス -->
   <div style="
     position:absolute;
-    left:10px;
-    right:10px;
+    left:8px;
+    right:8px;
     bottom:0;
-    height:50%;
+    height:48%;
     border-radius:100px 100px 0 0;
-    background:rgba(255,255,255,0.08);
+    background:rgba(255,255,255,0.06);
   "></div>
 
-  <!-- 影（これが当初の立体感） -->
+  <!-- 下影（強化） -->
   <div style="
     position:absolute;
     left:50%;
-    bottom:-6px;
-    width:60px;
-    height:10px;
+    bottom:-8px;
+    width:70px;
+    height:12px;
     background:black;
-    opacity:0.08;
+    opacity:0.12;
     border-radius:50%;
     transform:translateX(-50%);
   "></div>
 
-  <!-- 針 -->
+  <!-- 針（短く修正） -->
   <div style="
     position:absolute;
     left:50%;
     bottom:0;
     width:2px;
-    height:55px;
+    height:48px;
     background:#111;
     transform-origin:bottom center;
     transform:rotate(${ -90 + (scoreRight / 100) * 180 }deg);
@@ -235,13 +236,12 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
     position:absolute;
     left:50%;
     bottom:-2px;
-    width:8px;
-    height:8px;
+    width:7px;
+    height:7px;
     background:#111;
     border-radius:50%;
     transform:translateX(-50%);
   "></div>
-
 </div>
 
 </div>
