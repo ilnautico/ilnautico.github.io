@@ -177,7 +177,6 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
     <path stroke="#dc2626" stroke-width="2" fill="none"
       d="M0 10 Q20 ${10-ampRight} 40 10 T80 10"/>
   </svg>
-
 <div style="
   position:absolute;
   right:6%;
@@ -195,15 +194,28 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
   overflow:hidden;
 ">
 
-  <!-- 内側薄層 -->
+  <!-- 内側（ガラス感：薄くする） -->
   <div style="
     position:absolute;
-    left:12px;
-    right:12px;
+    left:10px;
+    right:10px;
     bottom:0;
-    height:55%;
+    height:50%;
     border-radius:100px 100px 0 0;
-    background:rgba(255,255,255,0.2);
+    background:rgba(255,255,255,0.08);
+  "></div>
+
+  <!-- 影（これが当初の立体感） -->
+  <div style="
+    position:absolute;
+    left:50%;
+    bottom:-6px;
+    width:60px;
+    height:10px;
+    background:black;
+    opacity:0.08;
+    border-radius:50%;
+    transform:translateX(-50%);
   "></div>
 
   <!-- 針 -->
@@ -212,12 +224,13 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
     left:50%;
     bottom:0;
     width:2px;
-    height:60px;
+    height:55px;
     background:#111;
     transform-origin:bottom center;
     transform:rotate(${ -90 + (scoreRight / 100) * 180 }deg);
   "></div>
 
+  <!-- 中心点 -->
   <div style="
     position:absolute;
     left:50%;
@@ -228,6 +241,8 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
     border-radius:50%;
     transform:translateX(-50%);
   "></div>
+
+</div>
 
 </div>
 `;
