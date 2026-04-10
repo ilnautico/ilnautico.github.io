@@ -1,49 +1,36 @@
-const express = require("express");
-const puppeteer = require("puppeteer");
-const fs = require("fs");
-const path = require("path");
+import express from "express";
+import puppeteer from "puppeteer";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
 
 const app = express();
 app.use(express.json());
 
+// __dirname対応（ESM用）
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 const PDF_PATH = path.join(__dirname, "latest.pdf");
 
 // ==============================
-// ① 入力正規化
-// ==============================
+// 入力
 function normalizeInput(data) {
   return {
     application: (data.application || "").toLowerCase(),
     material: (data.material || "").toLowerCase(),
     bio_material: (data.bio_material || "").toLowerCase(),
-    equipment: data.equipment || "",
-    concern: data.concern || "",
-    stage: data.stage || "",
-    notes: data.notes || ""
+    concern: data.concern || ""
   };
 }
 
 // ==============================
-// ② 判定ロジック
-// ==============================
+// 判定
 function evaluateCompatibility(input) {
   let score = 0;
 
-  if (input.material.includes("pe") || input.material.includes("pp")) {
-    score += 2;
-  }
-
-  if (input.material.includes("pet") || input.material.includes("ps")) {
-    score += 0;
-  }
-
-  if (input.application.includes("film")) {
-    score += 1;
-  }
-
-  if (input.stage.includes("test")) {
-    score += 1;
-  }
+  if (input.material.includes("pe")) score += 2;
+  if (input.application.includes("film")) score += 1;
 
   if (score >= 3) return "High";
   if (score === 2) return "Moderate";
@@ -51,70 +38,28 @@ function evaluateCompatibility(input) {
 }
 
 // ==============================
-// ③ HTMLテンプレ（※虹なしに戻した）
-// ==============================
+// HTML（虹なし＝元状態）
 function generateHTML(result, input) {
   return `
-  <!DOCTYPE html>
   <html>
-  <head>
-    <meta charset="UTF-8">
-    <style>
-      body {
-        font-family: Arial;
-        padding: 40px;
-        color: #333;
-      }
-      h1 {
-        color: #162D48;
-      }
-      .section {
-        margin-top: 20px;
-      }
-    </style>
-  </head>
-  <body>
-
-    <h1>FairVia™ Screening Report</h1>
-
-    <div class="section">
-      <strong>Compatibility Level:</strong> ${result}
-    </div>
-
-    <div class="section">
-      <strong>Application:</strong> ${input.application}
-    </div>
-
-    <div class="section">
-      <strong>Material:</strong> ${input.material}
-    </div>
-
-    <div class="section">
-      <strong>Bio Material:</strong> ${input.bio_material}
-    </div>
-
-    <div class="section">
-      <strong>Technical Concern:</strong> ${input.concern}
-    </div>
-
-  </body>
+    <body>
+      <h1>Report</h1>
+      <p>Compatibility: ${result}</p>
+      <p>Material: ${input.material}</p>
+    </body>
   </html>
   `;
 }
 
 // ==============================
-// ④ PDF生成（元の安定版）
-// ==============================
+// PDF
 async function generatePDF(html) {
   const browser = await puppeteer.launch({
-    args: [
-      "--no-sandbox",
-      "--disable-setuid-sandbox"
-    ]
+    args: ["--no-sandbox", "--disable-setuid-sandbox"]
   });
 
   const page = await browser.newPage();
-  await page.setContent(html, { waitUntil: "networkidle0" });
+  await page.setContent(html);
 
   const pdf = await page.pdf({
     format: "A4",
@@ -126,55 +71,45 @@ async function generatePDF(html) {
 }
 
 // ==============================
-// ⑤ メインAPI
-// ==============================
+// API
 app.post("/generate", async (req, res) => {
   try {
     const input = normalizeInput(req.body);
-
     const result = evaluateCompatibility(input);
 
     const html = generateHTML(result, input);
+    const pdf = await generatePDF(html);
 
-    const pdfBuffer = await generatePDF(html);
-
-    fs.writeFileSync(PDF_PATH, pdfBuffer);
+    fs.writeFileSync(PDF_PATH, pdf);
 
     res.json({
-      status: "success",
-      result: result,
+      status: "ok",
       download: "/latest-pdf"
     });
 
-  } catch (error) {
-    console.error(error);
-    res.status(500).send("Error generating report");
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("error");
   }
 });
 
 // ==============================
-// ⑥ PDF取得
-// ==============================
 app.get("/latest-pdf", (req, res) => {
   if (!fs.existsSync(PDF_PATH)) {
-    return res.status(404).send("PDF not found");
+    return res.status(404).send("no pdf");
   }
-
-  res.setHeader("Content-Type", "application/pdf");
   res.sendFile(PDF_PATH);
 });
 
 // ==============================
-// 動作確認
-// ==============================
 app.get("/", (req, res) => {
-  res.send("Server is running");
+  res.send("Server OK");
 });
 
 // ==============================
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log("🚀 Server running");
 });
 const htmlTemplate = `
 <!DOCTYPE html>
