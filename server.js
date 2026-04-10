@@ -178,44 +178,58 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
       d="M0 10 Q20 ${10-ampRight} 40 10 T80 10"/>
   </svg>
 
-  <!-- ===== メーター（完全復元） ===== -->
- <svg viewBox="0 0 200 120"
-  style="
-    position:absolute;
-    right:6%;
-    bottom:4%;
-    width:140px;
-    height:90px;
-    opacity:0.95;
-  ">
-
-  <defs>
-    <linearGradient id="gaugeFill" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="#22c55e"/>   <!-- 緑 -->
-      <stop offset="45%" stop-color="#fde047"/> <!-- 黄 -->
-      <stop offset="75%" stop-color="#f59e0b"/> <!-- オレンジ -->
-      <stop offset="100%" stop-color="#ef4444"/> <!-- 赤 -->
-    </linearGradient>
-  </defs>
-
-  <!-- 外側 -->
-  <path d="M20 100 A80 80 0 0 1 180 100 L20 100 Z"
-    fill="url(#gaugeFill)" />
+<div style="
+  position:absolute;
+  right:6%;
+  bottom:4%;
+  width:140px;
+  height:70px;
+  border-radius:100px 100px 0 0;
+  background:linear-gradient(
+    90deg,
+    #22c55e 0%,
+    #fde047 45%,
+    #f59e0b 70%,
+    #ef4444 100%
+  );
+  overflow:hidden;
+">
 
   <!-- 内側薄層 -->
-  <path d="M35 100 A65 65 0 0 1 165 100 L35 100 Z"
-    fill="rgba(255,255,255,0.18)" />
+  <div style="
+    position:absolute;
+    left:12px;
+    right:12px;
+    bottom:0;
+    height:55%;
+    border-radius:100px 100px 0 0;
+    background:rgba(255,255,255,0.2);
+  "></div>
 
   <!-- 針 -->
-  <g transform="rotate(${ -90 + (scoreRight / 100) * 180 } 100 100)">
-    <line x1="100" y1="100" x2="145" y2="60"
-      stroke="#111"
-      stroke-width="2.5"
-      stroke-linecap="round"/>
-    <circle cx="100" cy="100" r="4" fill="#111"/>
-  </g>
+  <div style="
+    position:absolute;
+    left:50%;
+    bottom:0;
+    width:2px;
+    height:60px;
+    background:#111;
+    transform-origin:bottom center;
+    transform:rotate(${ -90 + (scoreRight / 100) * 180 }deg);
+  "></div>
 
-</svg>
+  <div style="
+    position:absolute;
+    left:50%;
+    bottom:-2px;
+    width:8px;
+    height:8px;
+    background:#111;
+    border-radius:50%;
+    transform:translateX(-50%);
+  "></div>
+
+</div>
 `;
 }
 
