@@ -2,20 +2,48 @@ import express from "express";
 import puppeteer from "puppeteer";
 import fs from "fs";
 import OpenAI from "openai";
+const express = require("express");
+const puppeteer = require("puppeteer");
+const fs = require("fs");
+const path = require("path");
 
 const app = express();
+app.use(express.json());
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
 });
+// ==============================
+// 設定
+// ==============================
+const PDF_PATH = path.join(__dirname, "latest.pdf");
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.text({ type: "*/*" }));
+// ==============================
+// ① 入力正規化
+// ==============================
+function normalizeInput(data) {
+  return {
+    application: (data.application || "").toLowerCase(),
+    material: (data.material || "").toLowerCase(),
+    bio_material: (data.bio_material || "").toLowerCase(),
+    equipment: data.equipment || "",
+    concern: data.concern || "",
+    stage: data.stage || "",
+    notes: data.notes || ""
+  };
+}
 
-app.get("/", (req, res) => {
+app.get("/", (req, res) => { 
   res.send("SERVER OK");
 });
+// ==============================
+// ② 判定ロジック（AIに任せない）
+// ==============================
+function evaluateCompatibility(input) {
+  let score = 0;
 
 // =========================
 // 値取得
@@ -24,13 +52,16 @@ function getValue(fields, keyword) {
     const key = String(item?.label || "").toLowerCase();
     const value = String(item?.value || "");
     if (key.includes(keyword)) return value;
+  // 材料相性
+  if (input.material.includes("pe") || input.material.includes("pp")) {
+    score += 2;
   }
   return "";
 }
 
 // =========================
-// スコア
-function calculateScores(body) {
+// スコア（温度ベース固定）
+function calculateScores() {
   const optimalTemp = 180;
 
   function calc(temp) {
@@ -41,6 +72,8 @@ function calculateScores(body) {
     if (diff <= 20) return 75;
     if (diff <= 30) return 60;
     return 40;
+  if (input.material.includes("pet") || input.material.includes("ps")) {
+    score += 0;
   }
 
   return {
@@ -48,164 +81,235 @@ function calculateScores(body) {
     scoreRight: calc(180)
   };
 }
+  // 工法
+  if (input.application.includes("film")) {
+    score += 1;
+  }
 
 // =========================
-// AI
-function cleanAIResponse(raw) {
-  return String(raw || "")
-    .replace(/```json/gi, "")
-    .replace(/```/g, "")
-    .trim();
-}
-
-async function generateAIReport(inputs) {
-  const prompt = `
-You are a senior polymer processing consultant.
-Return ONLY JSON.
-
-{
-  "executive_summary": "",
-  "key_risk": "",
-  "processing_window": "",
-  "next_step": ""
-}
-
-Input:
-${JSON.stringify(inputs)}
-`;
-
-  const res = await openai.chat.completions.create({
-    model: "gpt-4o",
-    messages: [{ role: "user", content: prompt }],
-    temperature: 0.4
-  });
-
-  return JSON.parse(cleanAIResponse(res.choices[0].message.content));
-}
-
-// =========================
-// overlay（完全元に戻した）
-function generateOverlay(scoreLeft, scoreRight) {
+// Overlay（確定版：SVGメーター）
+function generateOverlay(scoreLeft = 80, scoreRight = 35) {
+  // ステージ
+  if (input.stage.includes("testing")) {
+    score += 1;
+  }
 
   const ampLeft = 4 + scoreLeft * 0.12;
   const ampRight = 4 + scoreRight * 0.12;
+  // 判定
+  if (score >= 3) return "High";
+  if (score === 2) return "Moderate";
+  return "Low";
+}
 
+// ==============================
+// ③ HTMLテンプレ（固定）
+// ==============================
+function generateHTML(result, input) {
   return `
 <div style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:9999;">
 
+  <!-- 温度 -->
   <div style="position:absolute; left:33.5%; top:4%; font-size:32px;">230°C</div>
   <div style="position:absolute; left:66%; top:4%; font-size:32px; color:#dc2626;">180°C</div>
 
+  <!-- 数値 -->
   <div style="position:absolute; left:40%; top:22%; font-size:18px;">${scoreLeft}</div>
   <div style="position:absolute; left:72%; top:22%; font-size:18px; color:#dc2626;">${scoreRight}</div>
 
+  <!-- 青波 -->
   <svg style="position:absolute;left:46.8%;top:57.2%;width:11%;height:8%;transform:translate(-50%,-50%);" viewBox="0 0 80 20">
     <path stroke="#3B82A0" stroke-width="2" fill="none"
       d="M0 10 Q20 ${10-ampLeft} 40 10 T80 10"/>
   </svg>
 
+  <!-- 赤波 -->
   <svg style="position:absolute;left:71.5%;top:66.8%;width:11%;height:8%;transform:translate(-50%,-50%);" viewBox="0 0 80 20">
     <path stroke="#dc2626" stroke-width="2" fill="none"
       d="M0 10 Q20 ${10-ampRight} 40 10 T80 10"/>
   </svg>
 
-  <!-- 元のレインボー復元 -->
+  <!-- メーター -->
   <svg viewBox="0 0 200 120"
-    style="position:absolute; left:70%; top:68%; width:150px; height:100px;">
-    <defs>
-      <linearGradient id="gaugeFill">
-        <stop offset="0%" stop-color="#22c55e"/>
-        <stop offset="40%" stop-color="#fde047"/>
-        <stop offset="70%" stop-color="#f59e0b"/>
-        <stop offset="100%" stop-color="#ef4444"/>
-      </linearGradient>
-    </defs>
+    style="position:absolute; right:6%; bottom:4%; width:140px; height:90px;">
 
-    <path d="M20 100 A80 80 0 0 1 180 100 L20 100 Z"
-      fill="url(#gaugeFill)" />
+    <path d="M20 100 A80 80 0 0 1 60 30 L60 100 Z" fill="#22c55e"/>
+    <path d="M60 30 A80 80 0 0 1 100 20 L100 100 Z" fill="#fde047"/>
+    <path d="M100 20 A80 80 0 0 1 140 30 L140 100 Z" fill="#f59e0b"/>
+    <path d="M140 30 A80 80 0 0 1 180 100 L140 100 Z" fill="#ef4444"/>
+
+    <path d="M35 100 A65 65 0 0 1 165 100 L35 100 Z"
+      fill="rgba(255,255,255,0.12)" />
+
+    <ellipse cx="100" cy="104" rx="46" ry="8"
+      fill="black" opacity="0.08"/>
 
     <g transform="rotate(${ -90 + (scoreRight / 100) * 180 } 100 100)">
-      <line x1="100" y1="100" x2="150" y2="60"
-        stroke="#111" stroke-width="3"/>
+      <line x1="100" y1="100" x2="145" y2="62"
+        stroke="#111"
+        stroke-width="2.5"
+        stroke-linecap="round"/>
+      <circle cx="100" cy="100" r="4.5" fill="#111"/>
     </g>
   </svg>
+  <!DOCTYPE html>
+  <html>
+  <head>
+    <meta charset="UTF-8">
+    <style>
+      body { font-family: Arial; padding:40px; }
+      h1 { color:#162D48; }
+      .section { margin-top:20px; }
+    </style>
+  </head>
+  <body>
+    <h1>FairVia™ Screening Report</h1>
+
+    <div class="section">
+      <strong>Compatibility Level:</strong> ${result}
+    </div>
 
 </div>
 `;
 }
+    <div class="section">
+      <strong>Application:</strong> ${input.application}
+    </div>
 
 // =========================
-// HTML
+// HTML差し込み
 function injectHtml(template, data) {
   let html = template;
   Object.keys(data).forEach((key) => {
-    html = html.replace(new RegExp(`{{${key}}}`, "g"), data[key] || "");
+    const regex = new RegExp(`{{\\s*${key}\\s*}}`, "g");
+    html = html.replace(regex, data[key] || "");
+    <div class="section">
+      <strong>Material:</strong> ${input.material}
+    </div>
+
+    <div class="section">
+      <strong>Bio Material:</strong> ${input.bio_material}
+    </div>
+
+    <div class="section">
+      <strong>Technical Concern:</strong> ${input.concern}
+    </div>
+
+  </body>
+  </html>
+  `;
+}
+
+// ==============================
+// ④ PDF生成
+// ==============================
+async function generatePDF(html) {
+  const browser = await puppeteer.launch({
+    args: [
+      "--no-sandbox",
+      "--disable-setuid-sandbox",
+      "--disable-dev-shm-usage",
+      "--disable-gpu"
+    ]
   });
   return html;
 }
 
 // =========================
-// メイン（ここ元に戻した）
+// メイン処理
 app.post("/tally-pdf", async (req, res) => {
   try {
-
-    const parsed = req.body;
-    const fields = parsed?.data?.fields || [];
-
-    const inputs = {
-      application: getValue(fields, "application"),
-      currentMaterial: getValue(fields, "current material"),
-      bioMaterial: getValue(fields, "biodegradable material"),
-      processing: getValue(fields, "processing method"),
-      concern: getValue(fields, "primary concern")
-    };
-
-    const aiData = await generateAIReport(inputs);
-    const { scoreLeft, scoreRight } = calculateScores(parsed);
+    const { scoreLeft, scoreRight } = calculateScores();
+  const page = await browser.newPage();
+  await page.setContent(html, { waitUntil: "networkidle0" });
 
     const template = fs.readFileSync("template.html", "utf8");
+  const pdf = await page.pdf({
+    format: "A4",
+    printBackground: true
+  });
 
     const html = injectHtml(template, {
-      ...aiData,
-      base_image: "https://ilnautico.github.io/visual-base.png",
-      dynamic_overlay: generateOverlay(scoreLeft, scoreRight)
+      dynamic_overlay: generateOverlay(scoreLeft, scoreRight),
+      base_image: "https://ilnautico.github.io/visual-base.png"
     });
+  await browser.close();
+  return pdf;
+}
 
     const browser = await puppeteer.launch({
-      args: ["--no-sandbox", "--disable-setuid-sandbox"]
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-gpu"
+      ]
     });
+// ==============================
+// ⑤ メインAPI
+// ==============================
+app.post("/generate", async (req, res) => {
+  try {
+    const input = normalizeInput(req.body);
 
     const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: "networkidle0" });
+    // 判定
+    const result = evaluateCompatibility(input);
+
+    await page.setContent(html, { waitUntil: "domcontentloaded" });
+    // HTML生成
+    const html = generateHTML(result, input);
 
     const pdf = await page.pdf({
       format: "A4",
       printBackground: true
     });
+    // PDF生成
+    const pdfBuffer = await generatePDF(html);
 
     await browser.close();
+    // 保存
+    fs.writeFileSync(PDF_PATH, pdfBuffer);
 
-    fs.writeFileSync("/tmp/latest-report.pdf", pdf);
+    res.set({
+      "Content-Type": "application/pdf",
+      "Content-Disposition": "attachment; filename=report.pdf"
+    res.json({
+      status: "success",
+      result: result,
+      download: "/latest-pdf"
+    });
 
     res.send(pdf);
-
-  } catch (err) {
-    console.error(err);
-    res.status(500).send("fail");
+  } catch (error) {
+    console.error(error);
+    res.status(500).send("Error generating report");
   }
 });
 
-// =========================
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("PDF generation failed");
+// ==============================
+// ⑥ PDF取得
+// ==============================
 app.get("/latest-pdf", (req, res) => {
-  const file = "/tmp/latest-report.pdf";
-  if (!fs.existsSync(file)) return res.status(404).send("No PDF yet");
-  res.sendFile(file);
+  if (!fs.existsSync(PDF_PATH)) {
+    return res.status(404).send("PDF not found");
+  }
+
+  res.setHeader("Content-Type", "application/pdf");
+  res.sendFile(PDF_PATH);
 });
 
 // =========================
+// ==============================
+// 起動
+// ==============================
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log("🚀 Server running");
+  console.log("🚀 Server running on", PORT);
+  console.log(`Server running on port ${PORT}`);
 });
 const htmlTemplate = `
 <!DOCTYPE html>
