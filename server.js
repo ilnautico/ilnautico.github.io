@@ -18,21 +18,8 @@ app.get("/", (req, res) => {
 });
 
 // =========================
-// 値取得
-function getValue(fields, keyword) {
-  for (const item of fields) {
-    const key = String(item?.label || "").toLowerCase();
-    const value = String(item?.value || "");
-    if (key.includes(keyword)) return value;
-  }
-  return "";
-}
-
-// =========================
-// スコア
-function calculateScores(body) {
-  // 温度ベースに完全修正
-
+// スコア（温度ベース）
+function calculateScores() {
   const optimalTemp = 180;
 
   function calc(temp) {
@@ -46,96 +33,13 @@ function calculateScores(body) {
   }
 
   return {
-    scoreLeft: calc(230),  // ← 左は230°C
-    scoreRight: calc(180)  // ← 右は180°C
+    scoreLeft: calc(230),
+    scoreRight: calc(180)
   };
 }
 
 // =========================
-// AI応答のクリーン処理
-function cleanAIResponse(raw) {
-  return String(raw || "")
-    .replace(/```json/gi, "")
-    .replace(/```/g, "")
-    .trim();
-}
-
-// =========================
-// AIレポート生成
-async function generateAIReport(inputs) {
-  const prompt = `
-You are a senior polymer processing consultant.
-
-Generate a HIGH-DENSITY engineering assessment for a paid consulting report.
-
-STRICT RULES:
-- Return ONLY valid JSON
-- Do NOT include markdown
-- Do NOT include explanation outside JSON
-- No generic explanation
-- No short bullet-style fragments
-- Explain mechanisms such as thermal sensitivity, rheology, degradation, melt behavior, and process consistency where relevant
-- Use professional consulting tone
-- Keep statements realistic and non-hallucinatory
-- If information is limited, write cautious but useful engineering language
-
-Return this exact JSON structure:
-{
-  "application": "",
-  "material_transition": "",
-  "assessment_type": "",
-  "report_date": "",
-  "compatibility_level": "",
-  "executive_summary": "",
-  "key_risk": "",
-  "processing_window": "",
-  "thermal_behavior": "",
-  "flow_characteristics": "",
-  "mechanical_behavior": "",
-  "surface_quality": "",
-  "structural_consistency": "",
-  "application_implication": "",
-  "primary_risk_title": "",
-  "primary_risk": "",
-  "secondary_risk_title": "",
-  "secondary_risk": "",
-  "mechanism": "",
-  "stability": "",
-  "stability_note": "",
-  "consistency": "",
-  "consistency_note": "",
-  "next_step": ""
-}
-
-Input:
-Application: ${inputs.application}
-Current Material: ${inputs.currentMaterial}
-Biodegradable Material Considered: ${inputs.bioMaterial}
-Processing Method: ${inputs.processing}
-Equipment: ${inputs.equipment}
-Primary Concern: ${inputs.concern}
-Project Stage: ${inputs.stage}
-`;
-
-  const res = await openai.chat.completions.create({
-    model: "gpt-4o",
-    messages: [{ role: "user", content: prompt }],
-    temperature: 0.4
-  });
-
-  const cleaned = cleanAIResponse(res.choices?.[0]?.message?.content || "");
-
-  try {
-    return JSON.parse(cleaned);
-  } catch (err) {
-    console.error("❌ JSON PARSE ERROR");
-    console.log(cleaned);
-    throw err;
-  }
-}
-
-// =========================
-// Overlay（元デザイン復元版）
+// Overlay（完全修正版）
 function generateOverlay(scoreLeft = 80, scoreRight = 35) {
 
   const ampLeft = 4 + scoreLeft * 0.12;
@@ -163,72 +67,34 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
     <path stroke="#dc2626" stroke-width="2" fill="none"
       d="M0 10 Q20 ${10-ampRight} 40 10 T80 10"/>
   </svg>
-<div style="
-  position:absolute;
-  right:6%;
-  bottom:4%;
-  width:120px;
-  height:60px;
-  border-radius:100px 100px 0 0;
-  background:linear-gradient(
-    90deg,
-    #34d399 0%,
-    #fde047 45%,
-    #f59e0b 70%,
-    #ef4444 100%
-  );
-  overflow:hidden;
-  opacity:0.95;
-">
 
-  <!-- 内側ガラス -->
-  <div style="
-    position:absolute;
-    left:8px;
-    right:8px;
-    bottom:0;
-    height:48%;
-    border-radius:100px 100px 0 0;
-    background:rgba(255,255,255,0.06);
-  "></div>
+  <!-- ===== メーター（SVG確定版） ===== -->
+  <svg viewBox="0 0 200 120"
+    style="position:absolute; right:6%; bottom:4%; width:140px; height:90px;">
 
-  <!-- 下影（強化） -->
-  <div style="
-    position:absolute;
-    left:50%;
-    bottom:-8px;
-    width:70px;
-    height:12px;
-    background:black;
-    opacity:0.12;
-    border-radius:50%;
-    transform:translateX(-50%);
-  "></div>
+    <!-- 色帯 -->
+    <path d="M20 100 A80 80 0 0 1 60 30 L60 100 Z" fill="#22c55e"/>
+    <path d="M60 30 A80 80 0 0 1 100 20 L100 100 Z" fill="#fde047"/>
+    <path d="M100 20 A80 80 0 0 1 140 30 L140 100 Z" fill="#f59e0b"/>
+    <path d="M140 30 A80 80 0 0 1 180 100 L140 100 Z" fill="#ef4444"/>
 
-  <!-- 針（短く修正） -->
-  <div style="
-    position:absolute;
-    left:50%;
-    bottom:0;
-    width:2px;
-    height:48px;
-    background:#111;
-    transform-origin:bottom center;
-    transform:rotate(${ -90 + (scoreRight / 100) * 180 }deg);
-  "></div>
+    <!-- 内側 -->
+    <path d="M35 100 A65 65 0 0 1 165 100 L35 100 Z"
+      fill="rgba(255,255,255,0.12)" />
 
-  <!-- 中心点 -->
-  <div style="
-    position:absolute;
-    left:50%;
-    bottom:-2px;
-    width:7px;
-    height:7px;
-    background:#111;
-    border-radius:50%;
-    transform:translateX(-50%);
-  "></div>
-</div>
+    <!-- 影 -->
+    <ellipse cx="100" cy="104" rx="46" ry="8"
+      fill="black" opacity="0.08"/>
+
+    <!-- 針 -->
+    <g transform="rotate(${ -90 + (scoreRight / 100) * 180 } 100 100)">
+      <line x1="100" y1="100" x2="145" y2="62"
+        stroke="#111"
+        stroke-width="2.5"
+        stroke-linecap="round"/>
+      <circle cx="100" cy="100" r="4.5" fill="#111"/>
+    </g>
+  </svg>
 
 </div>
 `;
@@ -246,69 +112,24 @@ function injectHtml(template, data) {
 }
 
 // =========================
-// メイン処理
+// メイン
 app.post("/tally-pdf", async (req, res) => {
   try {
-    let parsed;
-
-    if (typeof req.body === "string") {
-      try {
-        parsed = JSON.parse(req.body);
-      } catch {
-        parsed = {};
-      }
-    } else {
-      parsed = req.body;
-    }
-
-    const fields = parsed?.data?.fields || parsed?.fields || [];
-
-    const inputs = {
-      application: getValue(fields, "application"),
-      currentMaterial: getValue(fields, "current material"),
-      bioMaterial: getValue(fields, "biodegradable material"),
-      processing: getValue(fields, "processing method"),
-      equipment: getValue(fields, "equipment"),
-      concern: getValue(fields, "primary concern"),
-      stage: getValue(fields, "project stage")
-    };
-
-    const aiData = await generateAIReport(inputs);
-    const { scoreLeft, scoreRight } = calculateScores(parsed);
+    const { scoreLeft, scoreRight } = calculateScores();
 
     const template = fs.readFileSync("template.html", "utf8");
 
     const html = injectHtml(template, {
-      // AI本文
-      ...aiData,
-
-      // 表紙などの不足防止
-      application: aiData.application || inputs.application || "",
-      material_transition:
-        aiData.material_transition ||
-        [inputs.currentMaterial, inputs.bioMaterial].filter(Boolean).join(" → "),
-      assessment_type: aiData.assessment_type || inputs.processing || "Technical hypothesis assessment",
-      report_date:
-        aiData.report_date ||
-        new Date().toISOString().slice(0, 10),
-
-      // デザイン用
-      base_image: "https://ilnautico.github.io/visual-base.png",
       dynamic_overlay: generateOverlay(scoreLeft, scoreRight),
-      pha_score: Math.round(scoreLeft)
+      base_image: "https://ilnautico.github.io/visual-base.png"
     });
 
     const browser = await puppeteer.launch({
-      args: [
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--disable-dev-shm-usage",
-        "--disable-gpu"
-      ]
+      args: ["--no-sandbox", "--disable-gpu"]
     });
 
     const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: "networkidle0" });
+    await page.setContent(html);
 
     const pdf = await page.pdf({
       format: "A4",
@@ -316,8 +137,6 @@ app.post("/tally-pdf", async (req, res) => {
     });
 
     await browser.close();
-
-    fs.writeFileSync("/tmp/latest-report.pdf", pdf);
 
     res.set({
       "Content-Type": "application/pdf",
@@ -332,20 +151,8 @@ app.post("/tally-pdf", async (req, res) => {
   }
 });
 
-// =========================
-// 最新PDF取得
-app.get("/latest-pdf", (req, res) => {
-  const file = "/tmp/latest-report.pdf";
-  if (!fs.existsSync(file)) {
-    return res.status(404).send("No PDF yet");
-  }
-  res.sendFile(file);
-});
-
-// =========================
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log("🚀 Server running on", PORT);
+app.listen(3000, () => {
+  console.log("🚀 Server running");
 });
 const htmlTemplate = `
 <!DOCTYPE html>
