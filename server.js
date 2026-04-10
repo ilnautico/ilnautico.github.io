@@ -14,7 +14,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.text({ type: "*/*" }));
 
 // =========================
-// スコア
+// スコア（固定ロジック）
 // =========================
 function calculateScores() {
   const optimalTemp = 180;
@@ -35,44 +35,56 @@ function calculateScores() {
 }
 
 // =========================
-// Overlay（元の安定版）
+// Overlay（完全復元版）
 // =========================
 function generateOverlay(scoreLeft, scoreRight) {
-  const ampLeft = 4 + scoreLeft * 0.12;
-  const ampRight = 4 + scoreRight * 0.12;
+
+  const ampLeft = 6 + scoreLeft * 0.18;
+  const ampRight = 6 + scoreRight * 0.18;
 
   return `
 <div style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:9999;">
 
-  <div style="position:absolute; left:33.5%; top:4%; font-size:32px;">230°C</div>
-  <div style="position:absolute; left:66%; top:4%; font-size:32px; color:#dc2626;">180°C</div>
+  <!-- 温度 -->
+  <div style="position:absolute; left:33.5%; top:4%; font-size:34px;">230°C</div>
+  <div style="position:absolute; left:66%; top:4%; font-size:34px; color:#dc2626;">180°C</div>
 
-  <div style="position:absolute; left:40%; top:22%; font-size:18px;">${scoreLeft}</div>
-  <div style="position:absolute; left:72%; top:22%; font-size:18px; color:#dc2626;">${scoreRight}</div>
+  <!-- スコア -->
+  <div style="position:absolute; left:40%; top:22%; font-size:20px;">${scoreLeft}</div>
+  <div style="position:absolute; left:72%; top:22%; font-size:20px; color:#dc2626;">${scoreRight}</div>
 
-  <svg style="position:absolute;left:46.8%;top:57.2%;width:11%;height:8%;transform:translate(-50%,-50%);" viewBox="0 0 80 20">
-    <path stroke="#3B82A0" stroke-width="2" fill="none"
+  <!-- 青ウェーブ -->
+  <svg style="position:absolute;left:46.8%;top:57.2%;width:12%;height:9%;transform:translate(-50%,-50%);" viewBox="0 0 80 20">
+    <path stroke="#3B82A0" stroke-width="2.4" fill="none"
       d="M0 10 Q20 ${10 - ampLeft} 40 10 T80 10"/>
   </svg>
 
-  <svg style="position:absolute;left:71.5%;top:66.8%;width:11%;height:8%;transform:translate(-50%,-50%);" viewBox="0 0 80 20">
-    <path stroke="#dc2626" stroke-width="2" fill="none"
+  <!-- 赤ウェーブ -->
+  <svg style="position:absolute;left:71.5%;top:66.8%;width:12%;height:9%;transform:translate(-50%,-50%);" viewBox="0 0 80 20">
+    <path stroke="#dc2626" stroke-width="2.4" fill="none"
       d="M0 10 Q20 ${10 - ampRight} 40 10 T80 10"/>
   </svg>
 
+  <!-- メーター -->
   <svg viewBox="0 0 200 120"
-    style="position:absolute; right:6%; bottom:4%; width:140px; height:90px;">
+    style="position:absolute; right:8%; bottom:6%; width:130px; height:85px;">
 
     <path d="M20 100 A80 80 0 0 1 60 30 L60 100 Z" fill="#22c55e"/>
     <path d="M60 30 A80 80 0 0 1 100 20 L100 100 Z" fill="#fde047"/>
     <path d="M100 20 A80 80 0 0 1 140 30 L140 100 Z" fill="#f59e0b"/>
     <path d="M140 30 A80 80 0 0 1 180 100 L140 100 Z" fill="#ef4444"/>
 
+    <ellipse cx="100" cy="104" rx="46" ry="8"
+      fill="black" opacity="0.08"/>
+
     <g transform="rotate(${ -90 + (scoreRight / 100) * 180 } 100 100)">
       <line x1="100" y1="100" x2="145" y2="62"
-        stroke="#111" stroke-width="2.5"/>
-      <circle cx="100" cy="100" r="4.5" fill="#111"/>
+        stroke="#111"
+        stroke-width="2.8"
+        stroke-linecap="round"/>
+      <circle cx="100" cy="100" r="5" fill="#111"/>
     </g>
+
   </svg>
 
 </div>`;
@@ -94,6 +106,7 @@ function injectHtml(template, data) {
 // =========================
 app.post("/tally-pdf", async (req, res) => {
   try {
+
     const { scoreLeft, scoreRight } = calculateScores();
 
     const template = fs.readFileSync(
@@ -104,10 +117,14 @@ app.post("/tally-pdf", async (req, res) => {
     const html = injectHtml(template, {
       base_image: "https://ilnautico.github.io/visual-base.png",
       dynamic_overlay: generateOverlay(scoreLeft, scoreRight),
-      pha_score: scoreLeft
+      pha_score: scoreLeft,
+      next_step: `
+Proceed with pilot-scale validation under controlled extrusion conditions.
+Focus on melt stability, bubble formation, and thermal degradation behavior.
+Material optimization may be required to improve structural consistency.
+      `
     });
 
-    // ✅ Railway対応 安定版
     const browser = await puppeteer.launch({
       headless: "new",
       args: [
@@ -119,10 +136,7 @@ app.post("/tally-pdf", async (req, res) => {
     });
 
     const page = await browser.newPage();
-
-    await page.setContent(html, {
-      waitUntil: "networkidle0"
-    });
+    await page.setContent(html, { waitUntil: "networkidle0" });
 
     const pdf = await page.pdf({
       format: "A4",
@@ -131,8 +145,7 @@ app.post("/tally-pdf", async (req, res) => {
 
     await browser.close();
 
-    const filePath = "/tmp/latest.pdf";
-    fs.writeFileSync(filePath, pdf);
+    fs.writeFileSync("/tmp/latest.pdf", pdf);
 
     res.set({
       "Content-Type": "application/pdf",
@@ -142,7 +155,7 @@ app.post("/tally-pdf", async (req, res) => {
     res.send(pdf);
 
   } catch (err) {
-    console.error("❌ ERROR:", err);
+    console.error(err);
     res.status(500).send("PDF generation failed");
   }
 });
@@ -152,19 +165,16 @@ app.post("/tally-pdf", async (req, res) => {
 // =========================
 app.get("/latest-pdf", (req, res) => {
   const file = "/tmp/latest.pdf";
-
   if (!fs.existsSync(file)) {
-    return res.status(404).send("No PDF yet");
+    return res.status(404).send("No PDF");
   }
-
   res.sendFile(file);
 });
 
-// =========================
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
-  console.log(`🚀 Server running on ${PORT}`);
+  console.log("🚀 Server running on", PORT);
 });
 const html = `
 <!DOCTYPE html>
