@@ -18,7 +18,18 @@ app.get("/", (req, res) => {
 });
 
 // =========================
-// スコア（温度ベース）
+// 値取得
+function getValue(fields, keyword) {
+  for (const item of fields) {
+    const key = String(item?.label || "").toLowerCase();
+    const value = String(item?.value || "");
+    if (key.includes(keyword)) return value;
+  }
+  return "";
+}
+
+// =========================
+// スコア（温度ベース固定）
 function calculateScores() {
   const optimalTemp = 180;
 
@@ -39,7 +50,7 @@ function calculateScores() {
 }
 
 // =========================
-// Overlay（完全修正版）
+// Overlay（確定版：SVGメーター）
 function generateOverlay(scoreLeft = 80, scoreRight = 35) {
 
   const ampLeft = 4 + scoreLeft * 0.12;
@@ -68,25 +79,21 @@ function generateOverlay(scoreLeft = 80, scoreRight = 35) {
       d="M0 10 Q20 ${10-ampRight} 40 10 T80 10"/>
   </svg>
 
-  <!-- ===== メーター（SVG確定版） ===== -->
+  <!-- メーター -->
   <svg viewBox="0 0 200 120"
     style="position:absolute; right:6%; bottom:4%; width:140px; height:90px;">
 
-    <!-- 色帯 -->
     <path d="M20 100 A80 80 0 0 1 60 30 L60 100 Z" fill="#22c55e"/>
     <path d="M60 30 A80 80 0 0 1 100 20 L100 100 Z" fill="#fde047"/>
     <path d="M100 20 A80 80 0 0 1 140 30 L140 100 Z" fill="#f59e0b"/>
     <path d="M140 30 A80 80 0 0 1 180 100 L140 100 Z" fill="#ef4444"/>
 
-    <!-- 内側 -->
     <path d="M35 100 A65 65 0 0 1 165 100 L35 100 Z"
       fill="rgba(255,255,255,0.12)" />
 
-    <!-- 影 -->
     <ellipse cx="100" cy="104" rx="46" ry="8"
       fill="black" opacity="0.08"/>
 
-    <!-- 針 -->
     <g transform="rotate(${ -90 + (scoreRight / 100) * 180 } 100 100)">
       <line x1="100" y1="100" x2="145" y2="62"
         stroke="#111"
@@ -112,7 +119,7 @@ function injectHtml(template, data) {
 }
 
 // =========================
-// メイン
+// メイン処理
 app.post("/tally-pdf", async (req, res) => {
   try {
     const { scoreLeft, scoreRight } = calculateScores();
@@ -125,11 +132,17 @@ app.post("/tally-pdf", async (req, res) => {
     });
 
     const browser = await puppeteer.launch({
-      args: ["--no-sandbox", "--disable-gpu"]
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-gpu"
+      ]
     });
 
     const page = await browser.newPage();
-    await page.setContent(html);
+
+    await page.setContent(html, { waitUntil: "domcontentloaded" });
 
     const pdf = await page.pdf({
       format: "A4",
@@ -151,8 +164,10 @@ app.post("/tally-pdf", async (req, res) => {
   }
 });
 
-app.listen(3000, () => {
-  console.log("🚀 Server running");
+// =========================
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log("🚀 Server running on", PORT);
 });
 const htmlTemplate = `
 <!DOCTYPE html>
