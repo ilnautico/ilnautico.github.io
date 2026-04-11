@@ -9,7 +9,7 @@
 :root {
   --navy:        #0C1C2E;
   --navy-soft:   #2C4A6E;
-  --block-light: #F9FCFF;　
+  --block-light: #F9FCFF;
   --block-mid:   #E6EFF8;
   --block-deep:  #DDE8F2;
   --sep:         #E6EDF3;
@@ -96,7 +96,7 @@ body {
 
 .body-wrap { padding: 38px 50px 32px; }
 .section {
-margin-bottom: 42px;
+.margin-bottom: 42px;
   page-break-inside: avoid;
 }
 .section + .section { padding-top: 38px; border-top: 1px solid var(--sep); }
@@ -612,51 +612,50 @@ margin-bottom: 42px;
 <!-- ============================= -->
 
   <!-- ===== 06 Conceptual Visualization ===== -->
-<!-- 🔥 変更は Conceptual Visualization 部分だけ -->
-<!-- 他は絶対に触ってない＝元構造完全維持 -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-num">06</span>
+      <span class="section-title">Conceptual Visualization</span>
+    </div>
 
-<!-- ===== 06 Conceptual Visualization ===== -->
-<div class="section">
-  <div class="section-header">
-    <span class="section-num">06</span>
-    <span class="section-title">Conceptual Visualization</span>
-  </div>
-
-  <!-- ビジュアル枠 -->
-  <div style="
-    width:700px;
-    margin:0 auto;
-    background:var(--block-light);
-    border:1px solid #D4E2EE;
-    border-radius:10px;
-    overflow:hidden;
-  ">
-
+    <!-- ビジュアル枠 -->
     <div style="
-      position:relative;
-      width:100%;
-      height:260px;
-      display:flex;
-      align-items:center;
-      justify-content:center;
+      width:700px;
+      margin:0 auto;
+      background:var(--block-light);
+      border:1px solid #D4E2EE;
+      border-radius:10px;
       overflow:hidden;
     ">
 
-      <!-- ✅ 画像（安定版） -->
-      <img src="{{base_image}}" style="
-        width:100%;
-        height:100%;
-        object-fit:contain;
-        display:block;
-      ">
+     <div style="
+  position:relative;
+  width:100%;
+  height:260px;
+  overflow:hidden;
+">
 
-      <!-- ✅ overlay（安定） -->
-      {{dynamic_overlay}}
+  <img src="{{base_image}}" style="
+    position:absolute;
+    left:0;
+    top:0;
+    width:100%;
+    height:100%;
+    object-fit:contain;
+    display:block;
+  ">
 
-    </div>
-
+  <div style="
+    position:absolute;
+    left:0;
+    top:0;
+    width:100%;
+    height:100%;
+  ">
+    {{dynamic_overlay}}
   </div>
-</div> 
+
+</div>
 
   <!-- ===== 07 Recommended Next Step ===== -->
   <div class="section">
@@ -692,7 +691,7 @@ margin-bottom: 42px;
     </div>
   </div>
 
-
+</div>
 
     <!-- 08 Closing Note -->
     <div class="section">
@@ -710,7 +709,7 @@ margin-bottom: 42px;
       </div>
     </div>
 
-
+    </div><!-- /page4-wrap -->
 
   </div><!-- /body-wrap -->
 
