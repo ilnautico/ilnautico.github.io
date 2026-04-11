@@ -38,67 +38,65 @@ function calculateScores() {
 // Overlay（完全版）
 // =========================
 function generateOverlay(scoreLeft, scoreRight) {
-  const uid = Date.now();
 
   const angle = -90 + (scoreRight / 100) * 180;
 
-<!-- メーター -->
-<svg viewBox="0 0 200 120"
-  style="
-    position:absolute;
-    right:6%;
-    bottom:6%;
-    width:140px;
-    height:90px;
-  ">
+  return `
+  <svg viewBox="0 0 200 120"
+    style="
+      position:absolute;
+      right:6%;
+      bottom:6%;
+      width:140px;
+      height:90px;
+    ">
 
-  <defs>
-    <linearGradient id="g-green" x1="0" x2="1">
-      <stop offset="0%" stop-color="#4ade80"/>
-      <stop offset="100%" stop-color="#16a34a"/>
-    </linearGradient>
+    <defs>
+      <linearGradient id="g-green" x1="0" x2="1">
+        <stop offset="0%" stop-color="#4ade80"/>
+        <stop offset="100%" stop-color="#16a34a"/>
+      </linearGradient>
 
-    <linearGradient id="g-yellow" x1="0" x2="1">
-      <stop offset="0%" stop-color="#fde047"/>
-      <stop offset="100%" stop-color="#eab308"/>
-    </linearGradient>
+      <linearGradient id="g-yellow" x1="0" x2="1">
+        <stop offset="0%" stop-color="#fde047"/>
+        <stop offset="100%" stop-color="#eab308"/>
+      </linearGradient>
 
-    <linearGradient id="g-orange" x1="0" x2="1">
-      <stop offset="0%" stop-color="#fb923c"/>
-      <stop offset="100%" stop-color="#ea580c"/>
-    </linearGradient>
+      <linearGradient id="g-orange" x1="0" x2="1">
+        <stop offset="0%" stop-color="#fb923c"/>
+        <stop offset="100%" stop-color="#ea580c"/>
+      </linearGradient>
 
-    <linearGradient id="g-red" x1="0" x2="1">
-      <stop offset="0%" stop-color="#f87171"/>
-      <stop offset="100%" stop-color="#dc2626"/>
-    </linearGradient>
-  </defs>
+      <linearGradient id="g-red" x1="0" x2="1">
+        <stop offset="0%" stop-color="#f87171"/>
+        <stop offset="100%" stop-color="#dc2626"/>
+      </linearGradient>
+    </defs>
 
-  <!-- 各ゾーン -->
-  <path d="M20 100 A80 80 0 0 1 60 30 L60 100 Z" fill="url(#g-green)"/>
-  <path d="M60 30 A80 80 0 0 1 100 20 L100 100 Z" fill="url(#g-yellow)"/>
-  <path d="M100 20 A80 80 0 0 1 140 30 L140 100 Z" fill="url(#g-orange)"/>
-  <path d="M140 30 A80 80 0 0 1 180 100 L140 100 Z" fill="url(#g-red)"/>
+    <!-- 各ゾーン -->
+    <path d="M20 100 A80 80 0 0 1 60 30 L60 100 Z" fill="url(#g-green)"/>
+    <path d="M60 30 A80 80 0 0 1 100 20 L100 100 Z" fill="url(#g-yellow)"/>
+    <path d="M100 20 A80 80 0 0 1 140 30 L140 100 Z" fill="url(#g-orange)"/>
+    <path d="M140 30 A80 80 0 0 1 180 100 L140 100 Z" fill="url(#g-red)"/>
 
-  <!-- ハイライト -->
-  <path d="M35 100 A65 65 0 0 1 165 100 L35 100 Z"
-    fill="rgba(255,255,255,0.12)" />
+    <!-- ハイライト -->
+    <path d="M35 100 A65 65 0 0 1 165 100 L35 100 Z"
+      fill="rgba(255,255,255,0.12)" />
 
-  <!-- 影 -->
-  <ellipse cx="100" cy="104" rx="46" ry="8"
-    fill="black" opacity="0.08"/>
+    <!-- 影 -->
+    <ellipse cx="100" cy="104" rx="46" ry="8"
+      fill="black" opacity="0.08"/>
 
-  <!-- 針 -->
-  <g transform="rotate(${angle} 100 100)">
-    <line x1="100" y1="100" x2="145" y2="62"
-      stroke="#111"
-      stroke-width="2.5"
-      stroke-linecap="round"/>
-    <circle cx="100" cy="100" r="4.5" fill="#111"/>
-  </g>
+    <!-- 針 -->
+    <g transform="rotate(${angle} 100 100)">
+      <line x1="100" y1="100" x2="145" y2="62"
+        stroke="#111"
+        stroke-width="2.5"
+        stroke-linecap="round"/>
+      <circle cx="100" cy="100" r="4.5" fill="#111"/>
+    </g>
 
-</svg>
-</div>
+  </svg>
   `;
 }
 // =========================
