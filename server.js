@@ -58,10 +58,11 @@ function generateOverlay(scoreLeft, scoreRight) {
 
 
 <!-- メーター（完全安定版） -->
+<!-- メーター（半月プレート完全復元） -->
 <svg viewBox="0 0 200 120"
   style="position:absolute; right:6%; bottom:4%; width:140px; height:90px;">
 
-  <!-- グラデーション定義 -->
+  <!-- グラデ -->
   <defs>
     <linearGradient id="meterGrad" x1="0" x2="1">
       <stop offset="0%" stop-color="#22c55e"/>
@@ -71,36 +72,28 @@ function generateOverlay(scoreLeft, scoreRight) {
     </linearGradient>
   </defs>
 
-  <!-- アーチ本体（1本化） -->
-  <path d="M20 100 A80 80 0 0 1 180 100"
-    fill="none"
-    stroke="url(#meterGrad)"
-    stroke-width="28"
-    stroke-linecap="round"
-  />
+  <!-- 半月プレート（ここが本体） -->
+  <path d="M20 100 A80 80 0 0 1 180 100 L100 100 Z"
+    fill="url(#meterGrad)" />
 
   <!-- 内側ハイライト -->
-  <path d="M35 100 A65 65 0 0 1 165 100"
-    fill="none"
-    stroke="rgba(255,255,255,0.15)"
-    stroke-width="14"
-    stroke-linecap="round"
-  />
+  <path d="M35 100 A65 65 0 0 1 165 100 L100 100 Z"
+    fill="rgba(255,255,255,0.12)" />
 
   <!-- 影 -->
   <ellipse cx="100" cy="104" rx="46" ry="8"
     fill="black" opacity="0.08"/>
 
-  <!-- 針（そのまま） -->
+  <!-- 針（今のやつそのまま使う） -->
   <g transform="rotate(${angle} 100 100)">
-    <line x1="100" y1="100" x2="145" y2="62"
+    <line x1="100" y1="100" x2="140" y2="65"
       stroke="#111"
       stroke-width="2.5"
       stroke-linecap="round"/>
     <circle cx="100" cy="100" r="4.5" fill="#111"/>
   </g>
-</svg>
 
+</svg>
   </div>
   `;
 }
