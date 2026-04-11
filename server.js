@@ -15,15 +15,17 @@ app.use(express.text({ type: "*/*" }));
 
 const PDF_PATH = "/tmp/latest.pdf";
 
+
 // =========================
-// スコア（動作確認用）
+// スコア（固定：連動確認用）
 // =========================
-function calculateScores() {
+function calculateScores(input) {
   return {
-    scoreLeft: Math.floor(Math.random() * 60 + 40),
-    scoreRight: Math.floor(Math.random() * 60 + 40)
+    scoreLeft: 45,
+    scoreRight: 78
   };
 }
+
 
 // =========================
 // Overlay
@@ -45,73 +47,78 @@ function generateOverlay(scoreLeft, scoreRight) {
     <div style="position:absolute; left:40%; top:22%; font-size:16px;">${scoreLeft}</div>
     <div style="position:absolute; left:72%; top:22%; font-size:16px; color:#dc2626;">${scoreRight}</div>
 
-    <!-- 波 -->
+    <!-- 波（左） -->
     <svg style="position:absolute;left:46.8%;top:57.2%;width:11%;height:8%;transform:translate(-50%,-50%);" viewBox="0 0 80 20">
       <path stroke="#3B82A0" stroke-width="2" fill="none"
         d="M0 10 Q20 ${10-ampLeft} 40 10 T80 10"/>
     </svg>
 
+    <!-- 波（右） -->
     <svg style="position:absolute;left:71.5%;top:64%;width:11%;height:8%;transform:translate(-50%,-50%);" viewBox="0 0 80 20">
       <path stroke="#dc2626" stroke-width="2" fill="none"
         d="M0 10 Q20 ${10-ampRight} 40 10 T80 10"/>
     </svg>
 
 
-<!-- メーター（完全安定版） -->
-<!-- メーター（半月プレート完全復元） -->
-<svg viewBox="0 0 200 120"
-  style="position:absolute; right:6%; bottom:4%; width:140px; height:90px;">
+    <!-- メーター -->
+    <svg viewBox="0 0 200 120"
+      style="position:absolute; right:6%; bottom:4%; width:140px; height:90px;">
 
-  <!-- グラデ -->
-  <defs>
-    <linearGradient id="meterGrad" x1="0" x2="1">
-      <stop offset="0%" stop-color="#22c55e"/>
-      <stop offset="45%" stop-color="#fde047"/>
-      <stop offset="70%" stop-color="#f59e0b"/>
-      <stop offset="100%" stop-color="#ef4444"/>
-    </linearGradient>
-  </defs>
+      <defs>
+        <linearGradient id="meterGrad" x1="0" x2="1">
+          <stop offset="0%" stop-color="#22c55e"/>
+          <stop offset="45%" stop-color="#fde047"/>
+          <stop offset="70%" stop-color="#f59e0b"/>
+          <stop offset="100%" stop-color="#ef4444"/>
+        </linearGradient>
+      </defs>
 
-  <!-- 半月プレート（ここが本体） -->
-  <path d="M20 100 A80 80 0 0 1 180 100 L100 100 Z"
-    fill="url(#meterGrad)" />
+      <!-- プレート -->
+      <path d="M20 100 A80 80 0 0 1 180 100 L100 100 Z"
+        fill="url(#meterGrad)" />
 
-  <!-- 内側ハイライト -->
-  <path d="M35 100 A65 65 0 0 1 165 100 L100 100 Z"
-    fill="rgba(255,255,255,0.12)" />
+      <!-- 内側 -->
+      <path d="M35 100 A65 65 0 0 1 165 100 L100 100 Z"
+        fill="rgba(255,255,255,0.12)" />
 
-  <!-- 影 -->
-  <ellipse cx="100" cy="104" rx="46" ry="8"
-    fill="black" opacity="0.08"/>
+      <!-- 影 -->
+      <ellipse cx="100" cy="104" rx="46" ry="8"
+        fill="black" opacity="0.08"/>
 
-  <!-- 針（今のやつそのまま使う） -->
-<g transform="rotate(${angle} 100 100)">
-  <line 
-    x1="100" 
-    y1="100" 
-    x2="100" 
-　y2="25"
-    stroke="#111"
-    stroke-width="2.5"
-    stroke-linecap="round"/>
-</g>
+      <!-- 針（完全修正版） -->
+      <g transform="rotate(${angle} 100 100)">
+        <line 
+          x1="100" 
+          y1="100" 
+          x2="100" 
+          y2="25"
+          stroke="#111"
+          stroke-width="2.5"
+          stroke-linecap="round"/>
+      </g>
 
-<circle cx="100" cy="100" r="4.5" fill="#111"/>
+      <circle cx="100" cy="100" r="4.5" fill="#111"/>
+
+    </svg>
+
   </div>
-
   `;
 }
+
 
 // =========================
 // HTML差し込み
 // =========================
 function injectHtml(template, data) {
   let html = template;
+
   Object.keys(data).forEach((key) => {
     html = html.replace(new RegExp(`{{\\s*${key}\\s*}}`, "g"), data[key] || "");
   });
+
   return html;
 }
+
 
 // =========================
 // POST（生成）
@@ -119,7 +126,9 @@ function injectHtml(template, data) {
 app.post("/tally-pdf", async (req, res) => {
   try {
 
-    const { scoreLeft, scoreRight } = calculateScores();
+    const inputData = req.body;
+
+    const { scoreLeft, scoreRight } = calculateScores(inputData);
 
     const template = fs.readFileSync(
       path.join(__dirname, "template.html"),
@@ -129,7 +138,30 @@ app.post("/tally-pdf", async (req, res) => {
     const html = injectHtml(template, {
       base_image: "https://ilnautico.github.io/visual-base.png",
       dynamic_overlay: generateOverlay(scoreLeft, scoreRight),
-      pha_score: scoreLeft
+      pha_score: scoreLeft,
+
+      // 仮文章（次フェーズでAI置き換え）
+      compatibility_level: "Moderate",
+      executive_summary: "This assessment indicates moderate compatibility...",
+      key_risk: "Thermal instability during extended runs...",
+      processing_window: "Stable between 170–185°C...",
+      thermal_behavior: "Sensitive to overheating...",
+      flow_characteristics: "Moderate viscosity variation...",
+      mechanical_behavior: "Slight brittleness observed...",
+      surface_quality: "Gloss reduction possible...",
+      structural_consistency: "Requires controlled cooling...",
+      application_implication: "Suitable for short lifecycle products...",
+      primary_risk_title: "Thermal Degradation",
+      primary_risk: "Material degradation above threshold...",
+      secondary_risk_title: "Flow Instability",
+      secondary_risk: "Inconsistent flow behavior...",
+      mechanism: "Polymer chain scission due to heat...",
+      stability: "Moderate",
+      stability_note: "Requires controlled processing",
+      consistency: "Variable",
+      consistency_note: "Dependent on cooling conditions",
+      next_step: "Proceed to controlled pilot validation..."
+
     });
 
     const browser = await puppeteer.launch({
@@ -146,7 +178,6 @@ app.post("/tally-pdf", async (req, res) => {
 
     await browser.close();
 
-    // ★ 保存復活
     fs.writeFileSync(PDF_PATH, pdf);
 
     res.send(pdf);
@@ -157,8 +188,9 @@ app.post("/tally-pdf", async (req, res) => {
   }
 });
 
+
 // =========================
-// GET（これが原因だった）
+// GET
 // =========================
 app.get("/latest-pdf", (req, res) => {
   if (!fs.existsSync(PDF_PATH)) {
@@ -166,6 +198,7 @@ app.get("/latest-pdf", (req, res) => {
   }
   res.sendFile(PDF_PATH);
 });
+
 
 // =========================
 const PORT = process.env.PORT || 8080;
