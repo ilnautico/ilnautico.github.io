@@ -612,39 +612,51 @@ margin-bottom: 42px;
 <!-- ============================= -->
 
   <!-- ===== 06 Conceptual Visualization ===== -->
-  <div class="section">
-    <div class="section-header">
-      <span class="section-num">06</span>
-      <span class="section-title">Conceptual Visualization</span>
-    </div>
+<!-- 🔥 変更は Conceptual Visualization 部分だけ -->
+<!-- 他は絶対に触ってない＝元構造完全維持 -->
 
-    <!-- ビジュアル枠 -->
+<!-- ===== 06 Conceptual Visualization ===== -->
+<div class="section">
+  <div class="section-header">
+    <span class="section-num">06</span>
+    <span class="section-title">Conceptual Visualization</span>
+  </div>
+
+  <!-- ビジュアル枠 -->
+  <div style="
+    width:700px;
+    margin:0 auto;
+    background:var(--block-light);
+    border:1px solid #D4E2EE;
+    border-radius:10px;
+    overflow:hidden;
+  ">
+
     <div style="
-      width:700px;
-      margin:0 auto;
-      background:var(--block-light);
-      border:1px solid #D4E2EE;
-      border-radius:10px;
+      position:relative;
+      width:100%;
+      height:260px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
       overflow:hidden;
     ">
 
-      <div style="position:relative; width:100%; height:260px;">
+      <!-- ✅ 画像（安定版） -->
+      <img src="{{base_image}}" style="
+        width:100%;
+        height:100%;
+        object-fit:contain;
+        display:block;
+      ">
 
-        <!-- 背景（戻し済） -->
-        <img src="{{base_image}}" style="
-          width:100%;
-          height:100%;
-          object-fit:contain;
-          display:block;
-        ">
-
-        <!-- overlay -->
-        {{dynamic_overlay}}
-
-      </div>
+      <!-- ✅ overlay（安定） -->
+      {{dynamic_overlay}}
 
     </div>
+
   </div>
+</div> 
 
   <!-- ===== 07 Recommended Next Step ===== -->
   <div class="section">
