@@ -54,38 +54,46 @@ function generateOverlay(scoreLeft, scoreRight) {
   <div style="position:absolute; left:40%; top:22%; font-size:18px;">${scoreLeft}</div>
   <div style="position:absolute; left:72%; top:22%; font-size:18px; color:#dc2626;">${scoreRight}</div>
 
-  <!-- 青波 -->
+  <!-- 青波（元位置） -->
   <svg style="position:absolute;left:46.8%;top:57.2%;width:11%;height:8%;" viewBox="0 0 80 20">
     <path stroke="#3B82A0" stroke-width="2" fill="none"
       d="M0 10 Q20 ${10-ampLeft} 40 10 T80 10"/>
   </svg>
 
-  <!-- 赤波 -->
-  <svg style="position:absolute;left:71.5%;top:66.8%;width:11%;height:8%;" viewBox="0 0 80 20">
+  <!-- 赤波（少し上に修正） -->
+  <svg style="position:absolute;left:71.5%;top:64.8%;width:11%;height:8%;" viewBox="0 0 80 20">
     <path stroke="#dc2626" stroke-width="2" fill="none"
       d="M0 10 Q20 ${10-ampRight} 40 10 T80 10"/>
   </svg>
 
-  <!-- メーター（完全安定版） -->
+  <!-- メーター（プレート完全版・ギザ無し） -->
   <svg viewBox="0 0 200 120"
     style="position:absolute; right:6%; bottom:4%; width:140px; height:90px;">
 
-    <!-- グラデーション（1本で描く） -->
     <defs>
-      <linearGradient id="meterGradient" x1="0" x2="1">
+      <linearGradient id="meterGrad" x1="0" x2="1">
         <stop offset="0%" stop-color="#22c55e"/>
         <stop offset="40%" stop-color="#fde047"/>
         <stop offset="70%" stop-color="#f59e0b"/>
         <stop offset="100%" stop-color="#ef4444"/>
       </linearGradient>
+
+      <!-- プレート用マスク -->
+      <mask id="meterMask">
+        <rect x="0" y="0" width="200" height="120" fill="black"/>
+        <path d="M20 100 A80 80 0 0 1 180 100 L180 100 L20 100 Z"
+          fill="white"/>
+      </mask>
     </defs>
 
-    <!-- 1本のアーチ -->
-    <path d="M20 100 A80 80 0 0 1 180 100"
-      fill="none"
-      stroke="url(#meterGradient)"
-      stroke-width="22"
-      stroke-linecap="round"/>
+    <!-- グラデーション本体 -->
+    <rect x="0" y="0" width="200" height="120"
+      fill="url(#meterGrad)"
+      mask="url(#meterMask)"/>
+
+    <!-- プレートハイライト -->
+    <path d="M35 100 A65 65 0 0 1 165 100 L35 100 Z"
+      fill="rgba(255,255,255,0.08)" />
 
     <!-- 影 -->
     <ellipse cx="100" cy="104" rx="46" ry="8"
@@ -105,6 +113,7 @@ function generateOverlay(scoreLeft, scoreRight) {
 </div>
 `;
 }
+
 
 // =========================
 // HTML差し込み
