@@ -14,23 +14,12 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.text({ type: "*/*" }));
 
 // =========================
-// スコア
+// スコア（確認用：動くようにする）
 // =========================
 function calculateScores() {
-  const optimalTemp = 180;
-
-  function calc(temp) {
-    const diff = Math.abs(temp - optimalTemp);
-    if (diff <= 5) return 95;
-    if (diff <= 10) return 90;
-    if (diff <= 20) return 75;
-    if (diff <= 30) return 60;
-    return 40;
-  }
-
   return {
-    scoreLeft: calc(230),
-    scoreRight: calc(180)
+    scoreLeft: Math.floor(Math.random() * 60 + 40),
+    scoreRight: Math.floor(Math.random() * 60 + 40)
   };
 }
 
@@ -41,89 +30,107 @@ function generateOverlay(scoreLeft, scoreRight) {
 
   const ampLeft = 4 + scoreLeft * 0.12;
   const ampRight = 4 + scoreRight * 0.12;
+
   const angle = -90 + (scoreRight / 100) * 180;
 
   return `
-<div style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:10;">
-
-  <!-- 温度 -->
-  <div style="position:absolute; left:33.5%; top:4%; font-size:32px;">230°C</div>
-  <div style="position:absolute; left:66%; top:4%; font-size:32px; color:#dc2626;">180°C</div>
-
-  <!-- 数値 -->
-  <div style="position:absolute; left:40%; top:22%; font-size:18px;">${scoreLeft}</div>
-  <div style="position:absolute; left:72%; top:22%; font-size:18px; color:#dc2626;">${scoreRight}</div>
-
-  <!-- 青波（完全元位置） -->
-  <svg style="
+  <div style="
     position:absolute;
-    left:46.8%;
-    top:57.2%;
-    width:11%;
-    height:8%;
-    transform:translate(-50%,-50%);
-  " viewBox="0 0 80 20">
-    <path stroke="#3B82A0" stroke-width="2" fill="none"
-      d="M0 10 Q20 ${10-ampLeft} 40 10 T80 10"/>
-  </svg>
+    left:0;
+    top:0;
+    width:100%;
+    height:100%;
+    pointer-events:none;
+  ">
 
-  <!-- 赤波（少し上だけ修正） -->
-  <svg style="
-    position:absolute;
-    left:71.5%;
-    top:63.8%;
-    width:11%;
-    height:8%;
-    transform:translate(-50%,-50%);
-  " viewBox="0 0 80 20">
-    <path stroke="#dc2626" stroke-width="2" fill="none"
-      d="M0 10 Q20 ${10-ampRight} 40 10 T80 10"/>
-  </svg>
+    <!-- 温度 -->
+    <div style="position:absolute; left:33.5%; top:6%; font-size:26px; color:#374151;">
+      230°C
+    </div>
 
-  <!-- メーター（完全復元・ギザ無し） -->
-  <svg viewBox="0 0 200 120"
-    style="position:absolute; right:6%; bottom:4%; width:140px; height:90px;">
+    <div style="position:absolute; left:66%; top:6%; font-size:26px; color:#dc2626;">
+      180°C
+    </div>
 
-    <defs>
-      <linearGradient id="meterGrad" x1="0" y1="0" x2="200" y2="0" gradientUnits="userSpaceOnUse">
-        <stop offset="0%" stop-color="#22c55e"/>
-        <stop offset="45%" stop-color="#fde047"/>
-        <stop offset="70%" stop-color="#f59e0b"/>
-        <stop offset="100%" stop-color="#ef4444"/>
-      </linearGradient>
+    <!-- スコア -->
+    <div style="position:absolute; left:40%; top:22%; font-size:16px; color:#374151;">
+      ${scoreLeft}
+    </div>
 
-      <clipPath id="meterClip">
-        <path d="M20 100 A80 80 0 0 1 180 100 L180 100 L20 100 Z"/>
-      </clipPath>
-    </defs>
+    <div style="position:absolute; left:72%; top:22%; font-size:16px; color:#dc2626;">
+      ${scoreRight}
+    </div>
 
-    <!-- グラデーション本体 -->
-    <rect x="0" y="0" width="200" height="120"
-      fill="url(#meterGrad)"
-      clip-path="url(#meterClip)"/>
+    <!-- 青波 -->
+    <svg style="
+      position:absolute;
+      left:46.8%;
+      top:57.2%;
+      width:11%;
+      height:8%;
+      transform:translate(-50%, -50%);
+    " viewBox="0 0 80 20">
+      <path stroke="#3B82A0" stroke-width="2" fill="none"
+        d="M0 10 Q20 ${10-ampLeft} 40 10 T80 10"/>
+    </svg>
 
-    <!-- ハイライト -->
-    <path d="M35 100 A65 65 0 0 1 165 100 L35 100 Z"
-      fill="rgba(255,255,255,0.08)" />
+    <!-- 赤波（少し上げた） -->
+    <svg style="
+      position:absolute;
+      left:71.5%;
+      top:64%;
+      width:11%;
+      height:8%;
+      transform:translate(-50%, -50%);
+    " viewBox="0 0 80 20">
+      <path stroke="#dc2626" stroke-width="2" fill="none"
+        d="M0 10 Q20 ${10-ampRight} 40 10 T80 10"/>
+    </svg>
 
-    <!-- 影 -->
-    <ellipse cx="100" cy="104" rx="46" ry="8"
-      fill="black" opacity="0.08"/>
+    <!-- メーター（完全復元：プレート型） -->
+    <svg viewBox="0 0 200 120"
+      style="
+        position:absolute;
+        right:6%;
+        bottom:6%;
+        width:140px;
+        height:90px;
+      ">
 
-    <!-- 針 -->
-<g transform="rotate(${angle} 100 100)">
-  <line x1="100" y1="104" x2="145" y2="66"
-    stroke="#111"
-    stroke-width="2.5"
-    stroke-linecap="round"/>
-  <circle cx="100" cy="104" r="4.5" fill="#111"/>
-</g>
-  </svg>
+      <!-- プレート -->
+      <path d="M20 100 A80 80 0 0 1 180 100"
+        fill="none"
+        stroke="url(#grad)"
+        stroke-width="20"
+        stroke-linecap="round"/>
 
-</div>
-`;
+      <defs>
+        <linearGradient id="grad" x1="0" x2="1">
+          <stop offset="0%" stop-color="#4ade80"/>
+          <stop offset="40%" stop-color="#fde047"/>
+          <stop offset="70%" stop-color="#fb923c"/>
+          <stop offset="100%" stop-color="#ef4444"/>
+        </linearGradient>
+      </defs>
+
+      <!-- 影 -->
+      <ellipse cx="100" cy="104" rx="46" ry="8"
+        fill="black" opacity="0.08"/>
+
+      <!-- 針（修正済み） -->
+      <g transform="rotate(${angle} 100 100)">
+        <line x1="100" y1="100" x2="100" y2="40"
+          stroke="#111"
+          stroke-width="3"
+          stroke-linecap="round"/>
+        <circle cx="100" cy="100" r="5" fill="#111"/>
+      </g>
+
+    </svg>
+
+  </div>
+  `;
 }
-
 
 // =========================
 // HTML差し込み
@@ -142,33 +149,18 @@ function injectHtml(template, data) {
 app.post("/tally-pdf", async (req, res) => {
   try {
 
-    // 🔥 キャッシュ削除
-    if (fs.existsSync("/tmp/latest.pdf")) {
-      fs.unlinkSync("/tmp/latest.pdf");
-    }
-
     const { scoreLeft, scoreRight } = calculateScores();
 
+    console.log("SCORE:", scoreLeft, scoreRight);
+
     const templatePath = path.join(__dirname, "template.html");
-
-console.log("🔥 TEMPLATE PATH:", templatePath);
-
-if (!fs.existsSync(templatePath)) {
-  throw new Error("❌ TEMPLATE NOT FOUND");
-}
-
-const template = fs.readFileSync(templatePath, "utf8");
-
-console.log("🔥 TEMPLATE LENGTH:", template.length);
-console.log("🔥 TEMPLATE START:", template.slice(0, 200));
+    const template = fs.readFileSync(templatePath, "utf8");
 
     const html = injectHtml(template, {
       base_image: "https://ilnautico.github.io/visual-base.png",
       dynamic_overlay: generateOverlay(scoreLeft, scoreRight),
       pha_score: scoreLeft
     });
-
-    console.log("HTML UPDATED");
 
     const browser = await puppeteer.launch({
       args: [
@@ -189,10 +181,6 @@ console.log("🔥 TEMPLATE START:", template.slice(0, 200));
 
     await browser.close();
 
-    const filePath = `/tmp/report-${Date.now()}.pdf`;
-    fs.writeFileSync(filePath, pdf);
-    fs.writeFileSync("/tmp/latest.pdf", pdf);
-
     res.set({
       "Content-Type": "application/pdf",
       "Content-Disposition": "attachment; filename=report.pdf"
@@ -206,18 +194,6 @@ console.log("🔥 TEMPLATE START:", template.slice(0, 200));
   }
 });
 
-// =========================
-// GET
-// =========================
-app.get("/latest-pdf", (req, res) => {
-  const file = "/tmp/latest.pdf";
-  if (!fs.existsSync(file)) {
-    return res.status(404).send("No PDF");
-  }
-  res.sendFile(file);
-});
-
-// =========================
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
   console.log("🚀 Server running on", PORT);
