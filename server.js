@@ -37,7 +37,7 @@ function calculateScores() {
 // =========================
 // Overlay（完全版）
 // =========================
-function generateOverlay(scoreLeft, scoreRight) {
+function generateOverlay(scoreLeft = 65, scoreRight = 70) {
 
   const ampLeft = 4 + scoreLeft * 0.12;
   const ampRight = 4 + scoreRight * 0.12;
@@ -45,106 +45,59 @@ function generateOverlay(scoreLeft, scoreRight) {
   const angle = -90 + (scoreRight / 100) * 180;
 
   return `
-  <div style="
-    position:absolute;
-    left:0;
-    top:0;
-    width:100%;
-    height:100%;
-    pointer-events:none;
-    font-family:Arial;
-  ">
+<div style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:10;">
 
-    <!-- 温度 -->
-    <div style="position:absolute; left:33.5%; top:6%; font-size:26px; color:#374151;">
-      230°C
-    </div>
+  <!-- 温度 -->
+  <div style="position:absolute; left:33.5%; top:4%; font-size:32px;">230°C</div>
+  <div style="position:absolute; left:66%; top:4%; font-size:32px; color:#dc2626;">180°C</div>
 
-    <div style="position:absolute; left:66%; top:6%; font-size:26px; color:#dc2626;">
-      180°C
-    </div>
+  <!-- 数値 -->
+  <div style="position:absolute; left:40%; top:22%; font-size:18px;">${scoreLeft}</div>
+  <div style="position:absolute; left:72%; top:22%; font-size:18px; color:#dc2626;">${scoreRight}</div>
 
-    <!-- スコア -->
-    <div style="position:absolute; left:40%; top:22%; font-size:16px; color:#374151;">
-      ${scoreLeft}
-    </div>
+  <!-- 青波（修正済） -->
+  <svg style="position:absolute;left:46.8%;top:57.2%;width:11%;height:8%;" viewBox="0 0 80 20">
+    <path stroke="#3B82A0" stroke-width="2" fill="none"
+      d="M0 10 Q20 ${10-ampLeft} 40 10 T80 10"/>
+  </svg>
 
-    <div style="position:absolute; left:72%; top:22%; font-size:16px; color:#dc2626;">
-      ${scoreRight}
-    </div>
+  <!-- 赤波（修正済） -->
+  <svg style="position:absolute;left:71.5%;top:66.8%;width:11%;height:8%;" viewBox="0 0 80 20">
+    <path stroke="#dc2626" stroke-width="2" fill="none"
+      d="M0 10 Q20 ${10-ampRight} 40 10 T80 10"/>
+  </svg>
 
-    <!-- 青波 -->
-    <svg style="
-      position:absolute;
-      left:46.8%;
-      top:57.2%;
-      width:11%;
-      height:8%;
-      transform:translate(-50%, -50%);
-    " viewBox="0 0 80 20">
-      <path stroke="#3B82A0" stroke-width="2" fill="none"
-        d="M0 10 Q20 ${10-ampLeft} 40 10 T80 10"/>
-    </svg>
+  <!-- メーター（完全復元） -->
+  <svg viewBox="0 0 200 120"
+    style="position:absolute; right:6%; bottom:4%; width:140px; height:90px;">
 
-    <!-- 赤波 -->
-    <svg style="
-      position:absolute;
-      left:71.5%;
-      top:66.8%;
-      width:11%;
-      height:8%;
-      transform:translate(-50%, -50%);
-    " viewBox="0 0 80 20">
-      <path stroke="#dc2626" stroke-width="2" fill="none"
-        d="M0 10 Q20 ${10-ampRight} 40 10 T80 10"/>
-    </svg>
+    <!-- カラープレート -->
+    <path d="M20 100 A80 80 0 0 1 60 30 L60 100 Z" fill="#22c55e"/>
+    <path d="M60 30 A80 80 0 0 1 100 20 L100 100 Z" fill="#fde047"/>
+    <path d="M100 20 A80 80 0 0 1 140 30 L140 100 Z" fill="#f59e0b"/>
+    <path d="M140 30 A80 80 0 0 1 180 100 L140 100 Z" fill="#ef4444"/>
 
-<!-- メーター -->
-<!-- メーター（安定版） -->
-<svg viewBox="0 0 200 120"
-  style="
-    position:absolute;
-    right:6%;
-    bottom:6%;
-    width:140px;
-    height:90px;
-  ">
+    <!-- ハイライト -->
+    <path d="M35 100 A65 65 0 0 1 165 100 L35 100 Z"
+      fill="rgba(255,255,255,0.08)" />
 
-  <!-- ベース -->
-  <path d="M20 100 Q100 20 180 100"
-    fill="none"
-    stroke="#ddd"
-    stroke-width="18"
-    stroke-linecap="round"/>
+    <!-- 影 -->
+    <ellipse cx="100" cy="104" rx="46" ry="8"
+      fill="black" opacity="0.08"/>
 
-  <!-- グラデ -->
-  <path d="M20 100 Q100 20 180 100"
-    fill="none"
-    stroke="url(#grad)"
-    stroke-width="18"
-    stroke-linecap="round"/>
+    <!-- 針 -->
+    <g transform="rotate(${angle} 100 100)">
+      <line x1="100" y1="100" x2="145" y2="62"
+        stroke="#111"
+        stroke-width="2.5"
+        stroke-linecap="round"/>
+      <circle cx="100" cy="100" r="4.5" fill="#111"/>
+    </g>
 
-  <defs>
-    <linearGradient id="grad" x1="0" x2="1">
-      <stop offset="0%" stop-color="#4ade80"/>
-      <stop offset="50%" stop-color="#fde047"/>
-      <stop offset="75%" stop-color="#fb923c"/>
-      <stop offset="100%" stop-color="#f87171"/>
-    </linearGradient>
-  </defs>
+  </svg>
 
-  <!-- 針 -->
-  <g transform="rotate(${angle} 100 100)">
-    <line x1="100" y1="100" x2="140" y2="60"
-      stroke="#111"
-      stroke-width="3"
-      stroke-linecap="round"/>
-    <circle cx="100" cy="100" r="5" fill="#111"/>
-  </g>
-
-</svg>
 </div>
-  `;
+`;
 }
 // =========================
 // HTML差し込み
