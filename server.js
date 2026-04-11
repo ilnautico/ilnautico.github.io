@@ -39,20 +39,40 @@ function calculateScores() {
 // =========================
 function generateOverlay(scoreLeft, scoreRight) {
 
-  const ampLeft = 4 + (scoreLeft || 0) * 0.12;
-  const ampRight = 4 + (scoreRight || 0) * 0.12;
+  const ampLeft = 4 + scoreLeft * 0.12;
+  const ampRight = 4 + scoreRight * 0.12;
 
   return `
-  <div style="position:absolute;left:0;top:0;width:100%;height:100%;z-index:10;">
+  <div style="
+    position:absolute;
+    left:0;
+    top:0;
+    width:100%;
+    height:100%;
+    pointer-events:none;
+    z-index:2;
+  ">
 
     <!-- 青波 -->
-    <svg style="position:absolute;left:46.8%;top:57.2%;width:11%;height:8%;" viewBox="0 0 80 20">
+    <svg style="
+      position:absolute;
+      left:46.8%;
+      top:57.2%;
+      width:11%;
+      height:8%;
+    " viewBox="0 0 80 20">
       <path stroke="#3B82A0" stroke-width="2" fill="none"
         d="M0 10 Q20 ${10-ampLeft} 40 10 T80 10"/>
     </svg>
 
     <!-- 赤波 -->
-    <svg style="position:absolute;left:71.5%;top:66.8%;width:11%;height:8%;" viewBox="0 0 80 20">
+    <svg style="
+      position:absolute;
+      left:71.5%;
+      top:66.8%;
+      width:11%;
+      height:8%;
+    " viewBox="0 0 80 20">
       <path stroke="#dc2626" stroke-width="2" fill="none"
         d="M0 10 Q20 ${10-ampRight} 40 10 T80 10"/>
     </svg>
