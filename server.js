@@ -35,7 +35,7 @@ function calculateScores() {
 }
 
 // =========================
-// Overlay（確定版）
+// Overlay（完全版）
 // =========================
 function generateOverlay(scoreLeft, scoreRight) {
 
@@ -45,20 +45,22 @@ function generateOverlay(scoreLeft, scoreRight) {
   return `
 <div style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:9999;">
 
+  <!-- 温度 -->
   <div style="position:absolute; left:33.5%; top:4%; font-size:32px;">230°C</div>
   <div style="position:absolute; left:66%; top:4%; font-size:32px; color:#dc2626;">180°C</div>
 
+  <!-- スコア -->
   <div style="position:absolute; left:40%; top:22%; font-size:18px;">${scoreLeft}</div>
   <div style="position:absolute; left:72%; top:22%; font-size:18px; color:#dc2626;">${scoreRight}</div>
 
   <!-- 青ウェーブ -->
-  <svg style="position:absolute;left:46.8%;top:57.2%;width:11%;height:8%;transform:translate(-50%,-50%);" viewBox="0 0 80 20">
+  <svg style="position:absolute;left:46.8%;top:55%;width:11%;height:8%;transform:translate(-50%,-50%);" viewBox="0 0 80 20">
     <path stroke="#3B82A0" stroke-width="2" fill="none"
       d="M0 10 Q20 ${10-ampLeft} 40 10 T80 10"/>
   </svg>
 
   <!-- 赤ウェーブ -->
-  <svg style="position:absolute;left:71.5%;top:66.8%;width:11%;height:8%;transform:translate(-50%,-50%);" viewBox="0 0 80 20">
+  <svg style="position:absolute;left:71.5%;top:63%;width:11%;height:8%;transform:translate(-50%,-50%);" viewBox="0 0 80 20">
     <path stroke="#dc2626" stroke-width="2" fill="none"
       d="M0 10 Q20 ${10-ampRight} 40 10 T80 10"/>
   </svg>
@@ -99,13 +101,10 @@ function injectHtml(template, data) {
 app.post("/tally-pdf", async (req, res) => {
   try {
 
-    // 🔥 キャッシュ削除（これが最重要）
-    try {
-      if (fs.existsSync("/tmp/latest.pdf")) {
-        fs.unlinkSync("/tmp/latest.pdf");
-        console.log("OLD PDF DELETED");
-      }
-    } catch (e) {}
+    // 🔥 キャッシュ削除
+    if (fs.existsSync("/tmp/latest.pdf")) {
+      fs.unlinkSync("/tmp/latest.pdf");
+    }
 
     const { scoreLeft, scoreRight } = calculateScores();
 
@@ -141,11 +140,8 @@ app.post("/tally-pdf", async (req, res) => {
 
     await browser.close();
 
-    // 🔥 毎回ユニーク保存（完全キャッシュ回避）
     const filePath = `/tmp/report-${Date.now()}.pdf`;
     fs.writeFileSync(filePath, pdf);
-
-    // 最新も更新
     fs.writeFileSync("/tmp/latest.pdf", pdf);
 
     res.set({
@@ -173,7 +169,7 @@ app.get("/latest-pdf", (req, res) => {
 });
 
 // =========================
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
   console.log("🚀 Server running on", PORT);
 });
