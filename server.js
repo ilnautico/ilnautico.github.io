@@ -90,7 +90,7 @@ function generateOverlay(scoreLeft, scoreRight) {
     x1="100" 
     y1="100" 
     x2="100" 
-    y2="30"
+　y2="25"
     stroke="#111"
     stroke-width="2.5"
     stroke-linecap="round"/>
