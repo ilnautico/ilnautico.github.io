@@ -133,6 +133,7 @@ return `
       stroke-linecap="round"/>
     <circle cx="100" cy="100" r="4.5" fill="#111"/>
   </g>
+  </svg>
 </svg>
   `;
 }
