@@ -72,30 +72,31 @@ function generateOverlay(scoreLeft, scoreRight) {
       ${scoreRight}
     </div>
 
-    <!-- 青波 -->
-    <svg style="
-      position:absolute;
-      left:46.8%;
-      top:57.2%;
-      width:11%;
-      height:8%;
-    " viewBox="0 0 80 20">
-      <path stroke="#3B82A0" stroke-width="2" fill="none"
-        d="M0 10 Q20 ${10-ampLeft} 40 10 T80 10"/>
-    </svg>
+   <!-- 青波 -->
+<svg style="
+  position:absolute;
+  left:46.8%;
+  top:57.2%;
+  width:11%;
+  height:8%;
+  transform:translate(-50%, -50%);
+" viewBox="0 0 80 20">
+  <path stroke="#3B82A0" stroke-width="2" fill="none"
+    d="M0 10 Q20 ${10-ampLeft} 40 10 T80 10"/>
+</svg>
 
-    <!-- 赤波 -->
-    <svg style="
-      position:absolute;
-      left:71.5%;
-      top:66.8%;
-      width:11%;
-      height:8%;
-    " viewBox="0 0 80 20">
-      <path stroke="#dc2626" stroke-width="2" fill="none"
-        d="M0 10 Q20 ${10-ampRight} 40 10 T80 10"/>
-    </svg>
-
+<!-- 赤波 -->
+<svg style="
+  position:absolute;
+  left:71.5%;
+  top:66.8%;
+  width:11%;
+  height:8%;
+  transform:translate(-50%, -50%);
+" viewBox="0 0 80 20">
+  <path stroke="#dc2626" stroke-width="2" fill="none"
+    d="M0 10 Q20 ${10-ampRight} 40 10 T80 10"/>
+</svg>
     <!-- メーター（完全復元） -->
     <svg viewBox="0 0 200 120"
       style="
