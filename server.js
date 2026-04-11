@@ -57,36 +57,33 @@ function generateOverlay(scoreLeft, scoreRight) {
     </svg>
 
     <!-- メーター -->
-    <svg viewBox="0 0 200 120"
-      style="position:absolute; right:6%; bottom:6%; width:140px; height:90px;">
+ <svg viewBox="0 0 200 120"
+  style="position:absolute; right:6%; bottom:6%; width:140px; height:90px;">
 
-      <defs>
-        <linearGradient id="grad" x1="0" x2="1">
-          <stop offset="0%" stop-color="#4ade80"/>
-          <stop offset="40%" stop-color="#fde047"/>
-          <stop offset="70%" stop-color="#fb923c"/>
-          <stop offset="100%" stop-color="#ef4444"/>
-        </linearGradient>
-      </defs>
+  <!-- 4分割プレート -->
+  <path d="M20 100 A80 80 0 0 1 60 30 L60 100 Z" fill="#22c55e"/>
+  <path d="M60 30 A80 80 0 0 1 100 20 L100 100 Z" fill="#fde047"/>
+  <path d="M100 20 A80 80 0 0 1 140 30 L140 100 Z" fill="#f59e0b"/>
+  <path d="M140 30 A80 80 0 0 1 180 100 L140 100 Z" fill="#ef4444"/>
 
-      <path d="M20 100 A80 80 0 0 1 180 100"
-        fill="none"
-        stroke="url(#grad)"
-        stroke-width="20"
-        stroke-linecap="round"/>
+  <!-- ハイライト -->
+  <path d="M35 100 A65 65 0 0 1 165 100 L35 100 Z"
+    fill="rgba(255,255,255,0.12)" />
 
-      <ellipse cx="100" cy="104" rx="46" ry="8"
-        fill="black" opacity="0.08"/>
+  <!-- 影 -->
+  <ellipse cx="100" cy="104" rx="46" ry="8"
+    fill="black" opacity="0.08"/>
 
-      <g transform="rotate(${angle} 100 100)">
-        <line x1="100" y1="100" x2="100" y2="40"
-          stroke="#111"
-          stroke-width="3"
-          stroke-linecap="round"/>
-        <circle cx="100" cy="100" r="5" fill="#111"/>
-      </g>
+  <!-- 針 -->
+  <g transform="rotate(${angle} 100 100)">
+    <line x1="100" y1="100" x2="100" y2="40"
+      stroke="#111"
+      stroke-width="3"
+      stroke-linecap="round"/>
+    <circle cx="100" cy="100" r="5" fill="#111"/>
+  </g>
 
-    </svg>
+</svg>
 
   </div>
   `;
