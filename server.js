@@ -39,102 +39,83 @@ function calculateScores() {
 // =========================
 function generateOverlay(scoreLeft, scoreRight) {
 
-  const ampLeft = 4 + scoreLeft * 0.12;
-  const ampRight = 4 + scoreRight * 0.12;
-
+  const uid = Date.now();
   const angle = -90 + (scoreRight / 100) * 180;
 
   return `
-  <div style="
-    position:absolute;
-    left:0;
-    top:0;
-    width:100%;
-    height:100%;
-    pointer-events:none;
-    z-index:2;
-  ">
+  <div style="position:absolute; inset:0;">
 
-    <!-- 青波 -->
-    <svg style="
-      position:absolute;
-      left:46.8%;
-      top:57.2%;
-      width:11%;
-      height:8%;
-      transform:translate(-50%, -50%);
-    " viewBox="0 0 80 20">
-      <path stroke="#3B82A0" stroke-width="2" fill="none"
-        d="M0 10 Q20 ${10-ampLeft} 40 10 T80 10"/>
+    <!-- 🔵 左の流れ（青波） -->
+    <svg viewBox="0 0 700 260"
+      style="position:absolute; inset:0; pointer-events:none;">
+      <path d="M260 150 C320 140, 380 170, 440 150"
+        stroke="#4A90A4"
+        stroke-width="3"
+        fill="none"
+        stroke-linecap="round"/>
     </svg>
 
-    <!-- 赤波 -->
-    <svg style="
-      position:absolute;
-      left:71.5%;
-      top:66.8%;
-      width:11%;
-      height:8%;
-      transform:translate(-50%, -50%);
-    " viewBox="0 0 80 20">
-      <path stroke="#dc2626" stroke-width="2" fill="none"
-        d="M0 10 Q20 ${10-ampRight} 40 10 T80 10"/>
+    <!-- 🔴 右の波（重要） -->
+    <svg viewBox="0 0 700 260"
+      style="position:absolute; inset:0; pointer-events:none;">
+      <path d="M460 175 C500 160, 540 190, 580 175"
+        stroke="#C23B32"
+        stroke-width="3"
+        fill="none"
+        stroke-linecap="round"/>
     </svg>
 
-    <!-- メーター -->
-    const uid = Date.now(); // 一意ID
+    <!-- 🌈 メーター -->
+    <svg viewBox="0 0 200 120"
+      style="
+        position:absolute;
+        right:6%;
+        bottom:6%;
+        width:140px;
+        height:90px;
+      ">
 
-const angle = -90 + (scoreRight / 100) * 180;
+      <defs>
+        <linearGradient id="g-green-${uid}" x1="0" x2="1">
+          <stop offset="0%" stop-color="#4ade80"/>
+          <stop offset="100%" stop-color="#16a34a"/>
+        </linearGradient>
 
-return `
-<svg viewBox="0 0 200 120"
-  style="
-    position:absolute;
-    right:6%;
-    bottom:6%;
-    width:140px;
-    height:90px;
-  ">
+        <linearGradient id="g-yellow-${uid}" x1="0" x2="1">
+          <stop offset="0%" stop-color="#fde047"/>
+          <stop offset="100%" stop-color="#eab308"/>
+        </linearGradient>
 
-  <defs>
-    <linearGradient id="g-green-${uid}" x1="0" x2="1">
-      <stop offset="0%" stop-color="#4ade80"/>
-      <stop offset="100%" stop-color="#16a34a"/>
-    </linearGradient>
+        <linearGradient id="g-orange-${uid}" x1="0" x2="1">
+          <stop offset="0%" stop-color="#fb923c"/>
+          <stop offset="100%" stop-color="#ea580c"/>
+        </linearGradient>
 
-    <linearGradient id="g-yellow-${uid}" x1="0" x2="1">
-      <stop offset="0%" stop-color="#fde047"/>
-      <stop offset="100%" stop-color="#eab308"/>
-    </linearGradient>
+        <linearGradient id="g-red-${uid}" x1="0" x2="1">
+          <stop offset="0%" stop-color="#f87171"/>
+          <stop offset="100%" stop-color="#dc2626"/>
+        </linearGradient>
+      </defs>
 
-    <linearGradient id="g-orange-${uid}" x1="0" x2="1">
-      <stop offset="0%" stop-color="#fb923c"/>
-      <stop offset="100%" stop-color="#ea580c"/>
-    </linearGradient>
+      <path d="M20 100 A80 80 0 0 1 60 30 L60 100 Z" fill="url(#g-green-${uid})"/>
+      <path d="M60 30 A80 80 0 0 1 100 20 L100 100 Z" fill="url(#g-yellow-${uid})"/>
+      <path d="M100 20 A80 80 0 0 1 140 30 L140 100 Z" fill="url(#g-orange-${uid})"/>
+      <path d="M140 30 A80 80 0 0 1 180 100 L140 100 Z" fill="url(#g-red-${uid})"/>
 
-    <linearGradient id="g-red-${uid}" x1="0" x2="1">
-      <stop offset="0%" stop-color="#f87171"/>
-      <stop offset="100%" stop-color="#dc2626"/>
-    </linearGradient>
-  </defs>
+      <ellipse cx="100" cy="104" rx="46" ry="8"
+        fill="black" opacity="0.08"/>
 
-  <path d="M20 100 A80 80 0 0 1 60 30 L60 100 Z" fill="url(#g-green-${uid})"/>
-  <path d="M60 30 A80 80 0 0 1 100 20 L100 100 Z" fill="url(#g-yellow-${uid})"/>
-  <path d="M100 20 A80 80 0 0 1 140 30 L140 100 Z" fill="url(#g-orange-${uid})"/>
-  <path d="M140 30 A80 80 0 0 1 180 100 L140 100 Z" fill="url(#g-red-${uid})"/>
+      <g transform="rotate(${angle} 100 100)">
+        <line x1="100" y1="100" x2="145" y2="62"
+          stroke="#111"
+          stroke-width="2.5"
+          stroke-linecap="round"/>
+        <circle cx="100" cy="100" r="4.5" fill="#111"/>
+      </g>
 
-  <ellipse cx="100" cy="104" rx="46" ry="8"
-    fill="black" opacity="0.08"/>
+    </svg>
 
-  <g transform="rotate(${angle} 100 100)">
-    <line x1="100" y1="100" x2="145" y2="62"
-      stroke="#111"
-      stroke-width="2.5"
-      stroke-linecap="round"/>
-    <circle cx="100" cy="100" r="4.5" fill="#111"/>
-  </g>
-  </svg>
-</svg>
+  </div>
   `;
 }
 // =========================
