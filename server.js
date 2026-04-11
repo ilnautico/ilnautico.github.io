@@ -111,12 +111,12 @@ function generateOverlay(scoreLeft, scoreRight) {
       fill="black" opacity="0.08"/>
 
     <!-- 針 -->
-    <g transform="rotate(${angle} 100 98)">
-  <line x1="100" y1="100" x2="145" y2="62"
+<g transform="rotate(${angle} 100 100)">
+  <line x1="100" y1="104" x2="145" y2="66"
     stroke="#111"
     stroke-width="2.5"
     stroke-linecap="round"/>
-  <circle cx="100" cy="100" r="4.5" fill="#111"/>
+  <circle cx="100" cy="104" r="4.5" fill="#111"/>
 </g>
   </svg>
 
