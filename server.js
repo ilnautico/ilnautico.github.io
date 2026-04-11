@@ -37,11 +37,10 @@ function calculateScores() {
 // =========================
 // Overlay（完全版）
 // =========================
-function generateOverlay(scoreLeft = 65, scoreRight = 70) {
+function generateOverlay(scoreLeft, scoreRight) {
 
   const ampLeft = 4 + scoreLeft * 0.12;
   const ampRight = 4 + scoreRight * 0.12;
-
   const angle = -90 + (scoreRight / 100) * 180;
 
   return `
@@ -55,31 +54,38 @@ function generateOverlay(scoreLeft = 65, scoreRight = 70) {
   <div style="position:absolute; left:40%; top:22%; font-size:18px;">${scoreLeft}</div>
   <div style="position:absolute; left:72%; top:22%; font-size:18px; color:#dc2626;">${scoreRight}</div>
 
-  <!-- 青波（修正済） -->
+  <!-- 青波 -->
   <svg style="position:absolute;left:46.8%;top:57.2%;width:11%;height:8%;" viewBox="0 0 80 20">
     <path stroke="#3B82A0" stroke-width="2" fill="none"
       d="M0 10 Q20 ${10-ampLeft} 40 10 T80 10"/>
   </svg>
 
-  <!-- 赤波（修正済） -->
+  <!-- 赤波 -->
   <svg style="position:absolute;left:71.5%;top:66.8%;width:11%;height:8%;" viewBox="0 0 80 20">
     <path stroke="#dc2626" stroke-width="2" fill="none"
       d="M0 10 Q20 ${10-ampRight} 40 10 T80 10"/>
   </svg>
 
-  <!-- メーター（完全復元） -->
+  <!-- メーター（完全安定版） -->
   <svg viewBox="0 0 200 120"
     style="position:absolute; right:6%; bottom:4%; width:140px; height:90px;">
 
-    <!-- カラープレート -->
-    <path d="M20 100 A80 80 0 0 1 60 30 L60 100 Z" fill="#22c55e"/>
-    <path d="M60 30 A80 80 0 0 1 100 20 L100 100 Z" fill="#fde047"/>
-    <path d="M100 20 A80 80 0 0 1 140 30 L140 100 Z" fill="#f59e0b"/>
-    <path d="M140 30 A80 80 0 0 1 180 100 L140 100 Z" fill="#ef4444"/>
+    <!-- グラデーション（1本で描く） -->
+    <defs>
+      <linearGradient id="meterGradient" x1="0" x2="1">
+        <stop offset="0%" stop-color="#22c55e"/>
+        <stop offset="40%" stop-color="#fde047"/>
+        <stop offset="70%" stop-color="#f59e0b"/>
+        <stop offset="100%" stop-color="#ef4444"/>
+      </linearGradient>
+    </defs>
 
-    <!-- ハイライト -->
-    <path d="M35 100 A65 65 0 0 1 165 100 L35 100 Z"
-      fill="rgba(255,255,255,0.08)" />
+    <!-- 1本のアーチ -->
+    <path d="M20 100 A80 80 0 0 1 180 100"
+      fill="none"
+      stroke="url(#meterGradient)"
+      stroke-width="22"
+      stroke-linecap="round"/>
 
     <!-- 影 -->
     <ellipse cx="100" cy="104" rx="46" ry="8"
@@ -99,6 +105,7 @@ function generateOverlay(scoreLeft = 65, scoreRight = 70) {
 </div>
 `;
 }
+
 // =========================
 // HTML差し込み
 // =========================
