@@ -17,7 +17,7 @@ const PDF_PATH = "/tmp/latest.pdf";
 
 
 // =========================
-// スコア（固定：連動確認用）
+// スコア（仮：あとで入力連動に変更）
 // =========================
 function calculateScores(input) {
   return {
@@ -28,7 +28,60 @@ function calculateScores(input) {
 
 
 // =========================
-// Overlay
+// 文章ロジック（ここが今回の追加）
+// =========================
+
+function getCompatibilityLevel(scoreLeft) {
+  if (scoreLeft < 40) return "Low";
+  if (scoreLeft < 70) return "Moderate";
+  return "High";
+}
+
+function getExecutiveSummary(scoreLeft) {
+  if (scoreLeft < 40) {
+    return "This assessment indicates limited compatibility under current processing conditions. Significant process adaptation may be required.";
+  }
+  if (scoreLeft < 70) {
+    return "This assessment indicates moderate compatibility with controlled processing conditions. Transition is feasible with careful parameter management.";
+  }
+  return "This assessment indicates strong compatibility with existing processing conditions.";
+}
+
+function getKeyRisk(scoreRight) {
+  if (scoreRight > 70) {
+    return "High sensitivity to thermal instability and process fluctuation.";
+  }
+  if (scoreRight > 40) {
+    return "Moderate variability in process stability.";
+  }
+  return "Limited operational risk.";
+}
+
+function getNextStep(scoreLeft, scoreRight) {
+  if (scoreLeft < 50) {
+    return "Proceed to controlled pilot validation with strict monitoring.";
+  }
+  if (scoreRight > 70) {
+    return "Conduct pilot validation focusing on risk mitigation.";
+  }
+  return "Proceed to scale-up validation.";
+}
+
+function getStability(scoreLeft) {
+  if (scoreLeft < 40) return "Low";
+  if (scoreLeft < 70) return "Moderate";
+  return "High";
+}
+
+function getConsistency(scoreRight) {
+  if (scoreRight > 70) return "Variable";
+  if (scoreRight > 40) return "Moderate";
+  return "Stable";
+}
+
+
+// =========================
+// Overlay（そのまま）
 // =========================
 function generateOverlay(scoreLeft, scoreRight) {
 
@@ -39,28 +92,22 @@ function generateOverlay(scoreLeft, scoreRight) {
   return `
   <div style="position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;">
 
-    <!-- 温度 -->
     <div style="position:absolute; left:33.5%; top:6%; font-size:26px;">230°C</div>
     <div style="position:absolute; left:66%; top:6%; font-size:26px; color:#dc2626;">180°C</div>
 
-    <!-- スコア -->
     <div style="position:absolute; left:40%; top:22%; font-size:16px;">${scoreLeft}</div>
     <div style="position:absolute; left:72%; top:22%; font-size:16px; color:#dc2626;">${scoreRight}</div>
 
-    <!-- 波（左） -->
     <svg style="position:absolute;left:46.8%;top:57.2%;width:11%;height:8%;transform:translate(-50%,-50%);" viewBox="0 0 80 20">
       <path stroke="#3B82A0" stroke-width="2" fill="none"
         d="M0 10 Q20 ${10-ampLeft} 40 10 T80 10"/>
     </svg>
 
-    <!-- 波（右） -->
     <svg style="position:absolute;left:71.5%;top:64%;width:11%;height:8%;transform:translate(-50%,-50%);" viewBox="0 0 80 20">
       <path stroke="#dc2626" stroke-width="2" fill="none"
         d="M0 10 Q20 ${10-ampRight} 40 10 T80 10"/>
     </svg>
 
-
-    <!-- メーター -->
     <svg viewBox="0 0 200 120"
       style="position:absolute; right:6%; bottom:4%; width:140px; height:90px;">
 
@@ -73,28 +120,18 @@ function generateOverlay(scoreLeft, scoreRight) {
         </linearGradient>
       </defs>
 
-      <!-- プレート -->
       <path d="M20 100 A80 80 0 0 1 180 100 L100 100 Z"
         fill="url(#meterGrad)" />
 
-      <!-- 内側 -->
       <path d="M35 100 A65 65 0 0 1 165 100 L100 100 Z"
         fill="rgba(255,255,255,0.12)" />
 
-      <!-- 影 -->
       <ellipse cx="100" cy="104" rx="46" ry="8"
         fill="black" opacity="0.08"/>
 
-      <!-- 針（完全修正版） -->
       <g transform="rotate(${angle} 100 100)">
-        <line 
-          x1="100" 
-          y1="100" 
-          x2="100" 
-          y2="25"
-          stroke="#111"
-          stroke-width="2.5"
-          stroke-linecap="round"/>
+        <line x1="100" y1="100" x2="100" y2="25"
+          stroke="#111" stroke-width="2.5" stroke-linecap="round"/>
       </g>
 
       <circle cx="100" cy="100" r="4.5" fill="#111"/>
@@ -111,17 +148,15 @@ function generateOverlay(scoreLeft, scoreRight) {
 // =========================
 function injectHtml(template, data) {
   let html = template;
-
   Object.keys(data).forEach((key) => {
     html = html.replace(new RegExp(`{{\\s*${key}\\s*}}`, "g"), data[key] || "");
   });
-
   return html;
 }
 
 
 // =========================
-// POST（生成）
+// POST
 // =========================
 app.post("/tally-pdf", async (req, res) => {
   try {
@@ -129,6 +164,14 @@ app.post("/tally-pdf", async (req, res) => {
     const inputData = req.body;
 
     const { scoreLeft, scoreRight } = calculateScores(inputData);
+
+    // 🔥 ここが今回の追加（文章連動）
+    const compatibility_level = getCompatibilityLevel(scoreLeft);
+    const executive_summary = getExecutiveSummary(scoreLeft);
+    const key_risk = getKeyRisk(scoreRight);
+    const next_step = getNextStep(scoreLeft, scoreRight);
+    const stability = getStability(scoreLeft);
+    const consistency = getConsistency(scoreRight);
 
     const template = fs.readFileSync(
       path.join(__dirname, "template.html"),
@@ -140,28 +183,15 @@ app.post("/tally-pdf", async (req, res) => {
       dynamic_overlay: generateOverlay(scoreLeft, scoreRight),
       pha_score: scoreLeft,
 
-      // 仮文章（次フェーズでAI置き換え）
-      compatibility_level: "Moderate",
-      executive_summary: "This assessment indicates moderate compatibility...",
-      key_risk: "Thermal instability during extended runs...",
-      processing_window: "Stable between 170–185°C...",
-      thermal_behavior: "Sensitive to overheating...",
-      flow_characteristics: "Moderate viscosity variation...",
-      mechanical_behavior: "Slight brittleness observed...",
-      surface_quality: "Gloss reduction possible...",
-      structural_consistency: "Requires controlled cooling...",
-      application_implication: "Suitable for short lifecycle products...",
-      primary_risk_title: "Thermal Degradation",
-      primary_risk: "Material degradation above threshold...",
-      secondary_risk_title: "Flow Instability",
-      secondary_risk: "Inconsistent flow behavior...",
-      mechanism: "Polymer chain scission due to heat...",
-      stability: "Moderate",
-      stability_note: "Requires controlled processing",
-      consistency: "Variable",
-      consistency_note: "Dependent on cooling conditions",
-      next_step: "Proceed to controlled pilot validation..."
+      compatibility_level,
+      executive_summary,
+      key_risk,
+      next_step,
 
+      stability,
+      stability_note: "Requires controlled processing",
+      consistency,
+      consistency_note: "Dependent on cooling conditions"
     });
 
     const browser = await puppeteer.launch({
@@ -190,8 +220,6 @@ app.post("/tally-pdf", async (req, res) => {
 
 
 // =========================
-// GET
-// =========================
 app.get("/latest-pdf", (req, res) => {
   if (!fs.existsSync(PDF_PATH)) {
     return res.status(404).send("No PDF yet");
@@ -199,8 +227,6 @@ app.get("/latest-pdf", (req, res) => {
   res.sendFile(PDF_PATH);
 });
 
-
-// =========================
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
   console.log("🚀 Server running on", PORT);
