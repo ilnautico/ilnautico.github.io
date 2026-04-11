@@ -46,28 +46,48 @@ function generateOverlay(scoreLeft, scoreRight) {
 <div style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:9999;">
 
   <!-- 温度 -->
-  <div style="position:absolute; left:33.5%; top:4%; font-size:32px;">230°C</div>
-  <div style="position:absolute; left:66%; top:4%; font-size:32px; color:#dc2626;">180°C</div>
+  <div style="position:absolute; left:33.5%; top:6%; font-size:32px;">230°C</div>
+  <div style="position:absolute; left:66%; top:6%; font-size:32px; color:#dc2626;">180°C</div>
 
   <!-- スコア -->
   <div style="position:absolute; left:40%; top:22%; font-size:18px;">${scoreLeft}</div>
   <div style="position:absolute; left:72%; top:22%; font-size:18px; color:#dc2626;">${scoreRight}</div>
 
   <!-- 青ウェーブ -->
-  <svg style="position:absolute;left:46.8%;top:55%;width:11%;height:8%;transform:translate(-50%,-50%);" viewBox="0 0 80 20">
+  <svg style="
+    position:absolute;
+    left:46%;
+    top:55%;
+    width:12%;
+    height:8%;
+    transform:translate(-50%,-50%);
+  " viewBox="0 0 80 20">
     <path stroke="#3B82A0" stroke-width="2" fill="none"
       d="M0 10 Q20 ${10-ampLeft} 40 10 T80 10"/>
   </svg>
 
   <!-- 赤ウェーブ -->
-  <svg style="position:absolute;left:71.5%;top:63%;width:11%;height:8%;transform:translate(-50%,-50%);" viewBox="0 0 80 20">
+  <svg style="
+    position:absolute;
+    left:71%;
+    top:63%;
+    width:12%;
+    height:8%;
+    transform:translate(-50%,-50%);
+  " viewBox="0 0 80 20">
     <path stroke="#dc2626" stroke-width="2" fill="none"
       d="M0 10 Q20 ${10-ampRight} 40 10 T80 10"/>
   </svg>
 
   <!-- メーター -->
   <svg viewBox="0 0 200 120"
-    style="position:absolute; right:6%; bottom:4%; width:140px; height:90px;">
+    style="
+      position:absolute;
+      right:6%;
+      bottom:6%;
+      width:120px;
+      height:80px;
+    ">
 
     <path d="M20 100 A80 80 0 0 1 60 30 L60 100 Z" fill="#22c55e"/>
     <path d="M60 30 A80 80 0 0 1 100 20 L100 100 Z" fill="#fde047"/>
