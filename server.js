@@ -132,17 +132,17 @@ function generateOverlay(scoreLeft, scoreRight) {
     </linearGradient>
   </defs>
 
-  <path d="M20 100 A80 80 0 0 1 60 30 L60 100 Z"
-    fill="url(#g-green)" shape-rendering="geometricPrecision"/>
-    
-  <path d="M60 30 A80 80 0 0 1 100 20 L100 100 Z"
-    fill="url(#g-yellow)" shape-rendering="geometricPrecision"/>
+  <!-- GREEN -->
+<path d="M18 100 A82 82 0 0 1 62 28 L62 100 Z" fill="url(#g-green)"/>
 
-  <path d="M100 20 A80 80 0 0 1 140 30 L140 100 Z"
-    fill="url(#g-orange)" shape-rendering="geometricPrecision"/>
+<!-- YELLOW -->
+<path d="M58 28 A82 82 0 0 1 102 18 L102 100 Z" fill="url(#g-yellow)"/>
 
-  <path d="M140 30 A80 80 0 0 1 180 100 L140 100 Z"
-    fill="url(#g-red)" shape-rendering="geometricPrecision"/>
+<!-- ORANGE -->
+<path d="M98 18 A82 82 0 0 1 142 28 L142 100 Z" fill="url(#g-orange)"/>
+
+<!-- RED -->
+<path d="M138 28 A82 82 0 0 1 182 100 L138 100 Z" fill="url(#g-red)"/>
 
   <ellipse cx="100" cy="104" rx="46" ry="8"
     fill="black" opacity="0.08"/>
