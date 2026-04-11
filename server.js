@@ -108,10 +108,18 @@ app.post("/tally-pdf", async (req, res) => {
 
     const { scoreLeft, scoreRight } = calculateScores();
 
-    const template = fs.readFileSync(
-      path.join(__dirname, "template.html"),
-      "utf8"
-    );
+    const templatePath = path.join(__dirname, "template.html");
+
+console.log("🔥 TEMPLATE PATH:", templatePath);
+
+if (!fs.existsSync(templatePath)) {
+  throw new Error("❌ TEMPLATE NOT FOUND");
+}
+
+const template = fs.readFileSync(templatePath, "utf8");
+
+console.log("🔥 TEMPLATE LENGTH:", template.length);
+console.log("🔥 TEMPLATE START:", template.slice(0, 200));
 
     const html = injectHtml(template, {
       base_image: "https://ilnautico.github.io/visual-base.png",
