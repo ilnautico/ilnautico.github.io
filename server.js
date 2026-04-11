@@ -100,6 +100,7 @@ function generateOverlay(scoreLeft, scoreRight) {
     </svg>
 
 <!-- メーター -->
+<!-- メーター（安定版） -->
 <svg viewBox="0 0 200 120"
   style="
     position:absolute;
@@ -107,59 +108,41 @@ function generateOverlay(scoreLeft, scoreRight) {
     bottom:6%;
     width:140px;
     height:90px;
-    shape-rendering:geometricPrecision;
   ">
 
+  <!-- ベース -->
+  <path d="M20 100 Q100 20 180 100"
+    fill="none"
+    stroke="#ddd"
+    stroke-width="18"
+    stroke-linecap="round"/>
+
+  <!-- グラデ -->
+  <path d="M20 100 Q100 20 180 100"
+    fill="none"
+    stroke="url(#grad)"
+    stroke-width="18"
+    stroke-linecap="round"/>
+
   <defs>
-    <linearGradient id="g-green" x1="0" x2="1">
+    <linearGradient id="grad" x1="0" x2="1">
       <stop offset="0%" stop-color="#4ade80"/>
-      <stop offset="100%" stop-color="#16a34a"/>
-    </linearGradient>
-
-    <linearGradient id="g-yellow" x1="0" x2="1">
-      <stop offset="0%" stop-color="#fde047"/>
-      <stop offset="100%" stop-color="#eab308"/>
-    </linearGradient>
-
-    <linearGradient id="g-orange" x1="0" x2="1">
-      <stop offset="0%" stop-color="#fb923c"/>
-      <stop offset="100%" stop-color="#ea580c"/>
-    </linearGradient>
-
-    <linearGradient id="g-red" x1="0" x2="1">
-      <stop offset="0%" stop-color="#f87171"/>
-      <stop offset="100%" stop-color="#dc2626"/>
+      <stop offset="50%" stop-color="#fde047"/>
+      <stop offset="75%" stop-color="#fb923c"/>
+      <stop offset="100%" stop-color="#f87171"/>
     </linearGradient>
   </defs>
 
-  <!-- GREEN -->
-<path d="M18 100 A82 82 0 0 1 62 28 L62 100 Z" fill="url(#g-green)"/>
-
-<!-- YELLOW -->
-<path d="M58 28 A82 82 0 0 1 102 18 L102 100 Z" fill="url(#g-yellow)"/>
-
-<!-- ORANGE -->
-<path d="M98 18 A82 82 0 0 1 142 28 L142 100 Z" fill="url(#g-orange)"/>
-
-<!-- RED -->
-<path d="M138 28 A82 82 0 0 1 182 100 L138 100 Z" fill="url(#g-red)"/>
-
-  <ellipse cx="100" cy="104" rx="46" ry="8"
-    fill="black" opacity="0.08"/>
-
+  <!-- 針 -->
   <g transform="rotate(${angle} 100 100)">
-    <line x1="100" y1="100" x2="145" y2="62"
+    <line x1="100" y1="100" x2="140" y2="60"
       stroke="#111"
-      stroke-width="2.5"
+      stroke-width="3"
       stroke-linecap="round"/>
-    <circle cx="100" cy="100" r="4.5" fill="#111"/>
+    <circle cx="100" cy="100" r="5" fill="#111"/>
   </g>
 
 </svg>
-
-  </div>
-  `;
-}
 // =========================
 // HTML差し込み
 // =========================
