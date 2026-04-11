@@ -143,6 +143,9 @@ function generateOverlay(scoreLeft, scoreRight) {
   </g>
 
 </svg>
+</div>
+  `;
+}
 // =========================
 // HTML差し込み
 // =========================
