@@ -3,6 +3,7 @@ import puppeteer from "puppeteer";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import OpenAI from "openai";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -17,71 +18,141 @@ const PDF_PATH = "/tmp/latest.pdf";
 
 
 // =========================
-// スコア（仮：あとで入力連動に変更）
+// OpenAI
+// =========================
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY
+});
+
+
+// =========================
+// スコア算出（ここが頭脳）
 // =========================
 function calculateScores(input) {
+
+  let scoreLeft = 50;   // 安定性
+  let scoreRight = 50;  // リスク
+
+  // 材料
+  if (input.material === "LDPE") scoreLeft += 10;
+
+  if (input.bio_material?.includes("PHA")) {
+    scoreLeft -= 15;
+    scoreRight += 20;
+  }
+
+  // プロセス
+  if (input.equipment?.includes("film")) {
+    scoreLeft += 5;
+  }
+
+  // 懸念
+  if (input.concern?.toLowerCase().includes("temperature")) {
+    scoreRight += 15;
+  }
+
   return {
-    scoreLeft: 45,
-    scoreRight: 78
+    scoreLeft: Math.max(0, Math.min(100, scoreLeft)),
+    scoreRight: Math.max(0, Math.min(100, scoreRight))
   };
 }
 
 
 // =========================
-// 文章ロジック（ここが今回の追加）
+// 判定（🔥絶対にAIにやらせない）
 // =========================
+function evaluate(scoreLeft, scoreRight) {
 
-function getCompatibilityLevel(scoreLeft) {
-  if (scoreLeft < 40) return "Low";
-  if (scoreLeft < 70) return "Moderate";
-  return "High";
-}
+  let compatibility_level;
+  if (scoreLeft < 40) compatibility_level = "Low";
+  else if (scoreLeft < 70) compatibility_level = "Moderate";
+  else compatibility_level = "High";
 
-function getExecutiveSummary(scoreLeft) {
-  if (scoreLeft < 40) {
-    return "This assessment indicates limited compatibility under current processing conditions. Significant process adaptation may be required.";
-  }
-  if (scoreLeft < 70) {
-    return "This assessment indicates moderate compatibility with controlled processing conditions. Transition is feasible with careful parameter management.";
-  }
-  return "This assessment indicates strong compatibility with existing processing conditions.";
-}
+  let risk_level;
+  if (scoreRight > 70) risk_level = "High";
+  else if (scoreRight > 40) risk_level = "Medium";
+  else risk_level = "Low";
 
-function getKeyRisk(scoreRight) {
-  if (scoreRight > 70) {
-    return "High sensitivity to thermal instability and process fluctuation.";
-  }
-  if (scoreRight > 40) {
-    return "Moderate variability in process stability.";
-  }
-  return "Limited operational risk.";
-}
-
-function getNextStep(scoreLeft, scoreRight) {
-  if (scoreLeft < 50) {
-    return "Proceed to controlled pilot validation with strict monitoring.";
-  }
-  if (scoreRight > 70) {
-    return "Conduct pilot validation focusing on risk mitigation.";
-  }
-  return "Proceed to scale-up validation.";
-}
-
-function getStability(scoreLeft) {
-  if (scoreLeft < 40) return "Low";
-  if (scoreLeft < 70) return "Moderate";
-  return "High";
-}
-
-function getConsistency(scoreRight) {
-  if (scoreRight > 70) return "Variable";
-  if (scoreRight > 40) return "Moderate";
-  return "Stable";
+  return {
+    compatibility_level,
+    risk_level
+  };
 }
 
 
 // =========================
-// Overlay（そのまま）
+// AI生成（説明のみ）
+// =========================
+async function generateAIReport(input, evaluation) {
+
+  const prompt = `
+You are a senior materials engineer specializing in biodegradable plastics.
+
+Your role is ONLY to explain the given evaluation.
+
+STRICT RULES:
+- Do NOT change the compatibility level
+- Do NOT reinterpret risk level
+- Do NOT provide processing parameters
+- Do NOT suggest formulations
+- Keep explanation realistic and technical
+
+INPUT:
+Compatibility Level: ${evaluation.compatibility_level}
+Risk Level: ${evaluation.risk_level}
+
+Application: ${input.application}
+Material Transition: ${input.material} → ${input.bio_material}
+Processing Method: ${input.equipment}
+Primary Concern: ${input.concern}
+
+Return ONLY JSON:
+
+{
+  "executive_summary": "",
+  "key_risk": "",
+  "processing_window": "",
+  "thermal_behavior": "",
+  "flow_characteristics": "",
+  "mechanical_behavior": "",
+  "surface_quality": "",
+  "structural_consistency": "",
+  "application_implication": "",
+  "primary_risk_title": "",
+  "primary_risk": "",
+  "secondary_risk_title": "",
+  "secondary_risk": "",
+  "mechanism": "",
+  "stability_note": "",
+  "consistency_note": "",
+  "next_step": ""
+}
+`;
+
+  const res = await openai.chat.completions.create({
+    model: "gpt-4.1-mini",
+    messages: [
+      { role: "system", content: "Return only JSON." },
+      { role: "user", content: prompt }
+    ],
+    temperature: 0.6
+  });
+
+  try {
+    return JSON.parse(res.choices[0].message.content);
+  } catch (e) {
+    console.error("AI JSON parse error:", e);
+    return {
+      executive_summary: "AI generation failed.",
+      key_risk: "Unknown",
+      next_step: "Manual review required."
+    };
+  }
+}
+
+
+// =========================
+// Overlay（可視化）
 // =========================
 function generateOverlay(scoreLeft, scoreRight) {
 
@@ -92,18 +163,15 @@ function generateOverlay(scoreLeft, scoreRight) {
   return `
   <div style="position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;">
 
-    <div style="position:absolute; left:33.5%; top:6%; font-size:26px;">230°C</div>
-    <div style="position:absolute; left:66%; top:6%; font-size:26px; color:#dc2626;">180°C</div>
+    <div style="position:absolute; left:40%; top:22%;">${scoreLeft}</div>
+    <div style="position:absolute; left:72%; top:22%; color:#dc2626;">${scoreRight}</div>
 
-    <div style="position:absolute; left:40%; top:22%; font-size:16px;">${scoreLeft}</div>
-    <div style="position:absolute; left:72%; top:22%; font-size:16px; color:#dc2626;">${scoreRight}</div>
-
-    <svg style="position:absolute;left:46.8%;top:57.2%;width:11%;height:8%;transform:translate(-50%,-50%);" viewBox="0 0 80 20">
+    <svg style="position:absolute;left:46.8%;top:57.2%;width:11%;height:8%;">
       <path stroke="#3B82A0" stroke-width="2" fill="none"
         d="M0 10 Q20 ${10-ampLeft} 40 10 T80 10"/>
     </svg>
 
-    <svg style="position:absolute;left:71.5%;top:64%;width:11%;height:8%;transform:translate(-50%,-50%);" viewBox="0 0 80 20">
+    <svg style="position:absolute;left:71.5%;top:64%;width:11%;height:8%;">
       <path stroke="#dc2626" stroke-width="2" fill="none"
         d="M0 10 Q20 ${10-ampRight} 40 10 T80 10"/>
     </svg>
@@ -123,19 +191,12 @@ function generateOverlay(scoreLeft, scoreRight) {
       <path d="M20 100 A80 80 0 0 1 180 100 L100 100 Z"
         fill="url(#meterGrad)" />
 
-      <path d="M35 100 A65 65 0 0 1 165 100 L100 100 Z"
-        fill="rgba(255,255,255,0.12)" />
-
-      <ellipse cx="100" cy="104" rx="46" ry="8"
-        fill="black" opacity="0.08"/>
-
       <g transform="rotate(${angle} 100 100)">
         <line x1="100" y1="100" x2="100" y2="25"
           stroke="#111" stroke-width="2.5" stroke-linecap="round"/>
       </g>
 
       <circle cx="100" cy="100" r="4.5" fill="#111"/>
-
     </svg>
 
   </div>
@@ -156,22 +217,19 @@ function injectHtml(template, data) {
 
 
 // =========================
-// POST
+// POST（統合）
 // =========================
 app.post("/tally-pdf", async (req, res) => {
+
   try {
 
     const inputData = req.body;
 
     const { scoreLeft, scoreRight } = calculateScores(inputData);
 
-    // 🔥 ここが今回の追加（文章連動）
-    const compatibility_level = getCompatibilityLevel(scoreLeft);
-    const executive_summary = getExecutiveSummary(scoreLeft);
-    const key_risk = getKeyRisk(scoreRight);
-    const next_step = getNextStep(scoreLeft, scoreRight);
-    const stability = getStability(scoreLeft);
-    const consistency = getConsistency(scoreRight);
+    const evaluation = evaluate(scoreLeft, scoreRight);
+
+    const aiData = await generateAIReport(inputData, evaluation);
 
     const template = fs.readFileSync(
       path.join(__dirname, "template.html"),
@@ -183,15 +241,11 @@ app.post("/tally-pdf", async (req, res) => {
       dynamic_overlay: generateOverlay(scoreLeft, scoreRight),
       pha_score: scoreLeft,
 
-      compatibility_level,
-      executive_summary,
-      key_risk,
-      next_step,
+      compatibility_level: evaluation.compatibility_level,
+      stability: evaluation.compatibility_level,
+      consistency: evaluation.risk_level,
 
-      stability,
-      stability_note: "Requires controlled processing",
-      consistency,
-      consistency_note: "Dependent on cooling conditions"
+      ...aiData
     });
 
     const browser = await puppeteer.launch({
@@ -227,6 +281,8 @@ app.get("/latest-pdf", (req, res) => {
   res.sendFile(PDF_PATH);
 });
 
+
+// =========================
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
   console.log("🚀 Server running on", PORT);
