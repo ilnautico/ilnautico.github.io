@@ -2,7 +2,7 @@ import express from "express";
 
 const app = express();
 
-app.use(express.json()); // JSON受信
+app.use(express.json());
 
 // =========================
 // GET（確認用）
@@ -12,54 +12,23 @@ app.get("/", (req, res) => {
 });
 
 // =========================
-// POST（本体）
+// 🔥 POST（これが今回の本体）
 // =========================
 app.post("/generate", (req, res) => {
+  console.log("受信データ:", req.body);
 
-  const data = req.body;
-
-  console.log("受信データ:", data);
-
-  // =========================
-  // 🔥 スコアロジック（ここが頭脳）
-  // =========================
-  let score = 50;
-
-  if (data.material === "LDPE") score += 10;
-  if (data.bio_material === "PHA") score -= 10;
-  if (data.equipment?.includes("film")) score += 10;
-  if (data.concern?.includes("temperature")) score -= 10;
-
-  // =========================
-  // 🔥 レベル判定
-  // =========================
-  let level;
-
-  if (score < 40) level = "High Risk";
-  else if (score < 70) level = "Moderate";
-  else level = "Stable";
-
-  console.log("スコア:", score);
-  console.log("レベル:", level);
-
-  // =========================
-  // レスポンス
-  // =========================
   res.json({
-    score: score,
-    level: level
+    message: "データ受信OK",
+    received: req.body
   });
-
 });
 
-// =========================
-// 起動
-// =========================
 const PORT = 8080;
 
 app.listen(PORT, () => {
   console.log("🚀 Server running on", PORT);
 });
+
 const html = `
 <!DOCTYPE html>
 <html lang="en">
