@@ -9,15 +9,32 @@ const anthropic = new Anthropic({
 
 app.use(express.json());
 
+// =========================
 // GET（確認用）
+// =========================
 app.get("/", (req, res) => {
   res.send("🚀 Server is working");
 });
 
-// POST（AI診断）
-app.post("/generate", async (req, res) => {
+// =========================
+// ① 3万円診断（既存・触らない）
+// =========================
+app.post("/generate-basic", (req, res) => {
+  console.log("Basic受信:", req.body);
 
-  console.log("受信データ:", req.body);
+  // ★ここは既存ロジックそのまま
+  res.json({
+    ok: true,
+    type: "basic"
+  });
+});
+
+// =========================
+// ② AI診断（今回追加）
+// =========================
+app.post("/generate-ai", async (req, res) => {
+
+  console.log("AI受信:", req.body);
 
   const prompt = `
 You are a polymer processing expert.
