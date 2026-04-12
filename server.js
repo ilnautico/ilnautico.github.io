@@ -1,26 +1,53 @@
 import express from "express";
+import Anthropic from "@anthropic-ai/sdk";
 
 const app = express();
 
+const anthropic = new Anthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY
+});
+
 app.use(express.json());
 
-// =========================
 // GET（確認用）
-// =========================
 app.get("/", (req, res) => {
   res.send("🚀 Server is working");
 });
 
-// =========================
-// 🔥 POST（これが今回の本体）
-// =========================
-app.post("/generate", (req, res) => {
+// POST（AI診断）
+app.post("/generate", async (req, res) => {
+
   console.log("受信データ:", req.body);
 
-  res.json({
-    message: "データ受信OK",
-    received: req.body
-  });
+  const prompt = `
+You are a polymer processing expert.
+
+Explain the technical feasibility.
+
+Material: ${req.body.material}
+Target: ${req.body.bio_material}
+Process: ${req.body.equipment}
+Concern: ${req.body.concern}
+`;
+
+  try {
+    const response = await anthropic.messages.create({
+      model: "claude-3-opus-20240229",
+      max_tokens: 500,
+      messages: [
+        { role: "user", content: prompt }
+      ]
+    });
+
+    res.json({
+      result: response.content[0].text
+    });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "AI error" });
+  }
+
 });
 
 const PORT = 8080;
