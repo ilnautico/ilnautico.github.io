@@ -3,7 +3,7 @@ import puppeteer from "puppeteer";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import OpenAI from "openai";
+import Anthropic from "@anthropic-ai/sdk";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -16,139 +16,38 @@ app.use(express.text({ type: "*/*" }));
 
 const PDF_PATH = "/tmp/latest.pdf";
 
-
 // =========================
-// OpenAI
+// Claude
 // =========================
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
+const anthropic = new Anthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY
 });
 
-
 // =========================
-// スコア算出
+// スコアロジック（固定）
 // =========================
-function calculateScores(input) {
+function evaluate(data) {
+  let score = 0;
 
-  let scoreLeft = 50;
-  let scoreRight = 50;
+  if (data.current_material?.includes("LDPE")) score += 30;
+  if (data.process?.includes("film")) score += 20;
+  if (data.concern?.includes("temperature")) score -= 10;
 
-  if (input.material === "LDPE") scoreLeft += 10;
+  score = Math.max(0, Math.min(100, score));
 
-  if (input.bio_material?.includes("PHA")) {
-    scoreLeft -= 15;
-    scoreRight += 20;
-  }
-
-  if (input.equipment?.includes("film")) {
-    scoreLeft += 5;
-  }
-
-  if (input.concern?.toLowerCase().includes("temperature")) {
-    scoreRight += 15;
-  }
+  let level = "Moderate";
+  if (score < 40) level = "Low";
+  if (score > 70) level = "High";
 
   return {
-    scoreLeft: Math.max(0, Math.min(100, scoreLeft)),
-    scoreRight: Math.max(0, Math.min(100, scoreRight))
+    scoreLeft: score,
+    scoreRight: 100 - score,
+    compatibility_level: level
   };
 }
 
-
 // =========================
-// 判定
-// =========================
-function evaluate(scoreLeft, scoreRight) {
-
-  let compatibility_level;
-  if (scoreLeft < 40) compatibility_level = "Low";
-  else if (scoreLeft < 70) compatibility_level = "Moderate";
-  else compatibility_level = "High";
-
-  let risk_level;
-  if (scoreRight > 70) risk_level = "High";
-  else if (scoreRight > 40) risk_level = "Medium";
-  else risk_level = "Low";
-
-  return { compatibility_level, risk_level };
-}
-
-
-// =========================
-// AI生成
-// =========================
-async function generateAIReport(input, evaluation) {
-
-  const prompt = `
-You are a senior materials engineer.
-
-Explain the given evaluation.
-
-Do NOT change the evaluation.
-
-Compatibility Level: ${evaluation.compatibility_level}
-Risk Level: ${evaluation.risk_level}
-
-Application: ${input.application}
-Material: ${input.material}
-Target: ${input.bio_material}
-Process: ${input.equipment}
-Concern: ${input.concern}
-
-Return ONLY JSON:
-
-{
-  "executive_summary": "",
-  "key_risk": "",
-  "processing_window": "",
-  "thermal_behavior": "",
-  "flow_characteristics": "",
-  "mechanical_behavior": "",
-  "surface_quality": "",
-  "structural_consistency": "",
-  "application_implication": "",
-  "primary_risk_title": "",
-  "primary_risk": "",
-  "secondary_risk_title": "",
-  "secondary_risk": "",
-  "mechanism": "",
-  "stability_note": "",
-  "consistency_note": "",
-  "next_step": ""
-}
-`;
-
-  const res = await openai.chat.completions.create({
-    model: "gpt-4.1-mini",
-    messages: [
-      { role: "system", content: "Return only JSON." },
-      { role: "user", content: prompt }
-    ],
-    temperature: 0.6
-  });
-
-  let text = res.choices[0].message.content;
-
-  console.log("AI RAW:", text);
-
-  try {
-    return JSON.parse(text);
-  } catch (e) {
-    console.error("JSON ERROR:", e);
-
-    // 応急処置（強制抽出）
-    try {
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
-      return JSON.parse(jsonMatch[0]);
-    } catch {
-      return {};
-    }
-  }
-}
-
-
-// =========================
-// Overlay（波修正済み）
+// Overlay
 // =========================
 function generateOverlay(scoreLeft, scoreRight) {
 
@@ -159,30 +58,31 @@ function generateOverlay(scoreLeft, scoreRight) {
   return `
   <div style="position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;">
 
-    <div style="position:absolute; left:40%; top:22%;">${scoreLeft}</div>
-    <div style="position:absolute; left:72%; top:22%; color:#dc2626;">${scoreRight}</div>
+    <!-- 温度（復活） -->
+    <div style="position:absolute; left:33.5%; top:6%; font-size:26px; font-weight:500; color:#1f2937;">
+      230°C
+    </div>
 
-    <!-- 波（中央補正済み） -->
-    <svg style="
-      position:absolute;
-      left:46.8%;
-      top:57.2%;
-      transform:translate(-50%,-50%);
-      width:11%;
-      height:8%;
-    ">
+    <div style="position:absolute; left:66%; top:6%; font-size:26px; font-weight:500; color:#dc2626;">
+      180°C
+    </div>
+
+    <!-- スコア -->
+    <div style="position:absolute; left:40%; top:22%; font-size:16px;">
+      ${scoreLeft}
+    </div>
+
+    <div style="position:absolute; left:72%; top:22%; font-size:16px; color:#dc2626;">
+      ${scoreRight}
+    </div>
+
+    <!-- 波（中心固定済み） -->
+    <svg style="position:absolute;left:46.8%;top:57%;width:11%;height:8%;transform:translate(-50%,-50%);" viewBox="0 0 80 20">
       <path stroke="#3B82A0" stroke-width="2" fill="none"
         d="M0 10 Q20 ${10-ampLeft} 40 10 T80 10"/>
     </svg>
 
-    <svg style="
-      position:absolute;
-      left:71.5%;
-      top:64%;
-      transform:translate(-50%,-50%);
-      width:11%;
-      height:8%;
-    ">
+    <svg style="position:absolute;left:71.5%;top:63%;width:11%;height:8%;transform:translate(-50%,-50%;" viewBox="0 0 80 20">
       <path stroke="#dc2626" stroke-width="2" fill="none"
         d="M0 10 Q20 ${10-ampRight} 40 10 T80 10"/>
     </svg>
@@ -203,18 +103,31 @@ function generateOverlay(scoreLeft, scoreRight) {
       <path d="M20 100 A80 80 0 0 1 180 100 L100 100 Z"
         fill="url(#meterGrad)" />
 
+      <path d="M35 100 A65 65 0 0 1 165 100 L100 100 Z"
+        fill="rgba(255,255,255,0.12)" />
+
+      <ellipse cx="100" cy="104" rx="46" ry="8"
+        fill="black" opacity="0.08"/>
+
+      <!-- 針（完全安定版） -->
       <g transform="rotate(${angle} 100 100)">
-        <line x1="100" y1="100" x2="100" y2="25"
-          stroke="#111" stroke-width="2.5" stroke-linecap="round"/>
+        <line 
+          x1="100" 
+          y1="100" 
+          x2="100" 
+          y2="60"
+          stroke="#111"
+          stroke-width="2.5"
+          stroke-linecap="round"/>
       </g>
 
       <circle cx="100" cy="100" r="4.5" fill="#111"/>
+
     </svg>
 
   </div>
   `;
 }
-
 
 // =========================
 // HTML差し込み
@@ -227,22 +140,56 @@ function injectHtml(template, data) {
   return html;
 }
 
+// =========================
+// Claude呼び出し
+// =========================
+async function generateAI(input, level) {
+
+  const prompt = `
+You are a polymer processing expert.
+
+Explain the technical feasibility.
+
+Compatibility Level: ${level}
+Application: ${input.application}
+Material Transition: ${input.current_material} → ${input.target_material}
+Processing Method: ${input.process}
+Primary Concern: ${input.concern}
+
+Return JSON only.
+`;
+
+  const response = await anthropic.messages.create({
+    model: "claude-3-opus-20240229",
+    max_tokens: 1000,
+    messages: [{ role: "user", content: prompt }]
+  });
+
+  try {
+    return JSON.parse(response.content[0].text);
+  } catch {
+    return {};
+  }
+}
 
 // =========================
 // POST
 // =========================
 app.post("/tally-pdf", async (req, res) => {
-
   try {
 
-    const inputData = req.body;
+    const input = req.body;
 
-    const { scoreLeft, scoreRight } = calculateScores(inputData);
-    const evaluation = evaluate(scoreLeft, scoreRight);
+    const result = evaluate(input);
 
-    const aiData = await generateAIReport(inputData, evaluation);
+    const aiDataRaw = await generateAI(input, result.compatibility_level);
 
-    console.log("AI PARSED:", aiData);
+    // 安全補完
+    const aiData = {
+      stability_note: "Stable production requires controlled conditions.",
+      consistency_note: "Variability may occur depending on processing stability.",
+      ...aiDataRaw
+    };
 
     const template = fs.readFileSync(
       path.join(__dirname, "template.html"),
@@ -251,12 +198,17 @@ app.post("/tally-pdf", async (req, res) => {
 
     const html = injectHtml(template, {
       base_image: "https://ilnautico.github.io/visual-base.png",
-      dynamic_overlay: generateOverlay(scoreLeft, scoreRight),
-      pha_score: scoreLeft,
+      dynamic_overlay: generateOverlay(result.scoreLeft, result.scoreRight),
 
-      compatibility_level: evaluation.compatibility_level,
-      stability: evaluation.compatibility_level,
-      consistency: evaluation.risk_level,
+      // 🔥 ここ修正
+      application: input.application || "Flexible packaging film",
+      material_transition: `${input.current_material} → ${input.target_material}`,
+      assessment_type: "Tier 2 – Pre-Commercial Feasibility",
+      report_date: new Date().toLocaleDateString(),
+
+      pha_score: result.scoreLeft,
+
+      compatibility_level: result.compatibility_level,
 
       ...aiData
     });
@@ -285,7 +237,8 @@ app.post("/tally-pdf", async (req, res) => {
   }
 });
 
-
+// =========================
+// GET
 // =========================
 app.get("/latest-pdf", (req, res) => {
   if (!fs.existsSync(PDF_PATH)) {
@@ -294,8 +247,6 @@ app.get("/latest-pdf", (req, res) => {
   res.sendFile(PDF_PATH);
 });
 
-
-// =========================
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
   console.log("🚀 Server running on", PORT);
