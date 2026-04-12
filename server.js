@@ -1,253 +1,26 @@
 import express from "express";
-import puppeteer from "puppeteer";
-import fs from "fs";
-import path from "path";
-import { fileURLToPath } from "url";
-import Anthropic from "@anthropic-ai/sdk";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 const app = express();
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-app.use(express.text({ type: "*/*" }));
+app.use(express.json()); // ← これ超重要
 
-const PDF_PATH = "/tmp/latest.pdf";
-
-// =========================
-// Claude
-// =========================
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY
+// テストGET
+app.get("/", (req, res) => {
+  res.send("🚀 Server is working");
 });
 
-// =========================
-// スコアロジック（固定）
-// =========================
-function evaluate(data) {
-  let score = 0;
+// 🔥 ここ追加（POST受信）
+app.post("/generate", (req, res) => {
+  console.log("受信データ:", req.body);
 
-  if (data.current_material?.includes("LDPE")) score += 30;
-  if (data.process?.includes("film")) score += 20;
-  if (data.concern?.includes("temperature")) score -= 10;
-
-  score = Math.max(0, Math.min(100, score));
-
-  let level = "Moderate";
-  if (score < 40) level = "Low";
-  if (score > 70) level = "High";
-
-  return {
-    scoreLeft: score,
-    scoreRight: 100 - score,
-    compatibility_level: level
-  };
-}
-
-// =========================
-// Overlay
-// =========================
-function generateOverlay(scoreLeft, scoreRight) {
-
-  const ampLeft = 4 + scoreLeft * 0.12;
-  const ampRight = 4 + scoreRight * 0.12;
-  const angle = -90 + (scoreRight / 100) * 180;
-
-  return `
-  <div style="position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;">
-
-    <!-- 温度（復活） -->
-    <div style="position:absolute; left:33.5%; top:6%; font-size:26px; font-weight:500; color:#1f2937;">
-      230°C
-    </div>
-
-    <div style="position:absolute; left:66%; top:6%; font-size:26px; font-weight:500; color:#dc2626;">
-      180°C
-    </div>
-
-    <!-- スコア -->
-    <div style="position:absolute; left:40%; top:22%; font-size:16px;">
-      ${scoreLeft}
-    </div>
-
-    <div style="position:absolute; left:72%; top:22%; font-size:16px; color:#dc2626;">
-      ${scoreRight}
-    </div>
-
-    <!-- 波（中心固定済み） -->
-    <svg style="position:absolute;left:46.8%;top:57%;width:11%;height:8%;transform:translate(-50%,-50%);" viewBox="0 0 80 20">
-      <path stroke="#3B82A0" stroke-width="2" fill="none"
-        d="M0 10 Q20 ${10-ampLeft} 40 10 T80 10"/>
-    </svg>
-
-    <svg style="position:absolute;left:71.5%;top:63%;width:11%;height:8%;transform:translate(-50%,-50%;" viewBox="0 0 80 20">
-      <path stroke="#dc2626" stroke-width="2" fill="none"
-        d="M0 10 Q20 ${10-ampRight} 40 10 T80 10"/>
-    </svg>
-
-    <!-- メーター -->
-    <svg viewBox="0 0 200 120"
-      style="position:absolute; right:6%; bottom:4%; width:140px; height:90px;">
-
-      <defs>
-        <linearGradient id="meterGrad" x1="0" x2="1">
-          <stop offset="0%" stop-color="#22c55e"/>
-          <stop offset="45%" stop-color="#fde047"/>
-          <stop offset="70%" stop-color="#f59e0b"/>
-          <stop offset="100%" stop-color="#ef4444"/>
-        </linearGradient>
-      </defs>
-
-      <path d="M20 100 A80 80 0 0 1 180 100 L100 100 Z"
-        fill="url(#meterGrad)" />
-
-      <path d="M35 100 A65 65 0 0 1 165 100 L100 100 Z"
-        fill="rgba(255,255,255,0.12)" />
-
-      <ellipse cx="100" cy="104" rx="46" ry="8"
-        fill="black" opacity="0.08"/>
-
-      <!-- 針（完全安定版） -->
-      <g transform="rotate(${angle} 100 100)">
-        <line 
-          x1="100" 
-          y1="100" 
-          x2="100" 
-          y2="60"
-          stroke="#111"
-          stroke-width="2.5"
-          stroke-linecap="round"/>
-      </g>
-
-      <circle cx="100" cy="100" r="4.5" fill="#111"/>
-
-    </svg>
-
-  </div>
-  `;
-}
-
-// =========================
-// HTML差し込み
-// =========================
-function injectHtml(template, data) {
-  let html = template;
-  Object.keys(data).forEach((key) => {
-    html = html.replace(new RegExp(`{{\\s*${key}\\s*}}`, "g"), data[key] || "");
+  res.json({
+    message: "データ受信OK",
+    data: req.body
   });
-  return html;
-}
-
-// =========================
-// Claude呼び出し
-// =========================
-async function generateAI(input, level) {
-
-  const prompt = `
-You are a polymer processing expert.
-
-Explain the technical feasibility.
-
-Compatibility Level: ${level}
-Application: ${input.application}
-Material Transition: ${input.current_material} → ${input.target_material}
-Processing Method: ${input.process}
-Primary Concern: ${input.concern}
-
-Return JSON only.
-`;
-
-  const response = await anthropic.messages.create({
-    model: "claude-3-opus-20240229",
-    max_tokens: 1000,
-    messages: [{ role: "user", content: prompt }]
-  });
-
-  try {
-    return JSON.parse(response.content[0].text);
-  } catch {
-    return {};
-  }
-}
-
-// =========================
-// POST
-// =========================
-app.post("/tally-pdf", async (req, res) => {
-  try {
-
-    const input = req.body;
-
-    const result = evaluate(input);
-
-    const aiDataRaw = await generateAI(input, result.compatibility_level);
-
-    // 安全補完
-    const aiData = {
-      stability_note: "Stable production requires controlled conditions.",
-      consistency_note: "Variability may occur depending on processing stability.",
-      ...aiDataRaw
-    };
-
-    const template = fs.readFileSync(
-      path.join(__dirname, "template.html"),
-      "utf8"
-    );
-
-    const html = injectHtml(template, {
-      base_image: "https://ilnautico.github.io/visual-base.png",
-      dynamic_overlay: generateOverlay(result.scoreLeft, result.scoreRight),
-
-      // 🔥 ここ修正
-      application: input.application || "Flexible packaging film",
-      material_transition: `${input.current_material} → ${input.target_material}`,
-      assessment_type: "Tier 2 – Pre-Commercial Feasibility",
-      report_date: new Date().toLocaleDateString(),
-
-      pha_score: result.scoreLeft,
-
-      compatibility_level: result.compatibility_level,
-
-      ...aiData
-    });
-
-    const browser = await puppeteer.launch({
-      args: ["--no-sandbox", "--disable-setuid-sandbox"]
-    });
-
-    const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: "networkidle0" });
-
-    const pdf = await page.pdf({
-      format: "A4",
-      printBackground: true
-    });
-
-    await browser.close();
-
-    fs.writeFileSync(PDF_PATH, pdf);
-
-    res.send(pdf);
-
-  } catch (err) {
-    console.error(err);
-    res.status(500).send("PDF generation failed");
-  }
 });
 
-// =========================
-// GET
-// =========================
-app.get("/latest-pdf", (req, res) => {
-  if (!fs.existsSync(PDF_PATH)) {
-    return res.status(404).send("No PDF yet");
-  }
-  res.sendFile(PDF_PATH);
-});
+const PORT = 8080;
 
-const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
   console.log("🚀 Server running on", PORT);
 });
