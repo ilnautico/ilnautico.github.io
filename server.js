@@ -22,20 +22,26 @@ Process: ${req.body.equipment}
 Concern: ${req.body.concern}
 `;
 
-  const response = await anthropic.messages.create({
-    model: "claude-3-opus-20240229",
-    max_tokens: 300,
-    messages: [{ role: "user", content: prompt }]
-  });
+  try {
+    const response = await anthropic.messages.create({
+      model: "claude-3-opus-20240229",
+      max_tokens: 300,
+      messages: [{ role: "user", content: prompt }]
+    });
 
-  res.json({
-    result: response.content[0].text
-  });
+    res.json({
+      result: response.content[0].text
+    });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "AI error" });
+  }
 
 });
 
 app.listen(8080, () => {
-  console.log("START");
+  console.log("AI SERVER START");
 });
 
 const html = `
