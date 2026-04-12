@@ -26,14 +26,13 @@ const openai = new OpenAI({
 
 
 // =========================
-// スコア算出（ここが頭脳）
+// スコア算出
 // =========================
 function calculateScores(input) {
 
-  let scoreLeft = 50;   // 安定性
-  let scoreRight = 50;  // リスク
+  let scoreLeft = 50;
+  let scoreRight = 50;
 
-  // 材料
   if (input.material === "LDPE") scoreLeft += 10;
 
   if (input.bio_material?.includes("PHA")) {
@@ -41,12 +40,10 @@ function calculateScores(input) {
     scoreRight += 20;
   }
 
-  // プロセス
   if (input.equipment?.includes("film")) {
     scoreLeft += 5;
   }
 
-  // 懸念
   if (input.concern?.toLowerCase().includes("temperature")) {
     scoreRight += 15;
   }
@@ -59,7 +56,7 @@ function calculateScores(input) {
 
 
 // =========================
-// 判定（🔥絶対にAIにやらせない）
+// 判定
 // =========================
 function evaluate(scoreLeft, scoreRight) {
 
@@ -73,38 +70,30 @@ function evaluate(scoreLeft, scoreRight) {
   else if (scoreRight > 40) risk_level = "Medium";
   else risk_level = "Low";
 
-  return {
-    compatibility_level,
-    risk_level
-  };
+  return { compatibility_level, risk_level };
 }
 
 
 // =========================
-// AI生成（説明のみ）
+// AI生成
 // =========================
 async function generateAIReport(input, evaluation) {
 
   const prompt = `
-You are a senior materials engineer specializing in biodegradable plastics.
+You are a senior materials engineer.
 
-Your role is ONLY to explain the given evaluation.
+Explain the given evaluation.
 
-STRICT RULES:
-- Do NOT change the compatibility level
-- Do NOT reinterpret risk level
-- Do NOT provide processing parameters
-- Do NOT suggest formulations
-- Keep explanation realistic and technical
+Do NOT change the evaluation.
 
-INPUT:
 Compatibility Level: ${evaluation.compatibility_level}
 Risk Level: ${evaluation.risk_level}
 
 Application: ${input.application}
-Material Transition: ${input.material} → ${input.bio_material}
-Processing Method: ${input.equipment}
-Primary Concern: ${input.concern}
+Material: ${input.material}
+Target: ${input.bio_material}
+Process: ${input.equipment}
+Concern: ${input.concern}
 
 Return ONLY JSON:
 
@@ -138,21 +127,28 @@ Return ONLY JSON:
     temperature: 0.6
   });
 
+  let text = res.choices[0].message.content;
+
+  console.log("AI RAW:", text);
+
   try {
-    return JSON.parse(res.choices[0].message.content);
+    return JSON.parse(text);
   } catch (e) {
-    console.error("AI JSON parse error:", e);
-    return {
-      executive_summary: "AI generation failed.",
-      key_risk: "Unknown",
-      next_step: "Manual review required."
-    };
+    console.error("JSON ERROR:", e);
+
+    // 応急処置（強制抽出）
+    try {
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      return JSON.parse(jsonMatch[0]);
+    } catch {
+      return {};
+    }
   }
 }
 
 
 // =========================
-// Overlay（可視化）
+// Overlay（波修正済み）
 // =========================
 function generateOverlay(scoreLeft, scoreRight) {
 
@@ -166,16 +162,32 @@ function generateOverlay(scoreLeft, scoreRight) {
     <div style="position:absolute; left:40%; top:22%;">${scoreLeft}</div>
     <div style="position:absolute; left:72%; top:22%; color:#dc2626;">${scoreRight}</div>
 
-    <svg style="position:absolute;left:46.8%;top:57.2%;width:11%;height:8%;">
+    <!-- 波（中央補正済み） -->
+    <svg style="
+      position:absolute;
+      left:46.8%;
+      top:57.2%;
+      transform:translate(-50%,-50%);
+      width:11%;
+      height:8%;
+    ">
       <path stroke="#3B82A0" stroke-width="2" fill="none"
         d="M0 10 Q20 ${10-ampLeft} 40 10 T80 10"/>
     </svg>
 
-    <svg style="position:absolute;left:71.5%;top:64%;width:11%;height:8%;">
+    <svg style="
+      position:absolute;
+      left:71.5%;
+      top:64%;
+      transform:translate(-50%,-50%);
+      width:11%;
+      height:8%;
+    ">
       <path stroke="#dc2626" stroke-width="2" fill="none"
         d="M0 10 Q20 ${10-ampRight} 40 10 T80 10"/>
     </svg>
 
+    <!-- メーター -->
     <svg viewBox="0 0 200 120"
       style="position:absolute; right:6%; bottom:4%; width:140px; height:90px;">
 
@@ -217,7 +229,7 @@ function injectHtml(template, data) {
 
 
 // =========================
-// POST（統合）
+// POST
 // =========================
 app.post("/tally-pdf", async (req, res) => {
 
@@ -226,10 +238,11 @@ app.post("/tally-pdf", async (req, res) => {
     const inputData = req.body;
 
     const { scoreLeft, scoreRight } = calculateScores(inputData);
-
     const evaluation = evaluate(scoreLeft, scoreRight);
 
     const aiData = await generateAIReport(inputData, evaluation);
+
+    console.log("AI PARSED:", aiData);
 
     const template = fs.readFileSync(
       path.join(__dirname, "template.html"),
