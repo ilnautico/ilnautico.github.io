@@ -9,68 +9,33 @@ const anthropic = new Anthropic({
 
 app.use(express.json());
 
-// =========================
-// GET（確認用）
-// =========================
 app.get("/", (req, res) => {
-  res.send("🚀 Server is working");
+  res.send("OK");
 });
 
-// =========================
-// ① 3万円診断（既存・触らない）
-// =========================
-app.post("/generate-basic", (req, res) => {
-  console.log("Basic受信:", req.body);
-
-  // ★ここは既存ロジックそのまま
-  res.json({
-    ok: true,
-    type: "basic"
-  });
-});
-
-// =========================
-// ② AI診断（今回追加）
-// =========================
 app.post("/generate-ai", async (req, res) => {
 
-  console.log("AI受信:", req.body);
-
   const prompt = `
-You are a polymer processing expert.
-
-Explain the technical feasibility.
-
 Material: ${req.body.material}
 Target: ${req.body.bio_material}
 Process: ${req.body.equipment}
 Concern: ${req.body.concern}
 `;
 
-  try {
-    const response = await anthropic.messages.create({
-      model: "claude-3-opus-20240229",
-      max_tokens: 500,
-      messages: [
-        { role: "user", content: prompt }
-      ]
-    });
+  const response = await anthropic.messages.create({
+    model: "claude-3-opus-20240229",
+    max_tokens: 300,
+    messages: [{ role: "user", content: prompt }]
+  });
 
-    res.json({
-      result: response.content[0].text
-    });
-
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "AI error" });
-  }
+  res.json({
+    result: response.content[0].text
+  });
 
 });
 
-const PORT = 8080;
-
-app.listen(PORT, () => {
-  console.log("🚀 Server running on", PORT);
+app.listen(8080, () => {
+  console.log("START");
 });
 
 const html = `
