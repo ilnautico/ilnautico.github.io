@@ -9,24 +9,31 @@ const anthropic = new Anthropic({
 
 app.use(express.json());
 
+// 確認用
 app.get("/", (req, res) => {
   res.send("OK");
 });
 
+// AI診断
 app.post("/generate-ai", async (req, res) => {
+  try {
+    const prompt = `
+You are a polymer processing expert.
 
-  const prompt = `
+Explain the technical feasibility.
+
 Material: ${req.body.material}
 Target: ${req.body.bio_material}
 Process: ${req.body.equipment}
 Concern: ${req.body.concern}
 `;
 
-  try {
     const response = await anthropic.messages.create({
-      model: "claude-3-opus-20240229",
-      max_tokens: 300,
-      messages: [{ role: "user", content: prompt }]
+      model: "claude-3-haiku-20240307", // ←ここ重要（安定モデル）
+      max_tokens: 500,
+      messages: [
+        { role: "user", content: prompt }
+      ]
     });
 
     res.json({
@@ -34,10 +41,9 @@ Concern: ${req.body.concern}
     });
 
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "AI error" });
+    console.error("AI ERROR:", err); // ←ログ見れるように
+    res.status(500).json({ error: "AI error", detail: err.message });
   }
-
 });
 
 app.listen(8080, () => {
