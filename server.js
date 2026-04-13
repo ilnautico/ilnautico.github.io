@@ -9,21 +9,29 @@ app.use(express.json());
 // util
 // =========================
 function injectHtml(template, data) {
-  let html = template;
+  let output = template;
   Object.keys(data).forEach((key) => {
-    html = html.replace(new RegExp(`{{${key}}}`, "g"), data[key] || "");
+    output = output.replace(new RegExp(`{{${key}}}`, "g"), data[key] || "");
   });
-  return html;
+  return output;
+}
+
+function getValue(fields, key) {
+  const f = fields.find((x) =>
+    (x.label || "").toLowerCase().includes(key)
+  );
+  return f?.value || "";
 }
 
 // =========================
-// TEST用（これが重要）
+// TEST（GETで確認できる用）
 // =========================
 app.get("/generate-report", async (req, res) => {
   console.log("🔥 GET TEST HIT");
 
   try {
-    const html = injectHtml(htmlTemplate, {
+    // 👇 下にある３万円テンプレ（const html = `...`）をそのまま使う
+    const finalHtml = injectHtml(html, {
       client_name: "Test Client",
       client_company: "Test Company",
       client_country: "Japan",
@@ -52,7 +60,7 @@ app.get("/generate-report", async (req, res) => {
     });
 
     const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: "networkidle0" });
+    await page.setContent(finalHtml, { waitUntil: "networkidle0" });
 
     const pdf = await page.pdf({
       format: "A4",
@@ -61,9 +69,8 @@ app.get("/generate-report", async (req, res) => {
 
     await browser.close();
 
-    // 🔥 絶対必要（これがなかったから全部失敗してた）
+    // 🔥 PDF保存（これがないと永遠にNOT FOUND）
     fs.writeFileSync("/tmp/latest.pdf", pdf);
-
     console.log("✅ PDF SAVED");
 
     res.send("PDF generated");
@@ -92,7 +99,7 @@ app.get("/latest-pdf", (req, res) => {
 });
 
 // =========================
-// 起動
+// 起動（最後に1回だけ）
 // =========================
 const PORT = process.env.PORT || 8080;
 
