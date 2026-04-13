@@ -1,12 +1,9 @@
 import express from "express";
 import puppeteer from "puppeteer";
-import { Resend } from "resend";
-import fs from "fs"; // ← 追加（PDF保存用）
+import fs from "fs";
 
 const app = express();
 app.use(express.json());
-
-const resend = new Resend(process.env.RESEND_API_KEY);
 
 // =========================
 // util
@@ -14,125 +11,34 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 function injectHtml(template, data) {
   let html = template;
   Object.keys(data).forEach((key) => {
-    const value = data[key] ?? "";
-    html = html.replace(new RegExp(`{{${key}}}`, "g"), value);
+    html = html.replace(new RegExp(`{{${key}}}`, "g"), data[key] || "");
   });
   return html;
 }
 
-function getValue(fields, key) {
-  const f = fields.find((x) =>
-    (x.label || "").toLowerCase().includes(key)
-  );
-  return f?.value || "";
-}
-
 // =========================
-// AI簡易
+// TEST用（これが重要）
 // =========================
-app.post("/generate-ai", (req, res) => {
-  try {
-    const { material, bio_material, equipment, concern } = req.body || {};
-
-    const result = `
-## Compatibility Level
-Moderate
-
-## Technical Observations
-- ${material || "Material"} と ${bio_material || "Bio"} は相溶性が低い
-- ${equipment || "Equipment"} は温度制御が重要
-- 分解リスクあり
-
-## Risks
-- 相分離
-- 熱劣化
-- 不安定性
-
-## Next Step
-試作テストを実施
-Concern: ${concern || "N/A"}
-`;
-
-    const html = `
-<!DOCTYPE html>
-<html>
-<head>
-<meta charset="UTF-8">
-<title>Report</title>
-</head>
-<body style="font-family: Arial; padding: 40px;">
-<h1>FairVia Report</h1>
-<pre>${result}</pre>
-</body>
-</html>
-`;
-
-    res.send(html);
-
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({
-      error: "AI generation failed"
-    });
-  }
-});
-
-// =========================
-// メイン（PDF生成）
-// =========================
-app.post("/generate-report", async (req, res) => {
-  console.log("🔥 REQUEST HIT");
+app.get("/generate-report", async (req, res) => {
+  console.log("🔥 GET TEST HIT");
 
   try {
-    const fields = Array.isArray(req.body)
-      ? req.body
-      : req.body?.fields || req.body?.data?.fields || [];
-
-    const email =
-      fields.find((f) => f.type === "INPUT_EMAIL")?.value ||
-      req.body?.email ||
-      "";
-
-    const processing = getValue(fields, "processing");
-    const currentMaterial = getValue(fields, "material");
-    const bioMaterial = getValue(fields, "biodegradable");
-
-    const clientName = getValue(fields, "client name");
-    const company = getValue(fields, "company name");
-    const country = getValue(fields, "country");
-    const equipment = getValue(fields, "equipment");
-    const productionScale = getValue(fields, "production");
-    const projectStage = getValue(fields, "project");
-
-    let finalFeasibility = "MODERATE";
-
-    const text = [
-      processing,
-      currentMaterial,
-      bioMaterial
-    ].join(" ").toLowerCase();
-
-    if (text.includes("injection") && text.includes("pp") && text.includes("pla")) {
-      finalFeasibility = "LOW";
-    }
-
-    // HTML生成（テンプレは下にある前提）
     const html = injectHtml(htmlTemplate, {
-      client_name: clientName || "",
-      client_company: company || "",
-      client_country: country || "",
+      client_name: "Test Client",
+      client_company: "Test Company",
+      client_country: "Japan",
 
-      application: processing || "",
-      current_material: currentMaterial || "",
-      processing_method: processing || "",
-      bio_material: bioMaterial || "",
-      equipment: equipment || "",
-      production_scale: productionScale || "",
-      project_stage: projectStage || "",
+      application: "Injection",
+      current_material: "PP",
+      processing_method: "Injection",
+      bio_material: "PLA",
+      equipment: "Standard Machine",
+      production_scale: "Medium",
+      project_stage: "Testing",
 
-      feasibility_level: finalFeasibility,
+      feasibility_level: "MODERATE",
       report_date: new Date().toISOString().split("T")[0],
-      report_id: "FV-" + Date.now()
+      report_id: "TEST-" + Date.now()
     });
 
     const browser = await puppeteer.launch({
@@ -155,18 +61,16 @@ app.post("/generate-report", async (req, res) => {
 
     await browser.close();
 
-    // 🔥 ここが今回の本命（保存）
+    // 🔥 絶対必要（これがなかったから全部失敗してた）
     fs.writeFileSync("/tmp/latest.pdf", pdf);
+
     console.log("✅ PDF SAVED");
 
-    res.json({
-      success: true,
-      message: "PDF generated"
-    });
+    res.send("PDF generated");
 
   } catch (err) {
     console.error("❌ ERROR:", err);
-    res.status(500).json({ error: "Server Error" });
+    res.status(500).send("error");
   }
 });
 
