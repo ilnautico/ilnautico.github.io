@@ -1500,3 +1500,50 @@ app.get("/generate-pdf", async (req, res) => {
     res.status(500).send("error");
   }
 });
+// ===== SAFE START BLOCK（追加専用・既存コード非干渉） =====
+if (!global.__SAFE_SERVER_STARTED__) {
+  global.__SAFE_SERVER_STARTED__ = true;
+
+  const express = (await import("express")).default;
+  const safeApp = express();
+
+  safeApp.use(express.json());
+
+  safeApp.post("/safe-generate", (req, res) => {
+    try {
+      const { material, bio_material, equipment, concern } = req.body || {};
+
+      const result = `
+## Compatibility Level
+Moderate
+
+## Technical Observations
+- ${material || "Material"} and ${bio_material || "Bio"} compatibility is limited
+- ${equipment || "Equipment"} requires stable temperature control
+- Degradation risk must be managed
+
+## Risks
+- Phase separation
+- Thermal degradation
+- Instability
+
+## Next Step
+Run pilot test
+Concern: ${concern || "N/A"}
+`;
+
+      res.json({ ok: true, result });
+
+    } catch (error) {
+      console.error("SAFE ERROR:", error);
+      res.status(500).json({ error: "safe generation failed" });
+    }
+  });
+
+  const PORT = process.env.PORT || 8080;
+
+  safeApp.listen(PORT, () => {
+    console.log("SAFE SERVER RUNNING ON " + PORT);
+  });
+}
+// ===== END SAFE BLOCK =====
