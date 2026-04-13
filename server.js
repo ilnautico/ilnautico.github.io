@@ -3,7 +3,7 @@ import express from "express";
 const app = express();
 app.use(express.json());
 
-// ===== API =====
+// ===== API（簡易）=====
 app.post("/generate-ai", (req, res) => {
   try {
     const { material, bio_material, equipment, concern } = req.body || {};
@@ -26,6 +26,115 @@ Moderate
 試作テストを実施
 Concern: ${concern || "N/A"}
 `;
+
+    const html = `
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Report</title>
+</head>
+<body style="font-family: Arial; padding: 40px;">
+<h1>FairVia Report</h1>
+<pre>${result}</pre>
+</body>
+</html>
+`;
+
+    res.send(html);
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      error: "AI generation failed"
+    });
+  }
+});
+
+// ===== 本番レポート =====
+app.post("/generate-report", async (req, res) => {
+  try {
+    console.log("🔥 REQUEST HIT");
+
+    const fields = Array.isArray(req.body)
+      ? req.body
+      : req.body?.fields || req.body?.data?.fields || [];
+
+    const processing = getValue(fields, "processing");
+    const currentMaterial = getValue(fields, "material");
+    const bioMaterial = getValue(fields, "biodegradable");
+
+    const clientName = getValue(fields, "client name");
+    const company = getValue(fields, "company name");
+    const country = getValue(fields, "country");
+    const equipment = getValue(fields, "equipment");
+    const productionScale = getValue(fields, "production");
+    const projectStage = getValue(fields, "project");
+
+    const text = [
+      processing,
+      currentMaterial,
+      bioMaterial,
+      projectStage
+    ].join(" ").toLowerCase();
+
+    let finalFeasibility = "MODERATE";
+
+    if (text.includes("injection") && text.includes("pp") && text.includes("pla")) {
+      finalFeasibility = "LOW";
+    }
+
+    const html = injectHtml(htmlTemplate, {
+      client_name: clientName || "",
+      client_company: company || "",
+      client_country: country || "",
+      application: processing || "",
+      current_material: currentMaterial || "",
+      bio_material: bioMaterial || "",
+      equipment: equipment || "",
+      production_scale: productionScale || "",
+      project_stage: projectStage || "",
+      feasibility_level: finalFeasibility,
+      report_date: new Date().toISOString().split("T")[0],
+      report_id: "FV-" + Date.now()
+    });
+
+    const browser = await puppeteer.launch({
+      headless: true,
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-gpu"
+      ]
+    });
+
+    const page = await browser.newPage();
+
+    await page.setContent(html, { waitUntil: "networkidle0" });
+
+    const pdf = await page.pdf({
+      format: "A4",
+      printBackground: true
+    });
+
+    await browser.close();
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.send(pdf);
+
+  } catch (err) {
+    console.error("❌ ERROR:", err);
+    res.status(500).json({ error: "Server Error" });
+  }
+});
+
+// ===== 起動 =====
+const PORT = process.env.PORT || 8080;
+
+app.listen(PORT, () => {
+  console.log("Server running on " + PORT);
+});
 
     const html = `
 <!DOCTYPE html>
