@@ -1477,7 +1477,7 @@ score_eol_note: "End-of-life compliance should be evaluated based on regional re
       from: "FairVia <info@ilnautico.com>",
       to: email,
       subject: "FairVia Report",
-      html: <p>Your report result: <b>${finalFeasibility}</b></p>,
+      html: `<p>Your report result: <b>${finalFeasibility}</b></p>`,
       attachments: [
         {
           filename: "report.pdf",
