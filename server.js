@@ -5,99 +5,92 @@ import path from "path";
 const app = express();
 app.use(express.json());
 
-// ===== 既存の処理はそのまま残してOK =====
-
-// ===== ここから追記（安全ブロック） =====
-
-// 最新PDFのパス（あなたの構成に合わせてOK）
 const PDF_PATH = "/tmp/latest.pdf";
 
-// テンプレ読み込み（無くても動くようにフォールバック）
+// ===== HTMLテンプレ読み込み =====
 function loadTemplate() {
   try {
-    const p = path.join(process.cwd(), "template.html");
-    return fs.readFileSync(p, "utf-8");
-  } catch {
+    return fs.readFileSync(path.join(process.cwd(), "template.html"), "utf-8");
+  } catch (e) {
     return `
-<!doctype html>
-<html><head><meta charset="utf-8"><title>Report</title></head>
-<body style="font-family:Arial;padding:40px">
-  <h1>FairVia Report</h1>
-  <pre id="content">{{CONTENT}}</pre>
-</body></html>`;
+    <html>
+      <body style="font-family: Arial; padding: 40px;">
+        <h1>FairVia Report</h1>
+        <pre>{{CONTENT}}</pre>
+      </body>
+    </html>`;
   }
 }
 
-// 文字列→HTML差し込み
-function renderHTML(content) {
-  const tpl = loadTemplate();
-  return tpl.replace("{{CONTENT}}", content);
+// ===== HTML生成 =====
+function buildHTML(content) {
+  const template = loadTemplate();
+  return template.replace("{{CONTENT}}", content);
 }
 
-// 疑似PDF生成（既存のPuppeteerがあるならそっち使ってOK）
-function writePDFStub(html) {
-  // 本番は Puppeteer に置き換え可
-  fs.writeFileSync(PDF_PATH, Buffer.from(html));
-}
-
-// AI結果生成（既存のAI呼び出しがあるならそれ使ってOK）
-function buildResult({ material, bio_material, equipment, concern }) {
+// ===== ダミーAI生成（既存AIに置き換えOK） =====
+function generateResult(input) {
   return `
 ## Compatibility Level
 Moderate
 
 ## Technical Observations
-- ${material} と ${bio_material} は極性差により相溶性が低い
-- ${equipment} では温度帯の安定化が重要
-- ${bio_material} は過熱に敏感
+- LDPEとPHAは極性差があり相溶性が低い
+- フィルム押出では温度制御が重要
+- PHAは熱分解リスクあり
 
 ## Potential Risks
 - 相分離
-- 熱分解
-- フィルム厚みのばらつき
+- 熱劣化
+- フィルム厚み不安定
 
 ## Suggested Next Step
-温度制御最適化と小規模トライアルを実施
-(Concern: ${concern})
+温度条件最適化と試作検証
+
+Input:
+${JSON.stringify(input, null, 2)}
 `;
 }
 
-// ===== API =====
-
-// ① 生成
-app.post("/generate-ai", async (req, res) => {
+// ===== メインAPI =====
+app.post("/generate-ai", (req, res) => {
   try {
-    const payload = req.body || {};
-    const result = buildResult(payload);
+    const input = req.body || {};
 
-    const html = renderHTML(result);
-    writePDFStub(html);
+    const result = generateResult(input);
+    const html = buildHTML(result);
+
+    fs.writeFileSync(PDF_PATH, Buffer.from(html));
 
     res.json({ ok: true, result });
+
   } catch (error) {
-    console.error("generate-ai error:", error);
-    res.status(500).json({ ok: false, error: "AI generation failed" });
+    console.error(error);
+    res.status(500).json({ error: "AI generation failed" });
   }
 });
 
-// ② 最新PDF取得
+// ===== PDF取得 =====
 app.get("/latest-pdf", (req, res) => {
   try {
     if (!fs.existsSync(PDF_PATH)) {
       return res.status(404).send("No PDF yet");
     }
+
     res.setHeader("Content-Type", "application/pdf");
     fs.createReadStream(PDF_PATH).pipe(res);
+
   } catch (error) {
-    console.error("latest-pdf error:", error);
-    res.status(500).send("Failed to load PDF");
+    console.error(error);
+    res.status(500).send("PDF load error");
   }
 });
 
 // ===== 起動 =====
 const PORT = process.env.PORT || 8080;
+
 app.listen(PORT, () => {
-  console.log(`Server running on ${PORT}`);
+  console.log("Server running on " + PORT);
 });
 // ===== HTMLテンプレ =====
     const html = `
