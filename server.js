@@ -1,11 +1,8 @@
 import express from "express";
 import puppeteer from "puppeteer";
-import { Resend } from "resend";
 
 const app = express();
 app.use(express.json());
-
-const resend = new Resend(process.env.RESEND_API_KEY);
 
 // =========================
 // util
@@ -19,106 +16,31 @@ function injectHtml(template, data) {
   return html;
 }
 
-function getValue(fields, key) {
-  const f = fields.find((x) =>
-    (x.label || "").toLowerCase().includes(key)
-  );
-  return f?.value || "";
-}
-
 // =========================
-// TEST用（確認用）
+// PDFテスト表示（ここが重要）
 // =========================
 app.get("/generate-report", async (req, res) => {
-  console.log("🔥 GET TEST HIT");
+  console.log("🔥 PDF GENERATE HIT");
 
   try {
-    const browser = await puppeteer.launch({
-      headless: true,
-      args: ["--no-sandbox"]
-    });
-
-    const page = await browser.newPage();
-    await page.setContent("<h1>TEST PDF OK</h1>");
-
-    const pdf = await page.pdf({
-      format: "A4",
-      printBackground: true
-    });
-
-    await browser.close();
-
-    console.log("✅ PDF GENERATED");
-
-    // 🔥 即返し
-    res.set({
-      "Content-Type": "application/pdf",
-      "Content-Disposition": "inline; filename=test.pdf"
-    });
-
-    res.send(pdf);
-
-  } catch (err) {
-    console.error(err);
-    res.status(500).send("error");
-  }
-});
-
-// =========================
-// 本番生成（最重要）
-// =========================
-app.post("/generate-report", async (req, res) => {
-  console.log("🔥 REQUEST HIT");
-
-  try {
-    const fields = Array.isArray(req.body)
-      ? req.body
-      : req.body?.fields || req.body?.data?.fields || [];
-
-    const email =
-      fields.find((f) => f.type === "INPUT_EMAIL")?.value ||
-      req.body?.email ||
-      "";
-
-    const processing = getValue(fields, "processing");
-    const currentMaterial = getValue(fields, "material");
-    const bioMaterial = getValue(fields, "biodegradable");
-
-    const clientName = getValue(fields, "client name");
-    const company = getValue(fields, "company name");
-    const country = getValue(fields, "country");
-    const equipment = getValue(fields, "equipment");
-    const productionScale = getValue(fields, "production");
-    const projectStage = getValue(fields, "project");
-
-    const text = [
-      processing,
-      currentMaterial,
-      bioMaterial,
-      projectStage
-    ].join(" ").toLowerCase();
-
-    let finalFeasibility = "MODERATE";
-
-    if (text.includes("injection") && text.includes("pp") && text.includes("pla")) {
-      finalFeasibility = "LOW";
-    }
-
+    // 👉 仮データ（確認用）
     const html = injectHtml(htmlTemplate, {
-      client_name: clientName || "",
-      client_company: company || "",
-      client_country: country || "",
-      application: processing || "",
-      current_material: currentMaterial || "",
-      processing_method: processing || "",
-      bio_material: bioMaterial || "",
-      equipment: equipment || "",
-      production_scale: productionScale || "",
-      project_stage: projectStage || "",
-      submission_reference: "Auto-generated",
-      feasibility_level: finalFeasibility,
+      client_name: "Test User",
+      client_company: "Test Company",
+      client_country: "Japan",
+
+      application: "Film extrusion",
+      current_material: "PP",
+      processing_method: "Extrusion",
+      bio_material: "PLA",
+      equipment: "Standard extruder",
+      production_scale: "Small",
+      project_stage: "Testing",
+      submission_reference: "TEST",
+
+      feasibility_level: "MODERATE",
       report_date: new Date().toISOString().split("T")[0],
-      report_id: "FV-" + Date.now()
+      report_id: "FV-TEST-001"
     });
 
     const browser = await puppeteer.launch({
@@ -132,6 +54,8 @@ app.post("/generate-report", async (req, res) => {
     });
 
     const page = await browser.newPage();
+
+    // 🔥 ここが最重要（さっきの修正）
     await page.setContent(html, { waitUntil: "networkidle0" });
 
     const pdf = await page.pdf({
@@ -141,47 +65,18 @@ app.post("/generate-report", async (req, res) => {
 
     await browser.close();
 
-    console.log("✅ PDF GENERATED");
-
-    // =========================
-    // メール送信（そのまま）
-    // =========================
-    if (email) {
-      await resend.emails.send({
-        from: "FairVia <info@ilnautico.com>",
-        to: email,
-        subject: "FairVia Report",
-        html: `<p>Your report result: <b>${finalFeasibility}</b></p>`,
-        attachments: [
-          {
-            filename: "report.pdf",
-            content: pdf.toString("base64"),
-            encoding: "base64"
-          }
-        ]
-      });
-
-      console.log("✅ MAIL SENT");
-    }
-
-    // =========================
-    // 🔥 ここが最終解決（即返し）
-    // =========================
-    res.set({
-      "Content-Type": "application/pdf",
-      "Content-Disposition": "inline; filename=report.pdf"
-    });
-
+    // 👉 PDFをブラウザに直接表示
+    res.setHeader("Content-Type", "application/pdf");
     res.send(pdf);
 
   } catch (err) {
-    console.error("❌ ERROR:", err);
-    res.status(500).json({ error: "Server Error" });
+    console.error("❌ PDF ERROR:", err);
+    res.status(500).send("PDF generation failed");
   }
 });
 
 // =========================
-// 起動
+// 起動（最後1回だけ）
 // =========================
 const PORT = process.env.PORT || 8080;
 
