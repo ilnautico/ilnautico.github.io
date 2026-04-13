@@ -189,6 +189,35 @@ app.post("/generate-report", async (req, res) => {
 // PDF表示
 // =========================
 app.get("/latest-pdf", (req, res) => {
+  app.get("/generate-report", async (req, res) => {
+  console.log("🔥 GET TEST HIT");
+
+  try {
+    const browser = await puppeteer.launch({
+      headless: true,
+      args: ["--no-sandbox"]
+    });
+
+    const page = await browser.newPage();
+
+    await page.setContent("<h1>TEST PDF OK</h1>");
+
+    await page.pdf({
+      path: "/tmp/latest.pdf",
+      format: "A4"
+    });
+
+    await browser.close();
+
+    console.log("✅ PDF SAVED");
+
+    res.send("PDF generated");
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("error");
+  }
+});
   console.log("📥 PDF REQUEST");
 
   if (!fs.existsSync(PDF_PATH)) {
