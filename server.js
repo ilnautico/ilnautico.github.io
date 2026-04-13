@@ -9,44 +9,150 @@ app.use(express.json());
 // =========================
 function getValue(fields, key) {
   if (!Array.isArray(fields)) return "";
-  const found = fields.find(f =>
-    (f.key && f.key.toLowerCase().includes(key)) ||
-    (f.label && f.label.toLowerCase().includes(key))
-  );
-  return found?.value || "";
+  const found = fields.find(function (f) {
+    return (
+      (f.key && f.key.toLowerCase().includes(key)) ||
+      (f.label && f.label.toLowerCase().includes(key))
+    );
+  });
+  return found && found.value ? found.value : "";
 }
 
 function injectHtml(template, data) {
-  let html = template;
-  Object.keys(data).forEach(key => {
-    const value = data[key] ?? "";
-    html = html.replace(new RegExp(`{{${key}}}`, "g"), value);
+  var html = template;
+  Object.keys(data).forEach(function (key) {
+    var value = data[key] || "";
+    html = html.replace(new RegExp("{{" + key + "}}", "g"), value);
   });
   return html;
 }
 
 // =========================
-// HTMLテンプレ（最小）
+// HTMLテンプレ（安全版）
 // =========================
-const htmlTemplate = `
-<!DOCTYPE html>
-<html>
-<body style="font-family: Arial; padding:40px;">
-<h1>FairVia Report</h1>
-<p>Client: {{client_name}}</p>
-<p>Feasibility: {{feasibility_level}}</p>
-<p>Date: {{report_date}}</p>
-<p>ID: {{report_id}}</p>
-</body>
-</html>
-`;
+const htmlTemplate =
+"<!DOCTYPE html>" +
+"<html>" +
+"<body style='font-family: Arial; padding:40px;'>" +
+"<h1>FairVia Report</h1>" +
+"<p>Client: {{client_name}}</p>" +
+"<p>Feasibility: {{feasibility_level}}</p>" +
+"<p>Date: {{report_date}}</p>" +
+"<p>ID: {{report_id}}</p>" +
+"</body>" +
+"</html>";
 
 // =========================
 // API（簡易）
 // =========================
-app.post("/generate-ai", (req, res) => {
+app.post("/generate-ai", function (req, res) {
   try {
-    const { material, bio_material } = req.body || {};
+    var material = req.body ? req.body.material : "";
+    var bio_material = req.body ? req.body.bio_material : "";
+
+    var result =
+      "Compatibility: Moderate\n" +
+      "Material: " + (material || "N/A") + "\n" +
+      "Bio: " + (bio_material || "N/A");
+
+    res.send("<pre>" + result + "</pre>");
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "AI generation failed" });
+  }
+});
+
+// =========================
+// 本番レポート
+// =========================
+app.post("/generate-report", async function (req, res) {
+  try {
+    var fields = Array.isArray(req.body)
+      ? req.body
+      : req.body && (req.body.fields || (req.body.data && req.body.data.fields)) || [];
+
+    var processing = getValue(fields, "processing");
+    var currentMaterial = getValue(fields, "material");
+    var bioMaterial = getValue(fields, "biodegradable");
+    var clientName = getValue(fields, "client name");
+
+    var text = (processing + " " + currentMaterial + " " + bioMaterial).toLowerCase();
+
+    var finalFeasibility = "MODERATE";
+
+    if (
+      text.indexOf("injection") !== -1 &&
+      text.indexOf("pp") !== -1 &&
+      text.indexOf("pla") !== -1
+    ) {
+      finalFeasibility = "LOW";
+    }
+
+    var html = injectHtml(htmlTemplate, {
+      client_name: clientName || "",
+      feasibility_level: finalFeasibility,
+      report_date: new Date().toISOString().split("T")[0],
+      report_id: "FV-" + Date.now()
+    });
+
+    const browser = await puppeteer.launch({
+      headless: true,
+      args: ["--no-sandbox", "--disable-dev-shm-usage"]
+    });
+
+    const page = await browser.newPage();
+
+    await page.setContent(html);
+
+    const pdf = await page.pdf({
+      format: "A4",
+      printBackground: true
+    });
+
+    await browser.close();
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.send(pdf);
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server Error" });
+  }
+});
+
+// =========================
+// Tier2
+// =========================
+app.post("/generate-tier2", async function (req, res) {
+  try {
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: "Tier2 failed" });
+  }
+});
+
+// =========================
+// Test
+// =========================
+app.get("/generate-pdf", function (req, res) {
+  res.send("OK");
+});
+
+// =========================
+// 起動（1回のみ）
+// =========================
+const PORT = process.env.PORT || 8080;
+
+app.listen(PORT, function () {
+  console.log("Server running on " + PORT);
+});
+
+/*
+=========================
+過去コードはここに貼る（必ずコメント内）
+=========================
+*/
 
     const result = \`
 Compatibility: Moderate
