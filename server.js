@@ -1,40 +1,103 @@
 import express from "express";
+import fs from "fs";
+import path from "path";
 
 const app = express();
 app.use(express.json());
 
-app.post("/generate-ai", async (req, res) => {
-  try {
-    const { material, bio_material, equipment, concern } = req.body;
+// ===== 既存の処理はそのまま残してOK =====
 
-    const result = `
+// ===== ここから追記（安全ブロック） =====
+
+// 最新PDFのパス（あなたの構成に合わせてOK）
+const PDF_PATH = "/tmp/latest.pdf";
+
+// テンプレ読み込み（無くても動くようにフォールバック）
+function loadTemplate() {
+  try {
+    const p = path.join(process.cwd(), "template.html");
+    return fs.readFileSync(p, "utf-8");
+  } catch {
+    return `
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Report</title></head>
+<body style="font-family:Arial;padding:40px">
+  <h1>FairVia Report</h1>
+  <pre id="content">{{CONTENT}}</pre>
+</body></html>`;
+  }
+}
+
+// 文字列→HTML差し込み
+function renderHTML(content) {
+  const tpl = loadTemplate();
+  return tpl.replace("{{CONTENT}}", content);
+}
+
+// 疑似PDF生成（既存のPuppeteerがあるならそっち使ってOK）
+function writePDFStub(html) {
+  // 本番は Puppeteer に置き換え可
+  fs.writeFileSync(PDF_PATH, Buffer.from(html));
+}
+
+// AI結果生成（既存のAI呼び出しがあるならそれ使ってOK）
+function buildResult({ material, bio_material, equipment, concern }) {
+  return `
 ## Compatibility Level
 Moderate
 
 ## Technical Observations
-- LDPE and PHA have different polarity → limited compatibility
-- Temperature control is critical to avoid degradation
-- Film extrusion requires stable melt behavior
+- ${material} と ${bio_material} は極性差により相溶性が低い
+- ${equipment} では温度帯の安定化が重要
+- ${bio_material} は過熱に敏感
 
 ## Potential Risks
-- Phase separation
-- Thermal degradation of PHA
-- Inconsistent film thickness
+- 相分離
+- 熱分解
+- フィルム厚みのばらつき
 
 ## Suggested Next Step
-Conduct controlled pilot trials with temperature optimization
+温度制御最適化と小規模トライアルを実施
+(Concern: ${concern})
 `;
+}
 
-    res.json({ result });
+// ===== API =====
 
+// ① 生成
+app.post("/generate-ai", async (req, res) => {
+  try {
+    const payload = req.body || {};
+    const result = buildResult(payload);
+
+    const html = renderHTML(result);
+    writePDFStub(html);
+
+    res.json({ ok: true, result });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "AI generation failed" });
+    console.error("generate-ai error:", error);
+    res.status(500).json({ ok: false, error: "AI generation failed" });
   }
 });
 
-app.listen(8080, () => {
-  console.log("Server running on 8080");
+// ② 最新PDF取得
+app.get("/latest-pdf", (req, res) => {
+  try {
+    if (!fs.existsSync(PDF_PATH)) {
+      return res.status(404).send("No PDF yet");
+    }
+    res.setHeader("Content-Type", "application/pdf");
+    fs.createReadStream(PDF_PATH).pipe(res);
+  } catch (error) {
+    console.error("latest-pdf error:", error);
+    res.status(500).send("Failed to load PDF");
+  }
+});
+
+// ===== 起動 =====
+const PORT = process.env.PORT || 8080;
+app.listen(PORT, () => {
+  console.log(`Server running on ${PORT}`);
 });
 // ===== HTMLテンプレ =====
     const html = `
