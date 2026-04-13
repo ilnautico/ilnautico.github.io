@@ -2,6 +2,7 @@ import express from "express";
 import puppeteer from "puppeteer";
 import { Resend } from "resend";
 import fs from "fs";
+import path from "path";
 
 const app = express();
 app.use(express.json());
@@ -30,54 +31,41 @@ function getValue(fields, key) {
 }
 
 // =========================
-// API（簡易AI）
-/* ここはそのまま */
-app.post("/generate-ai", (req, res) => {
+// TEST用（ブラウザで叩ける）
+// =========================
+app.get("/generate-report", async (req, res) => {
+  console.log("🔥 GET TEST HIT");
+
   try {
-    const { material, bio_material, equipment, concern } = req.body || {};
+    const browser = await puppeteer.launch({
+      headless: true,
+      args: ["--no-sandbox"]
+    });
 
-    const result = `
-## Compatibility Level
-Moderate
+    const page = await browser.newPage();
 
-## Technical Observations
-- ${material || "Material"} と ${bio_material || "Bio"} は相溶性が低い
-- ${equipment || "Equipment"} は温度制御が重要
-- 分解リスクあり
+    await page.setContent("<h1>TEST PDF OK</h1>");
 
-## Risks
-- 相分離
-- 熱劣化
-- 不安定性
+    await page.pdf({
+      path: PDF_PATH,
+      format: "A4",
+      printBackground: true
+    });
 
-## Next Step
-試作テストを実施
-Concern: ${concern || "N/A"}
-`;
+    await browser.close();
 
-    const html = `
-<!DOCTYPE html>
-<html>
-<head>
-<meta charset="UTF-8">
-<title>Report</title>
-</head>
-<body style="font-family: Arial; padding: 40px;">
-<h1>FairVia Report</h1>
-<pre>${result}</pre>
-</body>
-</html>
-`;
+    console.log("✅ PDF SAVED");
 
-    res.send(html);
+    res.send("PDF generated");
 
-  } catch (error) {
-    res.status(500).json({ error: "AI generation failed" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("error");
   }
 });
 
 // =========================
-// メイン生成
+// 本番生成
 // =========================
 app.post("/generate-report", async (req, res) => {
   console.log("🔥 REQUEST HIT");
@@ -146,7 +134,6 @@ app.post("/generate-report", async (req, res) => {
     const page = await browser.newPage();
     await page.setContent(html, { waitUntil: "networkidle0" });
 
-    // 🔥 ここが最重要（保存）
     const pdf = await page.pdf({
       path: PDF_PATH,
       format: "A4",
@@ -186,38 +173,9 @@ app.post("/generate-report", async (req, res) => {
 });
 
 // =========================
-// PDF表示
+// PDF表示（最重要）
 // =========================
 app.get("/latest-pdf", (req, res) => {
-  app.get("/generate-report", async (req, res) => {
-  console.log("🔥 GET TEST HIT");
-
-  try {
-    const browser = await puppeteer.launch({
-      headless: true,
-      args: ["--no-sandbox"]
-    });
-
-    const page = await browser.newPage();
-
-    await page.setContent("<h1>TEST PDF OK</h1>");
-
-    await page.pdf({
-      path: "/tmp/latest.pdf",
-      format: "A4"
-    });
-
-    await browser.close();
-
-    console.log("✅ PDF SAVED");
-
-    res.send("PDF generated");
-
-  } catch (err) {
-    console.error(err);
-    res.status(500).send("error");
-  }
-});
   console.log("📥 PDF REQUEST");
 
   if (!fs.existsSync(PDF_PATH)) {
@@ -226,11 +184,12 @@ app.get("/latest-pdf", (req, res) => {
   }
 
   console.log("✅ PDF SENT");
-  res.sendFile(PDF_PATH);
+
+  res.sendFile(path.resolve(PDF_PATH));
 });
 
 // =========================
-// 起動（1回だけ）
+// 起動
 // =========================
 const PORT = process.env.PORT || 8080;
 
