@@ -48,14 +48,16 @@ app.post("/generate-ai", (req, res) => {
   try {
     const { material, bio_material } = req.body || {};
 
-    const result = `
+    const result = \`
 Compatibility: Moderate
-Material: ${material || "N/A"}
-Bio: ${bio_material || "N/A"}
-`;
+Material: \${material || "N/A"}
+Bio: \${bio_material || "N/A"}
+\`;
 
-    res.send(`<pre>${result}</pre>`);
+    res.send(\`<pre>\${result}</pre>\`);
+
   } catch (error) {
+    console.error(error);
     res.status(500).json({ error: "AI generation failed" });
   }
 });
@@ -78,12 +80,16 @@ app.post("/generate-report", async (req, res) => {
 
     let finalFeasibility = "MODERATE";
 
-    if (text.includes("injection") && text.includes("pp") && text.includes("pla")) {
+    if (
+      text.includes("injection") &&
+      text.includes("pp") &&
+      text.includes("pla")
+    ) {
       finalFeasibility = "LOW";
     }
 
     const html = injectHtml(htmlTemplate, {
-      client_name: clientName,
+      client_name: clientName || "",
       feasibility_level: finalFeasibility,
       report_date: new Date().toISOString().split("T")[0],
       report_id: "FV-" + Date.now()
@@ -96,7 +102,8 @@ app.post("/generate-report", async (req, res) => {
 
     const page = await browser.newPage();
 
-    await page.setContent(html, { waitUntil: "networkidle0" });
+    // ★ここ重要（安定版）
+    await page.setContent(html);
 
     const pdf = await page.pdf({
       format: "A4",
@@ -133,13 +140,21 @@ app.get("/generate-pdf", (req, res) => {
 });
 
 // =========================
-// 起動（1回だけ）
+// 起動（絶対1回だけ）
 // =========================
 const PORT = process.env.PORT || 8080;
 
 app.listen(PORT, () => {
   console.log("Server running on " + PORT);
 });
+
+/*
+=========================
+過去コード（ここに全部入れる）
+=========================
+※ 必ずこの中に入れること
+※ 外に出したら即エラーになる
+*/
 
 /*
 =========================
