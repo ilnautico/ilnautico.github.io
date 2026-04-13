@@ -1,53 +1,148 @@
 import express from "express";
-import Anthropic from "@anthropic-ai/sdk";
 
 const app = express();
-
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY
-});
+const PORT = 8080;
 
 app.use(express.json());
 
-// 確認用
-app.get("/", (req, res) => {
-  res.send("OK");
-});
-
-// AI診断
 app.post("/generate-ai", async (req, res) => {
   try {
-    const prompt = `
-You are a polymer processing expert.
+    const { material, bio_material, equipment, concern } = req.body;
 
-Explain the technical feasibility.
+    // ===== OpenAI API呼び出し =====
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model: "gpt-5-3", // or gpt-4o
+        messages: [
+          {
+            role: "system",
+            content: `
+You are a senior polymer processing consultant.
 
-Material: ${req.body.material}
-Target: ${req.body.bio_material}
-Process: ${req.body.equipment}
-Concern: ${req.body.concern}
+Return ONLY valid JSON in this structure:
+
+{
+  "compatibility_level": "",
+  "executive_summary": "",
+  "key_risk": "",
+  "processing_window": "",
+  "thermal_behaviour": "",
+  "flow_characteristics": "",
+  "mechanical_behaviour": "",
+  "surface_quality": "",
+  "structural_consistency": "",
+  "primary_risk": "",
+  "secondary_risk": "",
+  "mechanism": "",
+  "stability": "",
+  "consistency": "",
+  "expected_deviations": [],
+  "conceptual_visualization": "",
+  "recommended_next_step": "",
+  "recommended_pathway": []
+}
+
+Be technical, specific, and decision-oriented.
+No markdown. JSON only.
+`
+          },
+          {
+            role: "user",
+            content: `
+Material: ${material}
+Bio material: ${bio_material}
+Equipment: ${equipment}
+Concern: ${concern}
+`
+          }
+        ],
+        temperature: 0.4
+      })
+    });
+
+    const data = await response.json();
+
+    const aiText = data.choices[0].message.content;
+
+    // ===== JSONパース =====
+    const aiJson = JSON.parse(aiText);
+
+    // ===== HTMLテンプレ =====
+    const html = `
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>FairVia Report</title>
+<style>
+body { font-family: Arial; padding: 40px; background: #f5f7fa; }
+h1 { color: #1a2b4c; }
+.section { margin-bottom: 20px; padding: 20px; background: white; border-radius: 10px; }
+.label { font-weight: bold; color: #5a6b8c; }
+</style>
+</head>
+
+<body>
+
+<h1>FairVia Technical Report</h1>
+
+<div class="section">
+<div class="label">Compatibility Level</div>
+<div>${aiJson.compatibility_level}</div>
+</div>
+
+<div class="section">
+<div class="label">Executive Summary</div>
+<div>${aiJson.executive_summary}</div>
+</div>
+
+<div class="section">
+<div class="label">Key Risk</div>
+<div>${aiJson.key_risk}</div>
+</div>
+
+<div class="section">
+<div class="label">Processing Window</div>
+<div>${aiJson.processing_window}</div>
+</div>
+
+<div class="section">
+<div class="label">Thermal Behaviour</div>
+<div>${aiJson.thermal_behaviour}</div>
+</div>
+
+<div class="section">
+<div class="label">Flow Characteristics</div>
+<div>${aiJson.flow_characteristics}</div>
+</div>
+
+<div class="section">
+<div class="label">Recommended Next Step</div>
+<div>${aiJson.recommended_next_step}</div>
+</div>
+
+</body>
+</html>
 `;
 
-    const response = await anthropic.messages.create({
-      model: "claude-3-haiku-20240307", // ←ここ重要（安定モデル）
-      max_tokens: 500,
-      messages: [
-        { role: "user", content: prompt }
-      ]
-    });
+    res.send(html);
 
-    res.json({
-      result: response.content[0].text
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      error: "AI generation failed",
+      detail: error.message
     });
-
-  } catch (err) {
-    console.error("AI ERROR:", err); // ←ログ見れるように
-    res.status(500).json({ error: "AI error", detail: err.message });
   }
 });
 
-app.listen(8080, () => {
-  console.log("AI SERVER START");
+app.listen(PORT, () => {
+  console.log(`🚀 Server running on ${PORT}`);
 });
 
 const html = `
