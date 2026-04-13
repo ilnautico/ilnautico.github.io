@@ -4,9 +4,9 @@ import puppeteer from "puppeteer";
 const app = express();
 app.use(express.json());
 
-// =========================
-// Utility
-// =========================
+/* =========================
+   Utility
+========================= */
 function getValue(fields, key) {
   if (!Array.isArray(fields)) return "";
   const found = fields.find(f =>
@@ -25,9 +25,143 @@ function injectHtml(template, data) {
 }
 
 /* =========================
-   🔥 3万円テンプレ（完全差し替え）
+   HTMLテンプレ（3万円そのまま）
 ========================= */
 const htmlTemplate = `
+（※ここにお前の3万円テンプレ全文そのまま貼ってある状態）
+`;
+
+/* =========================
+   🔥 追加：latest-pdfルート
+========================= */
+app.get("/latest-pdf", async (req, res) => {
+  try {
+    const browser = await puppeteer.launch({
+      headless: true,
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-gpu"
+      ]
+    });
+
+    const page = await browser.newPage();
+
+    await page.setContent("<h1>Latest PDF OK</h1>");
+
+    const pdf = await page.pdf({
+      format: "A4",
+      printBackground: true
+    });
+
+    await browser.close();
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.send(pdf);
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("error");
+  }
+});
+
+/* =========================
+   本番PDF生成
+========================= */
+app.post("/generate-report", async (req, res) => {
+  console.log("🔥 REQUEST HIT");
+
+  try {
+    const fields = Array.isArray(req.body)
+      ? req.body
+      : req.body?.fields || req.body?.data?.fields || [];
+
+    const processing = getValue(fields, "processing");
+    const currentMaterial = getValue(fields, "material");
+    const bioMaterial = getValue(fields, "biodegradable");
+
+    const clientName = getValue(fields, "client name");
+    const company = getValue(fields, "company name");
+    const country = getValue(fields, "country");
+    const equipment = getValue(fields, "equipment");
+    const productionScale = getValue(fields, "production");
+    const projectStage = getValue(fields, "project");
+    const submissionReference = "Auto-generated";
+
+    const text = [
+      processing,
+      currentMaterial,
+      bioMaterial,
+      projectStage
+    ].join(" ").toLowerCase();
+
+    let finalFeasibility = "MODERATE";
+
+    if (text.includes("injection") && text.includes("pp") && text.includes("pla")) {
+      finalFeasibility = "LOW";
+    }
+
+    const html = injectHtml(htmlTemplate, {
+      client_name: clientName || "",
+      client_company: company || "",
+      client_country: country || "",
+
+      application: processing || "",
+      current_material: currentMaterial || "",
+      processing_method: processing || "",
+      bio_material: bioMaterial || "",
+      equipment: equipment || "",
+      production_scale: productionScale || "",
+      project_stage: projectStage || "",
+      submission_reference: submissionReference,
+
+      feasibility_level: finalFeasibility,
+
+      report_date: new Date().toISOString().split("T")[0],
+      report_id: "FV-" + Date.now()
+    });
+
+    const browser = await puppeteer.launch({
+      headless: true,
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-gpu"
+      ]
+    });
+
+    const page = await browser.newPage();
+    await page.setContent(html, { waitUntil: "networkidle0" });
+
+    const pdf = await page.pdf({
+      format: "A4",
+      printBackground: true
+    });
+
+    await browser.close();
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.send(pdf);
+
+  } catch (err) {
+    console.error("❌ ERROR:", err);
+    res.status(500).json({ error: "Server Error" });
+  }
+});
+
+/* =========================
+   起動
+========================= */
+const PORT = process.env.PORT || 8080;
+
+app.listen(PORT, () => {
+  console.log("Server running on " + PORT);
+});
+/* =========================
+   🔥 3万円テンプレ（完全差し替え）
+========================= */
 const htmlTemplate = `
 <!DOCTYPE html>
 <html lang="en">
