@@ -7,18 +7,24 @@ app.use(express.json());
 
 const PDF_PATH = "/tmp/latest.pdf";
 
-// ===== HTMLテンプレ読み込み =====
+// ===== HTMLテンプレ =====
 function loadTemplate() {
   try {
     return fs.readFileSync(path.join(process.cwd(), "template.html"), "utf-8");
   } catch (e) {
     return `
-    <html>
-      <body style="font-family: Arial; padding: 40px;">
-        <h1>FairVia Report</h1>
-        <pre>{{CONTENT}}</pre>
-      </body>
-    </html>`;
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>FairVia Report</title>
+</head>
+<body style="font-family: Arial; padding: 40px;">
+<h1>FairVia Report</h1>
+<pre>{{CONTENT}}</pre>
+</body>
+</html>
+`;
   }
 }
 
@@ -28,31 +34,31 @@ function buildHTML(content) {
   return template.replace("{{CONTENT}}", content);
 }
 
-// ===== ダミーAI生成（既存AIに置き換えOK） =====
+// ===== AI結果（仮・後で本物に差し替えOK）=====
 function generateResult(input) {
   return `
 ## Compatibility Level
 Moderate
 
 ## Technical Observations
-- LDPEとPHAは極性差があり相溶性が低い
+- LDPEとPHAは相溶性が低い
 - フィルム押出では温度制御が重要
 - PHAは熱分解リスクあり
 
 ## Potential Risks
 - 相分離
 - 熱劣化
-- フィルム厚み不安定
+- 厚み不安定
 
 ## Suggested Next Step
-温度条件最適化と試作検証
+温度最適化と試作検証
 
 Input:
 ${JSON.stringify(input, null, 2)}
 `;
 }
 
-// ===== メインAPI =====
+// ===== API =====
 app.post("/generate-ai", (req, res) => {
   try {
     const input = req.body || {};
@@ -63,7 +69,6 @@ app.post("/generate-ai", (req, res) => {
     fs.writeFileSync(PDF_PATH, Buffer.from(html));
 
     res.json({ ok: true, result });
-
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "AI generation failed" });
@@ -79,7 +84,6 @@ app.get("/latest-pdf", (req, res) => {
 
     res.setHeader("Content-Type", "application/pdf");
     fs.createReadStream(PDF_PATH).pipe(res);
-
   } catch (error) {
     console.error(error);
     res.status(500).send("PDF load error");
