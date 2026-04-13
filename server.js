@@ -1,77 +1,97 @@
 import express from "express";
+import OpenAI from "openai";
+import { marked } from "marked";
 
 const app = express();
-const PORT = 8080;
-
 app.use(express.json());
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
 
 app.post("/generate-ai", async (req, res) => {
   try {
     const { material, bio_material, equipment, concern } = req.body;
 
-    // ===== OpenAI API呼び出し =====
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        model: "gpt-5-3", // or gpt-4o
-        messages: [
-          {
-            role: "system",
-            content: `
-You are a senior polymer processing consultant.
+    const prompt = `
+You are a professional consultant specializing in biodegradable materials and plastic processing.
 
-Return ONLY valid JSON in this structure:
+Generate a high-level technical assessment report.
 
-{
-  "compatibility_level": "",
-  "executive_summary": "",
-  "key_risk": "",
-  "processing_window": "",
-  "thermal_behaviour": "",
-  "flow_characteristics": "",
-  "mechanical_behaviour": "",
-  "surface_quality": "",
-  "structural_consistency": "",
-  "primary_risk": "",
-  "secondary_risk": "",
-  "mechanism": "",
-  "stability": "",
-  "consistency": "",
-  "expected_deviations": [],
-  "conceptual_visualization": "",
-  "recommended_next_step": "",
-  "recommended_pathway": []
-}
-
-Be technical, specific, and decision-oriented.
-No markdown. JSON only.
-`
-          },
-          {
-            role: "user",
-            content: `
 Material: ${material}
-Bio material: ${bio_material}
+Bio Material: ${bio_material}
 Equipment: ${equipment}
 Concern: ${concern}
-`
-          }
-        ],
-        temperature: 0.4
-      })
+
+Structure:
+1. Compatibility Level
+2. Technical Observations
+3. Risks
+4. Recommended Actions
+
+Write in structured Markdown with headings.
+`;
+
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [{ role: "user", content: prompt }],
     });
 
-    const data = await response.json();
+    const result = completion.choices[0].message.content;
 
-    const aiText = data.choices[0].message.content;
+    // 🔥 Markdown → HTML変換
+    const contentHTML = marked(result);
 
-    // ===== JSONパース =====
-    const aiJson = JSON.parse(aiText);
+    // 🔥 デザインテンプレに流し込み
+    const fullHTML = `
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>FairVia Report</title>
+<style>
+body {
+  font-family: -apple-system, BlinkMacSystemFont;
+  background:#f5f7fa;
+  padding:40px;
+}
+.container {
+  max-width:900px;
+  margin:auto;
+  background:white;
+  padding:40px;
+  border-radius:12px;
+  box-shadow:0 10px 30px rgba(0,0,0,0.08);
+}
+h1 { font-size:28px; }
+h2 { margin-top:30px; color:#2c3e50; }
+p { line-height:1.7; color:#444; }
+</style>
+</head>
 
+<body>
+<div class="container">
+<h1>FairVia™ Technical Assessment</h1>
+<p><strong>${material} → ${bio_material}</strong></p>
+
+${contentHTML}
+
+</div>
+</body>
+</html>
+`;
+
+    res.send(fullHTML);
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Error generating report");
+  }
+});
+
+app.listen(8080, () => {
+  console.log("🚀 Server running on 8080");
+});
     // ===== HTMLテンプレ =====
     const html = `
 <!DOCTYPE html>
