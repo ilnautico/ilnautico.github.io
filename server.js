@@ -1,72 +1,40 @@
 import express from "express";
-import OpenAI from "openai";
-import { marked } from "marked";
 
 const app = express();
 app.use(express.json());
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
 
 app.post("/generate-ai", async (req, res) => {
   try {
     const { material, bio_material, equipment, concern } = req.body;
 
-    const prompt = `
-You are a professional consultant specializing in biodegradable materials and plastic processing.
+    const result = `
+## Compatibility Level
+Moderate
 
-Generate a structured technical assessment.
+## Technical Observations
+- LDPE and PHA have different polarity → limited compatibility
+- Temperature control is critical to avoid degradation
+- Film extrusion requires stable melt behavior
 
-Material: ${material}
-Bio Material: ${bio_material}
-Equipment: ${equipment}
-Concern: ${concern}
+## Potential Risks
+- Phase separation
+- Thermal degradation of PHA
+- Inconsistent film thickness
 
-Structure:
-1. Compatibility Level
-2. Technical Observations
-3. Risks
-4. Recommended Actions
+## Suggested Next Step
+Conduct controlled pilot trials with temperature optimization
 `;
 
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [{ role: "user", content: prompt }],
-    });
-
-    const result = completion.choices[0].message.content;
-
-    const htmlContent = marked(result);
-
-    const fullHTML = `
-    <html>
-    <head>
-    <meta charset="UTF-8">
-    <title>Report</title>
-    <style>
-      body { font-family: Arial; padding: 40px; background: #f5f5f5; }
-      .box { background: white; padding: 30px; border-radius: 10px; }
-    </style>
-    </head>
-    <body>
-      <div class="box">
-        ${htmlContent}
-      </div>
-    </body>
-    </html>
-    `;
-
-    res.send(fullHTML);
+    res.json({ result });
 
   } catch (error) {
     console.error(error);
-    res.status(500).send("Error");
+    res.status(500).json({ error: "AI generation failed" });
   }
 });
 
 app.listen(8080, () => {
-  console.log("🚀 Server running on 8080");
+  console.log("Server running on 8080");
 });
 // ===== HTMLテンプレ =====
     const html = `
