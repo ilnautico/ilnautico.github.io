@@ -16,7 +16,7 @@ app.post("/generate-ai", async (req, res) => {
     const prompt = `
 You are a professional consultant specializing in biodegradable materials and plastic processing.
 
-Generate a high-level technical assessment report.
+Generate a structured technical assessment.
 
 Material: ${material}
 Bio Material: ${bio_material}
@@ -28,8 +28,6 @@ Structure:
 2. Technical Observations
 3. Risks
 4. Recommended Actions
-
-Write in structured Markdown with headings.
 `;
 
     const completion = await openai.chat.completions.create({
@@ -39,60 +37,38 @@ Write in structured Markdown with headings.
 
     const result = completion.choices[0].message.content;
 
-    // 🔥 Markdown → HTML変換
-    const contentHTML = marked(result);
+    const htmlContent = marked(result);
 
-    // 🔥 デザインテンプレに流し込み
     const fullHTML = `
-<!DOCTYPE html>
-<html>
-<head>
-<meta charset="UTF-8">
-<title>FairVia Report</title>
-<style>
-body {
-  font-family: -apple-system, BlinkMacSystemFont;
-  background:#f5f7fa;
-  padding:40px;
-}
-.container {
-  max-width:900px;
-  margin:auto;
-  background:white;
-  padding:40px;
-  border-radius:12px;
-  box-shadow:0 10px 30px rgba(0,0,0,0.08);
-}
-h1 { font-size:28px; }
-h2 { margin-top:30px; color:#2c3e50; }
-p { line-height:1.7; color:#444; }
-</style>
-</head>
-
-<body>
-<div class="container">
-<h1>FairVia™ Technical Assessment</h1>
-<p><strong>${material} → ${bio_material}</strong></p>
-
-${contentHTML}
-
-</div>
-</body>
-</html>
-`;
+    <html>
+    <head>
+    <meta charset="UTF-8">
+    <title>Report</title>
+    <style>
+      body { font-family: Arial; padding: 40px; background: #f5f5f5; }
+      .box { background: white; padding: 30px; border-radius: 10px; }
+    </style>
+    </head>
+    <body>
+      <div class="box">
+        ${htmlContent}
+      </div>
+    </body>
+    </html>
+    `;
 
     res.send(fullHTML);
 
-  } catch (err) {
-    console.error(err);
-    res.status(500).send("Error generating report");
+  } catch (error) {
+    console.error(error);
+    res.status(500).send("Error");
   }
 });
 
 app.listen(8080, () => {
   console.log("🚀 Server running on 8080");
 });
-    // ===== HTMLテンプレ =====
+// ===== HTMLテンプレ =====
     const html = `
 <!DOCTYPE html>
 <html>
