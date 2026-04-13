@@ -173,18 +173,18 @@ app.post("/generate-report", async (req, res) => {
     }
 
     await resend.emails.send({
-      from: "FairVia <info@ilnautico.com>",
-      to: email,
-      subject: "FairVia Report",
-      html: `<p>Your report result: <b>${finalFeasibility}</b></p>`,
-      attachments: [
-        {
-          filename: "report.pdf",
-          content: pdf.toString("base64"),
-          encoding: "base64"
-        }
-      ]
-    });
+  from: "FairVia <info@ilnautico.com>",
+  to: email,
+  subject: "FairVia Report",
+  html: `<p>Your report result: <b>${finalFeasibility}</b></p>`,
+  attachments: [
+    {
+      filename: "report.pdf",
+      content: pdf.toString("base64"),
+      encoding: "base64"
+    }
+  ]
+});
 
     res.json({ success: true });
 
