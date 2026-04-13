@@ -1,6 +1,7 @@
 import express from "express";
 import puppeteer from "puppeteer";
 import { Resend } from "resend";
+import fs from "fs"; // ←追加
 
 const app = express();
 app.use(express.json());
@@ -8,7 +9,7 @@ app.use(express.json());
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 // =========================
-// util（上だけ追加 OK）
+// util
 // =========================
 function injectHtml(template, data) {
   let html = template;
@@ -25,11 +26,6 @@ function getValue(fields, key) {
   );
   return f?.value || "";
 }
-
-// =========================
-// 🔥 ここから下はあなたのコードそのまま（触ってない）
-// =========================
-
 
 // ===== API =====
 app.post("/generate-ai", (req, res) => {
@@ -78,15 +74,6 @@ Concern: ${concern || "N/A"}
     });
   }
 });
-
-// ===== HTMLテンプレ（←1回だけに修正）=====
-const htmlTemplate = `
-
-（※ここにあなたの3万円テンプレをそのまま丸ごと入れる）
-※今貼ってる長いHTMLをそのままここに移動
-
-`;
-
 
 // =========================
 // メイン
@@ -166,6 +153,9 @@ app.post("/generate-report", async (req, res) => {
       printBackground: true
     });
 
+    // ✅ 追加（これが今回の本体）
+    fs.writeFileSync("/tmp/latest.pdf", pdf);
+
     await browser.close();
 
     if (!email) {
@@ -173,18 +163,18 @@ app.post("/generate-report", async (req, res) => {
     }
 
     await resend.emails.send({
-  from: "FairVia <info@ilnautico.com>",
-  to: email,
-  subject: "FairVia Report",
-  html: `<p>Your report result: <b>${finalFeasibility}</b></p>`,
-  attachments: [
-    {
-      filename: "report.pdf",
-      content: pdf.toString("base64"),
-      encoding: "base64"
-    }
-  ]
-});
+      from: "FairVia <info@ilnautico.com>",
+      to: email,
+      subject: "FairVia Report",
+      html: `<p>Your report result: <b>${finalFeasibility}</b></p>`,
+      attachments: [
+        {
+          filename: "report.pdf",
+          content: pdf.toString("base64"),
+          encoding: "base64"
+        }
+      ]
+    });
 
     res.json({ success: true });
 
@@ -211,8 +201,19 @@ app.get("/generate-pdf", async (req, res) => {
   res.send("PDF route working");
 });
 
+// ✅ 追加（/latest-pdfルート）
+app.get("/latest-pdf", (req, res) => {
+  const path = "/tmp/latest.pdf";
+
+  if (!fs.existsSync(path)) {
+    return res.status(404).send("PDF not found");
+  }
+
+  res.sendFile(path);
+});
+
 // =========================
-// 起動（←最後に1回だけ）
+// 起動
 // =========================
 const PORT = process.env.PORT || 8080;
 
@@ -1462,11 +1463,13 @@ score_eol_note: "End-of-life compliance should be evaluated based on regional re
     await page.setContent(html, { waitUntil: "networkidle0" });
 
     const pdf = await page.pdf({
-      format: "A4",
-      printBackground: true
-    });
+  format: "A4",
+  printBackground: true
+});
 
-    await browser.close();
+fs.writeFileSync("/tmp/latest.pdf", pdf);
+
+await browser.close();
 
     if (!email) {
       console.log("⚠️ NO EMAIL");
