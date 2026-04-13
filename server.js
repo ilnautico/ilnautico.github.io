@@ -1,12 +1,15 @@
 import express from "express";
 import puppeteer from "puppeteer";
 import { Resend } from "resend";
-import fs from "fs"; // ←追加
+import fs from "fs";
 
 const app = express();
 app.use(express.json());
 
 const resend = new Resend(process.env.RESEND_API_KEY);
+
+// 保存先
+const PDF_PATH = "/tmp/latest.pdf";
 
 // =========================
 // util
@@ -27,110 +30,19 @@ function getValue(fields, key) {
   return f?.value || "";
 }
 
-// ===== API =====
-app.post("/generate-ai", (req, res) => {
-  try {
-    const { material, bio_material, equipment, concern } = req.body || {};
-
-    const result = `
-## Compatibility Level
-Moderate
-
-## Technical Observations
-- ${material || "Material"} と ${bio_material || "Bio"} は相溶性が低い
-- ${equipment || "Equipment"} は温度制御が重要
-- 分解リスクあり
-
-## Risks
-- 相分離
-- 熱劣化
-- 不安定性
-
-## Next Step
-試作テストを実施
-Concern: ${concern || "N/A"}
-`;
-
-    const html = `
-<!DOCTYPE html>
-<html>
-<head>
-<meta charset="UTF-8">
-<title>Report</title>
-</head>
-<body style="font-family: Arial; padding: 40px;">
-<h1>FairVia Report</h1>
-<pre>${result}</pre>
-</body>
-</html>
-`;
-
-    res.send(html);
-
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({
-      error: "AI generation failed"
-    });
-  }
-});
-
 // =========================
 // メイン
 // =========================
 app.post("/generate-report", async (req, res) => {
-  console.log("🔥 REQUEST HIT");
-
   try {
+    console.log("🔥 GENERATE START");
+
     const fields = Array.isArray(req.body)
       ? req.body
       : req.body?.fields || req.body?.data?.fields || [];
 
-    const email =
-      fields.find((f) => f.type === "INPUT_EMAIL")?.value ||
-      req.body?.email ||
-      "";
-
-    const processing = getValue(fields, "processing");
-    const currentMaterial = getValue(fields, "material");
-    const bioMaterial = getValue(fields, "biodegradable");
-
-    const clientName = getValue(fields, "client name");
-    const company = getValue(fields, "company name");
-    const country = getValue(fields, "country");
-    const equipment = getValue(fields, "equipment");
-    const productionScale = getValue(fields, "production");
-    const projectStage = getValue(fields, "project");
-    const submissionReference = "Auto-generated";
-
-    const text = [
-      processing,
-      currentMaterial,
-      bioMaterial,
-      projectStage
-    ].join(" ").toLowerCase();
-
-    let finalFeasibility = "MODERATE";
-
-    if (text.includes("injection") && text.includes("pp") && text.includes("pla")) {
-      finalFeasibility = "LOW";
-    }
-
     const html = injectHtml(htmlTemplate, {
-      client_name: clientName || "",
-      client_company: company || "",
-      client_country: country || "",
-
-      application: processing || "",
-      current_material: currentMaterial || "",
-      processing_method: processing || "",
-      bio_material: bioMaterial || "",
-      equipment: equipment || "",
-      production_scale: productionScale || "",
-      project_stage: projectStage || "",
-      submission_reference: submissionReference,
-
-      feasibility_level: finalFeasibility,
+      client_name: "Test Client",
       report_date: new Date().toISOString().split("T")[0],
       report_id: "FV-" + Date.now()
     });
@@ -153,30 +65,17 @@ app.post("/generate-report", async (req, res) => {
       printBackground: true
     });
 
-    // ✅ 追加（これが今回の本体）
-    fs.writeFileSync("/tmp/latest.pdf", pdf);
+    // 🔥 ここが重要（絶対入れる）
+    fs.writeFileSync(PDF_PATH, pdf);
+
+    console.log("✅ PDF SAVED:", PDF_PATH);
 
     await browser.close();
 
-    if (!email) {
-      return res.json({ success: false });
-    }
-
-    await resend.emails.send({
-      from: "FairVia <info@ilnautico.com>",
-      to: email,
-      subject: "FairVia Report",
-      html: `<p>Your report result: <b>${finalFeasibility}</b></p>`,
-      attachments: [
-        {
-          filename: "report.pdf",
-          content: pdf.toString("base64"),
-          encoding: "base64"
-        }
-      ]
+    res.json({
+      success: true,
+      url: "/latest-pdf"
     });
-
-    res.json({ success: true });
 
   } catch (err) {
     console.error("❌ ERROR:", err);
@@ -184,32 +83,21 @@ app.post("/generate-report", async (req, res) => {
   }
 });
 
-app.post("/generate-tier2", async (req, res) => {
-  try {
-    const fields = req.body.data?.fields || [];
-
-    res.json({
-      success: true
-    });
-
-  } catch (err) {
-    res.status(500).json({ error: "Tier2 generation failed" });
-  }
-});
-
-app.get("/generate-pdf", async (req, res) => {
-  res.send("PDF route working");
-});
-
-// ✅ 追加（/latest-pdfルート）
+// =========================
+// PDF取得（これが本命）
+// =========================
 app.get("/latest-pdf", (req, res) => {
-  const path = "/tmp/latest.pdf";
+  console.log("📥 PDF REQUEST");
 
-  if (!fs.existsSync(path)) {
+  if (!fs.existsSync(PDF_PATH)) {
+    console.log("❌ PDF NOT FOUND");
     return res.status(404).send("PDF not found");
   }
 
-  res.sendFile(path);
+  console.log("✅ PDF FOUND");
+
+  res.setHeader("Content-Type", "application/pdf");
+  res.sendFile(PDF_PATH);
 });
 
 // =========================
