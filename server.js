@@ -18,54 +18,44 @@ function getValue(fields, key) {
 
 function injectHtml(template, data) {
   let html = template;
-
   Object.keys(data).forEach(key => {
     const value = data[key] ?? "";
     html = html.replace(new RegExp(`{{${key}}}`, "g"), value);
   });
-
   return html;
 }
+
+// =========================
+// HTMLテンプレ（最小）
+// =========================
+const htmlTemplate = `
+<!DOCTYPE html>
+<html>
+<body style="font-family: Arial; padding:40px;">
+<h1>FairVia Report</h1>
+<p>Client: {{client_name}}</p>
+<p>Feasibility: {{feasibility_level}}</p>
+<p>Date: {{report_date}}</p>
+<p>ID: {{report_id}}</p>
+</body>
+</html>
+`;
 
 // =========================
 // API（簡易）
 // =========================
 app.post("/generate-ai", (req, res) => {
   try {
-    const { material, bio_material, equipment, concern } = req.body || {};
+    const { material, bio_material } = req.body || {};
 
     const result = `
-## Compatibility Level
-Moderate
-
-## Technical Observations
-- ${material || "Material"} と ${bio_material || "Bio"} は相溶性が低い
-- ${equipment || "Equipment"} は温度制御が重要
-- 分解リスクあり
-
-## Risks
-- 相分離
-- 熱劣化
-- 不安定性
-
-## Next Step
-試作テストを実施
-Concern: ${concern || "N/A"}
+Compatibility: Moderate
+Material: ${material || "N/A"}
+Bio: ${bio_material || "N/A"}
 `;
 
-    const html = `
-<!DOCTYPE html>
-<html>
-<body>
-<pre>${result}</pre>
-</body>
-</html>
-`;
-
-    res.send(html);
-
+    res.send(`<pre>${result}</pre>`);
   } catch (error) {
-    console.error(error);
     res.status(500).json({ error: "AI generation failed" });
   }
 });
@@ -82,27 +72,18 @@ app.post("/generate-report", async (req, res) => {
     const processing = getValue(fields, "processing");
     const currentMaterial = getValue(fields, "material");
     const bioMaterial = getValue(fields, "biodegradable");
-
     const clientName = getValue(fields, "client name");
 
-    const text = [
-      processing,
-      currentMaterial,
-      bioMaterial
-    ].join(" ").toLowerCase();
+    const text = [processing, currentMaterial, bioMaterial].join(" ").toLowerCase();
 
     let finalFeasibility = "MODERATE";
 
-    if (
-      text.includes("injection") &&
-      text.includes("pp") &&
-      text.includes("pla")
-    ) {
+    if (text.includes("injection") && text.includes("pp") && text.includes("pla")) {
       finalFeasibility = "LOW";
     }
 
     const html = injectHtml(htmlTemplate, {
-      client_name: clientName || "",
+      client_name: clientName,
       feasibility_level: finalFeasibility,
       report_date: new Date().toISOString().split("T")[0],
       report_id: "FV-" + Date.now()
@@ -115,7 +96,7 @@ app.post("/generate-report", async (req, res) => {
 
     const page = await browser.newPage();
 
-    await page.setContent(html);
+    await page.setContent(html, { waitUntil: "networkidle0" });
 
     const pdf = await page.pdf({
       format: "A4",
@@ -152,7 +133,7 @@ app.get("/generate-pdf", (req, res) => {
 });
 
 // =========================
-// 起動（最後に1回だけ）
+// 起動（1回だけ）
 // =========================
 const PORT = process.env.PORT || 8080;
 
@@ -160,87 +141,13 @@ app.listen(PORT, () => {
   console.log("Server running on " + PORT);
 });
 
-
-/* =========================
-   ↓↓↓ ここから下は過去コード（触らない）
-   ただし全部コメント化して無効化
-========================= */
-
 /*
-ここに今までのHTMLや壊れたコード全部そのまま残してOK
+=========================
+過去コード（完全無効化）
+=========================
+ここに全部貼ってOK
+絶対にコメントの中に入れること
 */
-// ===== HTMLテンプレ =====
-    const html = `
-<!DOCTYPE html>
-<html>
-<head>
-<meta charset="UTF-8">
-<title>FairVia Report</title>
-<style>
-body { font-family: Arial; padding: 40px; background: #f5f7fa; }
-h1 { color: #1a2b4c; }
-.section { margin-bottom: 20px; padding: 20px; background: white; border-radius: 10px; }
-.label { font-weight: bold; color: #5a6b8c; }
-</style>
-</head>
-
-<body>
-
-<h1>FairVia Technical Report</h1>
-
-<div class="section">
-<div class="label">Compatibility Level</div>
-<div>${aiJson.compatibility_level}</div>
-</div>
-
-<div class="section">
-<div class="label">Executive Summary</div>
-<div>${aiJson.executive_summary}</div>
-</div>
-
-<div class="section">
-<div class="label">Key Risk</div>
-<div>${aiJson.key_risk}</div>
-</div>
-
-<div class="section">
-<div class="label">Processing Window</div>
-<div>${aiJson.processing_window}</div>
-</div>
-
-<div class="section">
-<div class="label">Thermal Behaviour</div>
-<div>${aiJson.thermal_behaviour}</div>
-</div>
-
-<div class="section">
-<div class="label">Flow Characteristics</div>
-<div>${aiJson.flow_characteristics}</div>
-</div>
-
-<div class="section">
-<div class="label">Recommended Next Step</div>
-<div>${aiJson.recommended_next_step}</div>
-</div>
-
-</body>
-</html>
-`;
-
-    res.send(html);
-
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({
-      error: "AI generation failed",
-      detail: error.message
-    });
-  }
-});
-
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on ${PORT}`);
-});
 
 const html = `
 <!DOCTYPE html>
