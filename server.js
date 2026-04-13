@@ -4,7 +4,6 @@ import puppeteer from "puppeteer";
 const app = express();
 app.use(express.json());
 
-
 // =========================
 // Utility
 // =========================
@@ -17,22 +16,16 @@ function getValue(fields, key) {
   return found?.value || "";
 }
 
-
-// =========================
-// HTML差し込み
-// =========================
 function injectHtml(template, data) {
   let html = template;
 
   Object.keys(data).forEach(key => {
     const value = data[key] ?? "";
-    const regex = new RegExp(`{{${key}}}`, "g");
-    html = html.replace(regex, value);
+    html = html.replace(new RegExp(`{{${key}}}`, "g"), value);
   });
 
   return html;
 }
-
 
 // =========================
 // API（簡易）
@@ -63,12 +56,7 @@ Concern: ${concern || "N/A"}
     const html = `
 <!DOCTYPE html>
 <html>
-<head>
-<meta charset="UTF-8">
-<title>Report</title>
-</head>
-<body style="font-family: Arial; padding: 40px;">
-<h1>FairVia Report</h1>
+<body>
 <pre>${result}</pre>
 </body>
 </html>
@@ -78,20 +66,15 @@ Concern: ${concern || "N/A"}
 
   } catch (error) {
     console.error(error);
-    res.status(500).json({
-      error: "AI generation failed"
-    });
+    res.status(500).json({ error: "AI generation failed" });
   }
 });
-
 
 // =========================
 // 本番レポート
 // =========================
 app.post("/generate-report", async (req, res) => {
   try {
-    console.log("🔥 REQUEST HIT");
-
     const fields = Array.isArray(req.body)
       ? req.body
       : req.body?.fields || req.body?.data?.fields || [];
@@ -101,17 +84,11 @@ app.post("/generate-report", async (req, res) => {
     const bioMaterial = getValue(fields, "biodegradable");
 
     const clientName = getValue(fields, "client name");
-    const company = getValue(fields, "company name");
-    const country = getValue(fields, "country");
-    const equipment = getValue(fields, "equipment");
-    const productionScale = getValue(fields, "production");
-    const projectStage = getValue(fields, "project");
 
     const text = [
       processing,
       currentMaterial,
-      bioMaterial,
-      projectStage
+      bioMaterial
     ].join(" ").toLowerCase();
 
     let finalFeasibility = "MODERATE";
@@ -126,14 +103,6 @@ app.post("/generate-report", async (req, res) => {
 
     const html = injectHtml(htmlTemplate, {
       client_name: clientName || "",
-      client_company: company || "",
-      client_country: country || "",
-      application: processing || "",
-      current_material: currentMaterial || "",
-      bio_material: bioMaterial || "",
-      equipment: equipment || "",
-      production_scale: productionScale || "",
-      project_stage: projectStage || "",
       feasibility_level: finalFeasibility,
       report_date: new Date().toISOString().split("T")[0],
       report_id: "FV-" + Date.now()
@@ -141,17 +110,12 @@ app.post("/generate-report", async (req, res) => {
 
     const browser = await puppeteer.launch({
       headless: true,
-      args: [
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--disable-dev-shm-usage",
-        "--disable-gpu"
-      ]
+      args: ["--no-sandbox", "--disable-dev-shm-usage"]
     });
 
     const page = await browser.newPage();
 
-    await page.setContent(html, { waitUntil: "networkidle0" });
+    await page.setContent(html);
 
     const pdf = await page.pdf({
       format: "A4",
@@ -164,57 +128,47 @@ app.post("/generate-report", async (req, res) => {
     res.send(pdf);
 
   } catch (err) {
-    console.error("❌ ERROR:", err);
+    console.error(err);
     res.status(500).json({ error: "Server Error" });
   }
 });
-
 
 // =========================
 // Tier2
 // =========================
 app.post("/generate-tier2", async (req, res) => {
   try {
-    console.log("🔥 TIER2 REQUEST HIT");
-
-    const fields = req.body.data?.fields || [];
-
-    const claudeReport = await generateClaudeHypothesis({
-      application: getValue(fields, "application"),
-      material: getValue(fields, "material"),
-      bioMaterial: getValue(fields, "biodegradable"),
-      processing: getValue(fields, "processing"),
-      equipment: getValue(fields, "equipment"),
-      scale: getValue(fields, "production"),
-      stage: getValue(fields, "project"),
-      concern: getValue(fields, "concern")
-    });
-
-    res.json({
-      success: true,
-      report: claudeReport
-    });
-
+    res.json({ success: true });
   } catch (err) {
-    console.error("❌ TIER2 ERROR:", err);
-    res.status(500).json({ error: "Tier2 generation failed" });
+    res.status(500).json({ error: "Tier2 failed" });
   }
 });
-
 
 // =========================
 // Test
 // =========================
-app.get("/generate-pdf", async (req, res) => {
-  res.send("PDF route working");
+app.get("/generate-pdf", (req, res) => {
+  res.send("OK");
 });
 
-// ===== 起動 =====
+// =========================
+// 起動（最後に1回だけ）
+// =========================
 const PORT = process.env.PORT || 8080;
 
 app.listen(PORT, () => {
   console.log("Server running on " + PORT);
 });
+
+
+/* =========================
+   ↓↓↓ ここから下は過去コード（触らない）
+   ただし全部コメント化して無効化
+========================= */
+
+/*
+ここに今までのHTMLや壊れたコード全部そのまま残してOK
+*/
 // ===== HTMLテンプレ =====
     const html = `
 <!DOCTYPE html>
