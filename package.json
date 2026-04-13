@@ -1,14 +1,9 @@
 {
-  "name": "ai-report",
+  "name": "fairvia",
   "version": "1.0.0",
-  "main": "server_clean.js",
   "type": "module",
-  "scripts": {
-    "start": "node server_clean.js"
-  },
   "dependencies": {
     "express": "^4.18.2",
-    "openai": "^4.0.0",
-    "marked": "^9.0.0"
+    "puppeteer": "^22.0.0"
   }
 }
