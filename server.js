@@ -1,9 +1,42 @@
 import express from "express";
+import puppeteer from "puppeteer";
 
 const app = express();
 app.use(express.json());
 
-// ===== API（簡易）=====
+
+// =========================
+// Utility
+// =========================
+function getValue(fields, key) {
+  if (!Array.isArray(fields)) return "";
+  const found = fields.find(f =>
+    (f.key && f.key.toLowerCase().includes(key)) ||
+    (f.label && f.label.toLowerCase().includes(key))
+  );
+  return found?.value || "";
+}
+
+
+// =========================
+// HTML差し込み
+// =========================
+function injectHtml(template, data) {
+  let html = template;
+
+  Object.keys(data).forEach(key => {
+    const value = data[key] ?? "";
+    const regex = new RegExp(`{{${key}}}`, "g");
+    html = html.replace(regex, value);
+  });
+
+  return html;
+}
+
+
+// =========================
+// API（簡易）
+// =========================
 app.post("/generate-ai", (req, res) => {
   try {
     const { material, bio_material, equipment, concern } = req.body || {};
@@ -51,7 +84,10 @@ Concern: ${concern || "N/A"}
   }
 });
 
-// ===== 本番レポート =====
+
+// =========================
+// 本番レポート
+// =========================
 app.post("/generate-report", async (req, res) => {
   try {
     console.log("🔥 REQUEST HIT");
@@ -80,7 +116,11 @@ app.post("/generate-report", async (req, res) => {
 
     let finalFeasibility = "MODERATE";
 
-    if (text.includes("injection") && text.includes("pp") && text.includes("pla")) {
+    if (
+      text.includes("injection") &&
+      text.includes("pp") &&
+      text.includes("pla")
+    ) {
       finalFeasibility = "LOW";
     }
 
@@ -129,35 +169,44 @@ app.post("/generate-report", async (req, res) => {
   }
 });
 
-// ===== 起動 =====
-const PORT = process.env.PORT || 8080;
 
-app.listen(PORT, () => {
-  console.log("Server running on " + PORT);
+// =========================
+// Tier2
+// =========================
+app.post("/generate-tier2", async (req, res) => {
+  try {
+    console.log("🔥 TIER2 REQUEST HIT");
+
+    const fields = req.body.data?.fields || [];
+
+    const claudeReport = await generateClaudeHypothesis({
+      application: getValue(fields, "application"),
+      material: getValue(fields, "material"),
+      bioMaterial: getValue(fields, "biodegradable"),
+      processing: getValue(fields, "processing"),
+      equipment: getValue(fields, "equipment"),
+      scale: getValue(fields, "production"),
+      stage: getValue(fields, "project"),
+      concern: getValue(fields, "concern")
+    });
+
+    res.json({
+      success: true,
+      report: claudeReport
+    });
+
+  } catch (err) {
+    console.error("❌ TIER2 ERROR:", err);
+    res.status(500).json({ error: "Tier2 generation failed" });
+  }
 });
 
-    const html = `
-<!DOCTYPE html>
-<html>
-<head>
-<meta charset="UTF-8">
-<title>Report</title>
-</head>
-<body style="font-family: Arial; padding: 40px;">
-<h1>FairVia Report</h1>
-<pre>${result}</pre>
-</body>
-</html>
-`;
 
-    res.send(html);
-
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({
-      error: "AI generation failed"
-    });
-  }
+// =========================
+// Test
+// =========================
+app.get("/generate-pdf", async (req, res) => {
+  res.send("PDF route working");
 });
 
 // ===== 起動 =====
