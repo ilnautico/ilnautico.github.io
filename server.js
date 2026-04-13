@@ -1,15 +1,11 @@
 import express from "express";
 import puppeteer from "puppeteer";
 import { Resend } from "resend";
-import fs from "fs";
-import path from "path";
 
 const app = express();
 app.use(express.json());
 
 const resend = new Resend(process.env.RESEND_API_KEY);
-
-const PDF_PATH = "/tmp/latest.pdf";
 
 // =========================
 // util
@@ -31,7 +27,7 @@ function getValue(fields, key) {
 }
 
 // =========================
-// TEST用（ブラウザで叩ける）
+// TEST用（確認用）
 // =========================
 app.get("/generate-report", async (req, res) => {
   console.log("🔥 GET TEST HIT");
@@ -43,20 +39,24 @@ app.get("/generate-report", async (req, res) => {
     });
 
     const page = await browser.newPage();
-
     await page.setContent("<h1>TEST PDF OK</h1>");
 
-    await page.pdf({
-      path: PDF_PATH,
+    const pdf = await page.pdf({
       format: "A4",
       printBackground: true
     });
 
     await browser.close();
 
-    console.log("✅ PDF SAVED");
+    console.log("✅ PDF GENERATED");
 
-    res.send("PDF generated");
+    // 🔥 即返し
+    res.set({
+      "Content-Type": "application/pdf",
+      "Content-Disposition": "inline; filename=test.pdf"
+    });
+
+    res.send(pdf);
 
   } catch (err) {
     console.error(err);
@@ -65,7 +65,7 @@ app.get("/generate-report", async (req, res) => {
 });
 
 // =========================
-// 本番生成
+// 本番生成（最重要）
 // =========================
 app.post("/generate-report", async (req, res) => {
   console.log("🔥 REQUEST HIT");
@@ -135,57 +135,49 @@ app.post("/generate-report", async (req, res) => {
     await page.setContent(html, { waitUntil: "networkidle0" });
 
     const pdf = await page.pdf({
-      path: PDF_PATH,
       format: "A4",
       printBackground: true
     });
 
-    console.log("✅ PDF SAVED");
-
     await browser.close();
 
-    if (!email) {
-      return res.json({ success: true });
+    console.log("✅ PDF GENERATED");
+
+    // =========================
+    // メール送信（そのまま）
+    // =========================
+    if (email) {
+      await resend.emails.send({
+        from: "FairVia <info@ilnautico.com>",
+        to: email,
+        subject: "FairVia Report",
+        html: `<p>Your report result: <b>${finalFeasibility}</b></p>`,
+        attachments: [
+          {
+            filename: "report.pdf",
+            content: pdf.toString("base64"),
+            encoding: "base64"
+          }
+        ]
+      });
+
+      console.log("✅ MAIL SENT");
     }
 
-    await resend.emails.send({
-      from: "FairVia <info@ilnautico.com>",
-      to: email,
-      subject: "FairVia Report",
-      html: `<p>Your report result: <b>${finalFeasibility}</b></p>`,
-      attachments: [
-        {
-          filename: "report.pdf",
-          content: pdf.toString("base64"),
-          encoding: "base64"
-        }
-      ]
+    // =========================
+    // 🔥 ここが最終解決（即返し）
+    // =========================
+    res.set({
+      "Content-Type": "application/pdf",
+      "Content-Disposition": "inline; filename=report.pdf"
     });
 
-    console.log("✅ MAIL SENT");
-
-    res.json({ success: true });
+    res.send(pdf);
 
   } catch (err) {
     console.error("❌ ERROR:", err);
     res.status(500).json({ error: "Server Error" });
   }
-});
-
-// =========================
-// PDF表示（最重要）
-// =========================
-app.get("/latest-pdf", (req, res) => {
-  console.log("📥 PDF REQUEST");
-
-  if (!fs.existsSync(PDF_PATH)) {
-    console.log("❌ PDF NOT FOUND");
-    return res.status(404).send("PDF not found");
-  }
-
-  console.log("✅ PDF SENT");
-
-  res.sendFile(path.resolve(PDF_PATH));
 });
 
 // =========================
