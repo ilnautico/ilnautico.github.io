@@ -1,92 +1,53 @@
 import express from "express";
-import fs from "fs";
-import path from "path";
 
 const app = express();
 app.use(express.json());
 
-const PDF_PATH = "/tmp/latest.pdf";
-
-// ===== HTMLテンプレ =====
-function loadTemplate() {
+// ===== API =====
+app.post("/generate-ai", (req, res) => {
   try {
-    return fs.readFileSync(path.join(process.cwd(), "template.html"), "utf-8");
-  } catch (e) {
-    return `
-<!DOCTYPE html>
-<html>
-<head>
-<meta charset="UTF-8">
-<title>FairVia Report</title>
-</head>
-<body style="font-family: Arial; padding: 40px;">
-<h1>FairVia Report</h1>
-<pre>{{CONTENT}}</pre>
-</body>
-</html>
-`;
-  }
-}
+    const { material, bio_material, equipment, concern } = req.body || {};
 
-// ===== HTML生成 =====
-function buildHTML(content) {
-  const template = loadTemplate();
-  return template.replace("{{CONTENT}}", content);
-}
-
-// ===== AI結果（仮・後で本物に差し替えOK）=====
-function generateResult(input) {
-  return `
+    const result = `
 ## Compatibility Level
 Moderate
 
 ## Technical Observations
-- LDPEとPHAは相溶性が低い
-- フィルム押出では温度制御が重要
-- PHAは熱分解リスクあり
+- ${material || "Material"} と ${bio_material || "Bio"} は相溶性が低い
+- ${equipment || "Equipment"} は温度制御が重要
+- 分解リスクあり
 
-## Potential Risks
+## Risks
 - 相分離
 - 熱劣化
-- 厚み不安定
+- 不安定性
 
-## Suggested Next Step
-温度最適化と試作検証
-
-Input:
-${JSON.stringify(input, null, 2)}
+## Next Step
+試作テストを実施
+Concern: ${concern || "N/A"}
 `;
-}
 
-// ===== API =====
-app.post("/generate-ai", (req, res) => {
-  try {
-    const input = req.body || {};
+    const html = `
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Report</title>
+</head>
+<body style="font-family: Arial; padding: 40px;">
+<h1>FairVia Report</h1>
+<pre>${result}</pre>
+</body>
+</html>
+`;
 
-    const result = generateResult(input);
-    const html = buildHTML(result);
+    res.send(html);
 
-    fs.writeFileSync(PDF_PATH, Buffer.from(html));
-
-    res.json({ ok: true, result });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: "AI generation failed" });
-  }
-});
-
-// ===== PDF取得 =====
-app.get("/latest-pdf", (req, res) => {
-  try {
-    if (!fs.existsSync(PDF_PATH)) {
-      return res.status(404).send("No PDF yet");
-    }
-
-    res.setHeader("Content-Type", "application/pdf");
-    fs.createReadStream(PDF_PATH).pipe(res);
-  } catch (error) {
-    console.error(error);
-    res.status(500).send("PDF load error");
+    res.status(500).json({
+      error: "AI generation failed"
+    });
   }
 });
 
@@ -1500,50 +1461,3 @@ app.get("/generate-pdf", async (req, res) => {
     res.status(500).send("error");
   }
 });
-// ===== SAFE START BLOCK（追加専用・既存コード非干渉） =====
-if (!global.__SAFE_SERVER_STARTED__) {
-  global.__SAFE_SERVER_STARTED__ = true;
-
-  const express = (await import("express")).default;
-  const safeApp = express();
-
-  safeApp.use(express.json());
-
-  safeApp.post("/safe-generate", (req, res) => {
-    try {
-      const { material, bio_material, equipment, concern } = req.body || {};
-
-      const result = `
-## Compatibility Level
-Moderate
-
-## Technical Observations
-- ${material || "Material"} and ${bio_material || "Bio"} compatibility is limited
-- ${equipment || "Equipment"} requires stable temperature control
-- Degradation risk must be managed
-
-## Risks
-- Phase separation
-- Thermal degradation
-- Instability
-
-## Next Step
-Run pilot test
-Concern: ${concern || "N/A"}
-`;
-
-      res.json({ ok: true, result });
-
-    } catch (error) {
-      console.error("SAFE ERROR:", error);
-      res.status(500).json({ error: "safe generation failed" });
-    }
-  });
-
-  const PORT = process.env.PORT || 8080;
-
-  safeApp.listen(PORT, () => {
-    console.log("SAFE SERVER RUNNING ON " + PORT);
-  });
-}
-// ===== END SAFE BLOCK =====
