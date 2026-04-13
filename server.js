@@ -261,14 +261,77 @@ app.listen(PORT, () => {
 ※ 必ずこの中に入れること
 ※ 外に出したら即エラーになる
 */
+   const html = `
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>FairVia Report</title>
+<style>
+body { font-family: Arial; padding: 40px; background: #f5f7fa; }
+h1 { color: #1a2b4c; }
+.section { margin-bottom: 20px; padding: 20px; background: white; border-radius: 10px; }
+.label { font-weight: bold; color: #5a6b8c; }
+</style>
+</head>
 
-/*
-=========================
-過去コード（完全無効化）
-=========================
-ここに全部貼ってOK
-絶対にコメントの中に入れること
-*/
+<body>
+
+<h1>FairVia Technical Report</h1>
+
+<div class="section">
+<div class="label">Compatibility Level</div>
+<div>${aiJson.compatibility_level}</div>
+</div>
+
+<div class="section">
+<div class="label">Executive Summary</div>
+<div>${aiJson.executive_summary}</div>
+</div>
+
+<div class="section">
+<div class="label">Key Risk</div>
+<div>${aiJson.key_risk}</div>
+</div>
+
+<div class="section">
+<div class="label">Processing Window</div>
+<div>${aiJson.processing_window}</div>
+</div>
+
+<div class="section">
+<div class="label">Thermal Behaviour</div>
+<div>${aiJson.thermal_behaviour}</div>
+</div>
+
+<div class="section">
+<div class="label">Flow Characteristics</div>
+<div>${aiJson.flow_characteristics}</div>
+</div>
+
+<div class="section">
+<div class="label">Recommended Next Step</div>
+<div>${aiJson.recommended_next_step}</div>
+</div>
+
+</body>
+</html>
+`;
+
+    res.send(html);
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      error: "AI generation failed",
+      detail: error.message
+    });
+  }
+});
+
+app.listen(PORT, () => {
+  console.log(🚀 Server running on ${PORT});
+});
 
 const html = `
 <!DOCTYPE html>
@@ -970,7 +1033,6 @@ body {
 </head>
 <body>
 
-
 <!-- ═══════════════════════════════════════════════════════
      PAGE 1 — COVER
 ═══════════════════════════════════════════════════════ -->
@@ -1028,7 +1090,6 @@ body {
   </div>
 
 </div>
-
 
 <!-- ═══════════════════════════════════════════════════════
      PAGE 2 — CLIENT INFORMATION + EXECUTIVE SUMMARY
@@ -1110,7 +1171,6 @@ body {
   </div>
 
 </div>
-
 
 <!-- ═══════════════════════════════════════════════════════
      PAGE 3 — RISK INDICATOR + SCORE TABLE
@@ -1217,7 +1277,6 @@ body {
 
 </div>
 
-
 <!-- ═══════════════════════════════════════════════════════
      PAGE 4 — TECHNICAL OBSERVATIONS + POTENTIAL RISKS
 ═══════════════════════════════════════════════════════ -->
@@ -1280,7 +1339,6 @@ body {
 
 </div>
 
-
 <!-- ═══════════════════════════════════════════════════════
      PAGE 5 — RECOMMENDATION + DISCLAIMER
 ═══════════════════════════════════════════════════════ -->
@@ -1336,7 +1394,6 @@ body {
   </div>
 
 </div>
-
 
 </body>
 </html>
@@ -1534,7 +1591,7 @@ score_eol_note: "End-of-life compliance should be evaluated based on regional re
       from: "FairVia <info@ilnautico.com>",
       to: email,
       subject: "FairVia Report",
-      html: `<p>Your report result: <b>${finalFeasibility}</b></p>`,
+      html: <p>Your report result: <b>${finalFeasibility}</b></p>,
       attachments: [
         {
           filename: "report.pdf",
@@ -1601,3 +1658,7 @@ app.get("/generate-pdf", async (req, res) => {
     res.status(500).send("error");
   }
 });
+/*
+=========================
+過去コード（完全無効化）
+=========================
