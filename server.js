@@ -16,15 +16,8 @@ function injectHtml(template, data) {
   return output;
 }
 
-function getValue(fields, key) {
-  const f = fields.find((x) =>
-    (x.label || "").toLowerCase().includes(key)
-  );
-  return f?.value || "";
-}
-
 // =========================
-// TEST（GETで確認できる用）
+// PDF生成（GETで1発確認）
 // =========================
 app.get("/generate-report", async (req, res) => {
   console.log("🔥 GET TEST HIT");
@@ -69,8 +62,8 @@ app.get("/generate-report", async (req, res) => {
 
     await browser.close();
 
-    // 🔥 PDF保存（これがないと永遠にNOT FOUND）
-    fs.writeFileSync("/tmp/latest.pdf", pdf);
+    // 🔥 ここが最重要（Railwayでも確実に残る場所）
+    fs.writeFileSync("./latest.pdf", pdf);
     console.log("✅ PDF SAVED");
 
     res.send("PDF generated");
@@ -87,7 +80,7 @@ app.get("/generate-report", async (req, res) => {
 app.get("/latest-pdf", (req, res) => {
   console.log("📥 PDF REQUEST");
 
-  const filePath = "/tmp/latest.pdf";
+  const filePath = "./latest.pdf";
 
   if (!fs.existsSync(filePath)) {
     console.log("❌ PDF NOT FOUND");
