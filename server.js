@@ -5,6 +5,13 @@ import fs from "fs";
 const app = express();
 app.use(express.json());
 
+const PORT = process.env.PORT || 8080;
+
+// =========================
+// テンプレURL（変更しない）
+// =========================
+const TEMPLATE_URL = "https://raw.githubusercontent.com/ilnautico/ilnautico.github.io/main/template.html";
+
 // =========================
 // util
 // =========================
@@ -25,11 +32,6 @@ function getValue(fields, keyName) {
 }
 
 // =========================
-// テンプレURL（←ここ重要）
-// =========================
-const TEMPLATE_URL = "https://raw.githubusercontent.com/ilnautico/ilnautico.github.io/main/template.html";
-
-// =========================
 // テンプレ取得
 // =========================
 async function fetchTemplate() {
@@ -39,7 +41,7 @@ async function fetchTemplate() {
 }
 
 // =========================
-// テスト（GET）
+// TEST（確認用）
 // =========================
 app.get("/generate-report", async (req, res) => {
   console.log("🔥 TEST HIT");
@@ -49,30 +51,49 @@ app.get("/generate-report", async (req, res) => {
 
     const html = injectHtml(template, {
       application: "Injection",
+
       executive_summary: "This transition presents moderate feasibility.",
+
       processing_window: "Stable window required",
       thermal_behavior: "Thermal sensitivity exists",
       flow_characteristics: "Flow differs from PP",
+
       mechanical_behavior: "Slight reduction in strength",
       surface_quality: "Minor variation",
       structural_consistency: "Cooling dependent",
+
       primary_risk: "Thermal degradation",
       secondary_risk: "Flow instability",
       mechanism: "Polymer breakdown under heat",
+
       stability: "Moderate",
       consistency: "Requires validation",
+
       pha_score: 60,
+
       base_image: "",
       dynamic_overlay: "",
+
       next_step: "Proceed with pilot"
     });
 
     const browser = await puppeteer.launch({
       headless: true,
-      args: ["--no-sandbox","--disable-setuid-sandbox","--disable-dev-shm-usage"]
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage"
+      ]
     });
 
     const page = await browser.newPage();
+
+    // 🔥 これがズレ防止の本体
+    await page.setViewport({
+      width: 1200,
+      height: 1600
+    });
+
     await page.setContent(html, { waitUntil: "networkidle0" });
 
     const pdf = await page.pdf({
@@ -81,6 +102,7 @@ app.get("/generate-report", async (req, res) => {
     });
 
     fs.writeFileSync("/tmp/latest.pdf", pdf);
+
     await browser.close();
 
     console.log("✅ PDF SAVED");
@@ -94,7 +116,7 @@ app.get("/generate-report", async (req, res) => {
 });
 
 // =========================
-// 本番（POST）
+// 本番（フォーム連携）
 // =========================
 app.post("/generate-report", async (req, res) => {
   console.log("🔥 REQUEST HIT");
@@ -106,15 +128,11 @@ app.post("/generate-report", async (req, res) => {
       ? req.body
       : req.body?.fields || req.body?.data?.fields || [];
 
-    // ===== 先に定義（←エラー対策） =====
+    // ===== 入力 =====
     const processing = getValue(fields, "processing");
     const currentMaterial = getValue(fields, "material");
     const bioMaterial = getValue(fields, "biodegradable");
     const projectStage = getValue(fields, "project");
-
-    const clientName = getValue(fields, "client");
-    const company = getValue(fields, "company");
-    const country = getValue(fields, "country");
 
     // ===== 判定 =====
     const text = [
@@ -136,12 +154,13 @@ app.post("/generate-report", async (req, res) => {
     // ===== スコア =====
     const phaScore = feasibility === "LOW" ? 35 : 65;
 
-    // ===== HTML =====
+    // ===== inject =====
     const html = injectHtml(template, {
 
       application: processing || "",
 
       executive_summary: `Feasibility: ${feasibility}`,
+
       processing_window: "Controlled processing window required",
       thermal_behavior: "Thermal stability must be monitored",
       flow_characteristics: "Flow differs from baseline material",
@@ -163,15 +182,25 @@ app.post("/generate-report", async (req, res) => {
       dynamic_overlay: "",
 
       next_step: "Proceed with pilot validation"
-
     });
 
     const browser = await puppeteer.launch({
       headless: true,
-      args: ["--no-sandbox","--disable-setuid-sandbox","--disable-dev-shm-usage"]
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage"
+      ]
     });
 
     const page = await browser.newPage();
+
+    // 🔥 ズレ防止
+    await page.setViewport({
+      width: 1200,
+      height: 1600
+    });
+
     await page.setContent(html, { waitUntil: "networkidle0" });
 
     const pdf = await page.pdf({
@@ -180,6 +209,7 @@ app.post("/generate-report", async (req, res) => {
     });
 
     fs.writeFileSync("/tmp/latest.pdf", pdf);
+
     await browser.close();
 
     console.log("✅ PDF SAVED");
@@ -211,8 +241,6 @@ app.get("/latest-pdf", (req, res) => {
 // =========================
 // 起動
 // =========================
-const PORT = process.env.PORT || 8080;
-
 app.listen(PORT, () => {
   console.log(`🚀 Server running on ${PORT}`);
 });
