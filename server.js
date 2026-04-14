@@ -29,27 +29,27 @@ function injectHtml(template, data) {
 }
 
 // =========================
-// メイン
+// メイン（POST）
 // =========================
 app.post("/generate-report", async (req, res) => {
-
   console.log("🔥 REQUEST HIT");
 
   try {
 
-    // =========================
-    // 🔥 テンプレ読み込み（これだけ）
-    // =========================
     const template = fs.readFileSync(
       path.join(__dirname, "template.html"),
       "utf8"
     );
 
     // =========================
-    // 入力（ここは既存ロジックに置き換えてOK）
+    // 固定データ（まずは動作優先）
     // =========================
-    const data = {
+    const dynamicOverlay = `
+<div style="position:absolute; left:42%; top:58%; width:120px; height:80px; border-radius:50%; border:2px solid rgba(180,180,180,0.5);"></div>
+<div style="position:absolute; left:45%; top:60%; width:80px; height:50px; border-radius:50%; border:2px solid rgba(140,200,160,0.6);"></div>
+`;
 
+    const data = {
       application: "Injection molding",
       material_transition: "PP → PHA",
       assessment_type: "Preliminary",
@@ -80,82 +80,15 @@ app.post("/generate-report", async (req, res) => {
       consistency_note: "Dependent on processing conditions.",
 
       pha_score: 65,
-      base_image: "https://ilnautico.github.io/visual-base.png",
-      dynamic_overlay: "",
+
+      // 🔥 画像＋バルーン
+      base_image: "https://images.unsplash.com/photo-1581094794329-c8112a89af12?q=80&w=1200",
+      dynamic_overlay: dynamicOverlay,
 
       next_step: "Proceed with pilot validation."
-
     };
 
-    // =========================
-    // HTML生成
-    // =========================
-// =========================
-// HTMLデータ注入（ここだけ置き換え）
-// =========================
-
-const dynamicOverlay = `
-<div style="position:absolute; left:42%; top:58%; width:120px; height:80px; border-radius:50%; border:2px solid rgba(180,180,180,0.5);"></div>
-<div style="position:absolute; left:45%; top:60%; width:80px; height:50px; border-radius:50%; border:2px solid rgba(140,200,160,0.6);"></div>
-`;
-
-const html = injectHtml(template, {
-  // 基本情報
-  application: application || "Test",
-  material_transition: (currentMaterial && bioMaterial)
-    ? `${currentMaterial} → ${bioMaterial}`
-    : "Test",
-  assessment_type: "Preliminary Screening",
-  report_date: new Date().toISOString().split("T")[0],
-
-  // 判定
-  compatibility_level: finalFeasibility || "Moderate",
-
-  // サマリー（未定義エラー防止）
-  executive_summary: typeof SUMMARY_OVERVIEW !== "undefined"
-    ? SUMMARY_OVERVIEW
-    : "Test summary",
-  key_risk: typeof SUMMARY_FINDINGS !== "undefined"
-    ? SUMMARY_FINDINGS
-    : "Test risk",
-
-  // 技術項目
-  processing_window: "Test",
-  thermal_behavior: "Test",
-  flow_characteristics: "Test",
-
-  mechanical_behavior: "Test",
-  surface_quality: "Test",
-  structural_consistency: "Test",
-
-  application_implication: "Test",
-
-  primary_risk_title: "Test",
-  primary_risk: "Test",
-
-  secondary_risk_title: "Test",
-  secondary_risk: "Test",
-
-  mechanism: "Test",
-
-  stability: "Test",
-  stability_note: "Test",
-
-  consistency: "Test",
-  consistency_note: "Test",
-
-  // グラフ
-  pha_score: 55,
-
-  // 🔥 ここが今回の修正（画像＋バルーン）
-  base_image: "https://images.unsplash.com/photo-1581094794329-c8112a89af12?q=80&w=1200",
-  dynamic_overlay: dynamicOverlay,
-
-  // 次ステップ
-  next_step: typeof STRATEGIC_RECOMMENDATION !== "undefined"
-    ? STRATEGIC_RECOMMENDATION
-    : "Test next step"
-});
+    const html = injectHtml(template, data);
 
     // =========================
     // Puppeteer
@@ -185,9 +118,6 @@ const html = injectHtml(template, {
 
     fs.writeFileSync(PDF_PATH, pdf);
 
-    // =========================
-    // 🔥 ここ重要（これがないと何も起きない）
-    // =========================
     res.setHeader("Content-Type", "application/pdf");
     res.send(pdf);
 
@@ -198,12 +128,10 @@ const html = injectHtml(template, {
 });
 
 // =========================
-// 確認用
+// GET（ブラウザ確認用）
 // =========================
-app.get("/", (req, res) => {
-  res.send("Server Running");
-});
 app.get("/generate-report", async (req, res) => {
+  console.log("🔥 GET HIT");
 
   try {
 
@@ -212,71 +140,29 @@ app.get("/generate-report", async (req, res) => {
       "utf8"
     );
 
-  const dynamicOverlay = `
-<div style="
-  position:absolute;
-  left:42%;
-  top:58%;
-  width:120px;
-  height:80px;
-  border-radius:50%;
-  border:2px solid rgba(180,180,180,0.5);
-"></div>
-
-<div style="
-  position:absolute;
-  left:45%;
-  top:60%;
-  width:80px;
-  height:50px;
-  border-radius:50%;
-  border:2px solid rgba(140,200,160,0.6);
-"></div>
+    const dynamicOverlay = `
+<div style="position:absolute; left:42%; top:58%; width:120px; height:80px; border-radius:50%; border:2px solid rgba(180,180,180,0.5);"></div>
 `;
 
-const html = injectHtml(template, {
-  application: application || "Test",
-  material_transition: `${currentMaterial} → ${bioMaterial}`,
-  assessment_type: "Preliminary Screening",
-  report_date: new Date().toISOString().split("T")[0],
+    const data = {
+      application: "Test",
+      material_transition: "Test → Test",
+      assessment_type: "Preview",
+      report_date: new Date().toISOString().split("T")[0],
 
-  compatibility_level: finalFeasibility,
+      compatibility_level: "Moderate",
+      executive_summary: "Preview mode",
+      key_risk: "Preview risk",
 
-  executive_summary: SUMMARY_OVERVIEW,
-  key_risk: SUMMARY_FINDINGS,
+      pha_score: 50,
 
-  processing_window: "To be validated under controlled conditions",
-  thermal_behavior: "Thermal sensitivity observed under transition conditions",
-  flow_characteristics: "Moderate deviation expected",
+      base_image: "https://images.unsplash.com/photo-1581094794329-c8112a89af12?q=80&w=1200",
+      dynamic_overlay: dynamicOverlay,
 
-  mechanical_behavior: "Reduced flexibility compared to baseline",
-  surface_quality: "Minor visual variation expected",
-  structural_consistency: "Requires validation",
+      next_step: "Test"
+    };
 
-  application_implication: "Applicable under controlled processing constraints",
-
-  primary_risk_title: "Thermal Instability",
-  primary_risk: "Material degradation risk under extended residence time",
-
-  secondary_risk_title: "Processing Sensitivity",
-  secondary_risk: "Stability may fluctuate depending on shear conditions",
-
-  mechanism: "Polymer chain sensitivity to thermal stress",
-
-  stability: "Moderate",
-  stability_note: "Requires controlled temperature range",
-
-  consistency: "Moderate",
-  consistency_note: "Dependent on equipment precision",
-
-  pha_score: 55,
-
-  // 🔥 ここ重要
-  base_image: "https://images.unsplash.com/photo-1581094794329-c8112a89af12?q=80&w=1200",
-  dynamic_overlay: dynamicOverlay,
-
-  next_step: STRATEGIC_RECOMMENDATION
-});
+    const html = injectHtml(template, data);
 
     const browser = await puppeteer.launch({
       headless: true,
@@ -297,8 +183,14 @@ const html = injectHtml(template, {
     res.send(pdf);
 
   } catch (err) {
+    console.error(err);
     res.status(500).send("error");
   }
+});
+
+// =========================
+app.get("/", (req, res) => {
+  res.send("Server Running");
 });
 
 const PORT = process.env.PORT || 8080;
