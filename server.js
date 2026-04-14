@@ -61,55 +61,49 @@ app.get("/generate-report", async (req, res) => {
     // =========================
     // HTML生成
     // =========================
-    const html = injectHtml(template, {
-      application: application,
-      material_transition: `${currentMaterial} → ${bioMaterial}`,
-      assessment_type: "Preliminary Screening",
-      report_date: new Date().toISOString().split("T")[0],
+   const html = injectHtml(template, {
+  application: application,
+  material_transition: `${currentMaterial} → ${bioMaterial}`,
+  assessment_type: "Preliminary Screening",
+  report_date: new Date().toISOString().split("T")[0],
 
-      compatibility_level: finalFeasibility,
+  compatibility_level: finalFeasibility,
 
-      executive_summary:
-        "This transition presents moderate feasibility under controlled conditions.",
-      key_risk:
-        "Thermal instability during extended residence time.",
+  // 🔥 AI戻す
+  executive_summary: SUMMARY_OVERVIEW,
+  key_risk: SUMMARY_FINDINGS,
 
-      processing_window: "Requires controlled temperature range",
-      thermal_behavior: "Thermal degradation risk under heat",
-      flow_characteristics: "Lower melt strength vs PP",
+  processing_window: "To be validated under controlled conditions",
+  thermal_behavior: "Thermal sensitivity observed",
+  flow_characteristics: "Moderate deviation expected",
 
-      mechanical_behavior: "Moderate stiffness reduction",
-      surface_quality: "Surface variation possible",
-      structural_consistency: "Dependent on stability",
+  mechanical_behavior: "Reduced flexibility",
+  surface_quality: "Minor variation",
+  structural_consistency: "Requires validation",
 
-      application_implication: "Suitable for pilot validation",
+  application_implication: SUMMARY_CONCLUSION,
 
-      primary_risk_title: "Thermal Degradation",
-      primary_risk: "Material breakdown under heat",
+  primary_risk_title: RISK_1_TITLE,
+  primary_risk: RISK_1_BODY,
 
-      secondary_risk_title: "Flow Instability",
-      secondary_risk: "Inconsistent flow",
+  secondary_risk_title: RISK_2_TITLE,
+  secondary_risk: RISK_2_BODY,
 
-      mechanism: "Polymer chain scission",
+  mechanism: "Polymer chain sensitivity",
 
-      stability: "Moderate",
-      stability_note: "Requires controlled validation",
+  stability: "Moderate",
+  stability_note: "Requires validation",
 
-      consistency: "Variable",
-      consistency_note: "Depends on process",
+  consistency: "Moderate",
+  consistency_note: "Process dependent",
 
-      // 🔥 メーター復活
-      pha_score: phaScore,
+  pha_score: phaScore,
 
-      // 🔥 元画像復活
-      base_image: "https://ilnautico.github.io/visual-base.png",
+  base_image: "https://ilnautico.github.io/visual-base.png",
+  dynamic_overlay: dynamicOverlay,
 
-      // 🔥 バルーン
-      dynamic_overlay: dynamicOverlay,
-
-      next_step: "Proceed with pilot validation"
-    });
-
+  next_step: STRATEGIC_RECOMMENDATION
+});
     // =========================
     // Puppeteer
     // =========================
