@@ -100,7 +100,7 @@ app.post("/generate-report", async (req, res) => {
 
       // 🔥 正しい書き方（ここ修正済）
       base_image:
-        "https://images.unsplash.com/photo-1581094794329-c8112a89af12?w=1200",
+       base_image: "https://ilnautico.github.io/bioplastic-visual.png",
 
       dynamic_overlay: dynamicOverlay,
 
