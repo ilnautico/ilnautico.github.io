@@ -1,3 +1,4 @@
+console.log("🔥 THIS IS NEW SERVER FILE 🔥");
 import express from "express";
 import puppeteer from "puppeteer";
 import fs from "fs";
