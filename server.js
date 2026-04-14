@@ -17,7 +17,7 @@ const PDF_PATH = "/tmp/latest.pdf";
 
 
 // =========================
-// スコアロジック（固定）
+// スコアロジック
 // =========================
 const optimalTemp = 180;
 
@@ -32,7 +32,7 @@ function calc(temp) {
 
 
 // =========================
-// Overlay（完全復元）
+// Overlay（完全復元＋ズレ修正済）
 // =========================
 function generateOverlay(scoreLeft, scoreRight) {
 
@@ -44,28 +44,58 @@ function generateOverlay(scoreLeft, scoreRight) {
   <div style="position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;">
 
     <!-- 温度 -->
-    <div style="position:absolute; left:33.5%; top:6%; font-size:26px;">230°C</div>
-    <div style="position:absolute; left:66%; top:6%; font-size:26px; color:#dc2626;">180°C</div>
+    <div style="position:absolute; left:33.5%; top:6%; font-size:26px;">
+      230°C
+    </div>
+
+    <div style="position:absolute; left:66%; top:6%; font-size:26px; color:#dc2626;">
+      180°C
+    </div>
 
     <!-- スコア -->
-    <div style="position:absolute; left:40%; top:22%;">${scoreLeft}</div>
-    <div style="position:absolute; left:72%; top:22%; color:#dc2626;">${scoreRight}</div>
+    <div style="position:absolute; left:40%; top:22%; font-size:16px;">
+      ${scoreLeft}
+    </div>
 
-    <!-- 青波 -->
-    <svg style="position:absolute; left:46.8%; top:57.2%; width:11%; height:8%;">
+    <div style="position:absolute; left:72%; top:22%; font-size:16px; color:#dc2626;">
+      ${scoreRight}
+    </div>
+
+    <!-- 青波（修正済） -->
+    <svg style="
+      position:absolute;
+      left:46.8%;
+      top:60%;
+      width:11%;
+      height:8%;
+      transform:translate(-50%, -50%);
+    " viewBox="0 0 80 20">
       <path stroke="#3B82A0" stroke-width="2" fill="none"
         d="M0 10 Q20 ${10-ampLeft} 40 10 T80 10"/>
     </svg>
 
-    <!-- 赤波 -->
-    <svg style="position:absolute; left:71.5%; top:64%; width:11%; height:8%;">
+    <!-- 赤波（修正済） -->
+    <svg style="
+      position:absolute;
+      left:71.5%;
+      top:66%;
+      width:11%;
+      height:8%;
+      transform:translate(-50%, -50%);
+    " viewBox="0 0 80 20">
       <path stroke="#dc2626" stroke-width="2" fill="none"
         d="M0 10 Q20 ${10-ampRight} 40 10 T80 10"/>
     </svg>
 
     <!-- メーター -->
     <svg viewBox="0 0 200 120"
-      style="position:absolute; right:6%; bottom:6%; width:140px; height:90px;">
+      style="
+        position:absolute;
+        right:6%;
+        bottom:6%;
+        width:140px;
+        height:90px;
+      ">
 
       <path d="M20 100 A80 80 0 0 1 180 100 L100 100 Z"
         fill="url(#grad)" />
@@ -81,7 +111,9 @@ function generateOverlay(scoreLeft, scoreRight) {
 
       <g transform="rotate(${angle} 100 100)">
         <line x1="100" y1="100" x2="100" y2="30"
-          stroke="#111" stroke-width="2.5"/>
+          stroke="#111"
+          stroke-width="2.5"
+          stroke-linecap="round"/>
       </g>
 
       <circle cx="100" cy="100" r="4.5" fill="#111"/>
@@ -108,7 +140,7 @@ function injectHtml(template, data) {
 
 
 // =========================
-// メインPDF生成
+// PDF生成
 // =========================
 async function generatePDF(res) {
 
@@ -120,9 +152,17 @@ async function generatePDF(res) {
   const scoreLeft = calc(230);
   const scoreRight = calc(180);
 
-  // 🔥 仮データ（AIなし）
-  const aiData = {
-    executive_summary: "Moderate feasibility under controlled processing conditions.",
+  const data = {
+    base_image: "https://ilnautico.github.io/visual-base.png",
+    dynamic_overlay: generateOverlay(scoreLeft, scoreRight),
+
+    pha_score: scoreRight,
+
+    compatibility_level: scoreLeft > 70 ? "High" : scoreLeft > 40 ? "Moderate" : "Low",
+    stability: scoreLeft > 70 ? "High" : "Moderate",
+    consistency: scoreRight > 70 ? "Variable" : "Stable",
+
+    executive_summary: "Moderate feasibility under controlled conditions.",
     key_risk: "Thermal instability risk.",
     processing_window: "Moderate",
     thermal_behavior: "Sensitive",
@@ -141,19 +181,7 @@ async function generatePDF(res) {
     next_step: "Proceed with pilot testing"
   };
 
-  const html = injectHtml(template, {
-
-    base_image: "https://ilnautico.github.io/visual-base.png",
-    dynamic_overlay: generateOverlay(scoreLeft, scoreRight),
-
-    pha_score: scoreRight,
-
-    compatibility_level: scoreLeft > 70 ? "High" : scoreLeft > 40 ? "Moderate" : "Low",
-    stability: scoreLeft > 70 ? "High" : "Moderate",
-    consistency: scoreRight > 70 ? "Variable" : "Stable",
-
-    ...aiData
-  });
+  const html = injectHtml(template, data);
 
   const browser = await puppeteer.launch({
     headless: true,
