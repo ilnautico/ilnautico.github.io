@@ -17,113 +17,96 @@ function injectHtml(template, data) {
 }
 
 // =========================
-// PDF生成（メイン）
+// HTMLテンプレ（←ここに3万円 or 数十万円テンプレ）
 // =========================
-app.post("/generate-report", async (req, res) => {
-  console.log("🔥 REQUEST HIT");
+const htmlTemplate = `
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>FairVia Report</title>
+</head>
+<body>
+
+<h1>{{client_name}}</h1>
+<p>{{client_company}}</p>
+<p>{{client_country}}</p>
+
+<h2>{{feasibility_level}}</h2>
+
+<p>{{executive_summary_overview}}</p>
+
+</body>
+</html>
+`;
+
+// =========================
+// PDF生成共通関数
+// =========================
+async function generatePDF(data) {
+  const html = injectHtml(htmlTemplate, data);
+
+  const browser = await puppeteer.launch({
+    headless: true,
+    args: [
+      "--no-sandbox",
+      "--disable-setuid-sandbox",
+      "--disable-dev-shm-usage",
+      "--disable-gpu"
+    ]
+  });
+
+  const page = await browser.newPage();
+  await page.setContent(html, { waitUntil: "networkidle0" });
+
+  const pdf = await page.pdf({
+    format: "A4",
+    printBackground: true
+  });
+
+  await browser.close();
+
+  fs.writeFileSync("/tmp/latest.pdf", pdf);
+  console.log("✅ PDF SAVED");
+}
+
+// =========================
+// GET（ブラウザ確認用）
+// =========================
+app.get("/generate-report", async (req, res) => {
+  console.log("🔥 GET HIT");
 
   try {
-
-    // テストデータ（あとでフォームに置き換え）
-    const html = injectHtml(htmlTemplate, {
+    await generatePDF({
       client_name: "Test Client",
       client_company: "Test Company",
       client_country: "Japan",
-
-      application: "Injection",
-      current_material: "PP",
-      processing_method: "Injection",
-      bio_material: "PLA",
-      equipment: "Standard Machine",
-      production_scale: "Medium",
-      project_stage: "Testing",
-      submission_reference: "TEST",
-
       feasibility_level: "MODERATE",
-      report_date: new Date().toISOString().split("T")[0],
-      report_id: "TEST-" + Date.now(),
-
-      executive_summary_overview: "Overview placeholder",
-      executive_summary_findings: "Findings placeholder",
-      executive_summary_conclusion: "Conclusion placeholder",
-
-      feasibility_explanation: "Explanation placeholder",
-
-      thermal_risk: "MODERATE",
-      thermal_note: "Thermal note",
-
-      processing_risk: "MODERATE",
-      processing_note: "Processing note",
-
-      equipment_risk: "MODERATE",
-      equipment_note: "Equipment note",
-
-      score_thermal_assessment: "Check required",
-      score_thermal_level: "MODERATE",
-      score_thermal_note: "Thermal note",
-
-      score_processing_assessment: "Check required",
-      score_processing_level: "MODERATE",
-      score_processing_note: "Processing note",
-
-      score_equipment_assessment: "Check required",
-      score_equipment_level: "MODERATE",
-      score_equipment_note: "Equipment note",
-
-      score_cert_assessment: "TBD",
-      score_cert_level: "MODERATE",
-      score_cert_note: "Cert note",
-
-      score_eol_assessment: "TBD",
-      score_eol_level: "MODERATE",
-      score_eol_note: "EOL note",
-
-      obs_1_title: "Observation 1",
-      obs_1_body: "Detail",
-      obs_2_title: "Observation 2",
-      obs_2_body: "Detail",
-      obs_3_title: "Observation 3",
-      obs_3_body: "Detail",
-
-      risk_1_title: "Risk 1",
-      risk_1_body: "Detail",
-      risk_2_title: "Risk 2",
-      risk_2_body: "Detail",
-
-      strategic_recommendation: "Proceed with pilot",
-      disclaimer: "Advisory only"
+      executive_summary_overview: "Test overview"
     });
 
-    // =========================
-    // Puppeteer
-    // =========================
-    const browser = await puppeteer.launch({
-      headless: true,
-      args: [
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--disable-dev-shm-usage",
-        "--disable-gpu"
-      ]
+    res.send("PDF generated");
+
+  } catch (err) {
+    console.error("❌ ERROR:", err);
+    res.status(500).send("error");
+  }
+});
+
+// =========================
+// POST（フォーム用）
+// =========================
+app.post("/generate-report", async (req, res) => {
+  console.log("🔥 POST HIT");
+
+  try {
+    await generatePDF({
+      client_name: "Client",
+      client_company: "Company",
+      client_country: "Japan",
+      feasibility_level: "MODERATE",
+      executive_summary_overview: "Generated from form"
     });
-
-    const page = await browser.newPage();
-
-    await page.setContent(html, { waitUntil: "networkidle0" });
-
-    const pdf = await page.pdf({
-      format: "A4",
-      printBackground: true
-    });
-
-    await browser.close();
-
-    // =========================
-    // 保存
-    // =========================
-    fs.writeFileSync("/tmp/latest.pdf", pdf);
-
-    console.log("✅ PDF SAVED");
 
     res.json({ success: true });
 
@@ -145,7 +128,6 @@ app.get("/latest-pdf", (req, res) => {
   }
 
   const file = fs.readFileSync(filePath);
-
   res.setHeader("Content-Type", "application/pdf");
   res.send(file);
 });
