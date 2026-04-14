@@ -13,23 +13,25 @@ app.use(express.json());
 const PDF_PATH = "/tmp/latest.pdf";
 
 // =========================
-// テンプレ差し込み
+// テンプレ差し込み（完全版）
 // =========================
 function injectHtml(template, data) {
   let html = template;
 
   for (const key in data) {
-    html = html.replace(
-      new RegExp(`{{\\s*${key}\\s*}}`, "g"),
-      String(data[key] ?? "")
-    );
+    const regex = new RegExp(`{{\\s*${key}\\s*}}`, "gi");
+    html = html.replace(regex, String(data[key] ?? ""));
   }
+
+  // 🔥 fallback（これで絶対消えない）
+  html = html.replace(/{{\s*base_image\s*}}/gi, data.base_image || "");
+  html = html.replace(/{{\s*dynamic_overlay\s*}}/gi, data.dynamic_overlay || "");
 
   return html;
 }
 
 // =========================
-// メイン（POST）
+// メイン
 // =========================
 app.post("/generate-report", async (req, res) => {
   console.log("🔥 GENERATE");
@@ -40,31 +42,18 @@ app.post("/generate-report", async (req, res) => {
       "utf8"
     );
 
-    // 固定データ
-    const application = "Injection molding";
-    const currentMaterial = "PP";
-    const bioMaterial = "PHA";
-    const phaScore = 65;
-    const finalFeasibility = "Moderate";
-
-    // =========================
-    // バルーン（OK）
-    // =========================
     const dynamicOverlay = `
-<div style="position:absolute; left:42%; top:58%; width:120px; height:80px; border-radius:50%; border:2px solid rgba(180,180,180,0.5);"></div>
+<div style="position:absolute; left:42%; top:58%; width:120px; height:80px; border-radius:50%; border:2px solid rgba(180,180,180,0.4);"></div>
 <div style="position:absolute; left:45%; top:60%; width:80px; height:50px; border-radius:50%; border:2px solid rgba(140,200,160,0.6);"></div>
 `;
 
-    // =========================
-    // HTML生成（ここ完全修正）
-    // =========================
     const html = injectHtml(template, {
-      application: application,
-      material_transition: `${currentMaterial} → ${bioMaterial}`,
-      assessment_type: "Preliminary Screening",
+      application: "Injection molding",
+      material_transition: "PP → PHA",
+      assessment_type: "Preliminary",
       report_date: new Date().toISOString().split("T")[0],
 
-      compatibility_level: finalFeasibility,
+      compatibility_level: "Moderate",
 
       executive_summary:
         "This transition presents moderate feasibility under controlled processing conditions.",
@@ -91,27 +80,20 @@ app.post("/generate-report", async (req, res) => {
 
       stability: "Moderate",
       stability_note: "Requires controlled validation",
-
       consistency: "Moderate",
       consistency_note: "Dependent on processing conditions",
 
-      // 🔥 メーター
-      pha_score: String(phaScore),
+      pha_score: "65",
 
-      // 🔥 正しい書き方（ここ修正済）
-     // ←このカンマが必要
-    base_image: "https://ilnautico.github.io/bioplastic-visual.png",
+      // 🔥 ここ重要（確実に出る画像）
+      base_image: "https://ilnautico.github.io/bioplastic-visual.png",
 
       dynamic_overlay: dynamicOverlay,
 
       next_step: "Proceed with controlled pilot validation"
     });
 
-    // =========================
-    // Puppeteer
-    // =========================
     const browser = await puppeteer.launch({
-      headless: true,
       args: [
         "--no-sandbox",
         "--disable-setuid-sandbox",
@@ -145,62 +127,12 @@ app.post("/generate-report", async (req, res) => {
 });
 
 // =========================
-// GET確認用
+// 確認用
 // =========================
-app.get("/generate-report", async (req, res) => {
-  try {
-    const template = fs.readFileSync(
-      path.join(__dirname, "template.html"),
-      "utf8"
-    );
-
-    const html = injectHtml(template, {
-      application: "TEST",
-      material_transition: "PP → PHA",
-      assessment_type: "Preview",
-      report_date: "TEST",
-
-      compatibility_level: "Moderate",
-
-      executive_summary: "Preview Mode",
-      key_risk: "Preview Mode",
-
-      pha_score: "65",
-
-      base_image:
-        "https://ilnautico.github.io/bioplastic-visual.png",
-
-      dynamic_overlay: "",
-
-      next_step: "Preview"
-    });
-
-    const browser = await puppeteer.launch({
-      headless: true,
-      args: ["--no-sandbox"]
-    });
-
-    const page = await browser.newPage();
-    await page.setContent(html);
-
-    const pdf = await page.pdf({
-      format: "A4",
-      printBackground: true
-    });
-
-    await browser.close();
-
-    res.setHeader("Content-Type", "application/pdf");
-    res.send(pdf);
-
-  } catch (err) {
-    res.status(500).send("error");
-  }
+app.get("/", (req, res) => {
+  res.send("Server Running");
 });
 
-// =========================
-// 起動
-// =========================
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
   console.log("🚀 Server running on", PORT);
