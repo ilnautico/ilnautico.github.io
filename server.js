@@ -12,9 +12,9 @@ const app = express();
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(express.text({ type: "*/*" }));
 
 const PDF_PATH = "/tmp/latest.pdf";
+
 
 // =========================
 // OpenAI
@@ -23,36 +23,66 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
 });
 
-// =========================
-// スコアロジック（固定）
-// =========================
-const optimalTemp = 180;
 
-function calc(temp) {
-  const diff = Math.abs(temp - optimalTemp);
-  if (diff <= 5) return 95;
-  if (diff <= 10) return 90;
-  if (diff <= 20) return 75;
-  if (diff <= 30) return 60;
-  return 40;
+// =========================
+// スコア計算（ここは後で入力連動OK）
+// =========================
+function calculateScores(input) {
+
+  const optimalTemp = 180;
+
+  function calc(temp) {
+    const diff = Math.abs(temp - optimalTemp);
+    if (diff <= 5) return 95;
+    if (diff <= 10) return 90;
+    if (diff <= 20) return 75;
+    if (diff <= 30) return 60;
+    return 40;
+  }
+
+  const scoreLeft = calc(230);
+  const scoreRight = calc(180);
+
+  return { scoreLeft, scoreRight };
 }
 
+
 // =========================
-// AI生成（JSONのみ）
+// AI生成（🔥最終版プロンプト）
 // =========================
 async function generateAIReport(input, scoreLeft, scoreRight) {
 
   const prompt = `
-You are a professional consultant specializing in biodegradable materials and plastic processing.
+You are a senior polymer engineer AND strategic technical consultant.
 
-Return ONLY valid JSON.
+Your role is to generate a professional technical assessment that can be used for real business decision-making.
 
-Application: ${input.application || "Injection molding"}
-Material: ${input.material || "PP"}
-Target: ${input.bio_material || "PHA"}
+The report must:
+- Be technically accurate
+- Be understandable by non-technical executives
+- Clearly explain implications and risks
+- Support decision-making
 
-Stability Score: ${scoreLeft}
-Risk Score: ${scoreRight}
+STRICT RULES:
+- Return ONLY valid JSON
+- No markdown
+- No explanations outside JSON
+- Do NOT provide formulation, blending ratios, or processing parameters
+- Do NOT recommend suppliers
+
+INPUT:
+Application: ${input.application}
+Current Material: ${input.material}
+Target Material: ${input.bio_material}
+Equipment: ${input.equipment}
+Concern: ${input.concern}
+Stage: ${input.stage}
+
+SCORING CONTEXT:
+Stability Score: ${scoreLeft} / 100
+Risk Score: ${scoreRight} / 100
+
+RETURN JSON:
 
 {
   "executive_summary": "",
@@ -75,32 +105,30 @@ Risk Score: ${scoreRight}
 }
 `;
 
+  const res = await openai.chat.completions.create({
+    model: "gpt-4.1-mini",
+    messages: [
+      { role: "system", content: "Return only JSON." },
+      { role: "user", content: prompt }
+    ],
+    temperature: 0.7
+  });
+
   try {
-    const res = await openai.chat.completions.create({
-      model: "gpt-4.1-mini",
-      messages: [
-        { role: "system", content: "Return only JSON." },
-        { role: "user", content: prompt }
-      ],
-      temperature: 0.7
-    });
-
     return JSON.parse(res.choices[0].message.content);
-
-  } catch (err) {
-    console.error("AI ERROR:", err);
-
-    // fallback（絶対壊さない）
+  } catch (e) {
+    console.error("AI parse error:", e);
     return {
-      executive_summary: "Assessment in progress.",
-      key_risk: "Pending analysis.",
-      next_step: "Further validation required."
+      executive_summary: "AI generation failed.",
+      key_risk: "Unknown",
+      next_step: "Manual review required."
     };
   }
 }
 
+
 // =========================
-// Overlay（絶対触らない）
+// Overlay（UI完全版）
 // =========================
 function generateOverlay(scoreLeft, scoreRight) {
 
@@ -109,43 +137,42 @@ function generateOverlay(scoreLeft, scoreRight) {
   const ampRight = 4 + scoreRight * 0.12;
 
   return `
-  <div style="position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;">
+  <div style="position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;font-family:Arial;">
 
-    <div style="position:absolute; left:33.5%; top:6%; font-size:26px;">230°C</div>
-    <div style="position:absolute; left:66%; top:6%; font-size:26px; color:#dc2626;">180°C</div>
+    <div style="position:absolute; left:33.5%; top:6%; font-size:26px;">
+      230°C
+    </div>
+
+    <div style="position:absolute; left:66%; top:6%; font-size:26px; color:#dc2626;">
+      180°C
+    </div>
 
     <div style="position:absolute; left:40%; top:22%;">${scoreLeft}</div>
     <div style="position:absolute; left:72%; top:22%; color:#dc2626;">${scoreRight}</div>
 
-    <svg style="position:absolute; left:46.8%; top:60%; width:11%; height:8%; transform:translate(-50%, -50%);">
+    <!-- 波 -->
+    <svg style="position:absolute;left:46.8%;top:57.2%;width:11%;height:8%;">
       <path stroke="#3B82A0" stroke-width="2" fill="none"
         d="M0 10 Q20 ${10-ampLeft} 40 10 T80 10"/>
     </svg>
 
-    <svg style="position:absolute; left:71.5%; top:66%; width:11%; height:8%; transform:translate(-50%, -50%);">
+    <svg style="position:absolute;left:71.5%;top:63.5%;width:11%;height:8%;">
       <path stroke="#dc2626" stroke-width="2" fill="none"
         d="M0 10 Q20 ${10-ampRight} 40 10 T80 10"/>
     </svg>
 
+    <!-- メーター -->
     <svg viewBox="0 0 200 120"
       style="position:absolute; right:6%; bottom:6%; width:140px; height:90px;">
 
-      <defs>
-        <linearGradient id="grad">
-          <stop offset="0%" stop-color="#22c55e"/>
-          <stop offset="50%" stop-color="#fde047"/>
-          <stop offset="75%" stop-color="#f59e0b"/>
-          <stop offset="100%" stop-color="#ef4444"/>
-        </linearGradient>
-      </defs>
-
-      <path d="M20 100 A80 80 0 0 1 180 100 L100 100 Z"
-        fill="url(#grad)" />
+      <path d="M20 100 A80 80 0 0 1 60 30 L60 100 Z" fill="#22c55e"/>
+      <path d="M60 30 A80 80 0 0 1 100 20 L100 100 Z" fill="#fde047"/>
+      <path d="M100 20 A80 80 0 0 1 140 30 L140 100 Z" fill="#f59e0b"/>
+      <path d="M140 30 A80 80 0 0 1 180 100 L140 100 Z" fill="#ef4444"/>
 
       <g transform="rotate(${angle} 100 100)">
-        <line x1="100" y1="100" x2="100" y2="30"
-          stroke="#111"
-          stroke-width="2.5"/>
+        <line x1="100" y1="100" x2="100" y2="60"
+          stroke="#111" stroke-width="2.5"/>
       </g>
 
       <circle cx="100" cy="100" r="4.5" fill="#111"/>
@@ -155,92 +182,92 @@ function generateOverlay(scoreLeft, scoreRight) {
   `;
 }
 
+
 // =========================
 // HTML差し込み
 // =========================
 function injectHtml(template, data) {
   let html = template;
   for (const key in data) {
-    html = html.replace(
-      new RegExp(`{{\\s*${key}\\s*}}`, "g"),
-      data[key] ?? ""
-    );
+    html = html.replace(new RegExp(`{{\\s*${key}\\s*}}`, "g"), data[key] || "");
   }
   return html;
 }
 
-// =========================
-// PDF生成
-// =========================
-async function generatePDF(req, res) {
-
-  const template = fs.readFileSync(
-    path.join(__dirname, "template.html"),
-    "utf8"
-  );
-
-  const inputData = req.body || {};
-
-  const scoreLeft = calc(230);
-  const scoreRight = calc(180);
-
-  const aiData = await generateAIReport(inputData, scoreLeft, scoreRight);
-
-  const html = injectHtml(template, {
-    base_image: "https://ilnautico.github.io/visual-base.png",
-    dynamic_overlay: generateOverlay(scoreLeft, scoreRight),
-
-    pha_score: scoreRight,
-
-    compatibility_level: scoreLeft > 70 ? "High" : scoreLeft > 40 ? "Moderate" : "Low",
-    stability: scoreLeft > 70 ? "High" : "Moderate",
-    consistency: scoreRight > 70 ? "Variable" : "Stable",
-
-    ...aiData
-  });
-
-  const browser = await puppeteer.launch({
-    headless: true,
-    args: ["--no-sandbox", "--disable-dev-shm-usage"]
-  });
-
-  const page = await browser.newPage();
-  await page.setContent(html, { waitUntil: "networkidle0" });
-
-  const pdf = await page.pdf({
-    format: "A4",
-    printBackground: true
-  });
-
-  await browser.close();
-
-  fs.writeFileSync(PDF_PATH, pdf);
-
-  res.setHeader("Content-Type", "application/pdf");
-  res.send(pdf);
-}
 
 // =========================
-// ルート
+// POSTエンドポイント
 // =========================
-app.get("/", (req, res) => {
-  res.send("OK");
+app.post("/tally-pdf", async (req, res) => {
+
+  try {
+
+    const inputData = req.body;
+
+    const { scoreLeft, scoreRight } = calculateScores(inputData);
+
+    const aiData = await generateAIReport(inputData, scoreLeft, scoreRight);
+
+    const template = fs.readFileSync(
+      path.join(__dirname, "template.html"),
+      "utf8"
+    );
+
+    const html = injectHtml(template, {
+      base_image: "https://ilnautico.github.io/visual-base.png",
+      dynamic_overlay: generateOverlay(scoreLeft, scoreRight),
+
+      compatibility_level:
+        scoreLeft < 40 ? "Low" :
+        scoreLeft < 70 ? "Moderate" : "High",
+
+      stability:
+        scoreLeft < 40 ? "Low" :
+        scoreLeft < 70 ? "Moderate" : "High",
+
+      consistency:
+        scoreRight > 70 ? "Variable" :
+        scoreRight > 40 ? "Moderate" : "Stable",
+
+      ...aiData
+    });
+
+    const browser = await puppeteer.launch({
+      args: ["--no-sandbox", "--disable-setuid-sandbox"]
+    });
+
+    const page = await browser.newPage();
+    await page.setContent(html, { waitUntil: "networkidle0" });
+
+    const pdf = await page.pdf({
+      format: "A4",
+      printBackground: true
+    });
+
+    await browser.close();
+
+    fs.writeFileSync(PDF_PATH, pdf);
+
+    res.send(pdf);
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("PDF generation failed");
+  }
 });
 
-// GETでも確認できる（超重要）
-app.get("/generate-report", async (req, res) => {
-  await generatePDF(req, res);
-});
-
-// POST（本番）
-app.post("/generate-report", async (req, res) => {
-  await generatePDF(req, res);
-});
 
 // =========================
-// 起動
+app.get("/latest-pdf", (req, res) => {
+  if (!fs.existsSync(PDF_PATH)) {
+    return res.status(404).send("No PDF yet");
+  }
+  res.sendFile(PDF_PATH);
+});
+
+
 // =========================
-const PORT = process.env.PORT || 8080;
+const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
   console.log("🚀 Server running on", PORT);
