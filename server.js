@@ -223,10 +223,58 @@ app.post("/generate-report", async (req, res) => {
 // =========================
 // GET（確認用）
 // =========================
-app.get("/generate-report", (req, res) => {
-  res.send("POSTで叩いてください");
-});
+app.get("/generate-report", async (req, res) => {
 
+  console.log("🔥 GET TEST");
+
+  try {
+    const template = fs.readFileSync(
+      path.join(__dirname, "template.html"),
+      "utf8"
+    );
+
+    const html = injectHtml(template, {
+      application: "TEST",
+      material_transition: "PP → PHA",
+      assessment_type: "Preview",
+      report_date: new Date().toISOString().split("T")[0],
+
+      compatibility_level: "Moderate",
+
+      executive_summary: "Preview",
+      key_risk: "Preview",
+
+      pha_score: "65",
+
+      base_image: "https://raw.githubusercontent.com/ilnautico/visual-assets/main/bioplastic-visual.png",
+
+      dynamic_overlay: dynamicOverlay,
+
+      next_step: "Preview"
+    });
+
+    const browser = await puppeteer.launch({
+      headless: true,
+      args: ["--no-sandbox"]
+    });
+
+    const page = await browser.newPage();
+    await page.setContent(html);
+
+    const pdf = await page.pdf({
+      format: "A4",
+      printBackground: true
+    });
+
+    await browser.close();
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.send(pdf);
+
+  } catch (err) {
+    res.status(500).send("error");
+  }
+});
 // =========================
 // 起動
 // =========================
