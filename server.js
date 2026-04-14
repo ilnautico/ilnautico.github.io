@@ -13,7 +13,7 @@ app.use(express.json());
 const PDF_PATH = "/tmp/latest.pdf";
 
 // =========================
-// inject（テンプレに差し込むだけ）
+// テンプレ差し込み
 // =========================
 function injectHtml(template, data) {
   let html = template;
@@ -29,20 +29,24 @@ function injectHtml(template, data) {
 }
 
 // =========================
-// PDF生成
+// メイン
 // =========================
 app.post("/generate-report", async (req, res) => {
 
+  console.log("🔥 REQUEST HIT");
+
   try {
 
-    // 🔥 ここ超重要（テンプレはこれだけ使う）
+    // =========================
+    // 🔥 テンプレ読み込み（これだけ）
+    // =========================
     const template = fs.readFileSync(
       path.join(__dirname, "template.html"),
       "utf8"
     );
 
     // =========================
-    // データ（仮でもOK）
+    // 入力（ここは既存ロジックに置き換えてOK）
     // =========================
     const data = {
 
@@ -83,11 +87,13 @@ app.post("/generate-report", async (req, res) => {
 
     };
 
-    // 🔥 正しい差し込み
+    // =========================
+    // HTML生成
+    // =========================
     const html = injectHtml(template, data);
 
     // =========================
-    // PDF生成
+    // Puppeteer
     // =========================
     const browser = await puppeteer.launch({
       headless: true,
@@ -114,27 +120,25 @@ app.post("/generate-report", async (req, res) => {
 
     fs.writeFileSync(PDF_PATH, pdf);
 
-    res.json({ success: true });
+    // =========================
+    // 🔥 ここ重要（これがないと何も起きない）
+    // =========================
+    res.setHeader("Content-Type", "application/pdf");
+    res.send(pdf);
 
   } catch (err) {
-    console.error(err);
-    res.status(500).send("error");
+    console.error("❌ ERROR:", err);
+    res.status(500).send("Server Error");
   }
 });
 
 // =========================
-// PDF取得
+// 確認用
 // =========================
-app.get("/latest-pdf", (req, res) => {
-
-  if (!fs.existsSync(PDF_PATH)) {
-    return res.status(404).send("No PDF yet");
-  }
-
-  res.sendFile(PDF_PATH);
+app.get("/", (req, res) => {
+  res.send("Server Running");
 });
 
-// =========================
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
   console.log("🚀 Server running on", PORT);
