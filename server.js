@@ -10,31 +10,79 @@ const __dirname = path.dirname(__filename);
 const app = express();
 app.use(express.json());
 
-const PDF_PATH = "/tmp/latest.pdf";
-
 // =========================
-// テンプレ差し込み（完全版）
+// テンプレ差し込み
 // =========================
 function injectHtml(template, data) {
   let html = template;
 
   for (const key in data) {
-    const regex = new RegExp(`{{\\s*${key}\\s*}}`, "gi");
-    html = html.replace(regex, String(data[key] ?? ""));
+    html = html.replace(
+      new RegExp(`{{\\s*${key}\\s*}}`, "gi"),
+      String(data[key] ?? "")
+    );
   }
-
-  // 🔥 fallback（これで絶対消えない）
-  html = html.replace(/{{\s*base_image\s*}}/gi, data.base_image || "");
-  html = html.replace(/{{\s*dynamic_overlay\s*}}/gi, data.dynamic_overlay || "");
 
   return html;
 }
 
 // =========================
-// メイン
+// 共通HTML生成（ここ一本化）
+// =========================
+function buildHtml(template) {
+  const dynamicOverlay = `
+<div style="position:absolute; left:42%; top:58%; width:120px; height:80px; border-radius:50%; border:2px solid rgba(180,180,180,0.4);"></div>
+<div style="position:absolute; left:45%; top:60%; width:80px; height:50px; border-radius:50%; border:2px solid rgba(140,200,160,0.6);"></div>
+`;
+
+  return injectHtml(template, {
+    application: "Injection molding",
+    material_transition: "PP → PHA",
+    assessment_type: "Preview",
+    report_date: new Date().toISOString().split("T")[0],
+
+    compatibility_level: "Moderate",
+
+    executive_summary: "Preview Mode",
+    key_risk: "Preview Mode",
+
+    processing_window: "Test",
+    thermal_behavior: "Test",
+    flow_characteristics: "Test",
+
+    mechanical_behavior: "Test",
+    surface_quality: "Test",
+    structural_consistency: "Test",
+
+    application_implication: "Test",
+
+    primary_risk_title: "Test",
+    primary_risk: "Test",
+    secondary_risk_title: "Test",
+    secondary_risk: "Test",
+    mechanism: "Test",
+
+    stability: "Test",
+    stability_note: "Test",
+    consistency: "Test",
+    consistency_note: "Test",
+
+    pha_score: "65",
+
+    // 🔥 ここが最重要（画像）
+    base_image: "https://ilnautico.github.io/bioplastic-visual.png",
+
+    dynamic_overlay: dynamicOverlay,
+
+    next_step: "Preview"
+  });
+}
+
+// =========================
+// POST（本番用）
 // =========================
 app.post("/generate-report", async (req, res) => {
-  console.log("🔥 GENERATE");
+  console.log("🔥 POST HIT");
 
   try {
     const template = fs.readFileSync(
@@ -42,71 +90,14 @@ app.post("/generate-report", async (req, res) => {
       "utf8"
     );
 
-    const dynamicOverlay = `
-<div style="position:absolute; left:42%; top:58%; width:120px; height:80px; border-radius:50%; border:2px solid rgba(180,180,180,0.4);"></div>
-<div style="position:absolute; left:45%; top:60%; width:80px; height:50px; border-radius:50%; border:2px solid rgba(140,200,160,0.6);"></div>
-`;
-
-    const html = injectHtml(template, {
-      application: "Injection molding",
-      material_transition: "PP → PHA",
-      assessment_type: "Preliminary",
-      report_date: new Date().toISOString().split("T")[0],
-
-      compatibility_level: "Moderate",
-
-      executive_summary:
-        "This transition presents moderate feasibility under controlled processing conditions.",
-      key_risk:
-        "Thermal instability may occur during extended residence time.",
-
-      processing_window: "Requires controlled temperature range",
-      thermal_behavior: "Sensitive under high temperature",
-      flow_characteristics: "Lower melt strength vs PP",
-
-      mechanical_behavior: "Moderate stiffness reduction",
-      surface_quality: "Minor variation expected",
-      structural_consistency: "Dependent on process stability",
-
-      application_implication: "Suitable for controlled pilot trials",
-
-      primary_risk_title: "Thermal Degradation",
-      primary_risk: "Material breakdown risk under heat",
-
-      secondary_risk_title: "Flow Instability",
-      secondary_risk: "Inconsistent flow behavior possible",
-
-      mechanism: "Polymer chain scission under stress",
-
-      stability: "Moderate",
-      stability_note: "Requires controlled validation",
-      consistency: "Moderate",
-      consistency_note: "Dependent on processing conditions",
-
-      pha_score: "65",
-
-      // 🔥 ここ重要（確実に出る画像）
-      base_image: "https://ilnautico.github.io/bioplastic-visual.png",
-
-      dynamic_overlay: dynamicOverlay,
-
-      next_step: "Proceed with controlled pilot validation"
-    });
+    const html = buildHtml(template);
 
     const browser = await puppeteer.launch({
-      args: [
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--disable-dev-shm-usage",
-        "--disable-gpu"
-      ]
+      args: ["--no-sandbox", "--disable-setuid-sandbox"]
     });
 
     const page = await browser.newPage();
-
-    await page.setContent(html, {
-      waitUntil: "networkidle0"
-    });
+    await page.setContent(html, { waitUntil: "networkidle0" });
 
     const pdf = await page.pdf({
       format: "A4",
@@ -115,24 +106,62 @@ app.post("/generate-report", async (req, res) => {
 
     await browser.close();
 
-    fs.writeFileSync(PDF_PATH, pdf);
+    res.setHeader("Content-Type", "application/pdf");
+    res.send(pdf);
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("error");
+  }
+});
+
+// =========================
+// GET（確認用 ← これが重要）
+// =========================
+app.get("/generate-report", async (req, res) => {
+  console.log("🔥 GET HIT");
+
+  try {
+    const template = fs.readFileSync(
+      path.join(__dirname, "template.html"),
+      "utf8"
+    );
+
+    const html = buildHtml(template);
+
+    const browser = await puppeteer.launch({
+      args: ["--no-sandbox"]
+    });
+
+    const page = await browser.newPage();
+    await page.setContent(html);
+
+    const pdf = await page.pdf({
+      format: "A4",
+      printBackground: true
+    });
+
+    await browser.close();
 
     res.setHeader("Content-Type", "application/pdf");
     res.send(pdf);
 
   } catch (err) {
-    console.error("❌ ERROR:", err);
-    res.status(500).send("Server Error");
+    console.error(err);
+    res.status(500).send("error");
   }
 });
 
 // =========================
-// 確認用
+// ルート確認
 // =========================
 app.get("/", (req, res) => {
-  res.send("Server Running");
+  res.send("OK");
 });
 
+// =========================
+// 起動
+// =========================
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
   console.log("🚀 Server running on", PORT);
