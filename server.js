@@ -90,7 +90,72 @@ app.post("/generate-report", async (req, res) => {
     // =========================
     // HTML生成
     // =========================
-    const html = injectHtml(template, data);
+// =========================
+// HTMLデータ注入（ここだけ置き換え）
+// =========================
+
+const dynamicOverlay = `
+<div style="position:absolute; left:42%; top:58%; width:120px; height:80px; border-radius:50%; border:2px solid rgba(180,180,180,0.5);"></div>
+<div style="position:absolute; left:45%; top:60%; width:80px; height:50px; border-radius:50%; border:2px solid rgba(140,200,160,0.6);"></div>
+`;
+
+const html = injectHtml(template, {
+  // 基本情報
+  application: application || "Test",
+  material_transition: (currentMaterial && bioMaterial)
+    ? `${currentMaterial} → ${bioMaterial}`
+    : "Test",
+  assessment_type: "Preliminary Screening",
+  report_date: new Date().toISOString().split("T")[0],
+
+  // 判定
+  compatibility_level: finalFeasibility || "Moderate",
+
+  // サマリー（未定義エラー防止）
+  executive_summary: typeof SUMMARY_OVERVIEW !== "undefined"
+    ? SUMMARY_OVERVIEW
+    : "Test summary",
+  key_risk: typeof SUMMARY_FINDINGS !== "undefined"
+    ? SUMMARY_FINDINGS
+    : "Test risk",
+
+  // 技術項目
+  processing_window: "Test",
+  thermal_behavior: "Test",
+  flow_characteristics: "Test",
+
+  mechanical_behavior: "Test",
+  surface_quality: "Test",
+  structural_consistency: "Test",
+
+  application_implication: "Test",
+
+  primary_risk_title: "Test",
+  primary_risk: "Test",
+
+  secondary_risk_title: "Test",
+  secondary_risk: "Test",
+
+  mechanism: "Test",
+
+  stability: "Test",
+  stability_note: "Test",
+
+  consistency: "Test",
+  consistency_note: "Test",
+
+  // グラフ
+  pha_score: 55,
+
+  // 🔥 ここが今回の修正（画像＋バルーン）
+  base_image: "https://images.unsplash.com/photo-1581094794329-c8112a89af12?q=80&w=1200",
+  dynamic_overlay: dynamicOverlay,
+
+  // 次ステップ
+  next_step: typeof STRATEGIC_RECOMMENDATION !== "undefined"
+    ? STRATEGIC_RECOMMENDATION
+    : "Test next step"
+});
 
     // =========================
     // Puppeteer
