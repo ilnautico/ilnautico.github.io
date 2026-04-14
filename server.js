@@ -120,7 +120,7 @@ app.post("/generate-report", async (req, res) => {
 
       // 🔥 画像（変な人物防止）
       base_image:
-        "https://ilnautico.github.io/bioplastic-visual.png",
+        base_image: "https://images.unsplash.com/photo-1581094794329-c8112a89af12?w=1200"
 
       dynamic_overlay: dynamicOverlay,
 
