@@ -4,6 +4,9 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 
+// =========================
+// 基本設定
+// =========================
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -11,21 +14,23 @@ const app = express();
 app.use(express.json());
 
 // =========================
-// HTML差し込み
+// テンプレ差し込み
 // =========================
 function injectHtml(template, data) {
   let html = template;
+
   for (const key in data) {
     html = html.replace(
       new RegExp(`{{\\s*${key}\\s*}}`, "g"),
       String(data[key] ?? "")
     );
   }
+
   return html;
 }
 
 // =========================
-// 共通PDF生成関数
+// PDF生成関数（共通化）
 // =========================
 async function generatePDF(res) {
   try {
@@ -34,18 +39,24 @@ async function generatePDF(res) {
       "utf8"
     );
 
+    // 🔥 UI（メーター・針・円）復元
     const dynamicOverlay = `
 <svg width="220" height="220" style="position:absolute; left:50%; top:55%; transform:translate(-50%,-50%);">
   <circle cx="110" cy="110" r="80" stroke="rgba(180,180,180,0.35)" stroke-width="2" fill="none"/>
   <circle cx="110" cy="110" r="55" stroke="rgba(120,200,150,0.45)" stroke-width="2" fill="none"/>
   <g transform="rotate(35 110 110)">
     <line x1="110" y1="110" x2="50" y2="110"
-      stroke="#1c1c1c" stroke-width="2.5" stroke-linecap="round"/>
+      stroke="#1c1c1c"
+      stroke-width="2.5"
+      stroke-linecap="round"/>
   </g>
   <circle cx="110" cy="110" r="4.5" fill="#1c1c1c"/>
 </svg>
 `;
 
+    // =========================
+    // データ
+    // =========================
     const html = injectHtml(template, {
       application: "Injection molding",
       material_transition: "PP → PHA",
@@ -54,50 +65,63 @@ async function generatePDF(res) {
 
       compatibility_level: "Moderate",
 
-      executive_summary: "Preview working",
-      key_risk: "Thermal risk",
+      executive_summary:
+        "This transition presents moderate feasibility under controlled processing conditions.",
+      key_risk:
+        "Thermal instability may occur during extended residence time.",
 
-      processing_window: "Test",
-      thermal_behavior: "Test",
-      flow_characteristics: "Test",
+      processing_window: "Requires controlled temperature range",
+      thermal_behavior: "Sensitive under high temperature",
+      flow_characteristics: "Lower melt strength vs PP",
 
-      mechanical_behavior: "Test",
-      surface_quality: "Test",
-      structural_consistency: "Test",
+      mechanical_behavior: "Moderate stiffness reduction",
+      surface_quality: "Minor variation expected",
+      structural_consistency: "Dependent on process stability",
 
-      application_implication: "Test",
+      application_implication: "Suitable for controlled pilot trials",
 
-      primary_risk_title: "Test",
-      primary_risk: "Test",
+      primary_risk_title: "Thermal Degradation",
+      primary_risk: "Material breakdown risk under heat",
 
-      secondary_risk_title: "Test",
-      secondary_risk: "Test",
+      secondary_risk_title: "Flow Instability",
+      secondary_risk: "Inconsistent flow behavior possible",
 
-      mechanism: "Test",
+      mechanism: "Polymer chain scission under stress",
 
       stability: "Moderate",
-      stability_note: "Test",
+      stability_note: "Requires controlled validation",
 
       consistency: "Moderate",
-      consistency_note: "Test",
+      consistency_note: "Dependent on processing conditions",
 
+      // 🔥 メーター
       pha_score: "65",
 
+      // 🔥 画像（安定URL）
       base_image:
         "https://raw.githubusercontent.com/ilnautico/visual-assets/main/bioplastic-visual.png",
 
+      // 🔥 UI復元
       dynamic_overlay: dynamicOverlay,
 
-      next_step: "Proceed with validation"
+      next_step: "Proceed with controlled pilot validation"
     });
 
     const browser = await puppeteer.launch({
       headless: true,
-      args: ["--no-sandbox", "--disable-setuid-sandbox"]
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-gpu"
+      ]
     });
 
     const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: "networkidle0" });
+
+    await page.setContent(html, {
+      waitUntil: "networkidle0"
+    });
 
     const pdf = await page.pdf({
       format: "A4",
@@ -116,24 +140,32 @@ async function generatePDF(res) {
 }
 
 // =========================
-// GETでもPOSTでも動く
+// GET / POST 両対応
 // =========================
-app.get("/generate-report", generatePDF);
-app.post("/generate-report", generatePDF);
+app.get("/generate-report", (req, res) => {
+  generatePDF(res);
+});
+
+app.post("/generate-report", (req, res) => {
+  generatePDF(res);
+});
 
 // =========================
-const PORT = process.env.PORT || 3000;
+// ポート（←ここが今回の核心）
+// =========================
+const PORT = process.env.PORT;
 
-app.listen(PORT, () => {
+// 🔥 既存サーバがいても落ちない対策
+const server = app.listen(PORT, () => {
   console.log("🚀 Server running on", PORT);
 });
-// =========================
-// 起動
-// =========================
-const PORT = process.env.PORT || 3000;
 
-app.listen(PORT, () => {
-  console.log("🚀 Server running on", PORT);
+server.on("error", (err) => {
+  if (err.code === "EADDRINUSE") {
+    console.error("❌ Port already in use → Railway側問題");
+  } else {
+    console.error(err);
+  }
 });
 const html = `
 <!DOCTYPE html>
