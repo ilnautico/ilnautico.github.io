@@ -9,11 +9,13 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(express.text({ type: "*/*" }));
 
 const PDF_PATH = "/tmp/latest.pdf";
 
 // =========================
-// スコア
+// スコア（3万円そのまま）
 // =========================
 function calculateScores() {
   return {
@@ -26,7 +28,6 @@ function calculateScores() {
 // Overlay（完全復元）
 // =========================
 function generateOverlay(scoreLeft, scoreRight) {
-
   const ampLeft = 4 + scoreLeft * 0.12;
   const ampRight = 4 + scoreRight * 0.12;
   const angle = -90 + (scoreRight / 100) * 180;
@@ -34,15 +35,12 @@ function generateOverlay(scoreLeft, scoreRight) {
   return `
   <div style="position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;">
 
-    <!-- 温度 -->
     <div style="position:absolute; left:33.5%; top:6%; font-size:26px;">230°C</div>
     <div style="position:absolute; left:66%; top:6%; font-size:26px; color:#dc2626;">180°C</div>
 
-    <!-- スコア -->
     <div style="position:absolute; left:40%; top:22%; font-size:16px;">${scoreLeft}</div>
     <div style="position:absolute; left:72%; top:22%; font-size:16px; color:#dc2626;">${scoreRight}</div>
 
-    <!-- 波 -->
     <svg style="position:absolute;left:46.8%;top:57.2%;width:11%;height:8%;" viewBox="0 0 80 20">
       <path stroke="#3B82A0" stroke-width="2" fill="none"
         d="M0 10 Q20 ${10-ampLeft} 40 10 T80 10"/>
@@ -53,7 +51,6 @@ function generateOverlay(scoreLeft, scoreRight) {
         d="M0 10 Q20 ${10-ampRight} 40 10 T80 10"/>
     </svg>
 
-    <!-- メーター -->
     <svg viewBox="0 0 200 120"
       style="position:absolute; right:6%; bottom:4%; width:140px; height:90px;">
 
@@ -90,7 +87,7 @@ function generateOverlay(scoreLeft, scoreRight) {
 }
 
 // =========================
-// inject
+// inject（完全修正）
 // =========================
 function injectHtml(template, data) {
   let html = template;
@@ -106,22 +103,20 @@ function injectHtml(template, data) {
 }
 
 // =========================
-// PDF生成
+// PDF生成（3万円ルート）
 // =========================
 app.get("/tally-pdf", async (req, res) => {
-
   try {
 
     const { scoreLeft, scoreRight } = calculateScores();
 
+    // ✅ HTMLはここから読む（超重要）
     const template = fs.readFileSync(
       path.join(__dirname, "template.html"),
       "utf8"
     );
 
-    // 🔥 全データ完全注入（ここが核心）
     const html = injectHtml(template, {
-
       application: "Injection molding feasibility",
       executive_summary: "This transition presents moderate feasibility based on current conditions.",
 
@@ -148,10 +143,10 @@ app.get("/tally-pdf", async (req, res) => {
     });
 
     const browser = await puppeteer.launch({
-      args: ["--no-sandbox", "--disable-setuid-sandbox"]
+      args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage", "--disable-gpu"]
     });
 
-    const page = await browser.newPage();
+    const page = await browser.newPage(); // ←これ忘れると死ぬ
     await page.setContent(html, { waitUntil: "networkidle0" });
 
     const pdf = await page.pdf({
@@ -163,11 +158,11 @@ app.get("/tally-pdf", async (req, res) => {
 
     fs.writeFileSync(PDF_PATH, pdf);
 
-    res.send("PDF generated");
+    res.send(pdf);
 
   } catch (err) {
-    console.error(err);
-    res.status(500).send("error");
+    console.error("❌ ERROR:", err);
+    res.status(500).send("PDF generation failed");
   }
 });
 
@@ -175,11 +170,9 @@ app.get("/tally-pdf", async (req, res) => {
 // PDF取得
 // =========================
 app.get("/latest-pdf", (req, res) => {
-
   if (!fs.existsSync(PDF_PATH)) {
     return res.status(404).send("No PDF yet");
   }
-
   res.sendFile(PDF_PATH);
 });
 
@@ -189,375 +182,28 @@ app.listen(PORT, () => {
   console.log("🚀 Server running on", PORT);
 });
 const html = `
- <!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>FairVia™ Technical Hypothesis Report</title>
-
-<style>
-:root {
-  --navy:#0C1C2E;
-  --navy-soft:#2C4A6E;
-  --block-light:#F9FCFF;
-  --block-mid:#E6EFF8;
-  --block-deep:#DDE8F2;
-  --sep:#E6EDF3;
-  --text-body:#374151;
-  --text-muted:#6B7A8E;
-  --text-label:#9AA5B4;
-}
-
-*{margin:0;padding:0;box-sizing:border-box;}
-
-body{
-  background:#F4F7FA;
-  font-family:'IBM Plex Sans',sans-serif;
-  color:var(--text-body);
-  font-size:13px;
-  line-height:1.68;
-}
-
-.page{
-  width:700px;
-  margin:20mm auto;
-  background:white;
-  border:1px solid #E0E8EF;
-  overflow:hidden;
-}
-
-.section{
-  margin-bottom:42px;
-  page-break-inside:avoid;
-}
-
-.page-break{
-  page-break-before:always;
-}
-
-.page-top-bar{
-  height:4px;
-  background:linear-gradient(90deg,#0C1C2E 0%,#2C4A6E 60%,#DDE8F2 100%);
-}
-
-.cover{
-  padding:52px 50px 44px;
-  border-bottom:1px solid var(--sep);
-}
-
-.body-wrap{
-  padding:38px 50px 32px;
-}
-
-.bar{
-  width:100%;
-  height:10px;
-  background:rgba(0,0,0,0.06);
-  border-radius:6px;
-  overflow:hidden;
-}
-.bar-inner{
-  height:100%;
-  width:{{pha_score}}%;
-  background:linear-gradient(90deg,#6eb48c,#46966e);
-}
-</style>
-</head>
-
-<body>
-
-<div class="page">
-
-<div class="page-top-bar"></div>
-
-<!-- COVER -->
-<div class="cover">
-  <h2>{{application}}</h2>
-</div>
-
-<div class="body-wrap">
-
-<!-- 01 -->
-<div class="section">
-  <p>{{executive_summary}}</p>
-</div>
-
-<div class="page-break"></div>
-<div class="page-top-bar"></div>
-
-<!-- 02 -->
-<div class="section">
-  <p>{{processing_window}}</p>
-  <p>{{thermal_behavior}}</p>
-  <p>{{flow_characteristics}}</p>
-</div>
-
-<div class="page-break"></div>
-<div class="page-top-bar"></div>
-
-<!-- 03 -->
-<div class="section">
-  <p>{{mechanical_behavior}}</p>
-  <p>{{surface_quality}}</p>
-  <p>{{structural_consistency}}</p>
-</div>
-
-<div class="page-break"></div>
-<div class="page-top-bar"></div>
-
-<!-- 04 -->
-<div class="section">
-  <p>{{primary_risk}}</p>
-  <p>{{secondary_risk}}</p>
-  <p>{{mechanism}}</p>
-</div>
-
-<div class="page-break"></div>
-<div class="page-top-bar"></div>
-
-<!-- 05 -->
-<div class="section">
-  <p>{{stability}}</p>
-  <p>{{consistency}}</p>
-
-  <div class="bar">
-    <div class="bar-inner"></div>
-  </div>
-
-</div>
-
-<div class="page-break"></div>
-<div class="page-top-bar"></div>
-
-<!-- 06 -->
-<div class="section">
-
-<div style="position:relative;width:100%;height:260px;overflow:hidden;">
-
-<img src="{{base_image}}" style="
-position:absolute;
-width:100%;
-height:100%;
-object-fit:contain;
-">
-
-<div style="
-position:absolute;
-width:100%;
-height:100%;
-pointer-events:none;
-">
-{{dynamic_overlay}}
-</div>
-
-</div>
-
-</div>
-
-<div class="page-break"></div>
-<div class="page-top-bar"></div>
-
-<!-- 07 -->
-<div class="section">
-  <p>{{next_step}}</p>
-</div>
-
-<!-- 08 -->
-<div class="section">
-  <p>This report is based on hypothesis-driven evaluation.</p>
-</div>
-
-</div>
-</div>
-
-</body>
-</html>
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>FairVia™ Technical Hypothesis Report</title>
-
-<style>
-:root {
-  --navy:#0C1C2E;
-  --navy-soft:#2C4A6E;
-  --block-light:#F9FCFF;
-  --block-mid:#E6EFF8;
-  --block-deep:#DDE8F2;
-  --sep:#E6EDF3;
-  --text-body:#374151;
-  --text-muted:#6B7A8E;
-  --text-label:#9AA5B4;
-}
-
-*{margin:0;padding:0;box-sizing:border-box;}
-
-body{
-  background:#F4F7FA;
-  font-family:'IBM Plex Sans',sans-serif;
-  color:var(--text-body);
-  font-size:13px;
-  line-height:1.68;
-}
-
-.page{
-  width:700px;
-  margin:20mm auto;
-  background:white;
-  border:1px solid #E0E8EF;
-  overflow:hidden;
-}
-
-.section{
-  margin-bottom:42px;
-  page-break-inside:avoid;
-}
-
-.page-break{
-  page-break-before:always;
-}
-
-.page-top-bar{
-  height:4px;
-  background:linear-gradient(90deg,#0C1C2E 0%,#2C4A6E 60%,#DDE8F2 100%);
-}
-
-.cover{
-  padding:52px 50px 44px;
-  border-bottom:1px solid var(--sep);
-}
-
-.body-wrap{
-  padding:38px 50px 32px;
-}
-
-.bar{
-  width:100%;
-  height:10px;
-  background:rgba(0,0,0,0.06);
-  border-radius:6px;
-  overflow:hidden;
-}
-.bar-inner{
-  height:100%;
-  width:{{pha_score}}%;
-  background:linear-gradient(90deg,#6eb48c,#46966e);
-}
-</style>
+<title>FairVia Report</title>
 </head>
 
 <body>
+<h1>{{client_name}}</h1>
+<p>{{client_company}}</p>
+<p>{{client_country}}</p>
 
-<div class="page">
+<h2>Feasibility: {{feasibility_level}}</h2>
 
-<div class="page-top-bar"></div>
-
-<!-- COVER -->
-<div class="cover">
-  <h2>{{application}}</h2>
-</div>
-
-<div class="body-wrap">
-
-<!-- 01 -->
-<div class="section">
-  <p>{{executive_summary}}</p>
-</div>
-
-<div class="page-break"></div>
-<div class="page-top-bar"></div>
-
-<!-- 02 -->
-<div class="section">
-  <p>{{processing_window}}</p>
-  <p>{{thermal_behavior}}</p>
-  <p>{{flow_characteristics}}</p>
-</div>
-
-<div class="page-break"></div>
-<div class="page-top-bar"></div>
-
-<!-- 03 -->
-<div class="section">
-  <p>{{mechanical_behavior}}</p>
-  <p>{{surface_quality}}</p>
-  <p>{{structural_consistency}}</p>
-</div>
-
-<div class="page-break"></div>
-<div class="page-top-bar"></div>
-
-<!-- 04 -->
-<div class="section">
-  <p>{{primary_risk}}</p>
-  <p>{{secondary_risk}}</p>
-  <p>{{mechanism}}</p>
-</div>
-
-<div class="page-break"></div>
-<div class="page-top-bar"></div>
-
-<!-- 05 -->
-<div class="section">
-  <p>{{stability}}</p>
-  <p>{{consistency}}</p>
-
-  <div class="bar">
-    <div class="bar-inner"></div>
-  </div>
-
-</div>
-
-<div class="page-break"></div>
-<div class="page-top-bar"></div>
-
-<!-- 06 -->
-<div class="section">
-
-<div style="position:relative;width:100%;height:260px;overflow:hidden;">
-
-<img src="{{base_image}}" style="
-position:absolute;
-width:100%;
-height:100%;
-object-fit:contain;
-">
-
-<div style="
-position:absolute;
-width:100%;
-height:100%;
-pointer-events:none;
-">
-{{dynamic_overlay}}
-</div>
-
-</div>
-
-</div>
-
-<div class="page-break"></div>
-<div class="page-top-bar"></div>
-
-<!-- 07 -->
-<div class="section">
-  <p>{{next_step}}</p>
-</div>
-
-<!-- 08 -->
-<div class="section">
-  <p>This report is based on hypothesis-driven evaluation.</p>
-</div>
-
-</div>
-</div>
+<p>{{executive_summary_overview}}</p>
+<p>{{executive_summary_findings}}</p>
+<p>{{executive_summary_conclusion}}</p>
 
 </body>
 </html>
-const html = `
+;
+const html = 
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1817,7 +1463,7 @@ await browser.close();
       from: "FairVia <info@ilnautico.com>",
       to: email,
       subject: "FairVia Report",
-      html: `<p>Your report result: <b>${finalFeasibility}</b></p>`,
+      html: <p>Your report result: <b>${finalFeasibility}</b></p>,
       attachments: [
         {
           filename: "report.pdf",
