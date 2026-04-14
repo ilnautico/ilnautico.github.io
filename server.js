@@ -99,8 +99,8 @@ app.post("/generate-report", async (req, res) => {
       pha_score: String(phaScore),
 
       // 🔥 正しい書き方（ここ修正済）
-      base_image:
-       base_image: "https://ilnautico.github.io/bioplastic-visual.png",
+     // ←このカンマが必要
+    base_image: "https://ilnautico.github.io/bioplastic-visual.png",
 
       dynamic_overlay: dynamicOverlay,
 
