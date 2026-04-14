@@ -69,8 +69,7 @@ function buildHtml(template) {
     pha_score: 65,
 
     // ✅ 絶対出る画像（ここが重要）
-    base_image:
-      "https://upload.wikimedia.org/wikipedia/commons/3/3a/Polymer_sample.jpg",
+base_image: "https://raw.githubusercontent.com/ilnautico/visual-assets/main/bioplastic-visual.png",
 
     // UI触らない
     dynamic_overlay: "",
