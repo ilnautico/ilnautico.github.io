@@ -10,7 +10,7 @@ const PORT = process.env.PORT || 8080;
 // =========================
 // 🔥 ここだけ自分のURLに変更
 // =========================
-const TEMPLATE_URL = "https://raw.githubusercontent.com/ilnautico/ilnautico.github.io/main/tier2.html";
+const TEMPLATE_URL = "https://raw.githubusercontent.com/ilnautico/ilnautico.github.io/main/template.html";
 
 // =========================
 // util
