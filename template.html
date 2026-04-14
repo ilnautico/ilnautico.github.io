@@ -1144,83 +1144,55 @@ body {
 
   <!-- ===== 06 Conceptual Visualization ===== -->
 
-  <div class="section">
+ <!-- ===== 06 Conceptual Visualization ===== -->
 
-    <div class="section-header">
+<div class="section">
 
-      <span class="section-num">06</span>
+  <div class="section-header">
+    <span class="section-num">06</span>
+    <span class="section-title">Conceptual Visualization</span>
+  </div>
 
-      <span class="section-title">Conceptual Visualization</span>
+  <div style="
+    width:700px;
+    margin:0 auto;
+    background:var(--block-light);
+    border:1px solid #D4E2EE;
+    border-radius:10px;
+    overflow:hidden;
+  ">
+
+    <div style="
+      position:relative;
+      width:100%;
+      height:260px;
+      overflow:hidden;
+    ">
+
+      <img src="{{base_image}}" style="
+        position:absolute;
+        left:0;
+        top:0;
+        width:100%;
+        height:100%;
+        object-fit:contain;
+        display:block;
+      ">
+
+      <div style="
+        position:absolute;
+        left:0;
+        top:0;
+        width:100%;
+        height:100%;
+        pointer-events:none;
+      ">
+        {{dynamic_overlay}}
+      </div>
 
     </div>
 
-    <!-- ビジュアル枠 -->
-
-    <div style="
-
-      width:700px;
-
-      margin:0 auto;
-
-      background:var(--block-light);
-
-      border:1px solid #D4E2EE;
-
-      border-radius:10px;
-
-      overflow:hidden;
-
-    ">
-
-     <div style="
-
-  position:relative;
-
-  width:100%;
-
-  height:260px;
-
-  overflow:hidden;
-
-">
-
-  <img src="{{base_image}}" style="
-
-    position:absolute;
-
-    left:0;
-
-    top:0;
-
-    width:100%;
-
-    height:100%;
-
-    object-fit:contain;
-
-    display:block;
-
-  ">
-
-  <div style="
-
-  position:absolute;
-
-  left:0;
-
-  top:0;
-
-  width:100%;
-
-  height:100%;
-
-  pointer-events:none;
-
-">
-
-  {{dynamic_overlay}}
-
-</div>
+  </div>
 
 </div>
 
