@@ -1,123 +1,187 @@
-console.log("🔥 THIS IS NEW SERVER FILE 🔥");
-import express from "express";
-import puppeteer from "puppeteer";
-import fs from "fs";
-import path from "path";
-import { fileURLToPath } from "url";
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FairVia™ Technical Hypothesis Report</title>
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-const app = express();
-app.use(express.json());
-
-const PDF_PATH = "/tmp/latest.pdf";
-
-// =========================
-// スコア
-// =========================
-function calculateScores() {
-  return {
-    scoreLeft: Math.floor(Math.random() * 60 + 40),
-    scoreRight: Math.floor(Math.random() * 60 + 40)
-  };
+<style>
+:root {
+  --navy:#0C1C2E;
+  --navy-soft:#2C4A6E;
+  --block-light:#F9FCFF;
+  --block-mid:#E6EFF8;
+  --block-deep:#DDE8F2;
+  --sep:#E6EDF3;
+  --text-body:#374151;
+  --text-muted:#6B7A8E;
+  --text-label:#9AA5B4;
 }
 
-// =========================
-// overlay
-// =========================
-function generateOverlay(scoreLeft, scoreRight) {
+*{margin:0;padding:0;box-sizing:border-box;}
 
-  const ampLeft = 4 + scoreLeft * 0.12;
-  const ampRight = 4 + scoreRight * 0.12;
-
-  return `
-    <svg style="position:absolute;left:50%;top:60%;width:120px;height:40px;" viewBox="0 0 80 20">
-      <path stroke="#3B82A0" stroke-width="2" fill="none"
-        d="M0 10 Q20 ${10-ampLeft} 40 10 T80 10"/>
-    </svg>
-  `;
+body{
+  background:#F4F7FA;
+  font-family:'IBM Plex Sans',sans-serif;
+  color:var(--text-body);
+  font-size:13px;
+  line-height:1.68;
 }
 
-// =========================
-// inject（完全修正）
-// =========================
-function injectHtml(template, data) {
-  let html = template;
-
-  for (const key in data) {
-    html = html.replace(
-      new RegExp(`{{\\s*${key}\\s*}}`, "g"),
-      data[key] || ""
-    );
-  }
-
-  return html;
+.page{
+  width:700px;
+  margin:20mm auto;
+  background:white;
+  border:1px solid #E0E8EF;
+  overflow:hidden;
 }
 
-// =========================
-// POST
-// =========================
-app.get("/tally-pdf", async (req, res) => {
+.section{
+  margin-bottom:42px;
+  page-break-inside:avoid;
+}
 
-  try {
+.page-break{
+  page-break-before:always;
+}
 
-    const { scoreLeft, scoreRight } = calculateScores();
+.page-top-bar{
+  height:4px;
+  background:linear-gradient(90deg,#0C1C2E 0%,#2C4A6E 60%,#DDE8F2 100%);
+}
 
-    // 🔥ここが重要（ローカル固定）
-    const template = fs.readFileSync(
-      path.join(__dirname, "template.html"),
-      "utf8"
-    );
+.cover{
+  padding:52px 50px 44px;
+  border-bottom:1px solid var(--sep);
+}
 
-    const html = injectHtml(template, {
-      application: "Injection",
-      executive_summary: "This transition presents moderate feasibility.",
-      base_image: "https://ilnautico.github.io/visual-base.png",
-      dynamic_overlay: generateOverlay(scoreLeft, scoreRight),
-      pha_score: scoreLeft
-    });
+.body-wrap{
+  padding:38px 50px 32px;
+}
 
-    const browser = await puppeteer.launch({
-      args: ["--no-sandbox"]
-    });
+.bar{
+  width:100%;
+  height:10px;
+  background:rgba(0,0,0,0.06);
+  border-radius:6px;
+  overflow:hidden;
+}
+.bar-inner{
+  height:100%;
+  width:{{pha_score}}%;
+  background:linear-gradient(90deg,#6eb48c,#46966e);
+}
+</style>
+</head>
 
-    const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: "networkidle0" });
+<body>
 
-    const pdf = await page.pdf({
-      format: "A4",
-      printBackground: true
-    });
+<div class="page">
 
-    await browser.close();
+<div class="page-top-bar"></div>
 
-    fs.writeFileSync(PDF_PATH, pdf);
+<!-- COVER -->
+<div class="cover">
+  <h2>{{application}}</h2>
+</div>
 
-    res.send("PDF generated");
+<div class="body-wrap">
 
-  } catch (err) {
-    console.error(err);
-    res.status(500).send("error");
-  }
-});
+<!-- 01 -->
+<div class="section">
+  <p>{{executive_summary}}</p>
+</div>
 
-// =========================
-// GET
-// =========================
-app.get("/latest-pdf", (req, res) => {
+<div class="page-break"></div>
+<div class="page-top-bar"></div>
 
-  if (!fs.existsSync(PDF_PATH)) {
-    return res.status(404).send("No PDF yet");
-  }
+<!-- 02 -->
+<div class="section">
+  <p>{{processing_window}}</p>
+  <p>{{thermal_behavior}}</p>
+  <p>{{flow_characteristics}}</p>
+</div>
 
-  res.sendFile(PDF_PATH);
-});
+<div class="page-break"></div>
+<div class="page-top-bar"></div>
 
-const PORT = process.env.PORT || 8080;
-app.listen(PORT, () => {
-  console.log("🚀 Server running on", PORT);
-});
+<!-- 03 -->
+<div class="section">
+  <p>{{mechanical_behavior}}</p>
+  <p>{{surface_quality}}</p>
+  <p>{{structural_consistency}}</p>
+</div>
+
+<div class="page-break"></div>
+<div class="page-top-bar"></div>
+
+<!-- 04 -->
+<div class="section">
+  <p>{{primary_risk}}</p>
+  <p>{{secondary_risk}}</p>
+  <p>{{mechanism}}</p>
+</div>
+
+<div class="page-break"></div>
+<div class="page-top-bar"></div>
+
+<!-- 05 -->
+<div class="section">
+  <p>{{stability}}</p>
+  <p>{{consistency}}</p>
+
+  <div class="bar">
+    <div class="bar-inner"></div>
+  </div>
+
+</div>
+
+<div class="page-break"></div>
+<div class="page-top-bar"></div>
+
+<!-- 06 -->
+<div class="section">
+
+<div style="position:relative;width:100%;height:260px;overflow:hidden;">
+
+<img src="{{base_image}}" style="
+position:absolute;
+width:100%;
+height:100%;
+object-fit:contain;
+">
+
+<div style="
+position:absolute;
+width:100%;
+height:100%;
+pointer-events:none;
+">
+{{dynamic_overlay}}
+</div>
+
+</div>
+
+</div>
+
+<div class="page-break"></div>
+<div class="page-top-bar"></div>
+
+<!-- 07 -->
+<div class="section">
+  <p>{{next_step}}</p>
+</div>
+
+<!-- 08 -->
+<div class="section">
+  <p>This report is based on hypothesis-driven evaluation.</p>
+</div>
+
+</div>
+</div>
+
+</body>
+</html>
 const html = `
 <!DOCTYPE html>
 <html lang="en">
