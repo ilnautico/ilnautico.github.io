@@ -13,7 +13,7 @@ app.use(express.json());
 const PDF_PATH = "/tmp/latest.pdf";
 
 // =========================
-// HTML差し込み
+// テンプレ差し込み（安全版）
 // =========================
 function injectHtml(template, data) {
   let html = template;
@@ -21,105 +21,112 @@ function injectHtml(template, data) {
   for (const key in data) {
     html = html.replace(
       new RegExp(`{{\\s*${key}\\s*}}`, "g"),
-      data[key] ?? ""
+      String(data[key] ?? "")
     );
   }
 
   return html;
 }
-const SUMMARY_OVERVIEW =
-  "This transition presents moderate feasibility under controlled conditions.";
 
-const SUMMARY_FINDINGS =
-  "Thermal instability may occur during extended residence time.";
-
-const SUMMARY_CONCLUSION =
-  "Pilot validation is recommended before full-scale implementation.";
-
-const RISK_1_TITLE = "Thermal Degradation";
-const RISK_1_BODY = "Material breakdown under elevated temperature.";
-
-const RISK_2_TITLE = "Processing Instability";
-const RISK_2_BODY = "Flow inconsistency may impact product quality.";
-
-const STRATEGIC_RECOMMENDATION =
-  "Proceed with controlled pilot validation.";
 // =========================
-// メイン
+// メイン（POST）
 // =========================
-app.get("/generate-report", async (req, res) => {
+app.post("/generate-report", async (req, res) => {
+  console.log("🔥 GENERATE");
+
   try {
-    console.log("🔥 GENERATE");
-
     const template = fs.readFileSync(
       path.join(__dirname, "template.html"),
       "utf8"
     );
 
     // =========================
-    // ✅ データ（ここが全て）
+    // 固定データ（まずは安定優先）
     // =========================
     const application = "Injection molding";
     const currentMaterial = "PP";
     const bioMaterial = "PHA";
-
-    const finalFeasibility = "Moderate";
     const phaScore = 65;
+    const finalFeasibility = "Moderate";
 
     // =========================
-    // ✅ バルーン
+    // バルーン
     // =========================
     const dynamicOverlay = `
-    <div style="position:absolute;left:42%;top:58%;width:120px;height:80px;border-radius:50%;border:2px solid rgba(180,180,180,0.5);"></div>
-    <div style="position:absolute;left:45%;top:60%;width:80px;height:50px;border-radius:50%;border:2px solid rgba(140,200,160,0.6);"></div>
-    `;
+<div style="
+  position:absolute;
+  left:42%;
+  top:58%;
+  width:120px;
+  height:80px;
+  border-radius:50%;
+  border:2px solid rgba(180,180,180,0.5);
+"></div>
+
+<div style="
+  position:absolute;
+  left:45%;
+  top:60%;
+  width:80px;
+  height:50px;
+  border-radius:50%;
+  border:2px solid rgba(140,200,160,0.6);
+"></div>
+`;
 
     // =========================
-    // HTML生成
+    // HTML生成（絶対安全構造）
     // =========================
-   const html = injectHtml(template, {
-  application: application,
-  material_transition: `${currentMaterial} → ${bioMaterial}`,
-  assessment_type: "Preliminary Screening",
-  report_date: new Date().toISOString().split("T")[0],
+    const html = injectHtml(template, {
+      application: application,
+      material_transition: `${currentMaterial} → ${bioMaterial}`,
+      assessment_type: "Preliminary Screening",
+      report_date: new Date().toISOString().split("T")[0],
 
-  compatibility_level: finalFeasibility,
+      compatibility_level: finalFeasibility,
 
-  // 🔥 AI戻す
-  executive_summary: SUMMARY_OVERVIEW,
-  key_risk: SUMMARY_FINDINGS,
+      // 👇 仮（あとでAIに置き換え）
+      executive_summary:
+        "This transition presents moderate feasibility under controlled processing conditions.",
+      key_risk:
+        "Thermal instability may occur during extended residence time.",
 
-  processing_window: "To be validated under controlled conditions",
-  thermal_behavior: "Thermal sensitivity observed",
-  flow_characteristics: "Moderate deviation expected",
+      processing_window: "Requires controlled temperature range",
+      thermal_behavior: "Sensitive under high temperature",
+      flow_characteristics: "Lower melt strength vs PP",
 
-  mechanical_behavior: "Reduced flexibility",
-  surface_quality: "Minor variation",
-  structural_consistency: "Requires validation",
+      mechanical_behavior: "Moderate stiffness reduction",
+      surface_quality: "Minor variation expected",
+      structural_consistency: "Dependent on process stability",
 
-  application_implication: SUMMARY_CONCLUSION,
+      application_implication: "Suitable for controlled pilot trials",
 
-  primary_risk_title: RISK_1_TITLE,
-  primary_risk: RISK_1_BODY,
+      primary_risk_title: "Thermal Degradation",
+      primary_risk: "Material breakdown risk under heat",
 
-  secondary_risk_title: RISK_2_TITLE,
-  secondary_risk: RISK_2_BODY,
+      secondary_risk_title: "Flow Instability",
+      secondary_risk: "Inconsistent flow behavior possible",
 
-  mechanism: "Polymer chain sensitivity",
+      mechanism: "Polymer chain scission under stress",
 
-  stability: "Moderate",
-  stability_note: "Requires validation",
+      stability: "Moderate",
+      stability_note: "Requires controlled validation",
 
-  consistency: "Moderate",
-  consistency_note: "Process dependent",
+      consistency: "Moderate",
+      consistency_note: "Dependent on processing conditions",
 
-  pha_score: phaScore,
+      // 🔥 ここが超重要（メーター復活）
+      pha_score: String(phaScore),
 
-  base_image: "https://ilnautico.github.io/visual-base.png",
-  dynamic_overlay: dynamicOverlay,
+      // 🔥 画像（変な人物防止）
+      base_image:
+        "https://ilnautico.github.io/bioplastic-visual.png",
 
-  next_step: STRATEGIC_RECOMMENDATION
-});
+      dynamic_overlay: dynamicOverlay,
+
+      next_step: "Proceed with controlled pilot validation"
+    });
+
     // =========================
     // Puppeteer
     // =========================
@@ -148,6 +155,9 @@ app.get("/generate-report", async (req, res) => {
 
     fs.writeFileSync(PDF_PATH, pdf);
 
+    // =========================
+    // PDF返す
+    // =========================
     res.setHeader("Content-Type", "application/pdf");
     res.send(pdf);
 
@@ -158,12 +168,62 @@ app.get("/generate-report", async (req, res) => {
 });
 
 // =========================
-// ROOT
+// GET（ブラウザ確認用）
 // =========================
-app.get("/", (req, res) => {
-  res.send("Server Running");
+app.get("/generate-report", async (req, res) => {
+  try {
+    const template = fs.readFileSync(
+      path.join(__dirname, "template.html"),
+      "utf8"
+    );
+
+    const html = injectHtml(template, {
+      application: "TEST",
+      material_transition: "PP → PHA",
+      assessment_type: "Preview",
+      report_date: "TEST",
+
+      compatibility_level: "Moderate",
+
+      executive_summary: "Preview Mode",
+      key_risk: "Preview Mode",
+
+      pha_score: "65",
+
+      base_image:
+        "https://ilnautico.github.io/bioplastic-visual.png",
+
+      dynamic_overlay: "",
+
+      next_step: "Preview"
+    });
+
+    const browser = await puppeteer.launch({
+      headless: true,
+      args: ["--no-sandbox"]
+    });
+
+    const page = await browser.newPage();
+    await page.setContent(html);
+
+    const pdf = await page.pdf({
+      format: "A4",
+      printBackground: true
+    });
+
+    await browser.close();
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.send(pdf);
+
+  } catch (err) {
+    res.status(500).send("error");
+  }
 });
 
+// =========================
+// 起動
+// =========================
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
   console.log("🚀 Server running on", PORT);
