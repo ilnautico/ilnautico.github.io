@@ -122,8 +122,10 @@ app.get("/generate-report", generatePDF);
 app.post("/generate-report", generatePDF);
 
 // =========================
-app.listen(8080, () => {
-  console.log("🚀 Server running");
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, () => {
+  console.log("🚀 Server running on", PORT);
 });
 // =========================
 // 起動
