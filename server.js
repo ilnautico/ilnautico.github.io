@@ -29,52 +29,40 @@ function injectHtml(template, data) {
 }
 
 // =========================
-// POST（本番用）
+// メイン
 // =========================
-app.post("/generate-report", async (req, res) => {
+app.get("/generate-report", async (req, res) => {
   try {
-    console.log("🔥 POST HIT");
+    console.log("🔥 GENERATE");
 
     const template = fs.readFileSync(
       path.join(__dirname, "template.html"),
       "utf8"
     );
 
-    // ===== ダミー入力（あとでTallyに戻す） =====
+    // =========================
+    // ✅ データ（ここが全て）
+    // =========================
     const application = "Injection molding";
     const currentMaterial = "PP";
     const bioMaterial = "PHA";
 
-    const finalFeasibility = "MODERATE";
+    const finalFeasibility = "Moderate";
+    const phaScore = 65;
 
-    // ===== バルーン（復活） =====
+    // =========================
+    // ✅ バルーン
+    // =========================
     const dynamicOverlay = `
-    <div style="
-      position:absolute;
-      left:42%;
-      top:58%;
-      width:120px;
-      height:80px;
-      border-radius:50%;
-      border:2px solid rgba(180,180,180,0.5);
-    "></div>
-
-    <div style="
-      position:absolute;
-      left:45%;
-      top:60%;
-      width:80px;
-      height:50px;
-      border-radius:50%;
-      border:2px solid rgba(140,200,160,0.6);
-    "></div>
+    <div style="position:absolute;left:42%;top:58%;width:120px;height:80px;border-radius:50%;border:2px solid rgba(180,180,180,0.5);"></div>
+    <div style="position:absolute;left:45%;top:60%;width:80px;height:50px;border-radius:50%;border:2px solid rgba(140,200,160,0.6);"></div>
     `;
 
     // =========================
     // HTML生成
     // =========================
     const html = injectHtml(template, {
-      application,
+      application: application,
       material_transition: `${currentMaterial} → ${bioMaterial}`,
       assessment_type: "Preliminary Screening",
       report_date: new Date().toISOString().split("T")[0],
@@ -110,10 +98,13 @@ app.post("/generate-report", async (req, res) => {
       consistency: "Variable",
       consistency_note: "Depends on process",
 
-      pha_score: 65,
+      // 🔥 メーター復活
+      pha_score: phaScore,
 
-      // 🔥 ここが重要（元に戻した）
+      // 🔥 元画像復活
       base_image: "https://ilnautico.github.io/visual-base.png",
+
+      // 🔥 バルーン
       dynamic_overlay: dynamicOverlay,
 
       next_step: "Proceed with pilot validation"
@@ -147,96 +138,12 @@ app.post("/generate-report", async (req, res) => {
 
     fs.writeFileSync(PDF_PATH, pdf);
 
-    // ===== レスポンス（超重要） =====
     res.setHeader("Content-Type", "application/pdf");
     res.send(pdf);
 
   } catch (err) {
     console.error("❌ ERROR:", err);
     res.status(500).send("Server Error");
-  }
-});
-
-// =========================
-// GET（ブラウザ確認用）
-// =========================
-app.get("/generate-report", async (req, res) => {
-  try {
-    console.log("🔥 GET HIT");
-
-    const template = fs.readFileSync(
-      path.join(__dirname, "template.html"),
-      "utf8"
-    );
-
-    const dynamicOverlay = `
-    <div style="position:absolute;left:42%;top:58%;width:120px;height:80px;border-radius:50%;border:2px solid rgba(180,180,180,0.5);"></div>
-    <div style="position:absolute;left:45%;top:60%;width:80px;height:50px;border-radius:50%;border:2px solid rgba(140,200,160,0.6);"></div>
-    `;
-
-    const html = injectHtml(template, {
-      application: "Test",
-      material_transition: "PP → PHA",
-      assessment_type: "Test",
-      report_date: new Date().toISOString().split("T")[0],
-
-      compatibility_level: "Moderate",
-      executive_summary: "Test summary",
-      key_risk: "Test risk",
-
-      processing_window: "Test",
-      thermal_behavior: "Test",
-      flow_characteristics: "Test",
-
-      mechanical_behavior: "Test",
-      surface_quality: "Test",
-      structural_consistency: "Test",
-
-      application_implication: "Test",
-
-      primary_risk_title: "Test",
-      primary_risk: "Test",
-
-      secondary_risk_title: "Test",
-      secondary_risk: "Test",
-
-      mechanism: "Test",
-
-      stability: "Test",
-      stability_note: "Test",
-
-      consistency: "Test",
-      consistency_note: "Test",
-
-      pha_score: 50,
-
-      base_image: "https://ilnautico.github.io/visual-base.png",
-      dynamic_overlay: dynamicOverlay,
-
-      next_step: "Test"
-    });
-
-    const browser = await puppeteer.launch({
-      headless: true,
-      args: ["--no-sandbox"]
-    });
-
-    const page = await browser.newPage();
-    await page.setContent(html);
-
-    const pdf = await page.pdf({
-      format: "A4",
-      printBackground: true
-    });
-
-    await browser.close();
-
-    res.setHeader("Content-Type", "application/pdf");
-    res.send(pdf);
-
-  } catch (err) {
-    console.error(err);
-    res.status(500).send("error");
   }
 });
 
