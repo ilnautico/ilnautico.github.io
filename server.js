@@ -17,73 +17,47 @@ function injectHtml(template, data) {
 }
 
 // =========================
-// テスト生成
+// HTMLテンプレ（←1つだけ）
+// =========================
+const htmlTemplate = `
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>FairVia Report</title>
+</head>
+
+<body style="font-family: Arial; padding:40px;">
+
+<h1>{{client_name}}</h1>
+<p>{{client_company}}</p>
+<p>{{client_country}}</p>
+
+<h2>Feasibility: {{feasibility_level}}</h2>
+
+<p>{{executive_summary_overview}}</p>
+<p>{{executive_summary_findings}}</p>
+<p>{{executive_summary_conclusion}}</p>
+
+</body>
+</html>
+`;
+
+// =========================
+// テスト生成（これ叩く）
 // =========================
 app.get("/generate-report", async (req, res) => {
   console.log("🔥 GET TEST HIT");
 
   try {
-    const finalHtml = injectHtml(html, {
+    const finalHtml = injectHtml(htmlTemplate, {
       client_name: "Test Client",
       client_company: "Test Company",
       client_country: "Japan",
-
-      application: "Injection",
-      current_material: "PP",
-      processing_method: "Injection",
-      bio_material: "PLA",
-      equipment: "Standard Machine",
-      production_scale: "Medium",
-      project_stage: "Testing",
-      submission_reference: "TEST",
-
       feasibility_level: "MODERATE",
-      report_date: new Date().toISOString().split("T")[0],
-      report_id: "TEST-" + Date.now(),
-
       executive_summary_overview: "Overview placeholder",
       executive_summary_findings: "Findings placeholder",
-      executive_summary_conclusion: "Conclusion placeholder",
-      feasibility_explanation: "Explanation placeholder",
-
-      thermal_risk: "MODERATE",
-      processing_risk: "MODERATE",
-      equipment_risk: "MODERATE",
-
-      score_thermal_assessment: "Check required",
-      score_thermal_level: "MODERATE",
-      score_thermal_note: "Thermal note",
-
-      score_processing_assessment: "Check required",
-      score_processing_level: "MODERATE",
-      score_processing_note: "Processing note",
-
-      score_equipment_assessment: "Check required",
-      score_equipment_level: "MODERATE",
-      score_equipment_note: "Equipment note",
-
-      score_cert_assessment: "TBD",
-      score_cert_level: "MODERATE",
-      score_cert_note: "Cert note",
-
-      score_eol_assessment: "TBD",
-      score_eol_level: "MODERATE",
-      score_eol_note: "EOL note",
-
-      obs_1_title: "Observation 1",
-      obs_1_body: "Detail",
-      obs_2_title: "Observation 2",
-      obs_2_body: "Detail",
-      obs_3_title: "Observation 3",
-      obs_3_body: "Detail",
-
-      risk_1_title: "Risk 1",
-      risk_1_body: "Detail",
-      risk_2_title: "Risk 2",
-      risk_2_body: "Detail",
-
-      strategic_recommendation: "Proceed with pilot",
-      disclaimer: "Advisory only"
+      executive_summary_conclusion: "Conclusion placeholder"
     });
 
     const browser = await puppeteer.launch({
@@ -96,7 +70,8 @@ app.get("/generate-report", async (req, res) => {
       ]
     });
 
-    const page = await browser.newPage();
+    const page = await browser.newPage(); // ←これ重要
+
     await page.setContent(finalHtml, { waitUntil: "networkidle0" });
 
     const pdf = await page.pdf({
@@ -106,7 +81,8 @@ app.get("/generate-report", async (req, res) => {
 
     await browser.close();
 
-    fs.writeFileSync("./latest.pdf", pdf);
+    fs.writeFileSync("./latest.pdf", pdf); // ←ここ統一
+
     console.log("✅ PDF SAVED");
 
     res.send("PDF generated");
@@ -121,9 +97,12 @@ app.get("/generate-report", async (req, res) => {
 // PDF取得
 // =========================
 app.get("/latest-pdf", (req, res) => {
+  console.log("📥 PDF REQUEST");
+
   const filePath = process.cwd() + "/latest.pdf";
 
   if (!fs.existsSync(filePath)) {
+    console.log("❌ PDF NOT FOUND");
     return res.status(404).send("PDF not found");
   }
 
