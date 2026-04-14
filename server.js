@@ -1463,7 +1463,7 @@ await browser.close();
       from: "FairVia <info@ilnautico.com>",
       to: email,
       subject: "FairVia Report",
-      html: <p>Your report result: <b>${finalFeasibility}</b></p>,
+     html: `<p>Your report result: <b>${finalFeasibility}</b></p>`,
       attachments: [
         {
           filename: "report.pdf",
