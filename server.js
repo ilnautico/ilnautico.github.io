@@ -5,13 +5,6 @@ import fs from "fs";
 const app = express();
 app.use(express.json());
 
-const PORT = process.env.PORT || 8080;
-
-// =========================
-// 🔥 ここだけ自分のURLに変更
-// =========================
-const TEMPLATE_URL = "https://raw.githubusercontent.com/ilnautico/ilnautico.github.io/main/template.html";
-
 // =========================
 // util
 // =========================
@@ -23,8 +16,21 @@ function injectHtml(template, data) {
   return output;
 }
 
+function getValue(fields, keyName) {
+  const f = fields.find(f =>
+    (f.key || "").toLowerCase().includes(keyName) ||
+    (f.label || "").toLowerCase().includes(keyName)
+  );
+  return f?.value || "";
+}
+
 // =========================
-// GitHubテンプレ取得
+// テンプレURL（←ここ重要）
+// =========================
+const TEMPLATE_URL = "https://raw.githubusercontent.com/ilnautico/ilnautico.github.io/main/template.html";
+
+// =========================
+// テンプレ取得
 // =========================
 async function fetchTemplate() {
   const res = await fetch(TEMPLATE_URL);
@@ -33,7 +39,7 @@ async function fetchTemplate() {
 }
 
 // =========================
-// PDF生成
+// テスト（GET）
 // =========================
 app.get("/generate-report", async (req, res) => {
   console.log("🔥 TEST HIT");
@@ -42,56 +48,28 @@ app.get("/generate-report", async (req, res) => {
     const template = await fetchTemplate();
 
     const html = injectHtml(template, {
-
-  // ===== 基本 =====
-  application: processing || "Injection",
-
-  // ===== Executive =====
-  executive_summary: "This material transition presents a moderate feasibility level under controlled conditions.",
-
-  // ===== Processing =====
-  processing_window: "Processing window remains relatively narrow and requires temperature stability.",
-  thermal_behavior: "Thermal sensitivity increases near degradation threshold.",
-  flow_characteristics: "Flow behaviour differs from PP baseline requiring pressure adjustments.",
-
-  // ===== Mechanical =====
-  mechanical_behavior: "Mechanical strength is slightly reduced compared to PP.",
-  surface_quality: "Surface finish may show minor inconsistencies.",
-  structural_consistency: "Structural consistency depends on stable cooling profile.",
-
-  // ===== Risk =====
-  primary_risk: "Primary risk is thermal degradation during residence time.",
-  secondary_risk: "Secondary risk involves flow instability.",
-  mechanism: "Material chain scission under heat stress is the key mechanism.",
-
-  // ===== Stability =====
-  stability: "Overall stability: Moderate",
-  consistency: "Batch-to-batch consistency requires validation",
-
-  // ===== グラフ（🔥重要） =====
-  pha_score: 62, // ←ここでバーが伸びる（0〜100）
-
-  // ===== ビジュアル =====
-  base_image: "https://your-image-url.com/base.png",
-
-  dynamic_overlay: `
-    <div style="position:absolute;top:40%;left:30%;width:120px;height:120px;
-    border:2px solid rgba(200,0,0,0.5);border-radius:50%;">
-    </div>
-  `,
-
-  // ===== Next =====
-  next_step: "Proceed with controlled pilot testing before scale-up."
-
-});
+      application: "Injection",
+      executive_summary: "This transition presents moderate feasibility.",
+      processing_window: "Stable window required",
+      thermal_behavior: "Thermal sensitivity exists",
+      flow_characteristics: "Flow differs from PP",
+      mechanical_behavior: "Slight reduction in strength",
+      surface_quality: "Minor variation",
+      structural_consistency: "Cooling dependent",
+      primary_risk: "Thermal degradation",
+      secondary_risk: "Flow instability",
+      mechanism: "Polymer breakdown under heat",
+      stability: "Moderate",
+      consistency: "Requires validation",
+      pha_score: 60,
+      base_image: "",
+      dynamic_overlay: "",
+      next_step: "Proceed with pilot"
+    });
 
     const browser = await puppeteer.launch({
-      args: [
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--disable-dev-shm-usage",
-        "--disable-gpu"
-      ]
+      headless: true,
+      args: ["--no-sandbox","--disable-setuid-sandbox","--disable-dev-shm-usage"]
     });
 
     const page = await browser.newPage();
@@ -102,13 +80,12 @@ app.get("/generate-report", async (req, res) => {
       printBackground: true
     });
 
+    fs.writeFileSync("/tmp/latest.pdf", pdf);
     await browser.close();
 
-    fs.writeFileSync("/tmp/latest.pdf", pdf);
+    console.log("✅ PDF SAVED");
 
-    console.log("✅ PDF GENERATED");
-
-    res.send("OK");
+    res.send("PDF generated");
 
   } catch (err) {
     console.error("❌ ERROR:", err);
@@ -117,23 +94,125 @@ app.get("/generate-report", async (req, res) => {
 });
 
 // =========================
+// 本番（POST）
+// =========================
+app.post("/generate-report", async (req, res) => {
+  console.log("🔥 REQUEST HIT");
+
+  try {
+    const template = await fetchTemplate();
+
+    const fields = Array.isArray(req.body)
+      ? req.body
+      : req.body?.fields || req.body?.data?.fields || [];
+
+    // ===== 先に定義（←エラー対策） =====
+    const processing = getValue(fields, "processing");
+    const currentMaterial = getValue(fields, "material");
+    const bioMaterial = getValue(fields, "biodegradable");
+    const projectStage = getValue(fields, "project");
+
+    const clientName = getValue(fields, "client");
+    const company = getValue(fields, "company");
+    const country = getValue(fields, "country");
+
+    // ===== 判定 =====
+    const text = [
+      processing || "",
+      currentMaterial || "",
+      bioMaterial || "",
+      projectStage || ""
+    ].join(" ").toLowerCase();
+
+    const isInjection = text.includes("injection");
+    const isPP = text.includes("pp");
+    const isBio = text.includes("pla") || text.includes("bio");
+
+    let feasibility = "MODERATE";
+    if (isInjection && isPP && isBio) {
+      feasibility = "LOW";
+    }
+
+    // ===== スコア =====
+    const phaScore = feasibility === "LOW" ? 35 : 65;
+
+    // ===== HTML =====
+    const html = injectHtml(template, {
+
+      application: processing || "",
+
+      executive_summary: `Feasibility: ${feasibility}`,
+      processing_window: "Controlled processing window required",
+      thermal_behavior: "Thermal stability must be monitored",
+      flow_characteristics: "Flow differs from baseline material",
+
+      mechanical_behavior: "Mechanical variation expected",
+      surface_quality: "Surface consistency depends on cooling",
+      structural_consistency: "Stable condition required",
+
+      primary_risk: "Thermal degradation risk",
+      secondary_risk: "Flow instability risk",
+      mechanism: "Polymer chain breakdown",
+
+      stability: "Moderate",
+      consistency: "Requires validation",
+
+      pha_score: phaScore,
+
+      base_image: "",
+      dynamic_overlay: "",
+
+      next_step: "Proceed with pilot validation"
+
+    });
+
+    const browser = await puppeteer.launch({
+      headless: true,
+      args: ["--no-sandbox","--disable-setuid-sandbox","--disable-dev-shm-usage"]
+    });
+
+    const page = await browser.newPage();
+    await page.setContent(html, { waitUntil: "networkidle0" });
+
+    const pdf = await page.pdf({
+      format: "A4",
+      printBackground: true
+    });
+
+    fs.writeFileSync("/tmp/latest.pdf", pdf);
+    await browser.close();
+
+    console.log("✅ PDF SAVED");
+
+    res.json({ success: true });
+
+  } catch (err) {
+    console.error("❌ ERROR:", err);
+    res.status(500).json({ error: "Server Error" });
+  }
+});
+
+// =========================
 // PDF取得
 // =========================
 app.get("/latest-pdf", (req, res) => {
-  const path = "/tmp/latest.pdf";
+  const filePath = "/tmp/latest.pdf";
 
-  if (!fs.existsSync(path)) {
+  if (!fs.existsSync(filePath)) {
     console.log("❌ PDF NOT FOUND");
     return res.status(404).send("PDF not found");
   }
 
+  const file = fs.readFileSync(filePath);
   res.setHeader("Content-Type", "application/pdf");
-  res.send(fs.readFileSync(path));
+  res.send(file);
 });
 
 // =========================
 // 起動
 // =========================
+const PORT = process.env.PORT || 8080;
+
 app.listen(PORT, () => {
   console.log(`🚀 Server running on ${PORT}`);
 });
