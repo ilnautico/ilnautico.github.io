@@ -10,197 +10,94 @@ const __dirname = path.dirname(__filename);
 const app = express();
 app.use(express.json());
 
-const PDF_PATH = "/tmp/latest.pdf";
-
 // =========================
-// テンプレ差し込み（安全版）
+// HTML差し込み
 // =========================
 function injectHtml(template, data) {
   let html = template;
-
   for (const key in data) {
     html = html.replace(
       new RegExp(`{{\\s*${key}\\s*}}`, "g"),
       String(data[key] ?? "")
     );
   }
-
   return html;
 }
 
 // =========================
-// メイン（POST）
+// 共通PDF生成関数
 // =========================
-app.post("/generate-report", async (req, res) => {
-  console.log("🔥 GENERATE");
-
+async function generatePDF(res) {
   try {
-    // ✅ テンプレ1本化
     const template = fs.readFileSync(
       path.join(__dirname, "template.html"),
       "utf8"
     );
 
-    // =========================
-    // 基本データ
-    // =========================
-    const application = "Injection molding";
-    const currentMaterial = "PP";
-    const bioMaterial = "PHA";
-    const phaScore = 65;
-    const finalFeasibility = "Moderate";
-
-    // =========================
-    // コンサル文章（ここは後でAI差し替えOK）
-    // =========================
-    const REPORT = {
-      summary:
-        "This assessment evaluates the feasibility of transitioning from conventional polyolefin systems to biodegradable alternatives under controlled processing conditions. Based on initial screening, moderate compatibility is identified, with specific attention required for thermal stability and flow consistency.",
-
-      risk:
-        "Thermal instability during extended residence time may result in molecular degradation, affecting final product integrity.",
-
-      processing:
-        "Processing requires a controlled thermal window with reduced exposure to high shear conditions.",
-
-      thermal:
-        "Material exhibits sensitivity to elevated temperature zones beyond standard PP processing limits.",
-
-      flow:
-        "Reduced melt strength compared to conventional materials may impact film uniformity.",
-
-      mechanical:
-        "Moderate reduction in tensile performance is expected under non-optimized conditions.",
-
-      surface:
-        "Surface uniformity may vary depending on cooling and die conditions.",
-
-      structure:
-        "Consistency is achievable under stable processing conditions but may fluctuate during transitions.",
-
-      implication:
-        "Applicable within controlled pilot-scale operations with parameter optimization.",
-
-      primaryRiskTitle: "Thermal Degradation",
-      primaryRisk:
-        "Polymer breakdown under excessive thermal exposure leading to instability.",
-
-      secondaryRiskTitle: "Flow Instability",
-      secondaryRisk:
-        "Material flow inconsistency due to viscosity variation.",
-
-      mechanism:
-        "Polymer chain scission under combined thermal and shear stress.",
-
-      stability: "Moderate",
-      stabilityNote:
-        "Requires strict temperature control and residence time management.",
-
-      consistency: "Moderate",
-      consistencyNote:
-        "Dependent on equipment precision and processing stability.",
-
-      nextStep:
-        "Proceed with controlled pilot validation under monitored processing conditions."
-    };
-
-    // =========================
-    // 🔥 メーター＆バルーン（完全復元）
-    // =========================
     const dynamicOverlay = `
 <svg width="220" height="220" style="position:absolute; left:50%; top:55%; transform:translate(-50%,-50%);">
-
-  <circle cx="110" cy="110" r="80"
-    stroke="rgba(180,180,180,0.35)"
-    stroke-width="2"
-    fill="none"/>
-
-  <circle cx="110" cy="110" r="55"
-    stroke="rgba(120,200,150,0.45)"
-    stroke-width="2"
-    fill="none"/>
-
+  <circle cx="110" cy="110" r="80" stroke="rgba(180,180,180,0.35)" stroke-width="2" fill="none"/>
+  <circle cx="110" cy="110" r="55" stroke="rgba(120,200,150,0.45)" stroke-width="2" fill="none"/>
   <g transform="rotate(35 110 110)">
     <line x1="110" y1="110" x2="50" y2="110"
-      stroke="#1c1c1c"
-      stroke-width="2.5"
-      stroke-linecap="round"/>
+      stroke="#1c1c1c" stroke-width="2.5" stroke-linecap="round"/>
   </g>
-
   <circle cx="110" cy="110" r="4.5" fill="#1c1c1c"/>
-
 </svg>
 `;
 
-    // =========================
-    // HTML生成
-    // =========================
     const html = injectHtml(template, {
-      application,
-      material_transition: `${currentMaterial} → ${bioMaterial}`,
-      assessment_type: "Preliminary Screening",
+      application: "Injection molding",
+      material_transition: "PP → PHA",
+      assessment_type: "Preview",
       report_date: new Date().toISOString().split("T")[0],
 
-      compatibility_level: finalFeasibility,
+      compatibility_level: "Moderate",
 
-      executive_summary: REPORT.summary,
-      key_risk: REPORT.risk,
+      executive_summary: "Preview working",
+      key_risk: "Thermal risk",
 
-      processing_window: REPORT.processing,
-      thermal_behavior: REPORT.thermal,
-      flow_characteristics: REPORT.flow,
+      processing_window: "Test",
+      thermal_behavior: "Test",
+      flow_characteristics: "Test",
 
-      mechanical_behavior: REPORT.mechanical,
-      surface_quality: REPORT.surface,
-      structural_consistency: REPORT.structure,
+      mechanical_behavior: "Test",
+      surface_quality: "Test",
+      structural_consistency: "Test",
 
-      application_implication: REPORT.implication,
+      application_implication: "Test",
 
-      primary_risk_title: REPORT.primaryRiskTitle,
-      primary_risk: REPORT.primaryRisk,
+      primary_risk_title: "Test",
+      primary_risk: "Test",
 
-      secondary_risk_title: REPORT.secondaryRiskTitle,
-      secondary_risk: REPORT.secondaryRisk,
+      secondary_risk_title: "Test",
+      secondary_risk: "Test",
 
-      mechanism: REPORT.mechanism,
+      mechanism: "Test",
 
-      stability: REPORT.stability,
-      stability_note: REPORT.stabilityNote,
+      stability: "Moderate",
+      stability_note: "Test",
 
-      consistency: REPORT.consistency,
-      consistency_note: REPORT.consistencyNote,
+      consistency: "Moderate",
+      consistency_note: "Test",
 
-      // 🔥 メーター
-      pha_score: String(phaScore),
+      pha_score: "65",
 
-      // 🔥 画像（安定版）
       base_image:
         "https://raw.githubusercontent.com/ilnautico/visual-assets/main/bioplastic-visual.png",
 
-      // 🔥 UI復元
       dynamic_overlay: dynamicOverlay,
 
-      next_step: REPORT.nextStep
+      next_step: "Proceed with validation"
     });
 
-    // =========================
-    // Puppeteer
-    // =========================
     const browser = await puppeteer.launch({
       headless: true,
-      args: [
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--disable-dev-shm-usage",
-        "--disable-gpu"
-      ]
+      args: ["--no-sandbox", "--disable-setuid-sandbox"]
     });
 
     const page = await browser.newPage();
-
-    await page.setContent(html, {
-      waitUntil: "networkidle0"
-    });
+    await page.setContent(html, { waitUntil: "networkidle0" });
 
     const pdf = await page.pdf({
       format: "A4",
@@ -208,8 +105,6 @@ app.post("/generate-report", async (req, res) => {
     });
 
     await browser.close();
-
-    fs.writeFileSync(PDF_PATH, pdf);
 
     res.setHeader("Content-Type", "application/pdf");
     res.send(pdf);
@@ -218,62 +113,17 @@ app.post("/generate-report", async (req, res) => {
     console.error("❌ ERROR:", err);
     res.status(500).send("Server Error");
   }
-});
+}
 
 // =========================
-// GET（確認用）
+// GETでもPOSTでも動く
 // =========================
-app.get("/generate-report", async (req, res) => {
+app.get("/generate-report", generatePDF);
+app.post("/generate-report", generatePDF);
 
-  console.log("🔥 GET TEST");
-
-  try {
-    const template = fs.readFileSync(
-      path.join(__dirname, "template.html"),
-      "utf8"
-    );
-
-    const html = injectHtml(template, {
-      application: "TEST",
-      material_transition: "PP → PHA",
-      assessment_type: "Preview",
-      report_date: new Date().toISOString().split("T")[0],
-
-      compatibility_level: "Moderate",
-
-      executive_summary: "Preview",
-      key_risk: "Preview",
-
-      pha_score: "65",
-
-      base_image: "https://raw.githubusercontent.com/ilnautico/visual-assets/main/bioplastic-visual.png",
-
-      dynamic_overlay: dynamicOverlay,
-
-      next_step: "Preview"
-    });
-
-    const browser = await puppeteer.launch({
-      headless: true,
-      args: ["--no-sandbox"]
-    });
-
-    const page = await browser.newPage();
-    await page.setContent(html);
-
-    const pdf = await page.pdf({
-      format: "A4",
-      printBackground: true
-    });
-
-    await browser.close();
-
-    res.setHeader("Content-Type", "application/pdf");
-    res.send(pdf);
-
-  } catch (err) {
-    res.status(500).send("error");
-  }
+// =========================
+app.listen(8080, () => {
+  console.log("🚀 Server running");
 });
 // =========================
 // 起動
