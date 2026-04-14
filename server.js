@@ -1,99 +1,129 @@
 import express from "express";
 import puppeteer from "puppeteer";
 import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
+
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(express.text({ type: "*/*" }));
 
-const PORT = process.env.PORT || 8080;
-
-// =========================
-// テンプレURL（変更しない）
-// =========================
-const TEMPLATE_URL = "https://raw.githubusercontent.com/ilnautico/ilnautico.github.io/main/template.html";
+const PDF_PATH = "/tmp/latest.pdf";
 
 // =========================
-// util
+// スコア
+// =========================
+function calculateScores() {
+  return {
+    scoreLeft: Math.floor(Math.random() * 60 + 40),
+    scoreRight: Math.floor(Math.random() * 60 + 40)
+  };
+}
+
+// =========================
+// Overlay（修正済）
+// =========================
+function generateOverlay(scoreLeft, scoreRight) {
+  const ampLeft = 4 + scoreLeft * 0.12;
+  const ampRight = 4 + scoreRight * 0.12;
+  const angle = -90 + (scoreRight / 100) * 180;
+
+  return `
+  <div style="position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;">
+
+    <div style="position:absolute; left:33.5%; top:6%; font-size:26px;">230°C</div>
+    <div style="position:absolute; left:66%; top:6%; font-size:26px; color:#dc2626;">180°C</div>
+
+    <div style="position:absolute; left:40%; top:22%; font-size:16px;">${scoreLeft}</div>
+    <div style="position:absolute; left:72%; top:22%; font-size:16px; color:#dc2626;">${scoreRight}</div>
+
+    <svg style="position:absolute;left:46.8%;top:57.2%;width:11%;height:8%;transform:translate(-50%,-50%);" viewBox="0 0 80 20">
+      <path stroke="#3B82A0" stroke-width="2" fill="none"
+        d="M0 10 Q20 ${10-ampLeft} 40 10 T80 10"/>
+    </svg>
+
+    <svg style="position:absolute;left:71.5%;top:64%;width:11%;height:8%;transform:translate(-50%,-50%);" viewBox="0 0 80 20">
+      <path stroke="#dc2626" stroke-width="2" fill="none"
+        d="M0 10 Q20 ${10-ampRight} 40 10 T80 10"/>
+    </svg>
+
+    <svg viewBox="0 0 200 120"
+      style="position:absolute; right:6%; bottom:4%; width:140px; height:90px;">
+
+      <defs>
+        <linearGradient id="meterGrad" x1="0" x2="1">
+          <stop offset="0%" stop-color="#22c55e"/>
+          <stop offset="45%" stop-color="#fde047"/>
+          <stop offset="70%" stop-color="#f59e0b"/>
+          <stop offset="100%" stop-color="#ef4444"/>
+        </linearGradient>
+      </defs>
+
+      <path d="M20 100 A80 80 0 0 1 180 100 L100 100 Z"
+        fill="url(#meterGrad)" />
+
+      <path d="M35 100 A65 65 0 0 1 165 100 L100 100 Z"
+        fill="rgba(255,255,255,0.12)" />
+
+      <ellipse cx="100" cy="104" rx="46" ry="8"
+        fill="black" opacity="0.08"/>
+
+      <g transform="rotate(${angle} 100 100)">
+        <line x1="100" y1="100" x2="35" y2="100"
+          stroke="#111"
+          stroke-width="2.5"
+          stroke-linecap="round"/>
+      </g>
+
+      <circle cx="100" cy="100" r="4.5" fill="#111"/>
+
+    </svg>
+
+  </div>
+  `;
+}
+
+// =========================
+// inject（完全修正）
 // =========================
 function injectHtml(template, data) {
-  let output = template;
+  let html = template;
+
   Object.keys(data).forEach((key) => {
-    output = output.replace(new RegExp(`{{${key}}}`, "g"), data[key] || "");
+    html = html.replace(new RegExp(`{{\\s*${key}\\s*}}`, "g"), data[key] || "");
   });
-  return output;
-}
 
-function getValue(fields, keyName) {
-  const f = fields.find(f =>
-    (f.key || "").toLowerCase().includes(keyName) ||
-    (f.label || "").toLowerCase().includes(keyName)
-  );
-  return f?.value || "";
+  return html;
 }
 
 // =========================
-// テンプレ取得
+// POST
 // =========================
-async function fetchTemplate() {
-  const res = await fetch(TEMPLATE_URL);
-  if (!res.ok) throw new Error("Template fetch failed");
-  return await res.text();
-}
-
-// =========================
-// TEST（確認用）
-// =========================
-app.get("/generate-report", async (req, res) => {
-  console.log("🔥 TEST HIT");
-
+app.post("/tally-pdf", async (req, res) => {
   try {
-    const template = await fetchTemplate();
+    const { scoreLeft, scoreRight } = calculateScores();
+
+    const template = fs.readFileSync(
+      path.join(__dirname, "template.html"),
+      "utf8"
+    );
 
     const html = injectHtml(template, {
-      application: "Injection",
-
-      executive_summary: "This transition presents moderate feasibility.",
-
-      processing_window: "Stable window required",
-      thermal_behavior: "Thermal sensitivity exists",
-      flow_characteristics: "Flow differs from PP",
-
-      mechanical_behavior: "Slight reduction in strength",
-      surface_quality: "Minor variation",
-      structural_consistency: "Cooling dependent",
-
-      primary_risk: "Thermal degradation",
-      secondary_risk: "Flow instability",
-      mechanism: "Polymer breakdown under heat",
-
-      stability: "Moderate",
-      consistency: "Requires validation",
-
-      pha_score: 60,
-
-      base_image: "",
-      dynamic_overlay: "",
-
-      next_step: "Proceed with pilot"
+      base_image: "https://ilnautico.github.io/visual-base.png",
+      dynamic_overlay: generateOverlay(scoreLeft, scoreRight),
+      pha_score: scoreLeft
     });
 
     const browser = await puppeteer.launch({
-      headless: true,
-      args: [
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--disable-dev-shm-usage"
-      ]
+      args: ["--no-sandbox", "--disable-setuid-sandbox"]
     });
 
     const page = await browser.newPage();
-
-    // 🔥 これがズレ防止の本体
-    await page.setViewport({
-      width: 1200,
-      height: 1600
-    });
-
     await page.setContent(html, { waitUntil: "networkidle0" });
 
     const pdf = await page.pdf({
@@ -101,148 +131,33 @@ app.get("/generate-report", async (req, res) => {
       printBackground: true
     });
 
-    fs.writeFileSync("/tmp/latest.pdf", pdf);
-
     await browser.close();
 
-    console.log("✅ PDF SAVED");
+    fs.writeFileSync(PDF_PATH, pdf);
 
-    res.send("PDF generated");
+    res.send(pdf);
 
   } catch (err) {
-    console.error("❌ ERROR:", err);
-    res.status(500).send("error");
+    console.error(err);
+    res.status(500).send("PDF generation failed");
   }
 });
 
 // =========================
-// 本番（フォーム連携）
-// =========================
-app.post("/generate-report", async (req, res) => {
-  console.log("🔥 REQUEST HIT");
-
-  try {
-    const template = await fetchTemplate();
-
-    const fields = Array.isArray(req.body)
-      ? req.body
-      : req.body?.fields || req.body?.data?.fields || [];
-
-    // ===== 入力 =====
-    const processing = getValue(fields, "processing");
-    const currentMaterial = getValue(fields, "material");
-    const bioMaterial = getValue(fields, "biodegradable");
-    const projectStage = getValue(fields, "project");
-
-    // ===== 判定 =====
-    const text = [
-      processing || "",
-      currentMaterial || "",
-      bioMaterial || "",
-      projectStage || ""
-    ].join(" ").toLowerCase();
-
-    const isInjection = text.includes("injection");
-    const isPP = text.includes("pp");
-    const isBio = text.includes("pla") || text.includes("bio");
-
-    let feasibility = "MODERATE";
-    if (isInjection && isPP && isBio) {
-      feasibility = "LOW";
-    }
-
-    // ===== スコア =====
-    const phaScore = feasibility === "LOW" ? 35 : 65;
-
-    // ===== inject =====
-    const html = injectHtml(template, {
-
-      application: processing || "",
-
-      executive_summary: `Feasibility: ${feasibility}`,
-
-      processing_window: "Controlled processing window required",
-      thermal_behavior: "Thermal stability must be monitored",
-      flow_characteristics: "Flow differs from baseline material",
-
-      mechanical_behavior: "Mechanical variation expected",
-      surface_quality: "Surface consistency depends on cooling",
-      structural_consistency: "Stable condition required",
-
-      primary_risk: "Thermal degradation risk",
-      secondary_risk: "Flow instability risk",
-      mechanism: "Polymer chain breakdown",
-
-      stability: "Moderate",
-      consistency: "Requires validation",
-
-      pha_score: phaScore,
-
-      base_image: "",
-      dynamic_overlay: "",
-
-      next_step: "Proceed with pilot validation"
-    });
-
-    const browser = await puppeteer.launch({
-      headless: true,
-      args: [
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--disable-dev-shm-usage"
-      ]
-    });
-
-    const page = await browser.newPage();
-
-    // 🔥 ズレ防止
-    await page.setViewport({
-      width: 1200,
-      height: 1600
-    });
-
-    await page.setContent(html, { waitUntil: "networkidle0" });
-
-    const pdf = await page.pdf({
-      format: "A4",
-      printBackground: true
-    });
-
-    fs.writeFileSync("/tmp/latest.pdf", pdf);
-
-    await browser.close();
-
-    console.log("✅ PDF SAVED");
-
-    res.json({ success: true });
-
-  } catch (err) {
-    console.error("❌ ERROR:", err);
-    res.status(500).json({ error: "Server Error" });
-  }
-});
-
-// =========================
-// PDF取得
+// GET
 // =========================
 app.get("/latest-pdf", (req, res) => {
-  const filePath = "/tmp/latest.pdf";
-
-  if (!fs.existsSync(filePath)) {
-    console.log("❌ PDF NOT FOUND");
-    return res.status(404).send("PDF not found");
+  if (!fs.existsSync(PDF_PATH)) {
+    return res.status(404).send("No PDF yet");
   }
-
-  const file = fs.readFileSync(filePath);
-  res.setHeader("Content-Type", "application/pdf");
-  res.send(file);
+  res.sendFile(PDF_PATH);
 });
 
 // =========================
-// 起動
-// =========================
+const PORT = process.env.PORT || 8080;
+
 app.listen(PORT, () => {
-  console.log(`🚀 Server running on ${PORT}`);
+  console.log("🚀 Server running on", PORT);
 });
 const html = `
 <!DOCTYPE html>
