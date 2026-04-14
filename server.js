@@ -29,7 +29,7 @@ function injectHtml(template, data) {
 }
 
 // =========================
-// メイン（POST）
+// POST：PDF生成
 // =========================
 app.post("/generate-report", async (req, res) => {
   console.log("🔥 GENERATE");
@@ -40,9 +40,6 @@ app.post("/generate-report", async (req, res) => {
       "utf8"
     );
 
-    // =========================
-    // データ（ここだけ触る）
-    // =========================
     const html = injectHtml(template, {
       application: "Injection molding",
       material_transition: "PP → PHA",
@@ -80,21 +77,18 @@ app.post("/generate-report", async (req, res) => {
       consistency: "Moderate",
       consistency_note: "Dependent on processing conditions",
 
-      // ✅ メーター用（数値）
+      // ✅ メーター
       pha_score: 65,
 
       // ✅ 画像（テンプレ用）
       base_image: "https://ilnautico.github.io/bioplastic-visual.png",
 
-      // 🚫 ここが超重要（絶対いじらない）
+      // 🚫 UIはテンプレに任せる
       dynamic_overlay: "",
 
       next_step: "Proceed with controlled pilot validation"
     });
 
-    // =========================
-    // Puppeteer
-    // =========================
     const browser = await puppeteer.launch({
       headless: true,
       args: [
@@ -110,9 +104,6 @@ app.post("/generate-report", async (req, res) => {
     await page.setContent(html, {
       waitUntil: "networkidle0"
     });
-
-    // 🔥 画像読み込み待機
-    await page.waitForTimeout(800);
 
     const pdf = await page.pdf({
       format: "A4",
@@ -133,7 +124,7 @@ app.post("/generate-report", async (req, res) => {
 });
 
 // =========================
-// GET（確認用）
+// GET：ブラウザ確認
 // =========================
 app.get("/generate-report", async (req, res) => {
   try {
@@ -172,8 +163,6 @@ app.get("/generate-report", async (req, res) => {
     await page.setContent(html, {
       waitUntil: "networkidle0"
     });
-
-    await page.waitForTimeout(800);
 
     const pdf = await page.pdf({
       format: "A4",
