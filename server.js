@@ -13,7 +13,7 @@ app.use(express.json());
 const PDF_PATH = "/tmp/latest.pdf";
 
 // =========================
-// テンプレ差し込み
+// HTML差し込み
 // =========================
 function injectHtml(template, data) {
   let html = template;
@@ -21,7 +21,7 @@ function injectHtml(template, data) {
   for (const key in data) {
     html = html.replace(
       new RegExp(`{{\\s*${key}\\s*}}`, "g"),
-      data[key] || ""
+      data[key] ?? ""
     );
   }
 
@@ -29,66 +29,95 @@ function injectHtml(template, data) {
 }
 
 // =========================
-// メイン（POST）
+// POST（本番用）
 // =========================
 app.post("/generate-report", async (req, res) => {
-  console.log("🔥 REQUEST HIT");
-
   try {
+    console.log("🔥 POST HIT");
 
     const template = fs.readFileSync(
       path.join(__dirname, "template.html"),
       "utf8"
     );
 
-    // =========================
-    // 固定データ（まずは動作優先）
-    // =========================
-    const dynamicOverlay = `
-<div style="position:absolute; left:42%; top:58%; width:120px; height:80px; border-radius:50%; border:2px solid rgba(180,180,180,0.5);"></div>
-<div style="position:absolute; left:45%; top:60%; width:80px; height:50px; border-radius:50%; border:2px solid rgba(140,200,160,0.6);"></div>
-`;
+    // ===== ダミー入力（あとでTallyに戻す） =====
+    const application = "Injection molding";
+    const currentMaterial = "PP";
+    const bioMaterial = "PHA";
 
-    const data = {
-      application: "Injection molding",
-      material_transition: "PP → PHA",
-      assessment_type: "Preliminary",
+    const finalFeasibility = "MODERATE";
+
+    // ===== バルーン（復活） =====
+    const dynamicOverlay = `
+    <div style="
+      position:absolute;
+      left:42%;
+      top:58%;
+      width:120px;
+      height:80px;
+      border-radius:50%;
+      border:2px solid rgba(180,180,180,0.5);
+    "></div>
+
+    <div style="
+      position:absolute;
+      left:45%;
+      top:60%;
+      width:80px;
+      height:50px;
+      border-radius:50%;
+      border:2px solid rgba(140,200,160,0.6);
+    "></div>
+    `;
+
+    // =========================
+    // HTML生成
+    // =========================
+    const html = injectHtml(template, {
+      application,
+      material_transition: `${currentMaterial} → ${bioMaterial}`,
+      assessment_type: "Preliminary Screening",
       report_date: new Date().toISOString().split("T")[0],
 
-      compatibility_level: "Moderate",
-      executive_summary: "This transition presents moderate feasibility under controlled conditions.",
-      key_risk: "Thermal instability during extended residence time.",
+      compatibility_level: finalFeasibility,
 
-      processing_window: "Requires controlled temperature range.",
-      thermal_behavior: "Thermal degradation risk under high heat.",
-      flow_characteristics: "Lower melt strength vs PP.",
+      executive_summary:
+        "This transition presents moderate feasibility under controlled conditions.",
+      key_risk:
+        "Thermal instability during extended residence time.",
 
-      mechanical_behavior: "Moderate stiffness reduction.",
-      surface_quality: "Surface variation possible.",
-      structural_consistency: "Depends on process stability.",
-      application_implication: "Suitable for controlled pilot trials.",
+      processing_window: "Requires controlled temperature range",
+      thermal_behavior: "Thermal degradation risk under heat",
+      flow_characteristics: "Lower melt strength vs PP",
+
+      mechanical_behavior: "Moderate stiffness reduction",
+      surface_quality: "Surface variation possible",
+      structural_consistency: "Dependent on stability",
+
+      application_implication: "Suitable for pilot validation",
 
       primary_risk_title: "Thermal Degradation",
-      primary_risk: "Material breakdown under heat.",
+      primary_risk: "Material breakdown under heat",
+
       secondary_risk_title: "Flow Instability",
-      secondary_risk: "Inconsistent flow behavior.",
-      mechanism: "Polymer chain scission.",
+      secondary_risk: "Inconsistent flow",
+
+      mechanism: "Polymer chain scission",
 
       stability: "Moderate",
-      stability_note: "Requires controlled validation.",
+      stability_note: "Requires controlled validation",
+
       consistency: "Variable",
-      consistency_note: "Dependent on processing conditions.",
+      consistency_note: "Depends on process",
 
       pha_score: 65,
 
-      // 🔥 画像＋バルーン
-      base_image: "https://images.unsplash.com/photo-1581094794329-c8112a89af12?q=80&w=1200",
+      // 🔥 ここが重要（元に戻した）
+      base_image: "https://ilnautico.github.io/visual-base.png",
       dynamic_overlay: dynamicOverlay,
 
-      next_step: "Proceed with pilot validation."
-    };
-
-    const html = injectHtml(template, data);
+      next_step: "Proceed with pilot validation"
+    });
 
     // =========================
     // Puppeteer
@@ -118,6 +147,7 @@ app.post("/generate-report", async (req, res) => {
 
     fs.writeFileSync(PDF_PATH, pdf);
 
+    // ===== レスポンス（超重要） =====
     res.setHeader("Content-Type", "application/pdf");
     res.send(pdf);
 
@@ -131,9 +161,8 @@ app.post("/generate-report", async (req, res) => {
 // GET（ブラウザ確認用）
 // =========================
 app.get("/generate-report", async (req, res) => {
-  console.log("🔥 GET HIT");
-
   try {
+    console.log("🔥 GET HIT");
 
     const template = fs.readFileSync(
       path.join(__dirname, "template.html"),
@@ -141,28 +170,51 @@ app.get("/generate-report", async (req, res) => {
     );
 
     const dynamicOverlay = `
-<div style="position:absolute; left:42%; top:58%; width:120px; height:80px; border-radius:50%; border:2px solid rgba(180,180,180,0.5);"></div>
-`;
+    <div style="position:absolute;left:42%;top:58%;width:120px;height:80px;border-radius:50%;border:2px solid rgba(180,180,180,0.5);"></div>
+    <div style="position:absolute;left:45%;top:60%;width:80px;height:50px;border-radius:50%;border:2px solid rgba(140,200,160,0.6);"></div>
+    `;
 
-    const data = {
+    const html = injectHtml(template, {
       application: "Test",
-      material_transition: "Test → Test",
-      assessment_type: "Preview",
+      material_transition: "PP → PHA",
+      assessment_type: "Test",
       report_date: new Date().toISOString().split("T")[0],
 
       compatibility_level: "Moderate",
-      executive_summary: "Preview mode",
-      key_risk: "Preview risk",
+      executive_summary: "Test summary",
+      key_risk: "Test risk",
+
+      processing_window: "Test",
+      thermal_behavior: "Test",
+      flow_characteristics: "Test",
+
+      mechanical_behavior: "Test",
+      surface_quality: "Test",
+      structural_consistency: "Test",
+
+      application_implication: "Test",
+
+      primary_risk_title: "Test",
+      primary_risk: "Test",
+
+      secondary_risk_title: "Test",
+      secondary_risk: "Test",
+
+      mechanism: "Test",
+
+      stability: "Test",
+      stability_note: "Test",
+
+      consistency: "Test",
+      consistency_note: "Test",
 
       pha_score: 50,
 
-      base_image: "https://images.unsplash.com/photo-1581094794329-c8112a89af12?q=80&w=1200",
+      base_image: "https://ilnautico.github.io/visual-base.png",
       dynamic_overlay: dynamicOverlay,
 
       next_step: "Test"
-    };
-
-    const html = injectHtml(template, data);
+    });
 
     const browser = await puppeteer.launch({
       headless: true,
@@ -188,6 +240,8 @@ app.get("/generate-report", async (req, res) => {
   }
 });
 
+// =========================
+// ROOT
 // =========================
 app.get("/", (req, res) => {
   res.send("Server Running");
