@@ -15,7 +15,6 @@ app.use(express.urlencoded({ extended: true }));
 
 const PDF_PATH = "/tmp/latest.pdf";
 
-
 // =========================
 // OpenAI
 // =========================
@@ -23,66 +22,96 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
 });
 
-
 // =========================
-// スコア計算（ここは後で入力連動OK）
+// スコア（仮）
 // =========================
-function calculateScores(input) {
-
-  const optimalTemp = 180;
-
-  function calc(temp) {
-    const diff = Math.abs(temp - optimalTemp);
-    if (diff <= 5) return 95;
-    if (diff <= 10) return 90;
-    if (diff <= 20) return 75;
-    if (diff <= 30) return 60;
-    return 40;
-  }
-
-  const scoreLeft = calc(230);
-  const scoreRight = calc(180);
-
-  return { scoreLeft, scoreRight };
+function calculateScores() {
+  return {
+    scoreLeft: 40,
+    scoreRight: 95
+  };
 }
 
+// =========================
+// Overlay（UI完全版）
+// =========================
+function generateOverlay(scoreLeft, scoreRight) {
+
+  const ampLeft = 4 + scoreLeft * 0.12;
+  const ampRight = 4 + scoreRight * 0.12;
+  const angle = -90 + (scoreRight / 100) * 180;
+
+  return `
+  <div style="position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;">
+
+    <div style="position:absolute; left:33.5%; top:6%; font-size:26px;">
+      230°C
+    </div>
+
+    <div style="position:absolute; left:66%; top:6%; font-size:26px; color:#dc2626;">
+      180°C
+    </div>
+
+    <div style="position:absolute; left:40%; top:22%;">${scoreLeft}</div>
+    <div style="position:absolute; left:72%; top:22%; color:#dc2626;">${scoreRight}</div>
+
+    <svg style="position:absolute;left:46.8%;top:57.2%;width:11%;height:8%;">
+      <path stroke="#3B82A0" stroke-width="2" fill="none"
+        d="M0 10 Q20 ${10-ampLeft} 40 10 T80 10"/>
+    </svg>
+
+    <svg style="position:absolute;left:71.5%;top:64%;width:11%;height:8%;">
+      <path stroke="#dc2626" stroke-width="2" fill="none"
+        d="M0 10 Q20 ${10-ampRight} 40 10 T80 10"/>
+    </svg>
+
+    <svg viewBox="0 0 200 120"
+      style="position:absolute; right:6%; bottom:6%; width:140px; height:90px;">
+
+      <defs>
+        <linearGradient id="meterGrad" x1="0" x2="1">
+          <stop offset="0%" stop-color="#22c55e"/>
+          <stop offset="45%" stop-color="#fde047"/>
+          <stop offset="70%" stop-color="#f59e0b"/>
+          <stop offset="100%" stop-color="#ef4444"/>
+        </linearGradient>
+      </defs>
+
+      <path d="M20 100 A80 80 0 0 1 180 100 L100 100 Z"
+        fill="url(#meterGrad)" />
+
+      <g transform="rotate(${angle} 100 100)">
+        <line x1="100" y1="100" x2="100" y2="25"
+          stroke="#111"
+          stroke-width="2.5"
+          stroke-linecap="round"/>
+      </g>
+
+      <circle cx="100" cy="100" r="4.5" fill="#111"/>
+    </svg>
+
+  </div>
+  `;
+}
 
 // =========================
-// AI生成（🔥最終版プロンプト）
+// AI生成（プロ仕様）
 // =========================
 async function generateAIReport(input, scoreLeft, scoreRight) {
 
   const prompt = `
-You are a senior polymer engineer AND strategic technical consultant.
+You are a senior polymer engineer and technical consultant.
 
-Your role is to generate a professional technical assessment that can be used for real business decision-making.
+Write a professional technical assessment for executive decision-making.
 
-The report must:
-- Be technically accurate
-- Be understandable by non-technical executives
-- Clearly explain implications and risks
-- Support decision-making
+Return ONLY JSON.
 
-STRICT RULES:
-- Return ONLY valid JSON
-- No markdown
-- No explanations outside JSON
-- Do NOT provide formulation, blending ratios, or processing parameters
-- Do NOT recommend suppliers
-
-INPUT:
 Application: ${input.application}
-Current Material: ${input.material}
-Target Material: ${input.bio_material}
-Equipment: ${input.equipment}
-Concern: ${input.concern}
-Stage: ${input.stage}
+Material: ${input.material}
+Target: ${input.bio_material}
 
-SCORING CONTEXT:
-Stability Score: ${scoreLeft} / 100
-Risk Score: ${scoreRight} / 100
-
-RETURN JSON:
+Stability: ${scoreLeft}
+Risk: ${scoreRight}
 
 {
   "executive_summary": "",
@@ -108,136 +137,71 @@ RETURN JSON:
   const res = await openai.chat.completions.create({
     model: "gpt-4.1-mini",
     messages: [
-      { role: "system", content: "Return only JSON." },
+      { role: "system", content: "Return JSON only." },
       { role: "user", content: prompt }
     ],
-    temperature: 0.7
+    temperature: 0.4
   });
 
   try {
     return JSON.parse(res.choices[0].message.content);
-  } catch (e) {
-    console.error("AI parse error:", e);
+  } catch {
     return {
-      executive_summary: "AI generation failed.",
+      executive_summary: "Fallback",
       key_risk: "Unknown",
-      next_step: "Manual review required."
+      next_step: "Manual review required"
     };
   }
 }
 
-
 // =========================
-// Overlay（UI完全版）
-// =========================
-function generateOverlay(scoreLeft, scoreRight) {
-
-  const angle = -90 + (scoreRight / 100) * 180;
-  const ampLeft = 4 + scoreLeft * 0.12;
-  const ampRight = 4 + scoreRight * 0.12;
-
-  return `
-  <div style="position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;font-family:Arial;">
-
-    <div style="position:absolute; left:33.5%; top:6%; font-size:26px;">
-      230°C
-    </div>
-
-    <div style="position:absolute; left:66%; top:6%; font-size:26px; color:#dc2626;">
-      180°C
-    </div>
-
-    <div style="position:absolute; left:40%; top:22%;">${scoreLeft}</div>
-    <div style="position:absolute; left:72%; top:22%; color:#dc2626;">${scoreRight}</div>
-
-    <!-- 波 -->
-    <svg style="position:absolute;left:46.8%;top:57.2%;width:11%;height:8%;">
-      <path stroke="#3B82A0" stroke-width="2" fill="none"
-        d="M0 10 Q20 ${10-ampLeft} 40 10 T80 10"/>
-    </svg>
-
-    <svg style="position:absolute;left:71.5%;top:63.5%;width:11%;height:8%;">
-      <path stroke="#dc2626" stroke-width="2" fill="none"
-        d="M0 10 Q20 ${10-ampRight} 40 10 T80 10"/>
-    </svg>
-
-    <!-- メーター -->
-    <svg viewBox="0 0 200 120"
-      style="position:absolute; right:6%; bottom:6%; width:140px; height:90px;">
-
-      <path d="M20 100 A80 80 0 0 1 60 30 L60 100 Z" fill="#22c55e"/>
-      <path d="M60 30 A80 80 0 0 1 100 20 L100 100 Z" fill="#fde047"/>
-      <path d="M100 20 A80 80 0 0 1 140 30 L140 100 Z" fill="#f59e0b"/>
-      <path d="M140 30 A80 80 0 0 1 180 100 L140 100 Z" fill="#ef4444"/>
-
-      <g transform="rotate(${angle} 100 100)">
-        <line x1="100" y1="100" x2="100" y2="60"
-          stroke="#111" stroke-width="2.5"/>
-      </g>
-
-      <circle cx="100" cy="100" r="4.5" fill="#111"/>
-    </svg>
-
-  </div>
-  `;
-}
-
-
-// =========================
-// HTML差し込み
+// HTML inject
 // =========================
 function injectHtml(template, data) {
-  let html = template;
+  let htmlStr = template;
   for (const key in data) {
-    html = html.replace(new RegExp(`{{\\s*${key}\\s*}}`, "g"), data[key] || "");
+    htmlStr = htmlStr.replace(
+      new RegExp(`{{\\s*${key}\\s*}}`, "g"),
+      data[key] || ""
+    );
   }
-  return html;
+  return htmlStr;
 }
 
-
 // =========================
-// POSTエンドポイント
+// メイン
 // =========================
 app.post("/tally-pdf", async (req, res) => {
 
   try {
 
-    const inputData = req.body;
+    const input = req.body;
 
-    const { scoreLeft, scoreRight } = calculateScores(inputData);
+    const { scoreLeft, scoreRight } = calculateScores();
 
-    const aiData = await generateAIReport(inputData, scoreLeft, scoreRight);
+    const aiData = await generateAIReport(input, scoreLeft, scoreRight);
 
     const template = fs.readFileSync(
       path.join(__dirname, "template.html"),
       "utf8"
     );
 
-    const html = injectHtml(template, {
+    const htmlStr = injectHtml(template, {
       base_image: "https://ilnautico.github.io/visual-base.png",
       dynamic_overlay: generateOverlay(scoreLeft, scoreRight),
-
-      compatibility_level:
-        scoreLeft < 40 ? "Low" :
-        scoreLeft < 70 ? "Moderate" : "High",
-
-      stability:
-        scoreLeft < 40 ? "Low" :
-        scoreLeft < 70 ? "Moderate" : "High",
-
-      consistency:
-        scoreRight > 70 ? "Variable" :
-        scoreRight > 40 ? "Moderate" : "Stable",
-
+      compatibility_level: "Moderate",
+      stability: "Moderate",
+      consistency: "Variable",
       ...aiData
     });
 
     const browser = await puppeteer.launch({
+      headless: "new",
       args: ["--no-sandbox", "--disable-setuid-sandbox"]
     });
 
     const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: "networkidle0" });
+    await page.setContent(htmlStr);
 
     const pdf = await page.pdf({
       format: "A4",
@@ -252,10 +216,9 @@ app.post("/tally-pdf", async (req, res) => {
 
   } catch (err) {
     console.error(err);
-    res.status(500).send("PDF generation failed");
+    res.status(500).send("error");
   }
 });
-
 
 // =========================
 app.get("/latest-pdf", (req, res) => {
@@ -265,10 +228,8 @@ app.get("/latest-pdf", (req, res) => {
   res.sendFile(PDF_PATH);
 });
 
-
 // =========================
-const PORT = process.env.PORT || 3000;
-
+const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
   console.log("🚀 Server running on", PORT);
 });
