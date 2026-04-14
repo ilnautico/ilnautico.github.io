@@ -5,6 +5,13 @@ import fs from "fs";
 const app = express();
 app.use(express.json());
 
+const PORT = process.env.PORT || 8080;
+
+// =========================
+// 🔥 ここだけ自分のURLに変更
+// =========================
+const TEMPLATE_URL = "https://raw.githubusercontent.com/ilnautico/ilnautico.github.io/main/tier2.html";
+
 // =========================
 // util
 // =========================
@@ -17,75 +24,125 @@ function injectHtml(template, data) {
 }
 
 // =========================
-// HTMLテンプレ（←ここに3万円 or 数十万円テンプレ）
+// GitHubテンプレ取得
 // =========================
-const htmlTemplate = `
-<!DOCTYPE html>
-<html>
-<head>
-<meta charset="UTF-8">
-<title>FairVia Report</title>
-</head>
-<body>
-
-<h1>{{client_name}}</h1>
-<p>{{client_company}}</p>
-<p>{{client_country}}</p>
-
-<h2>{{feasibility_level}}</h2>
-
-<p>{{executive_summary_overview}}</p>
-
-</body>
-</html>
-`;
-
-// =========================
-// PDF生成共通関数
-// =========================
-async function generatePDF(data) {
-  const html = injectHtml(htmlTemplate, data);
-
-  const browser = await puppeteer.launch({
-    headless: true,
-    args: [
-      "--no-sandbox",
-      "--disable-setuid-sandbox",
-      "--disable-dev-shm-usage",
-      "--disable-gpu"
-    ]
-  });
-
-  const page = await browser.newPage();
-  await page.setContent(html, { waitUntil: "networkidle0" });
-
-  const pdf = await page.pdf({
-    format: "A4",
-    printBackground: true
-  });
-
-  await browser.close();
-
-  fs.writeFileSync("/tmp/latest.pdf", pdf);
-  console.log("✅ PDF SAVED");
+async function fetchTemplate() {
+  const res = await fetch(TEMPLATE_URL);
+  if (!res.ok) throw new Error("Template fetch failed");
+  return await res.text();
 }
 
 // =========================
-// GET（ブラウザ確認用）
+// PDF生成
 // =========================
 app.get("/generate-report", async (req, res) => {
-  console.log("🔥 GET HIT");
+  console.log("🔥 TEST HIT");
 
   try {
-    await generatePDF({
+    const template = await fetchTemplate();
+
+    const html = injectHtml(template, {
       client_name: "Test Client",
       client_company: "Test Company",
       client_country: "Japan",
+
+      application: "Injection",
+      current_material: "PP",
+      processing_method: "Injection",
+      bio_material: "PLA",
+      equipment: "Machine",
+      production_scale: "Medium",
+      project_stage: "Testing",
+      submission_reference: "TEST",
+
       feasibility_level: "MODERATE",
-      executive_summary_overview: "Test overview"
+      feasibility_class: "level-moderate",
+
+      report_date: new Date().toISOString().split("T")[0],
+      report_id: "TEST-" + Date.now(),
+
+      executive_summary_overview: "Test overview",
+      executive_summary_findings: "Test findings",
+      executive_summary_conclusion: "Test conclusion",
+      feasibility_explanation: "Test explanation",
+
+      thermal_risk: "MODERATE",
+      thermal_note: "Thermal test",
+      thermal_risk_class: "risk-moderate",
+
+      processing_risk: "MODERATE",
+      processing_note: "Processing test",
+      processing_risk_class: "risk-moderate",
+
+      equipment_risk: "MODERATE",
+      equipment_note: "Equipment test",
+      equipment_risk_class: "risk-moderate",
+
+      score_thermal_assessment: "Check",
+      score_thermal_level: "MODERATE",
+      score_thermal_note: "Note",
+      score_thermal_class: "moderate",
+
+      score_processing_assessment: "Check",
+      score_processing_level: "MODERATE",
+      score_processing_note: "Note",
+      score_processing_class: "moderate",
+
+      score_equipment_assessment: "Check",
+      score_equipment_level: "MODERATE",
+      score_equipment_note: "Note",
+      score_equipment_class: "moderate",
+
+      score_cert_assessment: "TBD",
+      score_cert_level: "MODERATE",
+      score_cert_note: "Note",
+      score_cert_class: "moderate",
+
+      score_eol_assessment: "TBD",
+      score_eol_level: "MODERATE",
+      score_eol_note: "Note",
+      score_eol_class: "moderate",
+
+      obs_1_title: "Observation 1",
+      obs_1_body: "Detail",
+      obs_2_title: "Observation 2",
+      obs_2_body: "Detail",
+      obs_3_title: "Observation 3",
+      obs_3_body: "Detail",
+
+      risk_1_title: "Risk 1",
+      risk_1_body: "Detail",
+      risk_2_title: "Risk 2",
+      risk_2_body: "Detail",
+
+      strategic_recommendation: "Proceed",
+      disclaimer: "Advisory only"
     });
 
-    res.send("PDF generated");
+    const browser = await puppeteer.launch({
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-gpu"
+      ]
+    });
+
+    const page = await browser.newPage();
+    await page.setContent(html, { waitUntil: "networkidle0" });
+
+    const pdf = await page.pdf({
+      format: "A4",
+      printBackground: true
+    });
+
+    await browser.close();
+
+    fs.writeFileSync("/tmp/latest.pdf", pdf);
+
+    console.log("✅ PDF GENERATED");
+
+    res.send("OK");
 
   } catch (err) {
     console.error("❌ ERROR:", err);
@@ -94,49 +151,23 @@ app.get("/generate-report", async (req, res) => {
 });
 
 // =========================
-// POST（フォーム用）
-// =========================
-app.post("/generate-report", async (req, res) => {
-  console.log("🔥 POST HIT");
-
-  try {
-    await generatePDF({
-      client_name: "Client",
-      client_company: "Company",
-      client_country: "Japan",
-      feasibility_level: "MODERATE",
-      executive_summary_overview: "Generated from form"
-    });
-
-    res.json({ success: true });
-
-  } catch (err) {
-    console.error("❌ ERROR:", err);
-    res.status(500).json({ error: "Server Error" });
-  }
-});
-
-// =========================
 // PDF取得
 // =========================
 app.get("/latest-pdf", (req, res) => {
-  const filePath = "/tmp/latest.pdf";
+  const path = "/tmp/latest.pdf";
 
-  if (!fs.existsSync(filePath)) {
+  if (!fs.existsSync(path)) {
     console.log("❌ PDF NOT FOUND");
     return res.status(404).send("PDF not found");
   }
 
-  const file = fs.readFileSync(filePath);
   res.setHeader("Content-Type", "application/pdf");
-  res.send(file);
+  res.send(fs.readFileSync(path));
 });
 
 // =========================
 // 起動
 // =========================
-const PORT = process.env.PORT || 8080;
-
 app.listen(PORT, () => {
   console.log(`🚀 Server running on ${PORT}`);
 });
