@@ -147,35 +147,71 @@ app.get("/generate-report", async (req, res) => {
       "utf8"
     );
 
-    const html = injectHtml(template, {
-      application: "Test",
-      material_transition: "Test",
-      assessment_type: "Test",
-      report_date: new Date().toISOString().split("T")[0],
-      compatibility_level: "Moderate",
-      executive_summary: "Test",
-      key_risk: "Test",
-      processing_window: "Test",
-      thermal_behavior: "Test",
-      flow_characteristics: "Test",
-      mechanical_behavior: "Test",
-      surface_quality: "Test",
-      structural_consistency: "Test",
-      application_implication: "Test",
-      primary_risk_title: "Test",
-      primary_risk: "Test",
-      secondary_risk_title: "Test",
-      secondary_risk: "Test",
-      mechanism: "Test",
-      stability: "Test",
-      stability_note: "Test",
-      consistency: "Test",
-      consistency_note: "Test",
-      pha_score: 50,
-      base_image: "",
-      dynamic_overlay: "",
-      next_step: "Test"
-    });
+  const dynamicOverlay = `
+<div style="
+  position:absolute;
+  left:42%;
+  top:58%;
+  width:120px;
+  height:80px;
+  border-radius:50%;
+  border:2px solid rgba(180,180,180,0.5);
+"></div>
+
+<div style="
+  position:absolute;
+  left:45%;
+  top:60%;
+  width:80px;
+  height:50px;
+  border-radius:50%;
+  border:2px solid rgba(140,200,160,0.6);
+"></div>
+`;
+
+const html = injectHtml(template, {
+  application: application || "Test",
+  material_transition: `${currentMaterial} → ${bioMaterial}`,
+  assessment_type: "Preliminary Screening",
+  report_date: new Date().toISOString().split("T")[0],
+
+  compatibility_level: finalFeasibility,
+
+  executive_summary: SUMMARY_OVERVIEW,
+  key_risk: SUMMARY_FINDINGS,
+
+  processing_window: "To be validated under controlled conditions",
+  thermal_behavior: "Thermal sensitivity observed under transition conditions",
+  flow_characteristics: "Moderate deviation expected",
+
+  mechanical_behavior: "Reduced flexibility compared to baseline",
+  surface_quality: "Minor visual variation expected",
+  structural_consistency: "Requires validation",
+
+  application_implication: "Applicable under controlled processing constraints",
+
+  primary_risk_title: "Thermal Instability",
+  primary_risk: "Material degradation risk under extended residence time",
+
+  secondary_risk_title: "Processing Sensitivity",
+  secondary_risk: "Stability may fluctuate depending on shear conditions",
+
+  mechanism: "Polymer chain sensitivity to thermal stress",
+
+  stability: "Moderate",
+  stability_note: "Requires controlled temperature range",
+
+  consistency: "Moderate",
+  consistency_note: "Dependent on equipment precision",
+
+  pha_score: 55,
+
+  // 🔥 ここ重要
+  base_image: "https://images.unsplash.com/photo-1581094794329-c8112a89af12?q=80&w=1200",
+  dynamic_overlay: dynamicOverlay,
+
+  next_step: STRATEGIC_RECOMMENDATION
+});
 
     const browser = await puppeteer.launch({
       headless: true,
