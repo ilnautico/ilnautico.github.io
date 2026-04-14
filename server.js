@@ -3,7 +3,6 @@ import puppeteer from "puppeteer";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import OpenAI from "openai";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -16,12 +15,6 @@ app.use(express.text({ type: "*/*" }));
 
 const PDF_PATH = "/tmp/latest.pdf";
 
-// =========================
-// OpenAI
-// =========================
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
-});
 
 // =========================
 // スコアロジック（固定）
@@ -37,78 +30,9 @@ function calc(temp) {
   return 40;
 }
 
-// =========================
-// AI生成
-// =========================
-async function generateAIReport(input, scoreLeft, scoreRight) {
-
-  const prompt = `
-You are a professional consultant specializing in biodegradable materials and plastic processing.
-
-IMPORTANT RULES:
-- Return ONLY JSON
-- No explanations
-- No markdown
-
-Client:
-Application: ${input.application || "N/A"}
-Material: ${input.material || "N/A"}
-Target: ${input.bio_material || "N/A"}
-Equipment: ${input.equipment || "N/A"}
-Concern: ${input.concern || "N/A"}
-Stage: ${input.stage || "N/A"}
-
-Scores:
-Stability: ${scoreLeft}
-Risk: ${scoreRight}
-
-Return JSON:
-{
-  "executive_summary": "",
-  "key_risk": "",
-  "processing_window": "",
-  "thermal_behavior": "",
-  "flow_characteristics": "",
-  "mechanical_behavior": "",
-  "surface_quality": "",
-  "structural_consistency": "",
-  "application_implication": "",
-  "primary_risk_title": "",
-  "primary_risk": "",
-  "secondary_risk_title": "",
-  "secondary_risk": "",
-  "mechanism": "",
-  "stability_note": "",
-  "consistency_note": "",
-  "next_step": ""
-}
-`;
-
-  try {
-    const res = await openai.chat.completions.create({
-      model: "gpt-4.1-mini",
-      messages: [
-        { role: "system", content: "Return JSON only." },
-        { role: "user", content: prompt }
-      ],
-      temperature: 0.7
-    });
-
-    return JSON.parse(res.choices[0].message.content);
-
-  } catch (e) {
-    console.error("AI ERROR:", e);
-
-    return {
-      executive_summary: "Assessment in progress.",
-      key_risk: "Pending analysis.",
-      next_step: "Further validation required."
-    };
-  }
-}
 
 // =========================
-// Overlay（完全版UI）
+// Overlay（完全復元）
 // =========================
 function generateOverlay(scoreLeft, scoreRight) {
 
@@ -127,12 +51,13 @@ function generateOverlay(scoreLeft, scoreRight) {
     <div style="position:absolute; left:40%; top:22%;">${scoreLeft}</div>
     <div style="position:absolute; left:72%; top:22%; color:#dc2626;">${scoreRight}</div>
 
-    <!-- 波 -->
+    <!-- 青波 -->
     <svg style="position:absolute; left:46.8%; top:57.2%; width:11%; height:8%;">
       <path stroke="#3B82A0" stroke-width="2" fill="none"
         d="M0 10 Q20 ${10-ampLeft} 40 10 T80 10"/>
     </svg>
 
+    <!-- 赤波 -->
     <svg style="position:absolute; left:71.5%; top:64%; width:11%; height:8%;">
       <path stroke="#dc2626" stroke-width="2" fill="none"
         d="M0 10 Q20 ${10-ampRight} 40 10 T80 10"/>
@@ -166,6 +91,7 @@ function generateOverlay(scoreLeft, scoreRight) {
   `;
 }
 
+
 // =========================
 // HTML差し込み
 // =========================
@@ -180,10 +106,11 @@ function injectHtml(template, data) {
   return html;
 }
 
+
 // =========================
-// メイン処理
+// メインPDF生成
 // =========================
-async function generatePDF(res, inputData = {}) {
+async function generatePDF(res) {
 
   const template = fs.readFileSync(
     path.join(__dirname, "template.html"),
@@ -193,7 +120,26 @@ async function generatePDF(res, inputData = {}) {
   const scoreLeft = calc(230);
   const scoreRight = calc(180);
 
-  const aiData = await generateAIReport(inputData, scoreLeft, scoreRight);
+  // 🔥 仮データ（AIなし）
+  const aiData = {
+    executive_summary: "Moderate feasibility under controlled processing conditions.",
+    key_risk: "Thermal instability risk.",
+    processing_window: "Moderate",
+    thermal_behavior: "Sensitive",
+    flow_characteristics: "Lower melt strength",
+    mechanical_behavior: "Reduced stiffness",
+    surface_quality: "Minor variation",
+    structural_consistency: "Moderate",
+    application_implication: "Pilot recommended",
+    primary_risk_title: "Thermal degradation",
+    primary_risk: "Heat breakdown risk",
+    secondary_risk_title: "Flow instability",
+    secondary_risk: "Inconsistent flow",
+    mechanism: "Polymer chain scission",
+    stability_note: "Requires validation",
+    consistency_note: "Process dependent",
+    next_step: "Proceed with pilot testing"
+  };
 
   const html = injectHtml(template, {
 
@@ -230,6 +176,7 @@ async function generatePDF(res, inputData = {}) {
   res.send(pdf);
 }
 
+
 // =========================
 // ルート
 // =========================
@@ -241,9 +188,6 @@ app.get("/generate-report", async (req, res) => {
   await generatePDF(res);
 });
 
-app.post("/generate-report", async (req, res) => {
-  await generatePDF(res, req.body);
-});
 
 // =========================
 // 起動
