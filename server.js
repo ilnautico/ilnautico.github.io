@@ -13,7 +13,7 @@ app.use(express.json());
 const PDF_PATH = "/tmp/latest.pdf";
 
 // =========================
-// テンプレ差し込み（安全版）
+// テンプレ差し込み
 // =========================
 function injectHtml(template, data) {
   let html = template;
@@ -40,9 +40,7 @@ app.post("/generate-report", async (req, res) => {
       "utf8"
     );
 
-    // =========================
-    // 固定データ（まずは安定優先）
-    // =========================
+    // 固定データ
     const application = "Injection molding";
     const currentMaterial = "PP";
     const bioMaterial = "PHA";
@@ -50,32 +48,15 @@ app.post("/generate-report", async (req, res) => {
     const finalFeasibility = "Moderate";
 
     // =========================
-    // バルーン
+    // バルーン（OK）
     // =========================
     const dynamicOverlay = `
-<div style="
-  position:absolute;
-  left:42%;
-  top:58%;
-  width:120px;
-  height:80px;
-  border-radius:50%;
-  border:2px solid rgba(180,180,180,0.5);
-"></div>
-
-<div style="
-  position:absolute;
-  left:45%;
-  top:60%;
-  width:80px;
-  height:50px;
-  border-radius:50%;
-  border:2px solid rgba(140,200,160,0.6);
-"></div>
+<div style="position:absolute; left:42%; top:58%; width:120px; height:80px; border-radius:50%; border:2px solid rgba(180,180,180,0.5);"></div>
+<div style="position:absolute; left:45%; top:60%; width:80px; height:50px; border-radius:50%; border:2px solid rgba(140,200,160,0.6);"></div>
 `;
 
     // =========================
-    // HTML生成（絶対安全構造）
+    // HTML生成（ここ完全修正）
     // =========================
     const html = injectHtml(template, {
       application: application,
@@ -85,7 +66,6 @@ app.post("/generate-report", async (req, res) => {
 
       compatibility_level: finalFeasibility,
 
-      // 👇 仮（あとでAIに置き換え）
       executive_summary:
         "This transition presents moderate feasibility under controlled processing conditions.",
       key_risk:
@@ -115,12 +95,12 @@ app.post("/generate-report", async (req, res) => {
       consistency: "Moderate",
       consistency_note: "Dependent on processing conditions",
 
-      // 🔥 ここが超重要（メーター復活）
+      // 🔥 メーター
       pha_score: String(phaScore),
 
-      // 🔥 画像（変な人物防止）
+      // 🔥 正しい書き方（ここ修正済）
       base_image:
-        base_image: "https://images.unsplash.com/photo-1581094794329-c8112a89af12?w=1200"
+        "https://images.unsplash.com/photo-1581094794329-c8112a89af12?w=1200",
 
       dynamic_overlay: dynamicOverlay,
 
@@ -155,9 +135,6 @@ app.post("/generate-report", async (req, res) => {
 
     fs.writeFileSync(PDF_PATH, pdf);
 
-    // =========================
-    // PDF返す
-    // =========================
     res.setHeader("Content-Type", "application/pdf");
     res.send(pdf);
 
@@ -168,7 +145,7 @@ app.post("/generate-report", async (req, res) => {
 });
 
 // =========================
-// GET（ブラウザ確認用）
+// GET確認用
 // =========================
 app.get("/generate-report", async (req, res) => {
   try {
