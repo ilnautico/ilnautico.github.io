@@ -17,9 +17,9 @@ function injectHtml(template, data) {
 }
 
 // =========================
-// HTMLテンプレ（←1つだけ）
+// ★ HTMLテンプレ（1つだけ）
 // =========================
-const htmlTemplate = `
+const html = `
 <!DOCTYPE html>
 <html>
 <head>
@@ -44,13 +44,13 @@ const htmlTemplate = `
 `;
 
 // =========================
-// テスト生成（これ叩く）
+// PDF生成
 // =========================
 app.get("/generate-report", async (req, res) => {
-  console.log("🔥 GET TEST HIT");
+  console.log("🔥 GENERATE REPORT");
 
   try {
-    const finalHtml = injectHtml(htmlTemplate, {
+    const finalHtml = injectHtml(html, {
       client_name: "Test Client",
       client_company: "Test Company",
       client_country: "Japan",
@@ -70,9 +70,11 @@ app.get("/generate-report", async (req, res) => {
       ]
     });
 
-    const page = await browser.newPage(); // ←これ重要
+    const page = await browser.newPage();
 
-    await page.setContent(finalHtml, { waitUntil: "networkidle0" });
+    await page.setContent(finalHtml, {
+      waitUntil: "networkidle0"
+    });
 
     const pdf = await page.pdf({
       format: "A4",
@@ -81,7 +83,7 @@ app.get("/generate-report", async (req, res) => {
 
     await browser.close();
 
-    fs.writeFileSync("./latest.pdf", pdf); // ←ここ統一
+    fs.writeFileSync("./latest.pdf", pdf);
 
     console.log("✅ PDF SAVED");
 
