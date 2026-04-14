@@ -10,30 +10,18 @@ const __dirname = path.dirname(__filename);
 const app = express();
 app.use(express.json());
 
-const PDF_PATH = "/tmp/latest.pdf";
-
-// =========================
-// テンプレ差し込み（安全版）
-// =========================
 function injectHtml(template, data) {
   let html = template;
-
   for (const key in data) {
     html = html.replace(
       new RegExp(`{{\\s*${key}\\s*}}`, "g"),
       String(data[key] ?? "")
     );
   }
-
   return html;
 }
 
-// =========================
-// POST：PDF生成
-// =========================
 app.post("/generate-report", async (req, res) => {
-  console.log("🔥 GENERATE");
-
   try {
     const template = fs.readFileSync(
       path.join(__dirname, "template.html"),
@@ -77,13 +65,10 @@ app.post("/generate-report", async (req, res) => {
       consistency: "Moderate",
       consistency_note: "Dependent on processing conditions",
 
-      // ✅ メーター
       pha_score: 65,
 
-      // ✅ 画像（テンプレ用）
       base_image: "https://ilnautico.github.io/bioplastic-visual.png",
 
-      // 🚫 UIはテンプレに任せる
       dynamic_overlay: "",
 
       next_step: "Proceed with controlled pilot validation"
@@ -112,76 +97,15 @@ app.post("/generate-report", async (req, res) => {
 
     await browser.close();
 
-    fs.writeFileSync(PDF_PATH, pdf);
-
     res.setHeader("Content-Type", "application/pdf");
     res.send(pdf);
 
   } catch (err) {
-    console.error("❌ ERROR:", err);
+    console.error(err);
     res.status(500).send("Server Error");
   }
 });
 
-// =========================
-// GET：ブラウザ確認
-// =========================
-app.get("/generate-report", async (req, res) => {
-  try {
-    const template = fs.readFileSync(
-      path.join(__dirname, "template.html"),
-      "utf8"
-    );
-
-    const html = injectHtml(template, {
-      application: "Preview",
-      material_transition: "PP → PHA",
-      assessment_type: "Preview",
-      report_date: "Preview",
-
-      compatibility_level: "Moderate",
-
-      executive_summary: "Preview Mode",
-      key_risk: "Preview Mode",
-
-      pha_score: 65,
-
-      base_image: "https://ilnautico.github.io/bioplastic-visual.png",
-
-      dynamic_overlay: "",
-
-      next_step: "Preview"
-    });
-
-    const browser = await puppeteer.launch({
-      headless: true,
-      args: ["--no-sandbox"]
-    });
-
-    const page = await browser.newPage();
-
-    await page.setContent(html, {
-      waitUntil: "networkidle0"
-    });
-
-    const pdf = await page.pdf({
-      format: "A4",
-      printBackground: true
-    });
-
-    await browser.close();
-
-    res.setHeader("Content-Type", "application/pdf");
-    res.send(pdf);
-
-  } catch (err) {
-    res.status(500).send("error");
-  }
-});
-
-// =========================
-// 起動
-// =========================
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
   console.log("🚀 Server running on", PORT);
