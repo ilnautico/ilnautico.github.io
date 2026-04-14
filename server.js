@@ -138,6 +138,67 @@ app.post("/generate-report", async (req, res) => {
 app.get("/", (req, res) => {
   res.send("Server Running");
 });
+app.get("/generate-report", async (req, res) => {
+
+  try {
+
+    const template = fs.readFileSync(
+      path.join(__dirname, "template.html"),
+      "utf8"
+    );
+
+    const html = injectHtml(template, {
+      application: "Test",
+      material_transition: "Test",
+      assessment_type: "Test",
+      report_date: new Date().toISOString().split("T")[0],
+      compatibility_level: "Moderate",
+      executive_summary: "Test",
+      key_risk: "Test",
+      processing_window: "Test",
+      thermal_behavior: "Test",
+      flow_characteristics: "Test",
+      mechanical_behavior: "Test",
+      surface_quality: "Test",
+      structural_consistency: "Test",
+      application_implication: "Test",
+      primary_risk_title: "Test",
+      primary_risk: "Test",
+      secondary_risk_title: "Test",
+      secondary_risk: "Test",
+      mechanism: "Test",
+      stability: "Test",
+      stability_note: "Test",
+      consistency: "Test",
+      consistency_note: "Test",
+      pha_score: 50,
+      base_image: "",
+      dynamic_overlay: "",
+      next_step: "Test"
+    });
+
+    const browser = await puppeteer.launch({
+      headless: true,
+      args: ["--no-sandbox"]
+    });
+
+    const page = await browser.newPage();
+    await page.setContent(html);
+
+    const pdf = await page.pdf({
+      format: "A4",
+      printBackground: true
+    });
+
+    await browser.close();
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.send(pdf);
+
+  } catch (err) {
+    res.status(500).send("error");
+  }
+});
 
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
