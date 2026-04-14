@@ -16,15 +16,21 @@ function injectHtml(template, data) {
   return output;
 }
 
+function getValue(fields, key) {
+  const f = fields.find((x) =>
+    (x.label || "").toLowerCase().includes(key)
+  );
+  return f?.value || "";
+}
+
 // =========================
-// PDF生成（GETで1発確認）
+// GET（テスト確認用）
 // =========================
 app.get("/generate-report", async (req, res) => {
   console.log("🔥 GET TEST HIT");
 
   try {
-    // 👇 下にある３万円テンプレ（const html = `...`）をそのまま使う
-    const finalHtml = injectHtml(html, {
+    const htmlOutput = injectHtml(htmlTemplate, {
       client_name: "Test Client",
       client_company: "Test Company",
       client_country: "Japan",
@@ -36,10 +42,56 @@ app.get("/generate-report", async (req, res) => {
       equipment: "Standard Machine",
       production_scale: "Medium",
       project_stage: "Testing",
+      submission_reference: "TEST",
 
       feasibility_level: "MODERATE",
       report_date: new Date().toISOString().split("T")[0],
-      report_id: "TEST-" + Date.now()
+      report_id: "TEST-" + Date.now(),
+
+      // ===== ダミー埋め（最低限表示用）=====
+      executive_summary_overview: "Overview placeholder",
+      executive_summary_findings: "Findings placeholder",
+      executive_summary_conclusion: "Conclusion placeholder",
+      feasibility_explanation: "Feasibility explanation placeholder",
+
+      thermal_risk: "MODERATE",
+      processing_risk: "MODERATE",
+      equipment_risk: "MODERATE",
+
+      score_thermal_assessment: "Review required",
+      score_thermal_level: "MODERATE",
+      score_thermal_note: "Check thermal",
+
+      score_processing_assessment: "Review required",
+      score_processing_level: "MODERATE",
+      score_processing_note: "Check process",
+
+      score_equipment_assessment: "Check",
+      score_equipment_level: "MODERATE",
+      score_equipment_note: "Check equipment",
+
+      score_cert_assessment: "TBD",
+      score_cert_level: "MODERATE",
+      score_cert_note: "Check cert",
+
+      score_eol_assessment: "TBD",
+      score_eol_level: "MODERATE",
+      score_eol_note: "Check EOL",
+
+      obs_1_title: "Observation 1",
+      obs_1_body: "Detail",
+      obs_2_title: "Observation 2",
+      obs_2_body: "Detail",
+      obs_3_title: "Observation 3",
+      obs_3_body: "Detail",
+
+      risk_1_title: "Risk 1",
+      risk_1_body: "Detail",
+      risk_2_title: "Risk 2",
+      risk_2_body: "Detail",
+
+      strategic_recommendation: "Proceed with pilot",
+      disclaimer: "Technical advisory only"
     });
 
     const browser = await puppeteer.launch({
@@ -53,7 +105,7 @@ app.get("/generate-report", async (req, res) => {
     });
 
     const page = await browser.newPage();
-    await page.setContent(finalHtml, { waitUntil: "networkidle0" });
+    await page.setContent(htmlOutput, { waitUntil: "networkidle0" });
 
     const pdf = await page.pdf({
       format: "A4",
@@ -62,7 +114,6 @@ app.get("/generate-report", async (req, res) => {
 
     await browser.close();
 
-    // 🔥 ここが最重要（Railwayでも確実に残る場所）
     fs.writeFileSync("./latest.pdf", pdf);
     console.log("✅ PDF SAVED");
 
@@ -75,7 +126,133 @@ app.get("/generate-report", async (req, res) => {
 });
 
 // =========================
-// PDF取得
+// 本番（フォーム連動）
+// =========================
+app.post("/generate-report", async (req, res) => {
+  console.log("🔥 POST HIT");
+
+  try {
+    const fields = req.body?.data?.fields || [];
+
+    const processing = getValue(fields, "processing");
+    const currentMaterial = getValue(fields, "material");
+    const bioMaterial = getValue(fields, "biodegradable");
+
+    const clientName = getValue(fields, "client");
+    const company = getValue(fields, "company");
+    const country = getValue(fields, "country");
+
+    const equipment = getValue(fields, "equipment");
+    const productionScale = getValue(fields, "production");
+    const projectStage = getValue(fields, "project");
+
+    // ===== 判定ロジック =====
+    let finalFeasibility = "MODERATE";
+
+    if (
+      processing.toLowerCase().includes("injection") &&
+      currentMaterial.toLowerCase().includes("pp") &&
+      bioMaterial.toLowerCase().includes("pla")
+    ) {
+      finalFeasibility = "LOW";
+    }
+
+    const htmlOutput = injectHtml(htmlTemplate, {
+      client_name: clientName,
+      client_company: company,
+      client_country: country,
+
+      application: processing,
+      current_material: currentMaterial,
+      processing_method: processing,
+      bio_material: bioMaterial,
+      equipment,
+      production_scale: productionScale,
+      project_stage: projectStage,
+      submission_reference: "AUTO",
+
+      feasibility_level: finalFeasibility,
+      report_date: new Date().toISOString().split("T")[0],
+      report_id: "FV-" + Date.now(),
+
+      // ===== 本番中身 =====
+      executive_summary_overview: "Material transition requires validation.",
+      executive_summary_findings: "Compatibility risk identified.",
+      executive_summary_conclusion: "Pilot recommended.",
+      feasibility_explanation: "Moderate feasibility under conditions.",
+
+      thermal_risk: "MODERATE",
+      processing_risk: "MODERATE",
+      equipment_risk: "MODERATE",
+
+      score_thermal_assessment: "Check required",
+      score_thermal_level: "MODERATE",
+      score_thermal_note: "Thermal sensitivity present",
+
+      score_processing_assessment: "Check required",
+      score_processing_level: "MODERATE",
+      score_processing_note: "Processing instability risk",
+
+      score_equipment_assessment: "Check required",
+      score_equipment_level: "MODERATE",
+      score_equipment_note: "Equipment compatibility uncertain",
+
+      score_cert_assessment: "TBD",
+      score_cert_level: "MODERATE",
+      score_cert_note: "Certification needed",
+
+      score_eol_assessment: "TBD",
+      score_eol_level: "MODERATE",
+      score_eol_note: "EOL to be verified",
+
+      obs_1_title: "Material Compatibility",
+      obs_1_body: "Potential mismatch",
+      obs_2_title: "Thermal Stability",
+      obs_2_body: "Requires validation",
+      obs_3_title: "Processing Window",
+      obs_3_body: "Narrow margin",
+
+      risk_1_title: "Thermal degradation",
+      risk_1_body: "Risk under heat",
+      risk_2_title: "Flow instability",
+      risk_2_body: "Processing variation",
+
+      strategic_recommendation: "Conduct pilot testing",
+      disclaimer: "Advisory only"
+    });
+
+    const browser = await puppeteer.launch({
+      headless: true,
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-gpu"
+      ]
+    });
+
+    const page = await browser.newPage();
+    await page.setContent(htmlOutput, { waitUntil: "networkidle0" });
+
+    const pdf = await page.pdf({
+      format: "A4",
+      printBackground: true
+    });
+
+    await browser.close();
+
+    fs.writeFileSync("./latest.pdf", pdf);
+
+    res.json({ success: true });
+
+  } catch (err) {
+    console.error("❌ ERROR:", err);
+    res.status(500).json({ error: "Server Error" });
+  }
+});
+
+// =========================
+// PDF表示
 // =========================
 app.get("/latest-pdf", (req, res) => {
   const filePath = process.cwd() + "/latest.pdf";
@@ -85,15 +262,12 @@ app.get("/latest-pdf", (req, res) => {
   }
 
   const file = fs.readFileSync(filePath);
-
   res.setHeader("Content-Type", "application/pdf");
-  res.setHeader("Content-Disposition", "inline; filename=report.pdf");
-
   res.send(file);
 });
 
 // =========================
-// 起動（最後に1回だけ）
+// 起動
 // =========================
 const PORT = process.env.PORT || 8080;
 
