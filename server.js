@@ -27,7 +27,23 @@ function injectHtml(template, data) {
 
   return html;
 }
+const SUMMARY_OVERVIEW =
+  "This transition presents moderate feasibility under controlled conditions.";
 
+const SUMMARY_FINDINGS =
+  "Thermal instability may occur during extended residence time.";
+
+const SUMMARY_CONCLUSION =
+  "Pilot validation is recommended before full-scale implementation.";
+
+const RISK_1_TITLE = "Thermal Degradation";
+const RISK_1_BODY = "Material breakdown under elevated temperature.";
+
+const RISK_2_TITLE = "Processing Instability";
+const RISK_2_BODY = "Flow inconsistency may impact product quality.";
+
+const STRATEGIC_RECOMMENDATION =
+  "Proceed with controlled pilot validation.";
 // =========================
 // メイン
 // =========================
