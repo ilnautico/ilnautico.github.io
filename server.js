@@ -182,6 +182,190 @@ pointer-events:none;
 
 </body>
 </html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FairVia™ Technical Hypothesis Report</title>
+
+<style>
+:root {
+  --navy:#0C1C2E;
+  --navy-soft:#2C4A6E;
+  --block-light:#F9FCFF;
+  --block-mid:#E6EFF8;
+  --block-deep:#DDE8F2;
+  --sep:#E6EDF3;
+  --text-body:#374151;
+  --text-muted:#6B7A8E;
+  --text-label:#9AA5B4;
+}
+
+*{margin:0;padding:0;box-sizing:border-box;}
+
+body{
+  background:#F4F7FA;
+  font-family:'IBM Plex Sans',sans-serif;
+  color:var(--text-body);
+  font-size:13px;
+  line-height:1.68;
+}
+
+.page{
+  width:700px;
+  margin:20mm auto;
+  background:white;
+  border:1px solid #E0E8EF;
+  overflow:hidden;
+}
+
+.section{
+  margin-bottom:42px;
+  page-break-inside:avoid;
+}
+
+.page-break{
+  page-break-before:always;
+}
+
+.page-top-bar{
+  height:4px;
+  background:linear-gradient(90deg,#0C1C2E 0%,#2C4A6E 60%,#DDE8F2 100%);
+}
+
+.cover{
+  padding:52px 50px 44px;
+  border-bottom:1px solid var(--sep);
+}
+
+.body-wrap{
+  padding:38px 50px 32px;
+}
+
+.bar{
+  width:100%;
+  height:10px;
+  background:rgba(0,0,0,0.06);
+  border-radius:6px;
+  overflow:hidden;
+}
+.bar-inner{
+  height:100%;
+  width:{{pha_score}}%;
+  background:linear-gradient(90deg,#6eb48c,#46966e);
+}
+</style>
+</head>
+
+<body>
+
+<div class="page">
+
+<div class="page-top-bar"></div>
+
+<!-- COVER -->
+<div class="cover">
+  <h2>{{application}}</h2>
+</div>
+
+<div class="body-wrap">
+
+<!-- 01 -->
+<div class="section">
+  <p>{{executive_summary}}</p>
+</div>
+
+<div class="page-break"></div>
+<div class="page-top-bar"></div>
+
+<!-- 02 -->
+<div class="section">
+  <p>{{processing_window}}</p>
+  <p>{{thermal_behavior}}</p>
+  <p>{{flow_characteristics}}</p>
+</div>
+
+<div class="page-break"></div>
+<div class="page-top-bar"></div>
+
+<!-- 03 -->
+<div class="section">
+  <p>{{mechanical_behavior}}</p>
+  <p>{{surface_quality}}</p>
+  <p>{{structural_consistency}}</p>
+</div>
+
+<div class="page-break"></div>
+<div class="page-top-bar"></div>
+
+<!-- 04 -->
+<div class="section">
+  <p>{{primary_risk}}</p>
+  <p>{{secondary_risk}}</p>
+  <p>{{mechanism}}</p>
+</div>
+
+<div class="page-break"></div>
+<div class="page-top-bar"></div>
+
+<!-- 05 -->
+<div class="section">
+  <p>{{stability}}</p>
+  <p>{{consistency}}</p>
+
+  <div class="bar">
+    <div class="bar-inner"></div>
+  </div>
+
+</div>
+
+<div class="page-break"></div>
+<div class="page-top-bar"></div>
+
+<!-- 06 -->
+<div class="section">
+
+<div style="position:relative;width:100%;height:260px;overflow:hidden;">
+
+<img src="{{base_image}}" style="
+position:absolute;
+width:100%;
+height:100%;
+object-fit:contain;
+">
+
+<div style="
+position:absolute;
+width:100%;
+height:100%;
+pointer-events:none;
+">
+{{dynamic_overlay}}
+</div>
+
+</div>
+
+</div>
+
+<div class="page-break"></div>
+<div class="page-top-bar"></div>
+
+<!-- 07 -->
+<div class="section">
+  <p>{{next_step}}</p>
+</div>
+
+<!-- 08 -->
+<div class="section">
+  <p>This report is based on hypothesis-driven evaluation.</p>
+</div>
+
+</div>
+</div>
+
+</body>
+</html>
 const html = `
 <!DOCTYPE html>
 <html lang="en">
