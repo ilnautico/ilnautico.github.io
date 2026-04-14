@@ -1,4 +1,194 @@
-<!DOCTYPE html>
+import express from "express";
+import puppeteer from "puppeteer";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const app = express();
+app.use(express.json());
+
+const PDF_PATH = "/tmp/latest.pdf";
+
+// =========================
+// スコア
+// =========================
+function calculateScores() {
+  return {
+    scoreLeft: Math.floor(Math.random() * 60 + 40),
+    scoreRight: Math.floor(Math.random() * 60 + 40)
+  };
+}
+
+// =========================
+// Overlay（完全復元）
+// =========================
+function generateOverlay(scoreLeft, scoreRight) {
+
+  const ampLeft = 4 + scoreLeft * 0.12;
+  const ampRight = 4 + scoreRight * 0.12;
+  const angle = -90 + (scoreRight / 100) * 180;
+
+  return `
+  <div style="position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;">
+
+    <!-- 温度 -->
+    <div style="position:absolute; left:33.5%; top:6%; font-size:26px;">230°C</div>
+    <div style="position:absolute; left:66%; top:6%; font-size:26px; color:#dc2626;">180°C</div>
+
+    <!-- スコア -->
+    <div style="position:absolute; left:40%; top:22%; font-size:16px;">${scoreLeft}</div>
+    <div style="position:absolute; left:72%; top:22%; font-size:16px; color:#dc2626;">${scoreRight}</div>
+
+    <!-- 波 -->
+    <svg style="position:absolute;left:46.8%;top:57.2%;width:11%;height:8%;" viewBox="0 0 80 20">
+      <path stroke="#3B82A0" stroke-width="2" fill="none"
+        d="M0 10 Q20 ${10-ampLeft} 40 10 T80 10"/>
+    </svg>
+
+    <svg style="position:absolute;left:71.5%;top:64%;width:11%;height:8%;" viewBox="0 0 80 20">
+      <path stroke="#dc2626" stroke-width="2" fill="none"
+        d="M0 10 Q20 ${10-ampRight} 40 10 T80 10"/>
+    </svg>
+
+    <!-- メーター -->
+    <svg viewBox="0 0 200 120"
+      style="position:absolute; right:6%; bottom:4%; width:140px; height:90px;">
+
+      <defs>
+        <linearGradient id="meterGrad" x1="0" x2="1">
+          <stop offset="0%" stop-color="#22c55e"/>
+          <stop offset="45%" stop-color="#fde047"/>
+          <stop offset="70%" stop-color="#f59e0b"/>
+          <stop offset="100%" stop-color="#ef4444"/>
+        </linearGradient>
+      </defs>
+
+      <path d="M20 100 A80 80 0 0 1 180 100 L100 100 Z"
+        fill="url(#meterGrad)" />
+
+      <path d="M35 100 A65 65 0 0 1 165 100 L100 100 Z"
+        fill="rgba(255,255,255,0.12)" />
+
+      <ellipse cx="100" cy="104" rx="46" ry="8"
+        fill="black" opacity="0.08"/>
+
+      <g transform="rotate(${angle} 100 100)">
+        <line x1="100" y1="100" x2="35" y2="100"
+          stroke="#111"
+          stroke-width="2.5"
+          stroke-linecap="round"/>
+      </g>
+
+      <circle cx="100" cy="100" r="4.5" fill="#111"/>
+    </svg>
+
+  </div>
+  `;
+}
+
+// =========================
+// inject
+// =========================
+function injectHtml(template, data) {
+  let html = template;
+
+  for (const key in data) {
+    html = html.replace(
+      new RegExp(`{{\\s*${key}\\s*}}`, "g"),
+      data[key] || ""
+    );
+  }
+
+  return html;
+}
+
+// =========================
+// PDF生成
+// =========================
+app.get("/tally-pdf", async (req, res) => {
+
+  try {
+
+    const { scoreLeft, scoreRight } = calculateScores();
+
+    const template = fs.readFileSync(
+      path.join(__dirname, "template.html"),
+      "utf8"
+    );
+
+    // 🔥 全データ完全注入（ここが核心）
+    const html = injectHtml(template, {
+
+      application: "Injection molding feasibility",
+      executive_summary: "This transition presents moderate feasibility based on current conditions.",
+
+      processing_window: "Requires controlled temperature range and stable shear conditions.",
+      thermal_behavior: "Thermal degradation risk observed under high residence time.",
+      flow_characteristics: "Lower melt strength compared to PP baseline.",
+
+      mechanical_behavior: "Moderate reduction in stiffness expected.",
+      surface_quality: "Surface variation may occur depending on cooling rate.",
+      structural_consistency: "Consistency dependent on process stability.",
+
+      primary_risk: "Thermal degradation during extended processing.",
+      secondary_risk: "Flow instability in high-speed cycles.",
+      mechanism: "Polymer chain scission under thermal stress.",
+
+      stability: "Moderate",
+      consistency: "Requires pilot validation",
+
+      next_step: "Proceed with controlled pilot testing and parameter optimization.",
+
+      base_image: "https://ilnautico.github.io/visual-base.png",
+      dynamic_overlay: generateOverlay(scoreLeft, scoreRight),
+      pha_score: scoreLeft
+    });
+
+    const browser = await puppeteer.launch({
+      args: ["--no-sandbox", "--disable-setuid-sandbox"]
+    });
+
+    const page = await browser.newPage();
+    await page.setContent(html, { waitUntil: "networkidle0" });
+
+    const pdf = await page.pdf({
+      format: "A4",
+      printBackground: true
+    });
+
+    await browser.close();
+
+    fs.writeFileSync(PDF_PATH, pdf);
+
+    res.send("PDF generated");
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("error");
+  }
+});
+
+// =========================
+// PDF取得
+// =========================
+app.get("/latest-pdf", (req, res) => {
+
+  if (!fs.existsSync(PDF_PATH)) {
+    return res.status(404).send("No PDF yet");
+  }
+
+  res.sendFile(PDF_PATH);
+});
+
+// =========================
+const PORT = process.env.PORT || 8080;
+app.listen(PORT, () => {
+  console.log("🚀 Server running on", PORT);
+});
+ <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
