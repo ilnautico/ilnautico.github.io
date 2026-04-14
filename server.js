@@ -3,6 +3,7 @@ import puppeteer from "puppeteer";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import OpenAI from "openai";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -15,9 +16,15 @@ app.use(express.text({ type: "*/*" }));
 
 const PDF_PATH = "/tmp/latest.pdf";
 
+// =========================
+// OpenAI
+// =========================
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY
+});
 
 // =========================
-// スコアロジック
+// スコアロジック（固定）
 // =========================
 const optimalTemp = 180;
 
@@ -30,9 +37,70 @@ function calc(temp) {
   return 40;
 }
 
+// =========================
+// AI生成（JSONのみ）
+// =========================
+async function generateAIReport(input, scoreLeft, scoreRight) {
+
+  const prompt = `
+You are a professional consultant specializing in biodegradable materials and plastic processing.
+
+Return ONLY valid JSON.
+
+Application: ${input.application || "Injection molding"}
+Material: ${input.material || "PP"}
+Target: ${input.bio_material || "PHA"}
+
+Stability Score: ${scoreLeft}
+Risk Score: ${scoreRight}
+
+{
+  "executive_summary": "",
+  "key_risk": "",
+  "processing_window": "",
+  "thermal_behavior": "",
+  "flow_characteristics": "",
+  "mechanical_behavior": "",
+  "surface_quality": "",
+  "structural_consistency": "",
+  "application_implication": "",
+  "primary_risk_title": "",
+  "primary_risk": "",
+  "secondary_risk_title": "",
+  "secondary_risk": "",
+  "mechanism": "",
+  "stability_note": "",
+  "consistency_note": "",
+  "next_step": ""
+}
+`;
+
+  try {
+    const res = await openai.chat.completions.create({
+      model: "gpt-4.1-mini",
+      messages: [
+        { role: "system", content: "Return only JSON." },
+        { role: "user", content: prompt }
+      ],
+      temperature: 0.7
+    });
+
+    return JSON.parse(res.choices[0].message.content);
+
+  } catch (err) {
+    console.error("AI ERROR:", err);
+
+    // fallback（絶対壊さない）
+    return {
+      executive_summary: "Assessment in progress.",
+      key_risk: "Pending analysis.",
+      next_step: "Further validation required."
+    };
+  }
+}
 
 // =========================
-// Overlay（完全復元＋ズレ修正済）
+// Overlay（絶対触らない）
 // =========================
 function generateOverlay(scoreLeft, scoreRight) {
 
@@ -43,62 +111,24 @@ function generateOverlay(scoreLeft, scoreRight) {
   return `
   <div style="position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;">
 
-    <!-- 温度 -->
-    <div style="position:absolute; left:33.5%; top:6%; font-size:26px;">
-      230°C
-    </div>
+    <div style="position:absolute; left:33.5%; top:6%; font-size:26px;">230°C</div>
+    <div style="position:absolute; left:66%; top:6%; font-size:26px; color:#dc2626;">180°C</div>
 
-    <div style="position:absolute; left:66%; top:6%; font-size:26px; color:#dc2626;">
-      180°C
-    </div>
+    <div style="position:absolute; left:40%; top:22%;">${scoreLeft}</div>
+    <div style="position:absolute; left:72%; top:22%; color:#dc2626;">${scoreRight}</div>
 
-    <!-- スコア -->
-    <div style="position:absolute; left:40%; top:22%; font-size:16px;">
-      ${scoreLeft}
-    </div>
-
-    <div style="position:absolute; left:72%; top:22%; font-size:16px; color:#dc2626;">
-      ${scoreRight}
-    </div>
-
-    <!-- 青波（修正済） -->
-    <svg style="
-      position:absolute;
-      left:46.8%;
-      top:60%;
-      width:11%;
-      height:8%;
-      transform:translate(-50%, -50%);
-    " viewBox="0 0 80 20">
+    <svg style="position:absolute; left:46.8%; top:60%; width:11%; height:8%; transform:translate(-50%, -50%);">
       <path stroke="#3B82A0" stroke-width="2" fill="none"
         d="M0 10 Q20 ${10-ampLeft} 40 10 T80 10"/>
     </svg>
 
-    <!-- 赤波（修正済） -->
-    <svg style="
-      position:absolute;
-      left:71.5%;
-      top:66%;
-      width:11%;
-      height:8%;
-      transform:translate(-50%, -50%);
-    " viewBox="0 0 80 20">
+    <svg style="position:absolute; left:71.5%; top:66%; width:11%; height:8%; transform:translate(-50%, -50%);">
       <path stroke="#dc2626" stroke-width="2" fill="none"
         d="M0 10 Q20 ${10-ampRight} 40 10 T80 10"/>
     </svg>
 
-    <!-- メーター -->
     <svg viewBox="0 0 200 120"
-      style="
-        position:absolute;
-        right:6%;
-        bottom:6%;
-        width:140px;
-        height:90px;
-      ">
-
-      <path d="M20 100 A80 80 0 0 1 180 100 L100 100 Z"
-        fill="url(#grad)" />
+      style="position:absolute; right:6%; bottom:6%; width:140px; height:90px;">
 
       <defs>
         <linearGradient id="grad">
@@ -109,11 +139,13 @@ function generateOverlay(scoreLeft, scoreRight) {
         </linearGradient>
       </defs>
 
+      <path d="M20 100 A80 80 0 0 1 180 100 L100 100 Z"
+        fill="url(#grad)" />
+
       <g transform="rotate(${angle} 100 100)">
         <line x1="100" y1="100" x2="100" y2="30"
           stroke="#111"
-          stroke-width="2.5"
-          stroke-linecap="round"/>
+          stroke-width="2.5"/>
       </g>
 
       <circle cx="100" cy="100" r="4.5" fill="#111"/>
@@ -122,7 +154,6 @@ function generateOverlay(scoreLeft, scoreRight) {
   </div>
   `;
 }
-
 
 // =========================
 // HTML差し込み
@@ -138,21 +169,24 @@ function injectHtml(template, data) {
   return html;
 }
 
-
 // =========================
 // PDF生成
 // =========================
-async function generatePDF(res) {
+async function generatePDF(req, res) {
 
   const template = fs.readFileSync(
     path.join(__dirname, "template.html"),
     "utf8"
   );
 
+  const inputData = req.body || {};
+
   const scoreLeft = calc(230);
   const scoreRight = calc(180);
 
-  const data = {
+  const aiData = await generateAIReport(inputData, scoreLeft, scoreRight);
+
+  const html = injectHtml(template, {
     base_image: "https://ilnautico.github.io/visual-base.png",
     dynamic_overlay: generateOverlay(scoreLeft, scoreRight),
 
@@ -162,26 +196,8 @@ async function generatePDF(res) {
     stability: scoreLeft > 70 ? "High" : "Moderate",
     consistency: scoreRight > 70 ? "Variable" : "Stable",
 
-    executive_summary: "Moderate feasibility under controlled conditions.",
-    key_risk: "Thermal instability risk.",
-    processing_window: "Moderate",
-    thermal_behavior: "Sensitive",
-    flow_characteristics: "Lower melt strength",
-    mechanical_behavior: "Reduced stiffness",
-    surface_quality: "Minor variation",
-    structural_consistency: "Moderate",
-    application_implication: "Pilot recommended",
-    primary_risk_title: "Thermal degradation",
-    primary_risk: "Heat breakdown risk",
-    secondary_risk_title: "Flow instability",
-    secondary_risk: "Inconsistent flow",
-    mechanism: "Polymer chain scission",
-    stability_note: "Requires validation",
-    consistency_note: "Process dependent",
-    next_step: "Proceed with pilot testing"
-  };
-
-  const html = injectHtml(template, data);
+    ...aiData
+  });
 
   const browser = await puppeteer.launch({
     headless: true,
@@ -204,7 +220,6 @@ async function generatePDF(res) {
   res.send(pdf);
 }
 
-
 // =========================
 // ルート
 // =========================
@@ -212,10 +227,15 @@ app.get("/", (req, res) => {
   res.send("OK");
 });
 
+// GETでも確認できる（超重要）
 app.get("/generate-report", async (req, res) => {
-  await generatePDF(res);
+  await generatePDF(req, res);
 });
 
+// POST（本番）
+app.post("/generate-report", async (req, res) => {
+  await generatePDF(req, res);
+});
 
 // =========================
 // 起動
