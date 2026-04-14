@@ -148,7 +148,7 @@ const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
   console.log(`🚀 Server running on ${PORT}`);
 });
-const htmlTemplate =  = `
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
