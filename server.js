@@ -42,82 +42,48 @@ app.get("/generate-report", async (req, res) => {
     const template = await fetchTemplate();
 
     const html = injectHtml(template, {
-      client_name: "Test Client",
-      client_company: "Test Company",
-      client_country: "Japan",
 
-      application: "Injection",
-      current_material: "PP",
-      processing_method: "Injection",
-      bio_material: "PLA",
-      equipment: "Machine",
-      production_scale: "Medium",
-      project_stage: "Testing",
-      submission_reference: "TEST",
+  // ===== 基本 =====
+  application: processing || "Injection",
 
-      feasibility_level: "MODERATE",
-      feasibility_class: "level-moderate",
+  // ===== Executive =====
+  executive_summary: "This material transition presents a moderate feasibility level under controlled conditions.",
 
-      report_date: new Date().toISOString().split("T")[0],
-      report_id: "TEST-" + Date.now(),
+  // ===== Processing =====
+  processing_window: "Processing window remains relatively narrow and requires temperature stability.",
+  thermal_behavior: "Thermal sensitivity increases near degradation threshold.",
+  flow_characteristics: "Flow behaviour differs from PP baseline requiring pressure adjustments.",
 
-      executive_summary_overview: "Test overview",
-      executive_summary_findings: "Test findings",
-      executive_summary_conclusion: "Test conclusion",
-      feasibility_explanation: "Test explanation",
+  // ===== Mechanical =====
+  mechanical_behavior: "Mechanical strength is slightly reduced compared to PP.",
+  surface_quality: "Surface finish may show minor inconsistencies.",
+  structural_consistency: "Structural consistency depends on stable cooling profile.",
 
-      thermal_risk: "MODERATE",
-      thermal_note: "Thermal test",
-      thermal_risk_class: "risk-moderate",
+  // ===== Risk =====
+  primary_risk: "Primary risk is thermal degradation during residence time.",
+  secondary_risk: "Secondary risk involves flow instability.",
+  mechanism: "Material chain scission under heat stress is the key mechanism.",
 
-      processing_risk: "MODERATE",
-      processing_note: "Processing test",
-      processing_risk_class: "risk-moderate",
+  // ===== Stability =====
+  stability: "Overall stability: Moderate",
+  consistency: "Batch-to-batch consistency requires validation",
 
-      equipment_risk: "MODERATE",
-      equipment_note: "Equipment test",
-      equipment_risk_class: "risk-moderate",
+  // ===== グラフ（🔥重要） =====
+  pha_score: 62, // ←ここでバーが伸びる（0〜100）
 
-      score_thermal_assessment: "Check",
-      score_thermal_level: "MODERATE",
-      score_thermal_note: "Note",
-      score_thermal_class: "moderate",
+  // ===== ビジュアル =====
+  base_image: "https://your-image-url.com/base.png",
 
-      score_processing_assessment: "Check",
-      score_processing_level: "MODERATE",
-      score_processing_note: "Note",
-      score_processing_class: "moderate",
+  dynamic_overlay: `
+    <div style="position:absolute;top:40%;left:30%;width:120px;height:120px;
+    border:2px solid rgba(200,0,0,0.5);border-radius:50%;">
+    </div>
+  `,
 
-      score_equipment_assessment: "Check",
-      score_equipment_level: "MODERATE",
-      score_equipment_note: "Note",
-      score_equipment_class: "moderate",
+  // ===== Next =====
+  next_step: "Proceed with controlled pilot testing before scale-up."
 
-      score_cert_assessment: "TBD",
-      score_cert_level: "MODERATE",
-      score_cert_note: "Note",
-      score_cert_class: "moderate",
-
-      score_eol_assessment: "TBD",
-      score_eol_level: "MODERATE",
-      score_eol_note: "Note",
-      score_eol_class: "moderate",
-
-      obs_1_title: "Observation 1",
-      obs_1_body: "Detail",
-      obs_2_title: "Observation 2",
-      obs_2_body: "Detail",
-      obs_3_title: "Observation 3",
-      obs_3_body: "Detail",
-
-      risk_1_title: "Risk 1",
-      risk_1_body: "Detail",
-      risk_2_title: "Risk 2",
-      risk_2_body: "Detail",
-
-      strategic_recommendation: "Proceed",
-      disclaimer: "Advisory only"
-    });
+});
 
     const browser = await puppeteer.launch({
       args: [
