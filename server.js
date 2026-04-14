@@ -16,21 +16,13 @@ function injectHtml(template, data) {
   return output;
 }
 
-function getValue(fields, key) {
-  const f = fields.find((x) =>
-    (x.label || "").toLowerCase().includes(key)
-  );
-  return f?.value || "";
-}
-
 // =========================
-// GET（テスト用）
+// テスト生成
 // =========================
 app.get("/generate-report", async (req, res) => {
   console.log("🔥 GET TEST HIT");
 
   try {
-    // 👇ここ重要（htmlTemplateじゃない）
     const finalHtml = injectHtml(html, {
       client_name: "Test Client",
       client_company: "Test Company",
@@ -148,6 +140,34 @@ const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
   console.log(`🚀 Server running on ${PORT}`);
 });
+
+
+// =========================
+// ↓↓↓ ここに３万円テンプレ ↓↓↓
+// =========================
+
+const html = `
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>FairVia Report</title>
+</head>
+
+<body>
+<h1>{{client_name}}</h1>
+<p>{{client_company}}</p>
+<p>{{client_country}}</p>
+
+<h2>Feasibility: {{feasibility_level}}</h2>
+
+<p>{{executive_summary_overview}}</p>
+<p>{{executive_summary_findings}}</p>
+<p>{{executive_summary_conclusion}}</p>
+
+</body>
+</html>
+`;
 
 <!DOCTYPE html>
 <html lang="en">
