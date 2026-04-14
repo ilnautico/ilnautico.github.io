@@ -10,86 +10,182 @@ const __dirname = path.dirname(__filename);
 const app = express();
 app.use(express.json());
 
+const PDF_PATH = "/tmp/latest.pdf";
+
 // =========================
-// テンプレ差し込み
+// テンプレ差し込み（安全版）
 // =========================
 function injectHtml(template, data) {
   let html = template;
+
   for (const key in data) {
     html = html.replace(
       new RegExp(`{{\\s*${key}\\s*}}`, "g"),
       String(data[key] ?? "")
     );
   }
+
   return html;
 }
 
 // =========================
-// 共通HTML生成
-// =========================
-function buildHtml(template) {
-  return injectHtml(template, {
-    application: "Injection molding",
-    material_transition: "PP → PHA",
-    assessment_type: "Preliminary Screening",
-    report_date: new Date().toISOString().split("T")[0],
-
-    compatibility_level: "Moderate",
-
-    executive_summary:
-      "This transition presents moderate feasibility under controlled processing conditions.",
-    key_risk:
-      "Thermal instability may occur during extended residence time.",
-
-    processing_window: "Requires controlled temperature range",
-    thermal_behavior: "Sensitive under high temperature",
-    flow_characteristics: "Lower melt strength vs PP",
-
-    mechanical_behavior: "Moderate stiffness reduction",
-    surface_quality: "Minor variation expected",
-    structural_consistency: "Dependent on process stability",
-
-    application_implication: "Suitable for controlled pilot trials",
-
-    primary_risk_title: "Thermal Degradation",
-    primary_risk: "Material breakdown risk under heat",
-
-    secondary_risk_title: "Flow Instability",
-    secondary_risk: "Inconsistent flow behavior possible",
-
-    mechanism: "Polymer chain scission under stress",
-
-    stability: "Moderate",
-    stability_note: "Requires controlled validation",
-
-    consistency: "Moderate",
-    consistency_note: "Dependent on processing conditions",
-
-    // メーター
-    pha_score: 65,
-
-    // ✅ 絶対出る画像（ここが重要）
-base_image: "https://raw.githubusercontent.com/ilnautico/visual-assets/main/bioplastic-visual.png",
-
-    // UI触らない
-    dynamic_overlay: "",
-
-    next_step: "Proceed with controlled pilot validation"
-  });
-}
-
-// =========================
-// POST（本番用）
+// メイン（POST）
 // =========================
 app.post("/generate-report", async (req, res) => {
+  console.log("🔥 GENERATE");
+
   try {
+    // ✅ テンプレ1本化
     const template = fs.readFileSync(
       path.join(__dirname, "template.html"),
       "utf8"
     );
 
-    const html = buildHtml(template);
+    // =========================
+    // 基本データ
+    // =========================
+    const application = "Injection molding";
+    const currentMaterial = "PP";
+    const bioMaterial = "PHA";
+    const phaScore = 65;
+    const finalFeasibility = "Moderate";
 
+    // =========================
+    // コンサル文章（ここは後でAI差し替えOK）
+    // =========================
+    const REPORT = {
+      summary:
+        "This assessment evaluates the feasibility of transitioning from conventional polyolefin systems to biodegradable alternatives under controlled processing conditions. Based on initial screening, moderate compatibility is identified, with specific attention required for thermal stability and flow consistency.",
+
+      risk:
+        "Thermal instability during extended residence time may result in molecular degradation, affecting final product integrity.",
+
+      processing:
+        "Processing requires a controlled thermal window with reduced exposure to high shear conditions.",
+
+      thermal:
+        "Material exhibits sensitivity to elevated temperature zones beyond standard PP processing limits.",
+
+      flow:
+        "Reduced melt strength compared to conventional materials may impact film uniformity.",
+
+      mechanical:
+        "Moderate reduction in tensile performance is expected under non-optimized conditions.",
+
+      surface:
+        "Surface uniformity may vary depending on cooling and die conditions.",
+
+      structure:
+        "Consistency is achievable under stable processing conditions but may fluctuate during transitions.",
+
+      implication:
+        "Applicable within controlled pilot-scale operations with parameter optimization.",
+
+      primaryRiskTitle: "Thermal Degradation",
+      primaryRisk:
+        "Polymer breakdown under excessive thermal exposure leading to instability.",
+
+      secondaryRiskTitle: "Flow Instability",
+      secondaryRisk:
+        "Material flow inconsistency due to viscosity variation.",
+
+      mechanism:
+        "Polymer chain scission under combined thermal and shear stress.",
+
+      stability: "Moderate",
+      stabilityNote:
+        "Requires strict temperature control and residence time management.",
+
+      consistency: "Moderate",
+      consistencyNote:
+        "Dependent on equipment precision and processing stability.",
+
+      nextStep:
+        "Proceed with controlled pilot validation under monitored processing conditions."
+    };
+
+    // =========================
+    // 🔥 メーター＆バルーン（完全復元）
+    // =========================
+    const dynamicOverlay = `
+<svg width="220" height="220" style="position:absolute; left:50%; top:55%; transform:translate(-50%,-50%);">
+
+  <circle cx="110" cy="110" r="80"
+    stroke="rgba(180,180,180,0.35)"
+    stroke-width="2"
+    fill="none"/>
+
+  <circle cx="110" cy="110" r="55"
+    stroke="rgba(120,200,150,0.45)"
+    stroke-width="2"
+    fill="none"/>
+
+  <g transform="rotate(35 110 110)">
+    <line x1="110" y1="110" x2="50" y2="110"
+      stroke="#1c1c1c"
+      stroke-width="2.5"
+      stroke-linecap="round"/>
+  </g>
+
+  <circle cx="110" cy="110" r="4.5" fill="#1c1c1c"/>
+
+</svg>
+`;
+
+    // =========================
+    // HTML生成
+    // =========================
+    const html = injectHtml(template, {
+      application,
+      material_transition: `${currentMaterial} → ${bioMaterial}`,
+      assessment_type: "Preliminary Screening",
+      report_date: new Date().toISOString().split("T")[0],
+
+      compatibility_level: finalFeasibility,
+
+      executive_summary: REPORT.summary,
+      key_risk: REPORT.risk,
+
+      processing_window: REPORT.processing,
+      thermal_behavior: REPORT.thermal,
+      flow_characteristics: REPORT.flow,
+
+      mechanical_behavior: REPORT.mechanical,
+      surface_quality: REPORT.surface,
+      structural_consistency: REPORT.structure,
+
+      application_implication: REPORT.implication,
+
+      primary_risk_title: REPORT.primaryRiskTitle,
+      primary_risk: REPORT.primaryRisk,
+
+      secondary_risk_title: REPORT.secondaryRiskTitle,
+      secondary_risk: REPORT.secondaryRisk,
+
+      mechanism: REPORT.mechanism,
+
+      stability: REPORT.stability,
+      stability_note: REPORT.stabilityNote,
+
+      consistency: REPORT.consistency,
+      consistency_note: REPORT.consistencyNote,
+
+      // 🔥 メーター
+      pha_score: String(phaScore),
+
+      // 🔥 画像（安定版）
+      base_image:
+        "https://raw.githubusercontent.com/ilnautico/visual-assets/main/bioplastic-visual.png",
+
+      // 🔥 UI復元
+      dynamic_overlay: dynamicOverlay,
+
+      next_step: REPORT.nextStep
+    });
+
+    // =========================
+    // Puppeteer
+    // =========================
     const browser = await puppeteer.launch({
       headless: true,
       args: [
@@ -113,52 +209,22 @@ app.post("/generate-report", async (req, res) => {
 
     await browser.close();
 
+    fs.writeFileSync(PDF_PATH, pdf);
+
     res.setHeader("Content-Type", "application/pdf");
     res.send(pdf);
 
   } catch (err) {
-    console.error(err);
+    console.error("❌ ERROR:", err);
     res.status(500).send("Server Error");
   }
 });
 
 // =========================
-// GET（ブラウザ確認用）
+// GET（確認用）
 // =========================
-app.get("/generate-report", async (req, res) => {
-  try {
-    const template = fs.readFileSync(
-      path.join(__dirname, "template.html"),
-      "utf8"
-    );
-
-    const html = buildHtml(template);
-
-    const browser = await puppeteer.launch({
-      headless: true,
-      args: ["--no-sandbox"]
-    });
-
-    const page = await browser.newPage();
-
-    await page.setContent(html, {
-      waitUntil: "networkidle0"
-    });
-
-    const pdf = await page.pdf({
-      format: "A4",
-      printBackground: true
-    });
-
-    await browser.close();
-
-    res.setHeader("Content-Type", "application/pdf");
-    res.send(pdf);
-
-  } catch (err) {
-    console.error(err);
-    res.status(500).send("Error");
-  }
+app.get("/generate-report", (req, res) => {
+  res.send("POSTで叩いてください");
 });
 
 // =========================
