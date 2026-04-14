@@ -11,23 +11,32 @@ const app = express();
 app.use(express.json());
 
 // =========================
-// テンプレ差し込み
+// inject（最終安定版）
 // =========================
 function injectHtml(template, data) {
   let html = template;
 
   for (const key in data) {
-    html = html.replace(
-      new RegExp(`{{\\s*${key}\\s*}}`, "gi"),
-      String(data[key] ?? "")
-    );
+    const regex = new RegExp(`{{\\s*${key}\\s*}}`, "gi");
+    html = html.replace(regex, String(data[key] ?? ""));
   }
+
+  // 🔥 強制注入（ここで絶対に画像とバルーンを保証）
+  html = html.replace(
+    /{{\s*base_image\s*}}/gi,
+    data.base_image || "https://ilnautico.github.io/bioplastic-visual.png"
+  );
+
+  html = html.replace(
+    /{{\s*dynamic_overlay\s*}}/gi,
+    data.dynamic_overlay || ""
+  );
 
   return html;
 }
 
 // =========================
-// 共通HTML生成（ここ一本化）
+// 共通HTML生成
 // =========================
 function buildHtml(template) {
   const dynamicOverlay = `
@@ -38,48 +47,54 @@ function buildHtml(template) {
   return injectHtml(template, {
     application: "Injection molding",
     material_transition: "PP → PHA",
-    assessment_type: "Preview",
+    assessment_type: "Preliminary",
     report_date: new Date().toISOString().split("T")[0],
 
     compatibility_level: "Moderate",
 
-    executive_summary: "Preview Mode",
-    key_risk: "Preview Mode",
+    executive_summary:
+      "This transition presents moderate feasibility under controlled processing conditions.",
+    key_risk:
+      "Thermal instability may occur during extended residence time.",
 
-    processing_window: "Test",
-    thermal_behavior: "Test",
-    flow_characteristics: "Test",
+    processing_window: "Requires controlled temperature range",
+    thermal_behavior: "Sensitive under high temperature",
+    flow_characteristics: "Lower melt strength vs PP",
 
-    mechanical_behavior: "Test",
-    surface_quality: "Test",
-    structural_consistency: "Test",
+    mechanical_behavior: "Moderate stiffness reduction",
+    surface_quality: "Minor variation expected",
+    structural_consistency: "Dependent on process stability",
 
-    application_implication: "Test",
+    application_implication: "Suitable for controlled pilot trials",
 
-    primary_risk_title: "Test",
-    primary_risk: "Test",
-    secondary_risk_title: "Test",
-    secondary_risk: "Test",
-    mechanism: "Test",
+    primary_risk_title: "Thermal Degradation",
+    primary_risk: "Material breakdown risk under heat",
 
-    stability: "Test",
-    stability_note: "Test",
-    consistency: "Test",
-    consistency_note: "Test",
+    secondary_risk_title: "Flow Instability",
+    secondary_risk: "Inconsistent flow behavior possible",
 
+    mechanism: "Polymer chain scission under stress",
+
+    stability: "Moderate",
+    stability_note: "Requires controlled validation",
+    consistency: "Moderate",
+    consistency_note: "Dependent on processing conditions",
+
+    // 🔥 メーター
     pha_score: "65",
 
-    // 🔥 ここが最重要（画像）
+    // 🔥 画像（確実に出る）
     base_image: "https://ilnautico.github.io/bioplastic-visual.png",
 
+    // 🔥 バルーン
     dynamic_overlay: dynamicOverlay,
 
-    next_step: "Preview"
+    next_step: "Proceed with controlled pilot validation"
   });
 }
 
 // =========================
-// POST（本番用）
+// POST（本番）
 // =========================
 app.post("/generate-report", async (req, res) => {
   console.log("🔥 POST HIT");
@@ -110,13 +125,13 @@ app.post("/generate-report", async (req, res) => {
     res.send(pdf);
 
   } catch (err) {
-    console.error(err);
+    console.error("❌ ERROR:", err);
     res.status(500).send("error");
   }
 });
 
 // =========================
-// GET（確認用 ← これが重要）
+// GET（確認用）
 // =========================
 app.get("/generate-report", async (req, res) => {
   console.log("🔥 GET HIT");
@@ -153,10 +168,10 @@ app.get("/generate-report", async (req, res) => {
 });
 
 // =========================
-// ルート確認
+// root確認
 // =========================
 app.get("/", (req, res) => {
-  res.send("OK");
+  res.send("Server OK");
 });
 
 // =========================
