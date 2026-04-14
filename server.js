@@ -78,17 +78,18 @@ app.get("/generate-report", async (req, res) => {
 // PDF取得
 // =========================
 app.get("/latest-pdf", (req, res) => {
-  console.log("📥 PDF REQUEST");
-
-  const filePath = "./latest.pdf";
+  const filePath = process.cwd() + "/latest.pdf";
 
   if (!fs.existsSync(filePath)) {
-    console.log("❌ PDF NOT FOUND");
     return res.status(404).send("PDF not found");
   }
 
-  console.log("✅ PDF FOUND");
-  res.sendFile(filePath);
+  const file = fs.readFileSync(filePath);
+
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader("Content-Disposition", "inline; filename=report.pdf");
+
+  res.send(file);
 });
 
 // =========================
