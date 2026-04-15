@@ -44,8 +44,7 @@ function generateOverlay(scoreLeft, scoreRight) {
     <div style="
       position:absolute;
       top:40px;
-      left:50%;
-      transform:translateX(-120px);
+      left:330px;
       text-align:center;
     ">
       <div style="font-size:28px; color:#2f3a44;">230°C</div>
@@ -56,59 +55,58 @@ function generateOverlay(scoreLeft, scoreRight) {
     <div style="
       position:absolute;
       top:40px;
-      right:120px;
+      left:580px;
       text-align:center;
     ">
       <div style="font-size:28px; color:#d62c2c;">180°C</div>
       <div style="font-size:16px; color:#d62c2c;">${scoreRight}</div>
     </div>
 
-   // ===== 波（完全FIX）=====
-    
-/* 青波 */
-<svg style="
-  position:absolute;
-  left:360px;
-  bottom:105px;
-" width="90" height="35" viewBox="0 0 90 35">
-  <path d="
-    M0 18
-    C15 2, 30 34, 45 18
-    C60 2, 75 34, 90 18
-  "
-  fill="none"
-  stroke="#4f7c8a"
-  stroke-width="3"
-  stroke-linecap="round"
-  opacity="0.95"
-  filter="drop-shadow(0 0 6px rgba(79,124,138,0.35))"
-/>
-</svg>
-
-<svg style="
-  position:absolute;
-  left:360px;
-  bottom:105px;
-" width="90" height="35" viewBox="0 0 90 35">
-  <path d="
-    M0 18
-    C15 2, 30 34, 45 18
-    C60 2, 75 34, 90 18
-  "
-  fill="none"
-  stroke="#4f7c8a"
-  stroke-width="3"
-  stroke-linecap="round"
-  opacity="0.95"
-  filter="drop-shadow(0 0 6px rgba(79,124,138,0.35))"
-/>
-</svg>
-
-    <!-- メーター（完全右下FIX） -->
+    <!-- 🔵 青波（位置完全FIX＋透け感復元） -->
     <svg style="
       position:absolute;
-      right:60px;
-      bottom:10px;
+      left:360px;
+      bottom:105px;
+    " width="90" height="35" viewBox="0 0 90 35">
+      <path d="
+        M0 18
+        C15 6, 30 30, 45 18
+        C60 6, 75 30, 90 18
+      "
+      fill="none"
+      stroke="#4f7c8a"
+      stroke-width="3"
+      stroke-linecap="round"
+      opacity="0.9"
+      filter="drop-shadow(0 0 6px rgba(79,124,138,0.35))"
+      />
+    </svg>
+
+    <!-- 🔴 赤波（中央戻しFIX） -->
+    <svg style="
+      position:absolute;
+      left:560px;
+      bottom:90px;
+    " width="90" height="35" viewBox="0 0 90 35">
+      <path d="
+        M0 18
+        C15 6, 30 30, 45 18
+        C60 6, 75 30, 90 18
+      "
+      fill="none"
+      stroke="#d62c2c"
+      stroke-width="3"
+      stroke-linecap="round"
+      opacity="0.9"
+      filter="drop-shadow(0 0 6px rgba(214,44,44,0.35))"
+      />
+    </svg>
+
+    <!-- 🎯 メーター（右下・完全固定） -->
+    <svg style="
+      position:absolute;
+      right:80px;
+      bottom:30px;
     " viewBox="0 0 200 120" width="140" height="90">
 
       <defs>
@@ -119,10 +117,12 @@ function generateOverlay(scoreLeft, scoreRight) {
         </linearGradient>
       </defs>
 
+      <!-- 半円（元デザイン） -->
       <path d="M20 100 A80 80 0 0 1 180 100 L100 100 Z"
         fill="url(#g)"
       />
 
+      <!-- 針 -->
       <g transform="rotate(${angle} 100 100)">
         <line x1="100" y1="100" x2="100" y2="25"
           stroke="#111"
@@ -130,6 +130,7 @@ function generateOverlay(scoreLeft, scoreRight) {
           stroke-linecap="round"/>
       </g>
 
+      <!-- 中心 -->
       <circle cx="100" cy="100" r="4" fill="#111"/>
 
     </svg>
