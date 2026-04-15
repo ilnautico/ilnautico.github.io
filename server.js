@@ -63,7 +63,7 @@ function generateOverlay(scoreLeft, scoreRight) {
       <div style="font-size:16px; color:#d62c2c;">${scoreRight}</div>
     </div>
 
-    <!-- 青い波（左） -->
+    <!-- 青い波 -->
     <svg style="
       position:absolute;
       left:48%;
@@ -82,7 +82,7 @@ function generateOverlay(scoreLeft, scoreRight) {
       />
     </svg>
 
-    <!-- 赤い波（右） -->
+    <!-- 赤い波 -->
     <svg style="
       position:absolute;
       right:140px;
@@ -100,7 +100,7 @@ function generateOverlay(scoreLeft, scoreRight) {
       />
     </svg>
 
-    <!-- メーター -->
+    <!-- メーター（完全復元） -->
     <svg style="
       position:absolute;
       right:80px;
@@ -115,19 +115,16 @@ function generateOverlay(scoreLeft, scoreRight) {
         </linearGradient>
       </defs>
 
-      <!-- 半円 -->
-      <path d="M20 100 A80 80 0 0 1 180 100"
-        fill="none"
-        stroke="url(#g)"
-        stroke-width="18"
-        stroke-linecap="round"
+      <!-- ★ここ完全復元 -->
+      <path d="M20 100 A80 80 0 0 1 180 100 L100 100 Z"
+        fill="url(#g)"
       />
 
       <!-- 針 -->
       <g transform="rotate(${angle} 100 100)">
         <line x1="100" y1="100" x2="100" y2="25"
           stroke="#111"
-          stroke-width="2"
+          stroke-width="3"
           stroke-linecap="round"/>
       </g>
 
@@ -139,7 +136,6 @@ function generateOverlay(scoreLeft, scoreRight) {
   </div>
   `;
 }
-  
 
 // =========================
 // HTML inject
@@ -156,7 +152,7 @@ function injectHtml(template, data) {
 }
 
 // =========================
-// AI生成（フル構造）
+// AI生成
 // =========================
 async function generateAIReport(input) {
 
@@ -188,10 +184,6 @@ Return ONLY JSON.
   "consistency_note": "",
   "next_step": ""
 }
-
-Application: ${input.application}
-Material: ${input.material}
-Target: ${input.bio_material}
 `;
 
   const res = await openai.chat.completions.create({
@@ -203,24 +195,12 @@ Target: ${input.bio_material}
     temperature: 0.5
   });
 
-  try {
-    const cleaned = res.choices[0].message.content
-      .replace(/```json/g, "")
-      .replace(/```/g, "")
-      .trim();
+  const cleaned = res.choices[0].message.content
+    .replace(/```json/g, "")
+    .replace(/```/g, "")
+    .trim();
 
-    return JSON.parse(cleaned);
-
-  } catch (e) {
-    console.error("AI ERROR", e);
-    return {
-      executive_summary_overview: "Analysis fallback",
-      executive_summary_findings: "",
-      executive_summary_conclusion: "",
-      key_risk: "Unknown",
-      next_step: "Manual validation required"
-    };
-  }
+  return JSON.parse(cleaned);
 }
 
 // =========================
@@ -232,7 +212,6 @@ app.post("/generate-report", async (req, res) => {
 
     const input = req.body;
 
-    // 🔥 スコア（2軸）
     const scoreLeft = 78;
     const scoreRight = 92;
 
@@ -247,7 +226,6 @@ app.post("/generate-report", async (req, res) => {
 
       compatibility_level: "Moderate",
 
-      // Executive Summary（統合）
       executive_summary:
         (aiData.executive_summary_overview || "") + " " +
         (aiData.executive_summary_findings || "") + " " +
@@ -280,11 +258,9 @@ app.post("/generate-report", async (req, res) => {
 
       next_step: aiData.next_step,
 
-      // ビジュアル
       base_image: "https://ilnautico.github.io/visual-base.png",
       dynamic_overlay: generateOverlay(scoreLeft, scoreRight),
 
-      // グラフ
       pha_score: scoreRight
     });
 
@@ -320,9 +296,6 @@ app.post("/generate-report", async (req, res) => {
   }
 });
 
-// =========================
-// PDF確認
-// =========================
 app.get("/latest-pdf", (req, res) => {
   if (!fs.existsSync(PDF_PATH)) {
     return res.status(404).send("No PDF yet");
@@ -330,7 +303,6 @@ app.get("/latest-pdf", (req, res) => {
   res.sendFile(PDF_PATH);
 });
 
-// =========================
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
   console.log("🚀 Server running on", PORT);
