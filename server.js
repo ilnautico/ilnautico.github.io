@@ -156,7 +156,6 @@ app.post("/generate-report", async (req, res) => {
     const aiData = await generateAIReport(input, scoreLeft, scoreRight);
 
     const html = injectHtml(htmlTemplate, {
-
   client_name: input.client_name || "",
   client_company: input.client_company || "",
   client_country: input.client_country || "",
@@ -171,12 +170,40 @@ app.post("/generate-report", async (req, res) => {
 
   report_date: new Date().toISOString().split("T")[0],
   report_id: "FV-" + Date.now(),
-
   compatibility_level: "Moderate",
 
-  ...aiData
-});
-      ...aiData
+  // 👇ここからAI手動展開（重要）
+  executive_summary_overview: aiData.executive_summary_overview,
+  executive_summary_findings: aiData.executive_summary_findings,
+  executive_summary_conclusion: aiData.executive_summary_conclusion,
+
+  key_risk: aiData.key_risk,
+
+  primary_risk_title: aiData.primary_risk_title,
+  primary_risk: aiData.primary_risk,
+
+  secondary_risk_title: aiData.secondary_risk_title,
+  secondary_risk: aiData.secondary_risk,
+
+  mechanism: aiData.mechanism,
+
+  processing_window: aiData.processing_window,
+  thermal_behavior: aiData.thermal_behavior,
+  flow_characteristics: aiData.flow_characteristics,
+
+  mechanical_behavior: aiData.mechanical_behavior,
+  surface_quality: aiData.surface_quality,
+  structural_consistency: aiData.structural_consistency,
+
+  application_implication: aiData.application_implication,
+
+  stability: aiData.stability,
+  consistency: aiData.consistency,
+
+  stability_note: aiData.stability_note,
+  consistency_note: aiData.consistency_note,
+
+  next_step: aiData.next_step
     });
 
     const browser = await puppeteer.launch({
