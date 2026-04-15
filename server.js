@@ -35,35 +35,45 @@ const htmlTemplate = fs.readFileSync(
 // =========================
 function generateOverlay(scoreLeft, scoreRight) {
 
-  // 🔥 元の針ロジック（ここ重要）
   const angle = -90 + (scoreRight * 1.8);
 
   return `
-  <div style="
-    position:absolute;
-    right:60px;
-    bottom:40px;
-    width:160px;
-  ">
+  <div style="position:absolute; left:0; top:0; width:100%; height:100%;">
 
-    <!-- 数字（完全復元） -->
+    <!-- 左数値 -->
     <div style="
-      font-size:16px;
-      font-weight:600;
-      color:#333;
-      text-align:right;
-      margin-bottom:8px;
+      position:absolute;
+      top:40px;
+      left:50%;
+      transform:translateX(-120px);
+      text-align:center;
     ">
-      Score: ${String(scoreRight).padStart(2, "0")}
+      <div style="font-size:28px; color:#2f3a44;">230°C</div>
+      <div style="font-size:16px; color:#5b6770;">${scoreLeft}</div>
     </div>
 
-    <!-- 波（元SVGそのまま） -->
-    <svg width="140" height="40" viewBox="0 0 140 40" style="margin-bottom:8px;">
+    <!-- 右数値 -->
+    <div style="
+      position:absolute;
+      top:40px;
+      right:120px;
+      text-align:center;
+    ">
+      <div style="font-size:28px; color:#d62c2c;">180°C</div>
+      <div style="font-size:16px; color:#d62c2c;">${scoreRight}</div>
+    </div>
+
+    <!-- 青い波（左） -->
+    <svg style="
+      position:absolute;
+      left:48%;
+      bottom:90px;
+      transform:translateX(-120px);
+    " width="80" height="30" viewBox="0 0 80 30">
       <path d="
-        M10 25
-        C25 5, 45 5, 60 25
-        C75 45, 95 45, 110 25
-        C125 5, 135 5, 135 25
+        M0 15
+        C15 5, 25 25, 40 15
+        C55 5, 65 25, 80 15
       "
       fill="none"
       stroke="#4f7c8a"
@@ -72,8 +82,31 @@ function generateOverlay(scoreLeft, scoreRight) {
       />
     </svg>
 
-    <!-- メーター（完全一致） -->
-    <svg viewBox="0 0 200 120" width="140" height="90">
+    <!-- 赤い波（右） -->
+    <svg style="
+      position:absolute;
+      right:140px;
+      bottom:70px;
+    " width="80" height="30" viewBox="0 0 80 30">
+      <path d="
+        M0 15
+        C15 5, 25 25, 40 15
+        C55 5, 65 25, 80 15
+      "
+      fill="none"
+      stroke="#d62c2c"
+      stroke-width="2.5"
+      stroke-linecap="round"
+      />
+    </svg>
+
+    <!-- メーター -->
+    <svg style="
+      position:absolute;
+      right:80px;
+      bottom:20px;
+    " viewBox="0 0 200 120" width="160" height="100">
+
       <defs>
         <linearGradient id="g">
           <stop offset="0%" stop-color="#22c55e"/>
@@ -82,17 +115,31 @@ function generateOverlay(scoreLeft, scoreRight) {
         </linearGradient>
       </defs>
 
-      <path d="M20 100 A80 80 0 0 1 180 100 L100 100 Z" fill="url(#g)" />
+      <!-- 半円 -->
+      <path d="M20 100 A80 80 0 0 1 180 100"
+        fill="none"
+        stroke="url(#g)"
+        stroke-width="18"
+        stroke-linecap="round"
+      />
 
+      <!-- 針 -->
       <g transform="rotate(${angle} 100 100)">
-        <line x1="100" y1="100" x2="100" y2="30" stroke="#111" stroke-width="3"/>
+        <line x1="100" y1="100" x2="100" y2="25"
+          stroke="#111"
+          stroke-width="2"
+          stroke-linecap="round"/>
       </g>
+
+      <!-- 中心 -->
+      <circle cx="100" cy="100" r="4" fill="#111"/>
+
     </svg>
 
   </div>
   `;
 }
- 
+  
 
 // =========================
 // HTML inject
