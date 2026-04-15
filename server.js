@@ -23,95 +23,48 @@ const openai = new OpenAI({
 });
 
 // =========================
-// スコア（仮）
+// HTML inject
 // =========================
-function calculateScores() {
-  return {
-    scoreLeft: 40,
-    scoreRight: 95
-  };
+function injectHtml(template, data) {
+  let htmlStr = template;
+  for (const key in data) {
+    htmlStr = htmlStr.replace(
+      new RegExp(`{{\\s*${key}\\s*}}`, "g"),
+      data[key] || ""
+    );
+  }
+  return htmlStr;
 }
 
 // =========================
-// Overlay（UI完全版）
-// =========================
-function generateOverlay(scoreLeft, scoreRight) {
-
-  const ampLeft = 4 + scoreLeft * 0.12;
-  const ampRight = 4 + scoreRight * 0.12;
-  const angle = -90 + (scoreRight / 100) * 180;
-
-  return `
-  <div style="position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;">
-
-    <div style="position:absolute; left:33.5%; top:6%; font-size:26px;">
-      230°C
-    </div>
-
-    <div style="position:absolute; left:66%; top:6%; font-size:26px; color:#dc2626;">
-      180°C
-    </div>
-
-    <div style="position:absolute; left:40%; top:22%;">${scoreLeft}</div>
-    <div style="position:absolute; left:72%; top:22%; color:#dc2626;">${scoreRight}</div>
-
-    <svg style="position:absolute;left:46.8%;top:57.2%;width:11%;height:8%;">
-      <path stroke="#3B82A0" stroke-width="2" fill="none"
-        d="M0 10 Q20 ${10-ampLeft} 40 10 T80 10"/>
-    </svg>
-
-    <svg style="position:absolute;left:71.5%;top:64%;width:11%;height:8%;">
-      <path stroke="#dc2626" stroke-width="2" fill="none"
-        d="M0 10 Q20 ${10-ampRight} 40 10 T80 10"/>
-    </svg>
-
-    <svg viewBox="0 0 200 120"
-      style="position:absolute; right:6%; bottom:6%; width:140px; height:90px;">
-
-      <defs>
-        <linearGradient id="meterGrad" x1="0" x2="1">
-          <stop offset="0%" stop-color="#22c55e"/>
-          <stop offset="45%" stop-color="#fde047"/>
-          <stop offset="70%" stop-color="#f59e0b"/>
-          <stop offset="100%" stop-color="#ef4444"/>
-        </linearGradient>
-      </defs>
-
-      <path d="M20 100 A80 80 0 0 1 180 100 L100 100 Z"
-        fill="url(#meterGrad)" />
-
-      <g transform="rotate(${angle} 100 100)">
-        <line x1="100" y1="100" x2="100" y2="25"
-          stroke="#111"
-          stroke-width="2.5"
-          stroke-linecap="round"/>
-      </g>
-
-      <circle cx="100" cy="100" r="4.5" fill="#111"/>
-    </svg>
-
-  </div>
-  `;
-}
-
-// =========================
-// AI生成（プロ仕様）
+// AI（完全プロ仕様）
 // =========================
 async function generateAIReport(input, scoreLeft, scoreRight) {
 
   const prompt = `
-You are a senior polymer engineer and technical consultant.
+You are a senior polymer processing engineer with industrial experience.
 
-Write a professional technical assessment for executive decision-making.
+Write a high-level technical assessment suitable for executive decision-making in manufacturing environments.
 
-Return ONLY JSON.
+The output must reflect:
+- Real processing constraints
+- Material behavior under industrial conditions
+- Clear cause-effect relationships
+- Practical implications for production
 
+Avoid generic language.
+Avoid vague expressions like "may" or "could" unless strictly necessary.
+
+Be precise, confident, and technical.
+
+INPUT:
 Application: ${input.application}
-Material: ${input.material}
-Target: ${input.bio_material}
+Current Material: ${input.material}
+Target Material: ${input.bio_material}
+Stability Score: ${scoreLeft}
+Risk Score: ${scoreRight}
 
-Stability: ${scoreLeft}
-Risk: ${scoreRight}
+Return ONLY JSON:
 
 {
   "executive_summary": "",
@@ -147,7 +100,7 @@ Risk: ${scoreRight}
     return JSON.parse(res.choices[0].message.content);
   } catch {
     return {
-      executive_summary: "Fallback",
+      executive_summary: "Analysis failed",
       key_risk: "Unknown",
       next_step: "Manual review required"
     };
@@ -155,29 +108,16 @@ Risk: ${scoreRight}
 }
 
 // =========================
-// HTML inject
+// メイン（最重要）
 // =========================
-function injectHtml(template, data) {
-  let htmlStr = template;
-  for (const key in data) {
-    htmlStr = htmlStr.replace(
-      new RegExp(`{{\\s*${key}\\s*}}`, "g"),
-      data[key] || ""
-    );
-  }
-  return htmlStr;
-}
-
-// =========================
-// メイン
-// =========================
-app.post("/tally-pdf", async (req, res) => {
+app.post("/generate-report", async (req, res) => {
 
   try {
 
     const input = req.body;
 
-    const { scoreLeft, scoreRight } = calculateScores();
+    const scoreLeft = 40;
+    const scoreRight = 95;
 
     const aiData = await generateAIReport(input, scoreLeft, scoreRight);
 
@@ -186,23 +126,45 @@ app.post("/tally-pdf", async (req, res) => {
       "utf8"
     );
 
-    const htmlStr = injectHtml(template, {
-      base_image: "https://ilnautico.github.io/visual-base.png",
-      dynamic_overlay: generateOverlay(scoreLeft, scoreRight),
-      compatibility_level: "Moderate",
-      stability: "Moderate",
-      consistency: "Variable",
+    const html = injectHtml(template, {
+      application: input.application || "",
+      current_material: input.material || "",
+      bio_material: input.bio_material || "",
       ...aiData
     });
 
+    // =========================
+    // Puppeteer（完全安定版）
+    // =========================
     const browser = await puppeteer.launch({
       headless: "new",
-      args: ["--no-sandbox", "--disable-setuid-sandbox"]
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-gpu"
+      ]
     });
 
     const page = await browser.newPage();
-    await page.setContent(htmlStr);
 
+    // ✅ A4固定
+    await page.setViewport({
+      width: 1240,
+      height: 1754
+    });
+
+    // ✅ HTML描画
+    await page.setContent(html, {
+      waitUntil: "networkidle0"
+    });
+
+    // ✅ フォント読み込み待機（ズレ完全防止）
+    await page.evaluateHandle("document.fonts.ready");
+
+    // =========================
+    // PDF生成
+    // =========================
     const pdf = await page.pdf({
       format: "A4",
       printBackground: true
