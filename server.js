@@ -23,6 +23,14 @@ const openai = new OpenAI({
 });
 
 // =========================
+// HTML TEMPLATE（←1個だけ）
+// =========================
+const htmlTemplate = fs.readFileSync(
+  path.join(__dirname, "template.html"),
+  "utf8"
+);
+
+// =========================
 // HTML inject
 // =========================
 function injectHtml(template, data) {
@@ -37,38 +45,27 @@ function injectHtml(template, data) {
 }
 
 // =========================
-// AI（完全プロ仕様）
+// AI生成（完全修正版）
 // =========================
 async function generateAIReport(input, scoreLeft, scoreRight) {
 
   const prompt = `
-You are a senior polymer processing engineer with industrial experience.
+Return ONLY JSON.
 
-Write a high-level technical assessment suitable for executive decision-making in manufacturing environments.
-
-The output must reflect:
-- Real processing constraints
-- Material behavior under industrial conditions
-- Clear cause-effect relationships
-- Practical implications for production
-
-Avoid generic language.
-Avoid vague expressions like "may" or "could" unless strictly necessary.
-
-Be precise, confident, and technical.
-
-INPUT:
 Application: ${input.application}
-Current Material: ${input.material}
-Target Material: ${input.bio_material}
-Stability Score: ${scoreLeft}
-Risk Score: ${scoreRight}
+Material: ${input.material}
+Target: ${input.bio_material}
 
-Return ONLY JSON:
+Stability: ${scoreLeft}
+Risk: ${scoreRight}
 
 {
   "executive_summary": "",
-  "key_risk": "",
+  "primary_risk_title": "",
+  "primary_risk": "",
+  "secondary_risk_title": "",
+  "secondary_risk": "",
+  "mechanism": "",
   "processing_window": "",
   "thermal_behavior": "",
   "flow_characteristics": "",
@@ -76,13 +73,6 @@ Return ONLY JSON:
   "surface_quality": "",
   "structural_consistency": "",
   "application_implication": "",
-  "primary_risk_title": "",
-  "primary_risk": "",
-  "secondary_risk_title": "",
-  "secondary_risk": "",
-  "mechanism": "",
-  "stability_note": "",
-  "consistency_note": "",
   "next_step": ""
 }
 `;
@@ -96,19 +86,30 @@ Return ONLY JSON:
     temperature: 0.4
   });
 
+  const raw = res.choices[0].message.content;
+
   try {
-    return JSON.parse(res.choices[0].message.content);
-  } catch {
+    const cleaned = raw
+      .replace(/```json/g, "")
+      .replace(/```/g, "")
+      .trim();
+
+    return JSON.parse(cleaned);
+
+  } catch (e) {
+    console.error("JSON parse error:", raw);
+
     return {
       executive_summary: "Analysis failed",
-      key_risk: "Unknown",
+      primary_risk_title: "Unknown",
+      primary_risk: "Parsing failed",
       next_step: "Manual review required"
     };
   }
 }
 
 // =========================
-// メイン（最重要）
+// メイン
 // =========================
 app.post("/generate-report", async (req, res) => {
 
@@ -121,23 +122,26 @@ app.post("/generate-report", async (req, res) => {
 
     const aiData = await generateAIReport(input, scoreLeft, scoreRight);
 
-    const template = fs.readFileSync(
-      path.join(__dirname, "template.html"),
-      "utf8"
-    );
+    const html = injectHtml(htmlTemplate, {
 
-    const html = injectHtml(template, {
+      client_name: input.client_name || "",
+      client_company: input.client_company || "",
+      client_country: input.client_country || "",
+
       application: input.application || "",
       current_material: input.material || "",
       bio_material: input.bio_material || "",
+      processing_method: input.processing || "",
+
+      report_date: new Date().toISOString().split("T")[0],
+      report_id: "FV-" + Date.now(),
+
+      compatibility_level: "Moderate",
+
       ...aiData
     });
 
-    // =========================
-    // Puppeteer（完全安定版）
-    // =========================
     const browser = await puppeteer.launch({
-      headless: "new",
       args: [
         "--no-sandbox",
         "--disable-setuid-sandbox",
@@ -148,23 +152,10 @@ app.post("/generate-report", async (req, res) => {
 
     const page = await browser.newPage();
 
-    // ✅ A4固定
-    await page.setViewport({
-      width: 1240,
-      height: 1754
-    });
-
-    // ✅ HTML描画
     await page.setContent(html, {
       waitUntil: "networkidle0"
     });
 
-    // ✅ フォント読み込み待機（ズレ完全防止）
-    await page.evaluateHandle("document.fonts.ready");
-
-    // =========================
-    // PDF生成
-    // =========================
     const pdf = await page.pdf({
       format: "A4",
       printBackground: true
