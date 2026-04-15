@@ -63,42 +63,76 @@ function generateOverlay(scoreLeft, scoreRight) {
       <div style="font-size:16px; color:#d62c2c;">${scoreRight}</div>
     </div>
 
-    <!-- 青い波 -->
-    <svg style="
-      position:absolute;
-      left:48%;
-      bottom:90px;
-      transform:translateX(-120px);
-    " width="80" height="30" viewBox="0 0 80 30">
-      <path d="
-        M0 15
-        C15 5, 25 25, 40 15
-        C55 5, 65 25, 80 15
-      "
-      fill="none"
-      stroke="#4f7c8a"
-      stroke-width="2.5"
-      stroke-linecap="round"
-      />
-    </svg>
+   <!-- 青い波（左：完全復元＋少しリッチ） -->
+<svg style="
+  position:absolute;
+  left:50%;
+  bottom:78px;
+  transform:translateX(-140px);
+" width="90" height="28" viewBox="0 0 90 28">
 
-    <!-- 赤い波 -->
-    <svg style="
-      position:absolute;
-      right:140px;
-      bottom:70px;
-    " width="80" height="30" viewBox="0 0 80 30">
-      <path d="
-        M0 15
-        C15 5, 25 25, 40 15
-        C55 5, 65 25, 80 15
-      "
-      fill="none"
-      stroke="#d62c2c"
-      stroke-width="2.5"
-      stroke-linecap="round"
-      />
-    </svg>
+  <!-- 本体 -->
+  <path d="
+    M0 14
+    C15 6, 25 22, 40 14
+    C55 6, 65 22, 80 14
+  "
+  fill="none"
+  stroke="#4f7c8a"
+  stroke-width="3"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+  opacity="0.95"
+  />
+
+  <!-- ハイライト -->
+  <path d="
+    M0 14
+    C15 6, 25 22, 40 14
+    C55 6, 65 22, 80 14
+  "
+  fill="none"
+  stroke="rgba(255,255,255,0.25)"
+  stroke-width="1"
+  transform="translate(0,-1)"
+  />
+</svg>
+
+
+<!-- 赤い波（右：完全復元＋統一感） -->
+<svg style="
+  position:absolute;
+  right:120px;
+  bottom:72px;
+" width="90" height="28" viewBox="0 0 90 28">
+
+  <!-- 本体 -->
+  <path d="
+    M0 14
+    C15 6, 25 22, 40 14
+    C55 6, 65 22, 80 14
+  "
+  fill="none"
+  stroke="#d62c2c"
+  stroke-width="3"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+  opacity="0.95"
+  />
+
+  <!-- ハイライト -->
+  <path d="
+    M0 14
+    C15 6, 25 22, 40 14
+    C55 6, 65 22, 80 14
+  "
+  fill="none"
+  stroke="rgba(255,255,255,0.2)"
+  stroke-width="1"
+  transform="translate(0,-1)"
+  />
+
+</svg>
 
     <!-- メーター（完全復元） -->
     <svg style="
