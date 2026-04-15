@@ -66,36 +66,30 @@ function generateOverlay(scoreLeft, scoreRight) {
       <div style="font-size:16px; color:#d62c2c;">${scoreRight}</div>
     </div>
 
-    <!-- ===== 青波（中央完全固定＋微アニメ）===== -->
+    <!-- ===== 青波（完全復元位置）===== -->
     <svg style="
       position:absolute;
       left:50%;
       bottom:100px;
-      transform:translateX(-60px);
-    " width="95" height="30" viewBox="0 0 95 30">
+      transform:translateX(-80px);
+    " width="90" height="30" viewBox="0 0 90 30">
 
-      <path fill="none"
-        stroke="rgba(79,124,138,0.85)"
-        stroke-width="3"
-        stroke-linecap="round"
-        d="M0 15 C15 ${15 - ampLeft},25 ${15 + ampLeft},40 15 C55 ${15 - ampLeft},65 ${15 + ampLeft},80 15">
-
-        <animate attributeName="d"
-          dur="3s"
-          repeatCount="indefinite"
-          values="
-            M0 15 C15 ${15 - ampLeft},25 ${15 + ampLeft},40 15 C55 ${15 - ampLeft},65 ${15 + ampLeft},80 15;
-            M0 15 C15 ${15 - ampLeft - 2},25 ${15 + ampLeft + 2},40 15 C55 ${15 - ampLeft - 2},65 ${15 + ampLeft + 2},80 15;
-            M0 15 C15 ${15 - ampLeft},25 ${15 + ampLeft},40 15 C55 ${15 - ampLeft},65 ${15 + ampLeft},80 15
-          "
-        />
-      </path>
+      <path d="
+        M0 15
+        C15 ${15 - ampLeft}, 25 ${15 + ampLeft}, 40 15
+        C55 ${15 - ampLeft}, 65 ${15 + ampLeft}, 80 15
+      "
+      fill="none"
+      stroke="rgba(79,124,138,0.85)"
+      stroke-width="3"
+      stroke-linecap="round"
+      />
 
       <!-- ハイライト -->
       <path d="
         M0 15
-        C15 ${15 - ampLeft},25 ${15 + ampLeft},40 15
-        C55 ${15 - ampLeft},65 ${15 + ampLeft},80 15
+        C15 ${15 - ampLeft}, 25 ${15 + ampLeft}, 40 15
+        C55 ${15 - ampLeft}, 65 ${15 + ampLeft}, 80 15
       "
       fill="none"
       stroke="rgba(255,255,255,0.25)"
@@ -105,35 +99,29 @@ function generateOverlay(scoreLeft, scoreRight) {
 
     </svg>
 
-    <!-- ===== 赤波（高さ補正＋微アニメ）===== -->
+    <!-- ===== 赤波（完全復元位置）===== -->
     <svg style="
       position:absolute;
-      right:140px;
-      bottom:90px;
-    " width="95" height="30" viewBox="0 0 95 30">
+      right:150px;
+      bottom:95px;
+    " width="90" height="30" viewBox="0 0 90 30">
 
-      <path fill="none"
-        stroke="rgba(214,44,44,0.85)"
-        stroke-width="3"
-        stroke-linecap="round"
-        d="M0 15 C15 ${15 - ampRight},25 ${15 + ampRight},40 15 C55 ${15 - ampRight},65 ${15 + ampRight},80 15">
-
-        <animate attributeName="d"
-          dur="3.2s"
-          repeatCount="indefinite"
-          values="
-            M0 15 C15 ${15 - ampRight},25 ${15 + ampRight},40 15 C55 ${15 - ampRight},65 ${15 + ampRight},80 15;
-            M0 15 C15 ${15 - ampRight - 2},25 ${15 + ampRight + 2},40 15 C55 ${15 - ampRight - 2},65 ${15 + ampRight + 2},80 15;
-            M0 15 C15 ${15 - ampRight},25 ${15 + ampRight},40 15 C55 ${15 - ampRight},65 ${15 + ampRight},80 15
-          "
-        />
-      </path>
+      <path d="
+        M0 15
+        C15 ${15 - ampRight}, 25 ${15 + ampRight}, 40 15
+        C55 ${15 - ampRight}, 65 ${15 + ampRight}, 80 15
+      "
+      fill="none"
+      stroke="rgba(214,44,44,0.85)"
+      stroke-width="3"
+      stroke-linecap="round"
+      />
 
       <!-- ハイライト -->
       <path d="
         M0 15
-        C15 ${15 - ampRight},25 ${15 + ampRight},40 15
-        C55 ${15 - ampRight},65 ${15 + ampRight},80 15
+        C15 ${15 - ampRight}, 25 ${15 + ampRight}, 40 15
+        C55 ${15 - ampRight}, 65 ${15 + ampRight}, 80 15
       "
       fill="none"
       stroke="rgba(255,255,255,0.25)"
@@ -143,12 +131,12 @@ function generateOverlay(scoreLeft, scoreRight) {
 
     </svg>
 
-    <!-- ===== メーター（完全復元＋位置修正）===== -->
+    <!-- ===== メーター（完全復元）===== -->
     <svg style="
       position:absolute;
       right:120px;
       bottom:45px;
-    " viewBox="0 0 200 120" width="160" height="100">
+    " viewBox="0 0 200 120" width="140" height="90">
 
       <defs>
         <linearGradient id="g">
@@ -158,7 +146,7 @@ function generateOverlay(scoreLeft, scoreRight) {
         </linearGradient>
       </defs>
 
-      <!-- 元の塗りつぶし -->
+      <!-- 塗りつぶし型（元デザイン） -->
       <path d="M20 100 A80 80 0 0 1 180 100 L100 100 Z"
         fill="url(#g)"
       />
