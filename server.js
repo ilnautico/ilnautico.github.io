@@ -67,69 +67,65 @@ function generateOverlay(scoreLeft, scoreRight) {
 <svg style="
   position:absolute;
   left:50%;
-  bottom:92px;   /* ← 上げた（78 → 92） */
-  transform:translateX(-115px); /* ← 右へ寄せた（-140 → -115） */
-" width="90" height="28" viewBox="0 0 90 28">
+  bottom:86px;
+  transform:translateX(-155px);
+" width="95" height="30" viewBox="0 0 95 30">
 
+  <!-- 影 -->
   <path d="
-    M0 14
-    C15 6, 25 22, 40 14
-    C55 6, 65 22, 80 14
+    M0 15
+    C15 7, 25 23, 40 15
+    C55 7, 65 23, 80 15
+  "
+  fill="none"
+  stroke="rgba(0,0,0,0.08)"
+  stroke-width="5"
+  stroke-linecap="round"
+  />
+
+  <!-- 本体 -->
+  <path d="
+    M0 15
+    C15 7, 25 23, 40 15
+    C55 7, 65 23, 80 15
   "
   fill="none"
   stroke="#4f7c8a"
   stroke-width="3"
   stroke-linecap="round"
-  stroke-linejoin="round"
   />
 
 </svg>
-
-  <!-- ハイライト -->
-  <path d="
-    M0 14
-    C15 6, 25 22, 40 14
-    C55 6, 65 22, 80 14
-  "
-  fill="none"
-  stroke="rgba(255,255,255,0.25)"
-  stroke-width="1"
-  transform="translate(0,-1)"
-  />
-</svg>
-
 
 <!-- 赤い波（右：完全復元＋統一感） -->
 <svg style="
   position:absolute;
-  right:130px;   /* ← 少し右へ */
-  bottom:82px;   /* ← 少し上げ */
-" width="90" height="28" viewBox="0 0 90 28">
+  right:150px;
+  bottom:95px;
+" width="95" height="30" viewBox="0 0 95 30">
 
+  <!-- 影 -->
   <path d="
-    M0 14
-    C15 6, 25 22, 40 14
-    C55 6, 65 22, 80 14
+    M0 15
+    C15 7, 25 23, 40 15
+    C55 7, 65 23, 80 15
+  "
+  fill="none"
+  stroke="rgba(0,0,0,0.08)"
+  stroke-width="5"
+  stroke-linecap="round"
+  />
+
+  <!-- 本体 -->
+  <path d="
+    M0 15
+    C15 7, 25 23, 40 15
+    C55 7, 65 23, 80 15
   "
   fill="none"
   stroke="#d62c2c"
   stroke-width="3"
   stroke-linecap="round"
-  stroke-linejoin="round"
-  />
-
-</svg>
-
-  <!-- ハイライト -->
-  <path d="
-    M0 14
-    C15 6, 25 22, 40 14
-    C55 6, 65 22, 80 14
-  "
-  fill="none"
-  stroke="rgba(255,255,255,0.2)"
-  stroke-width="1"
-  transform="translate(0,-1)"
   />
 
 </svg>
