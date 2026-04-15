@@ -23,7 +23,7 @@ const openai = new OpenAI({
 });
 
 // =========================
-// HTML TEMPLATE（1つだけ）
+// HTML
 // =========================
 const htmlTemplate = fs.readFileSync(
   path.join(__dirname, "template.html"),
@@ -33,19 +33,12 @@ const htmlTemplate = fs.readFileSync(
 // =========================
 // Overlay（メーター）
 // =========================
-function generateOverlay(scoreLeft, scoreRight) {
-  const angle = -90 + (scoreRight / 100) * 180;
+function generateOverlay(score) {
+  const angle = -90 + (score / 100) * 180;
 
   return `
   <div style="position:absolute;right:6%;bottom:6%;">
     <svg viewBox="0 0 200 120" width="140" height="90">
-      <defs>
-        <linearGradient id="g">
-          <stop offset="0%" stop-color="#22c55e"/>
-          <stop offset="50%" stop-color="#fde047"/>
-          <stop offset="100%" stop-color="#ef4444"/>
-        </linearGradient>
-      </defs>
       <path d="M20 100 A80 80 0 0 1 180 100 L100 100 Z" fill="url(#g)" />
       <g transform="rotate(${angle} 100 100)">
         <line x1="100" y1="100" x2="100" y2="25" stroke="#111" stroke-width="3"/>
@@ -70,25 +63,20 @@ function injectHtml(template, data) {
 }
 
 // =========================
-// AI生成（完全一致版）
+// AI（数十万円レベル）
 // =========================
-async function generateAIReport(input, scoreLeft, scoreRight) {
+async function generateAIReport(input) {
 
   const prompt = `
 You are a senior polymer consultant.
 
+Generate a HIGH-END professional report.
+
 Return ONLY JSON.
 
 {
-  "executive_summary_overview": "",
-  "executive_summary_findings": "",
-  "executive_summary_conclusion": "",
+  "executive_summary": "",
   "key_risk": "",
-  "primary_risk_title": "",
-  "primary_risk": "",
-  "secondary_risk_title": "",
-  "secondary_risk": "",
-  "mechanism": "",
   "processing_window": "",
   "thermal_behavior": "",
   "flow_characteristics": "",
@@ -96,6 +84,11 @@ Return ONLY JSON.
   "surface_quality": "",
   "structural_consistency": "",
   "application_implication": "",
+  "primary_risk_title": "",
+  "primary_risk": "",
+  "secondary_risk_title": "",
+  "secondary_risk": "",
+  "mechanism": "",
   "stability": "Moderate",
   "consistency": "Variable",
   "stability_note": "",
@@ -103,13 +96,19 @@ Return ONLY JSON.
   "next_step": ""
 }
 
+Make it:
+- deep
+- realistic
+- engineering-level
+- not generic
+
 Application: ${input.application}
 Material: ${input.material}
 Target: ${input.bio_material}
 `;
 
   const res = await openai.chat.completions.create({
-    model: "gpt-4.1-mini",
+    model: "gpt-4.1",
     messages: [
       { role: "system", content: "Return JSON only" },
       { role: "user", content: prompt }
@@ -117,28 +116,12 @@ Target: ${input.bio_material}
     temperature: 0.3
   });
 
-  try {
-    const cleaned = res.choices[0].message.content
-      .replace(/```json/g, "")
-      .replace(/```/g, "")
-      .trim();
+  const cleaned = res.choices[0].message.content
+    .replace(/```json/g, "")
+    .replace(/```/g, "")
+    .trim();
 
-    return JSON.parse(cleaned);
-
-  } catch (e) {
-    console.error("AI ERROR", e);
-
-    return {
-      executive_summary_overview: "Analysis failed",
-      executive_summary_findings: "",
-      executive_summary_conclusion: "",
-      key_risk: "Unknown",
-      primary_risk: "",
-      secondary_risk: "",
-      mechanism: "",
-      next_step: "Manual review required"
-    };
-  }
+  return JSON.parse(cleaned);
 }
 
 // =========================
@@ -150,76 +133,85 @@ app.post("/generate-report", async (req, res) => {
 
     const input = req.body;
 
-    const scoreLeft = 40;
-    const scoreRight = 95;
+    // =========================
+    // 判定ロジック
+    // =========================
+    const text = `${input.processing} ${input.material} ${input.bio_material}`.toLowerCase();
 
-    const aiData = await generateAIReport(input, scoreLeft, scoreRight);
+    let feasibility = "MODERATE";
+    let score = 75;
 
+    if (text.includes("injection") && text.includes("pp")) {
+      feasibility = "LOW";
+      score = 40;
+    }
+
+    // =========================
+    // AI生成
+    // =========================
+    const ai = await generateAIReport(input);
+
+    // =========================
+    // HTML
+    // =========================
     const html = injectHtml(htmlTemplate, {
-  client_name: input.client_name || "",
-  client_company: input.client_company || "",
-  client_country: input.client_country || "",
 
-  application: input.application || "",
-  current_material: input.material || "",
-  bio_material: input.bio_material || "",
-  processing_method: input.processing || "",
+      // 基本
+      application: input.processing || "",
+      current_material: input.material || "",
+      bio_material: input.bio_material || "",
 
-  base_image: "https://ilnautico.github.io/visual-base.png",
-  dynamic_overlay: generateOverlay(scoreLeft, scoreRight),
+      material_transition: `${input.material} → ${input.bio_material}`,
+      assessment_type: "Technical Hypothesis",
 
-  report_date: new Date().toISOString().split("T")[0],
-  report_id: "FV-" + Date.now(),
-  compatibility_level: "Moderate",
+      report_date: new Date().toISOString().split("T")[0],
 
-  // 👇ここからAI手動展開（重要）
-  executive_summary_overview: aiData.executive_summary_overview,
-  executive_summary_findings: aiData.executive_summary_findings,
-  executive_summary_conclusion: aiData.executive_summary_conclusion,
+      compatibility_level: feasibility,
 
-  key_risk: aiData.key_risk,
+      // AI
+      executive_summary: ai.executive_summary,
+      key_risk: ai.key_risk,
 
-  primary_risk_title: aiData.primary_risk_title,
-  primary_risk: aiData.primary_risk,
+      processing_window: ai.processing_window,
+      thermal_behavior: ai.thermal_behavior,
+      flow_characteristics: ai.flow_characteristics,
 
-  secondary_risk_title: aiData.secondary_risk_title,
-  secondary_risk: aiData.secondary_risk,
+      mechanical_behavior: ai.mechanical_behavior,
+      surface_quality: ai.surface_quality,
+      structural_consistency: ai.structural_consistency,
 
-  mechanism: aiData.mechanism,
+      application_implication: ai.application_implication,
 
-  processing_window: aiData.processing_window,
-  thermal_behavior: aiData.thermal_behavior,
-  flow_characteristics: aiData.flow_characteristics,
+      primary_risk_title: ai.primary_risk_title,
+      primary_risk: ai.primary_risk,
+      secondary_risk_title: ai.secondary_risk_title,
+      secondary_risk: ai.secondary_risk,
+      mechanism: ai.mechanism,
 
-  mechanical_behavior: aiData.mechanical_behavior,
-  surface_quality: aiData.surface_quality,
-  structural_consistency: aiData.structural_consistency,
+      stability: ai.stability,
+      consistency: ai.consistency,
+      stability_note: ai.stability_note,
+      consistency_note: ai.consistency_note,
 
-  application_implication: aiData.application_implication,
+      next_step: ai.next_step,
 
-  stability: aiData.stability,
-  consistency: aiData.consistency,
+      // ビジュアル
+      pha_score: score,
+      base_image: "https://ilnautico.github.io/visual-base.png",
+      dynamic_overlay: generateOverlay(score)
 
-  stability_note: aiData.stability_note,
-  consistency_note: aiData.consistency_note,
-
-  next_step: aiData.next_step
     });
 
+    // =========================
+    // PDF
+    // =========================
     const browser = await puppeteer.launch({
-      args: [
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--disable-dev-shm-usage",
-        "--disable-gpu"
-      ]
+      args: ["--no-sandbox", "--disable-setuid-sandbox"]
     });
 
     const page = await browser.newPage();
 
-    await page.setContent(html, {
-      waitUntil: "networkidle0"
-    });
+    await page.setContent(html, { waitUntil: "networkidle0" });
 
     const pdf = await page.pdf({
       format: "A4",
@@ -247,9 +239,8 @@ app.get("/latest-pdf", (req, res) => {
 });
 
 // =========================
-const PORT = process.env.PORT || 8080;
-app.listen(PORT, () => {
-  console.log("🚀 Server running on", PORT);
+app.listen(8080, () => {
+  console.log("🚀 running");
 });
 const html_3man =`;
 <!DOCTYPE html>
