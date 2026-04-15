@@ -36,46 +36,41 @@ const htmlTemplate = fs.readFileSync(
 function generateOverlay(scoreLeft, scoreRight) {
   const angle = -90 + (scoreRight / 100) * 180;
 
-  const amp = Math.max(4, Math.min(28, scoreLeft / 3));
-
   return `
   <div style="
     position:absolute;
-    right:2%;
-    bottom:6%;
+    right:40px;
+    bottom:30px;
     width:180px;
-    text-align:right;
   ">
 
-    <!-- 数値（絶対切れない） -->
+    <!-- 数字（元の位置） -->
     <div style="
       font-size:14px;
       margin-bottom:6px;
       font-weight:600;
       color:#333;
-      width:100%;
+      text-align:right;
     ">
-      Score: ${String(scoreRight).padStart(2, "0")}
+      Score: ${scoreRight}
     </div>
 
-    <!-- 波 -->
-    <div style="width:100%; overflow:hidden; margin-bottom:6px;">
-      <svg width="100%" height="40" viewBox="0 0 140 40">
-        <path d="
-          M0 20
-          Q20 ${20 - amp}, 40 20
-          T80 20
-          T120 20
-        "
-        fill="none"
-        stroke="#3b82a0"
-        stroke-width="2"
-        />
-      </svg>
-    </div>
+    <!-- 波（完全固定） -->
+    <svg width="140" height="40" viewBox="0 0 140 40" style="margin-bottom:6px;">
+      <path d="
+        M0 22
+        C15 5, 35 5, 50 22
+        C65 39, 85 39, 100 22
+        C115 5, 135 5, 140 22
+      "
+      fill="none"
+      stroke="#3b82a0"
+      stroke-width="2"
+      />
+    </svg>
 
     <!-- メーター -->
-    <svg viewBox="0 0 200 120" width="100%" height="90">
+    <svg viewBox="0 0 200 120" width="140" height="90">
       <defs>
         <linearGradient id="g">
           <stop offset="0%" stop-color="#22c55e"/>
