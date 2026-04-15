@@ -34,42 +34,45 @@ const htmlTemplate = fs.readFileSync(
 // Overlay（数字＋波＋メーター）
 // =========================
 function generateOverlay(scoreLeft, scoreRight) {
-  const angle = -90 + (scoreRight / 100) * 180;
+
+  // 🔥 元の針ロジック（ここ重要）
+  const angle = -90 + (scoreRight * 1.8);
 
   return `
   <div style="
     position:absolute;
-    right:40px;
-    bottom:30px;
-    width:180px;
+    right:60px;
+    bottom:40px;
+    width:160px;
   ">
 
-    <!-- 数字（元の位置） -->
+    <!-- 数字（完全復元） -->
     <div style="
-      font-size:14px;
-      margin-bottom:6px;
+      font-size:16px;
       font-weight:600;
       color:#333;
       text-align:right;
+      margin-bottom:8px;
     ">
-      Score: ${scoreRight}
+      Score: ${String(scoreRight).padStart(2, "0")}
     </div>
 
-    <!-- 波（完全固定） -->
-    <svg width="140" height="40" viewBox="0 0 140 40" style="margin-bottom:6px;">
+    <!-- 波（元SVGそのまま） -->
+    <svg width="140" height="40" viewBox="0 0 140 40" style="margin-bottom:8px;">
       <path d="
-        M0 22
-        C15 5, 35 5, 50 22
-        C65 39, 85 39, 100 22
-        C115 5, 135 5, 140 22
+        M10 25
+        C25 5, 45 5, 60 25
+        C75 45, 95 45, 110 25
+        C125 5, 135 5, 135 25
       "
       fill="none"
-      stroke="#3b82a0"
-      stroke-width="2"
+      stroke="#4f7c8a"
+      stroke-width="2.5"
+      stroke-linecap="round"
       />
     </svg>
 
-    <!-- メーター -->
+    <!-- メーター（完全一致） -->
     <svg viewBox="0 0 200 120" width="140" height="90">
       <defs>
         <linearGradient id="g">
@@ -82,7 +85,7 @@ function generateOverlay(scoreLeft, scoreRight) {
       <path d="M20 100 A80 80 0 0 1 180 100 L100 100 Z" fill="url(#g)" />
 
       <g transform="rotate(${angle} 100 100)">
-        <line x1="100" y1="100" x2="100" y2="25" stroke="#111" stroke-width="3"/>
+        <line x1="100" y1="100" x2="100" y2="30" stroke="#111" stroke-width="3"/>
       </g>
     </svg>
 
