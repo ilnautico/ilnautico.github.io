@@ -68,9 +68,8 @@ function generateOverlay(scoreLeft, scoreRight) {
 /* 青波 */
 <svg style="
   position:absolute;
-  left:50%;
-  transform:translateX(-80px);
-  bottom:110px;
+  left:360px;
+  bottom:105px;
 " width="90" height="35" viewBox="0 0 90 35">
   <path d="
     M0 18
@@ -83,15 +82,13 @@ function generateOverlay(scoreLeft, scoreRight) {
   stroke-linecap="round"
   opacity="0.95"
   filter="drop-shadow(0 0 6px rgba(79,124,138,0.35))"
-  />
+/>
 </svg>
 
-/* 赤波（中央に戻す） */
 <svg style="
   position:absolute;
-  left:50%;
-  transform:translateX(120px);
-  bottom:95px;
+  left:360px;
+  bottom:105px;
 " width="90" height="35" viewBox="0 0 90 35">
   <path d="
     M0 18
@@ -99,12 +96,12 @@ function generateOverlay(scoreLeft, scoreRight) {
     C60 2, 75 34, 90 18
   "
   fill="none"
-  stroke="#d62c2c"
+  stroke="#4f7c8a"
   stroke-width="3"
   stroke-linecap="round"
   opacity="0.95"
-  filter="drop-shadow(0 0 6px rgba(214,44,44,0.35))"
-  />
+  filter="drop-shadow(0 0 6px rgba(79,124,138,0.35))"
+/>
 </svg>
 
     <!-- メーター（完全右下FIX） -->
