@@ -67,8 +67,8 @@ function generateOverlay(scoreLeft, scoreRight) {
 <svg style="
   position:absolute;
   left:50%;
-  bottom:86px;
-  transform:translateX(-155px);
+  bottom:98px;
+  transform:translateX(-110px);
 " width="95" height="30" viewBox="0 0 95 30">
 
   <!-- 影 -->
@@ -78,8 +78,8 @@ function generateOverlay(scoreLeft, scoreRight) {
     C55 7, 65 23, 80 15
   "
   fill="none"
-  stroke="rgba(0,0,0,0.08)"
-  stroke-width="5"
+  stroke="rgba(0,0,0,0.06)"
+  stroke-width="4"
   stroke-linecap="round"
   />
 
@@ -90,9 +90,21 @@ function generateOverlay(scoreLeft, scoreRight) {
     C55 7, 65 23, 80 15
   "
   fill="none"
-  stroke="#4f7c8a"
+  stroke="rgba(79,124,138,0.85)"
   stroke-width="3"
   stroke-linecap="round"
+  />
+
+  <!-- ハイライト -->
+  <path d="
+    M0 15
+    C15 7, 25 23, 40 15
+    C55 7, 65 23, 80 15
+  "
+  fill="none"
+  stroke="rgba(255,255,255,0.35)"
+  stroke-width="1.2"
+  transform="translate(0,-1.2)"
   />
 
 </svg>
@@ -101,7 +113,7 @@ function generateOverlay(scoreLeft, scoreRight) {
 <svg style="
   position:absolute;
   right:150px;
-  bottom:95px;
+  bottom:88px;   /* ← 中心より少し下 */
 " width="95" height="30" viewBox="0 0 95 30">
 
   <!-- 影 -->
@@ -111,8 +123,8 @@ function generateOverlay(scoreLeft, scoreRight) {
     C55 7, 65 23, 80 15
   "
   fill="none"
-  stroke="rgba(0,0,0,0.08)"
-  stroke-width="5"
+  stroke="rgba(0,0,0,0.06)"
+  stroke-width="4"
   stroke-linecap="round"
   />
 
@@ -123,9 +135,21 @@ function generateOverlay(scoreLeft, scoreRight) {
     C55 7, 65 23, 80 15
   "
   fill="none"
-  stroke="#d62c2c"
+  stroke="rgba(214,44,44,0.9)"
   stroke-width="3"
   stroke-linecap="round"
+  />
+
+  <!-- ハイライト -->
+  <path d="
+    M0 15
+    C15 7, 25 23, 40 15
+    C55 7, 65 23, 80 15
+  "
+  fill="none"
+  stroke="rgba(255,255,255,0.25)"
+  stroke-width="1.2"
+  transform="translate(0,-1.2)"
   />
 
 </svg>
