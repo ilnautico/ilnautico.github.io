@@ -67,11 +67,10 @@ function generateOverlay(scoreLeft, scoreRight) {
 <svg style="
   position:absolute;
   left:50%;
-  bottom:78px;
-  transform:translateX(-140px);
+  bottom:92px;   /* ← 上げた（78 → 92） */
+  transform:translateX(-115px); /* ← 右へ寄せた（-140 → -115） */
 " width="90" height="28" viewBox="0 0 90 28">
 
-  <!-- 本体 -->
   <path d="
     M0 14
     C15 6, 25 22, 40 14
@@ -82,8 +81,9 @@ function generateOverlay(scoreLeft, scoreRight) {
   stroke-width="3"
   stroke-linecap="round"
   stroke-linejoin="round"
-  opacity="0.95"
   />
+
+</svg>
 
   <!-- ハイライト -->
   <path d="
@@ -102,11 +102,10 @@ function generateOverlay(scoreLeft, scoreRight) {
 <!-- 赤い波（右：完全復元＋統一感） -->
 <svg style="
   position:absolute;
-  right:120px;
-  bottom:72px;
+  right:130px;   /* ← 少し右へ */
+  bottom:82px;   /* ← 少し上げ */
 " width="90" height="28" viewBox="0 0 90 28">
 
-  <!-- 本体 -->
   <path d="
     M0 14
     C15 6, 25 22, 40 14
@@ -117,8 +116,9 @@ function generateOverlay(scoreLeft, scoreRight) {
   stroke-width="3"
   stroke-linecap="round"
   stroke-linejoin="round"
-  opacity="0.95"
   />
+
+</svg>
 
   <!-- ハイライト -->
   <path d="
@@ -136,10 +136,10 @@ function generateOverlay(scoreLeft, scoreRight) {
 
     <!-- メーター（完全復元） -->
     <svg style="
-      position:absolute;
-      right:80px;
-      bottom:20px;
-    " viewBox="0 0 200 120" width="160" height="100">
+  position:absolute;
+  right:110px;   /* ← 左へ（80 → 110） */
+  bottom:10px;   /* ← 下げる（20 → 10） */
+" viewBox="0 0 200 120" width="160" height="100">
 
       <defs>
         <linearGradient id="g">
