@@ -65,8 +65,8 @@ function generateOverlay(scoreLeft, scoreRight) {
     <!-- 🔵 青波（位置完全FIX＋透け感復元） -->
     <svg style="
       position:absolute;
-      left:320px;
-bottom:110px;
+      left:360px;
+      bottom:105px;
     " width="90" height="35" viewBox="0 0 90 35">
       <path d="
         M0 18
@@ -85,8 +85,8 @@ bottom:110px;
     <!-- 🔴 赤波（中央戻しFIX） -->
     <svg style="
       position:absolute;
-      left:520px;
-bottom:95px;
+      left:560px;
+      bottom:90px;
     " width="90" height="35" viewBox="0 0 90 35">
       <path d="
         M0 18
@@ -105,8 +105,8 @@ bottom:95px;
     <!-- 🎯 メーター（右下・完全固定） -->
     <svg style="
       position:absolute;
-      left:600px;
-bottom:20px;
+      right:80px;
+      bottom:30px;
     " viewBox="0 0 200 120" width="140" height="90">
 
       <defs>
@@ -138,7 +138,6 @@ bottom:20px;
   </div>
   `;
 }
-  
  
 // =========================
 // HTML inject
