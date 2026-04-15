@@ -37,9 +37,6 @@ function generateOverlay(scoreLeft, scoreRight) {
 
   const angle = -90 + (scoreRight * 1.8);
 
-  const ampLeft = Math.max(6, Math.min(18, scoreLeft / 4));
-  const ampRight = Math.max(6, Math.min(18, scoreRight / 4));
-
   return `
   <div style="position:absolute; left:0; top:0; width:100%; height:100%;">
 
@@ -66,107 +63,66 @@ function generateOverlay(scoreLeft, scoreRight) {
       <div style="font-size:16px; color:#d62c2c;">${scoreRight}</div>
     </div>
 
-    <!-- ===== 青波（固定位置）===== -->
+    <!-- 青波（完全中央補正） -->
     <svg style="
       position:absolute;
       left:50%;
-      bottom:100px;
-      transform:translateX(-80px);
-    " width="90" height="30" viewBox="0 0 90 30">
-
+      transform:translateX(-60px);
+      bottom:85px;
+    " width="90" height="35" viewBox="0 0 90 35">
       <path d="
-        M0 15
-        C15 ${15 - ampLeft}, 25 ${15 + ampLeft}, 40 15
-        C55 ${15 - ampLeft}, 65 ${15 + ampLeft}, 80 15
+        M0 18
+        C15 2, 30 34, 45 18
+        C60 2, 75 34, 90 18
       "
       fill="none"
-      stroke="rgba(79,124,138,0.85)"
+      stroke="#4f7c8a"
       stroke-width="3"
       stroke-linecap="round"
+      opacity="0.9"
+      filter="drop-shadow(0 0 4px rgba(79,124,138,0.25))"
       />
-
-      <!-- ハイライト -->
-      <path d="
-        M0 15
-        C15 ${15 - ampLeft}, 25 ${15 + ampLeft}, 40 15
-        C55 ${15 - ampLeft}, 65 ${15 + ampLeft}, 80 15
-      "
-      fill="none"
-      stroke="rgba(255,255,255,0.25)"
-      stroke-width="1"
-      transform="translate(0,-1)"
-      />
-
     </svg>
 
-    <!-- ===== 赤波（固定位置）===== -->
+    <!-- 赤波（位置微調整） -->
     <svg style="
       position:absolute;
-      right:150px;
-      bottom:95px;
-    " width="90" height="30" viewBox="0 0 90 30">
-
+      right:110px;
+      bottom:65px;
+    " width="90" height="35" viewBox="0 0 90 35">
       <path d="
-        M0 15
-        C15 ${15 - ampRight}, 25 ${15 + ampRight}, 40 15
-        C55 ${15 - ampRight}, 65 ${15 + ampRight}, 80 15
+        M0 18
+        C15 2, 30 34, 45 18
+        C60 2, 75 34, 90 18
       "
       fill="none"
-      stroke="rgba(214,44,44,0.85)"
+      stroke="#d62c2c"
       stroke-width="3"
       stroke-linecap="round"
+      opacity="0.9"
+      filter="drop-shadow(0 0 4px rgba(214,44,44,0.25))"
       />
-
-      <!-- ハイライト -->
-      <path d="
-        M0 15
-        C15 ${15 - ampRight}, 25 ${15 + ampRight}, 40 15
-        C55 ${15 - ampRight}, 65 ${15 + ampRight}, 80 15
-      "
-      fill="none"
-      stroke="rgba(255,255,255,0.25)"
-      stroke-width="1"
-      transform="translate(0,-1)"
-      />
-
     </svg>
 
-    <!-- ===== メーター（最終位置 FIX）===== -->
-    <<!-- ===== メーター（最終FIX）===== -->
-<svg style="
-  position:absolute;
-  right:200px;
-  bottom:30px;
-" viewBox="0 0 200 120" width="140" height="90">
+    <!-- メーター（完全右下FIX） -->
+    <svg style="
+      position:absolute;
+      right:60px;
+      bottom:10px;
+    " viewBox="0 0 200 120" width="140" height="90">
 
-  <defs>
-    <linearGradient id="g">
-      <stop offset="0%" stop-color="#22c55e"/>
-      <stop offset="50%" stop-color="#fde047"/>
-      <stop offset="100%" stop-color="#ef4444"/>
-    </linearGradient>
-  </defs>
+      <defs>
+        <linearGradient id="g">
+          <stop offset="0%" stop-color="#22c55e"/>
+          <stop offset="50%" stop-color="#fde047"/>
+          <stop offset="100%" stop-color="#ef4444"/>
+        </linearGradient>
+      </defs>
 
-  <path d="M20 100 A80 80 0 0 1 180 100 L100 100 Z"
-    fill="url(#g)"
-  />
-
-  <g transform="rotate(${angle} 100 100)">
-    <line x1="100" y1="100" x2="100" y2="25"
-      stroke="#111"
-      stroke-width="3"
-      stroke-linecap="round"/>
-  </g>
-
-  <circle cx="100" cy="100" r="4" fill="#111"/>
-
-</svg>
-      <!-- 元デザイン（塗り） -->
       <path d="M20 100 A80 80 0 0 1 180 100 L100 100 Z"
         fill="url(#g)"
       />
 
-      <!-- 針 -->
       <g transform="rotate(${angle} 100 100)">
         <line x1="100" y1="100" x2="100" y2="25"
           stroke="#111"
@@ -174,7 +130,6 @@ function generateOverlay(scoreLeft, scoreRight) {
           stroke-linecap="round"/>
       </g>
 
-      <!-- 中心 -->
       <circle cx="100" cy="100" r="4" fill="#111"/>
 
     </svg>
