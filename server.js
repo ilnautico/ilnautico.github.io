@@ -66,13 +66,13 @@ function generateOverlay(scoreLeft, scoreRight) {
       <div style="font-size:16px; color:#d62c2c;">${scoreRight}</div>
     </div>
 
-    <!-- ===== 青波（位置修正＋アニメ）===== -->
+    <!-- ===== 青波（位置完全修正）===== -->
     <svg style="
       position:absolute;
       left:50%;
-      bottom:98px;
-      transform:translateX(-60px);
-    " width="95" height="30" viewBox="0 0 95 30">
+      bottom:95px;
+      transform:translateX(-70px);
+    " width="90" height="30" viewBox="0 0 90 30">
 
       <path d="
         M0 15
@@ -80,16 +80,10 @@ function generateOverlay(scoreLeft, scoreRight) {
         C55 ${15 - ampLeft}, 65 ${15 + ampLeft}, 80 15
       "
       fill="none"
-      stroke="rgba(79,124,138,0.9)"
+      stroke="rgba(79,124,138,0.85)"
       stroke-width="3"
       stroke-linecap="round"
-      stroke-dasharray="4 4">
-
-        <animate attributeName="stroke-dashoffset"
-          from="0" to="20"
-          dur="2s"
-          repeatCount="indefinite"/>
-      </path>
+      />
 
       <!-- ハイライト -->
       <path d="
@@ -98,19 +92,19 @@ function generateOverlay(scoreLeft, scoreRight) {
         C55 ${15 - ampLeft}, 65 ${15 + ampLeft}, 80 15
       "
       fill="none"
-      stroke="rgba(255,255,255,0.3)"
-      stroke-width="1.2"
-      transform="translate(0,-1.2)"
+      stroke="rgba(255,255,255,0.25)"
+      stroke-width="1"
+      transform="translate(0,-1)"
       />
 
     </svg>
 
-    <!-- ===== 赤波（位置微調整＋アニメ）===== -->
+    <!-- ===== 赤波（位置微調整）===== -->
     <svg style="
       position:absolute;
       right:150px;
-      bottom:85px;
-    " width="95" height="30" viewBox="0 0 95 30">
+      bottom:82px;
+    " width="90" height="30" viewBox="0 0 90 30">
 
       <path d="
         M0 15
@@ -118,16 +112,10 @@ function generateOverlay(scoreLeft, scoreRight) {
         C55 ${15 - ampRight}, 65 ${15 + ampRight}, 80 15
       "
       fill="none"
-      stroke="rgba(214,44,44,0.9)"
+      stroke="rgba(214,44,44,0.85)"
       stroke-width="3"
       stroke-linecap="round"
-      stroke-dasharray="4 4">
-
-        <animate attributeName="stroke-dashoffset"
-          from="0" to="20"
-          dur="2.4s"
-          repeatCount="indefinite"/>
-      </path>
+      />
 
       <!-- ハイライト -->
       <path d="
@@ -137,17 +125,17 @@ function generateOverlay(scoreLeft, scoreRight) {
       "
       fill="none"
       stroke="rgba(255,255,255,0.25)"
-      stroke-width="1.2"
-      transform="translate(0,-1.2)"
+      stroke-width="1"
+      transform="translate(0,-1)"
       />
 
     </svg>
 
-    <!-- ===== メーター（位置調整済）===== -->
+    <!-- ===== メーター（完全に元に戻した）===== -->
     <svg style="
       position:absolute;
-      right:95px;
-      bottom:18px;
+      right:90px;
+      bottom:20px;
     " viewBox="0 0 200 120" width="160" height="100">
 
       <defs>
@@ -158,20 +146,20 @@ function generateOverlay(scoreLeft, scoreRight) {
         </linearGradient>
       </defs>
 
-      <path d="M20 100 A80 80 0 0 1 180 100"
-        fill="none"
-        stroke="url(#g)"
-        stroke-width="18"
-        stroke-linecap="round"
+      <!-- 元の塗りつぶし型 -->
+      <path d="M20 100 A80 80 0 0 1 180 100 L100 100 Z"
+        fill="url(#g)"
       />
 
+      <!-- 針 -->
       <g transform="rotate(${angle} 100 100)">
         <line x1="100" y1="100" x2="100" y2="25"
           stroke="#111"
-          stroke-width="2"
+          stroke-width="3"
           stroke-linecap="round"/>
       </g>
 
+      <!-- 中心 -->
       <circle cx="100" cy="100" r="4" fill="#111"/>
 
     </svg>
