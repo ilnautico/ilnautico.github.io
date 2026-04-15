@@ -23,7 +23,7 @@ const openai = new OpenAI({
 });
 
 // =========================
-// HTML TEMPLATE（←1個だけ）
+// HTML TEMPLATE（1つだけ）
 // =========================
 const htmlTemplate = fs.readFileSync(
   path.join(__dirname, "template.html"),
@@ -31,36 +31,59 @@ const htmlTemplate = fs.readFileSync(
 );
 
 // =========================
+// Overlay（メーター）
+// =========================
+function generateOverlay(scoreLeft, scoreRight) {
+  const angle = -90 + (scoreRight / 100) * 180;
+
+  return `
+  <div style="position:absolute;right:6%;bottom:6%;">
+    <svg viewBox="0 0 200 120" width="140" height="90">
+      <defs>
+        <linearGradient id="g">
+          <stop offset="0%" stop-color="#22c55e"/>
+          <stop offset="50%" stop-color="#fde047"/>
+          <stop offset="100%" stop-color="#ef4444"/>
+        </linearGradient>
+      </defs>
+      <path d="M20 100 A80 80 0 0 1 180 100 L100 100 Z" fill="url(#g)" />
+      <g transform="rotate(${angle} 100 100)">
+        <line x1="100" y1="100" x2="100" y2="25" stroke="#111" stroke-width="3"/>
+      </g>
+    </svg>
+  </div>
+  `;
+}
+
+// =========================
 // HTML inject
 // =========================
 function injectHtml(template, data) {
-  let htmlStr = template;
+  let html = template;
   for (const key in data) {
-    htmlStr = htmlStr.replace(
+    html = html.replace(
       new RegExp(`{{\\s*${key}\\s*}}`, "g"),
       data[key] || ""
     );
   }
-  return htmlStr;
+  return html;
 }
 
 // =========================
-// AI生成（完全修正版）
+// AI生成（完全一致版）
 // =========================
 async function generateAIReport(input, scoreLeft, scoreRight) {
 
   const prompt = `
+You are a senior polymer consultant.
+
 Return ONLY JSON.
 
-Application: ${input.application}
-Material: ${input.material}
-Target: ${input.bio_material}
-
-Stability: ${scoreLeft}
-Risk: ${scoreRight}
-
 {
-  "executive_summary": "",
+  "executive_summary_overview": "",
+  "executive_summary_findings": "",
+  "executive_summary_conclusion": "",
+  "key_risk": "",
   "primary_risk_title": "",
   "primary_risk": "",
   "secondary_risk_title": "",
@@ -73,23 +96,29 @@ Risk: ${scoreRight}
   "surface_quality": "",
   "structural_consistency": "",
   "application_implication": "",
+  "stability": "Moderate",
+  "consistency": "Variable",
+  "stability_note": "",
+  "consistency_note": "",
   "next_step": ""
 }
+
+Application: ${input.application}
+Material: ${input.material}
+Target: ${input.bio_material}
 `;
 
   const res = await openai.chat.completions.create({
     model: "gpt-4.1-mini",
     messages: [
-      { role: "system", content: "Return JSON only." },
+      { role: "system", content: "Return JSON only" },
       { role: "user", content: prompt }
     ],
-    temperature: 0.4
+    temperature: 0.3
   });
 
-  const raw = res.choices[0].message.content;
-
   try {
-    const cleaned = raw
+    const cleaned = res.choices[0].message.content
       .replace(/```json/g, "")
       .replace(/```/g, "")
       .trim();
@@ -97,12 +126,16 @@ Risk: ${scoreRight}
     return JSON.parse(cleaned);
 
   } catch (e) {
-    console.error("JSON parse error:", raw);
+    console.error("AI ERROR", e);
 
     return {
-      executive_summary: "Analysis failed",
-      primary_risk_title: "Unknown",
-      primary_risk: "Parsing failed",
+      executive_summary_overview: "Analysis failed",
+      executive_summary_findings: "",
+      executive_summary_conclusion: "",
+      key_risk: "Unknown",
+      primary_risk: "",
+      secondary_risk: "",
+      mechanism: "",
       next_step: "Manual review required"
     };
   }
@@ -132,6 +165,8 @@ app.post("/generate-report", async (req, res) => {
       current_material: input.material || "",
       bio_material: input.bio_material || "",
       processing_method: input.processing || "",
+
+      dynamic_overlay: generateOverlay(scoreLeft, scoreRight),
 
       report_date: new Date().toISOString().split("T")[0],
       report_id: "FV-" + Date.now(),
