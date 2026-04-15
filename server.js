@@ -36,26 +36,31 @@ const htmlTemplate = fs.readFileSync(
 function generateOverlay(scoreLeft, scoreRight) {
   const angle = -90 + (scoreRight / 100) * 180;
 
-  // 波の振幅（0〜30px程度に収める）
   const amp = Math.max(4, Math.min(28, scoreLeft / 3));
 
   return `
-  <div style="position:absolute;right:4%;bottom:6%;text-align:right;">
+  <div style="
+    position:absolute;
+    right:2%;
+    bottom:6%;
+    width:180px;
+    text-align:right;
+  ">
 
-    <!-- 数値（2桁確実表示） -->
+    <!-- 数値（絶対切れない） -->
     <div style="
       font-size:14px;
       margin-bottom:6px;
       font-weight:600;
       color:#333;
-      min-width:80px;
+      width:100%;
     ">
       Score: ${String(scoreRight).padStart(2, "0")}
     </div>
 
-    <!-- 波（スコア連動） -->
-    <div style="margin-bottom:6px;">
-      <svg width="140" height="40" viewBox="0 0 140 40">
+    <!-- 波 -->
+    <div style="width:100%; overflow:hidden; margin-bottom:6px;">
+      <svg width="100%" height="40" viewBox="0 0 140 40">
         <path d="
           M0 20
           Q20 ${20 - amp}, 40 20
@@ -70,7 +75,7 @@ function generateOverlay(scoreLeft, scoreRight) {
     </div>
 
     <!-- メーター -->
-    <svg viewBox="0 0 200 120" width="140" height="90">
+    <svg viewBox="0 0 200 120" width="100%" height="90">
       <defs>
         <linearGradient id="g">
           <stop offset="0%" stop-color="#22c55e"/>
@@ -89,6 +94,7 @@ function generateOverlay(scoreLeft, scoreRight) {
   </div>
   `;
 }
+ 
 
 // =========================
 // HTML inject
