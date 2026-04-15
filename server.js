@@ -31,17 +31,21 @@ const htmlTemplate = fs.readFileSync(
 );
 
 // =========================
-// メーター（完全復旧版）
+// メーター（完全版）
 // =========================
-function generateOverlay(score) {
-  const angle = -90 + (score / 100) * 180;
+function generateOverlay(scoreLeft, scoreRight) {
+  const angle = -90 + (scoreRight / 100) * 180;
 
   return `
-  <div style="position:absolute;right:6%;bottom:6%;">
-    <svg viewBox="0 0 200 120" width="140" height="90">
+  <div style="position:absolute;right:6%;bottom:6%;text-align:right;">
 
+    <div style="font-size:12px;margin-bottom:4px;">
+      Score: ${scoreRight}
+    </div>
+
+    <svg viewBox="0 0 200 120" width="140" height="90">
       <defs>
-        <linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="0%">
+        <linearGradient id="g">
           <stop offset="0%" stop-color="#22c55e"/>
           <stop offset="50%" stop-color="#fde047"/>
           <stop offset="100%" stop-color="#ef4444"/>
@@ -53,7 +57,6 @@ function generateOverlay(score) {
       <g transform="rotate(${angle} 100 100)">
         <line x1="100" y1="100" x2="100" y2="25" stroke="#111" stroke-width="3"/>
       </g>
-
     </svg>
   </div>
   `;
@@ -67,23 +70,26 @@ function injectHtml(template, data) {
   for (const key in data) {
     html = html.replace(
       new RegExp(`{{\\s*${key}\\s*}}`, "g"),
-      data[key] || ""
+      data[key] ?? ""
     );
   }
   return html;
 }
 
 // =========================
-// AI生成（強化版）
+// AI（フル構造復元）
 // =========================
 async function generateAIReport(input) {
+
   const prompt = `
 You are a senior polymer consultant.
 
 Return ONLY JSON.
 
 {
-  "executive_summary": "",
+  "executive_summary_overview": "",
+  "executive_summary_findings": "",
+  "executive_summary_conclusion": "",
   "key_risk": "",
   "processing_window": "",
   "thermal_behavior": "",
@@ -115,7 +121,7 @@ Target: ${input.bio_material}
       { role: "system", content: "Return JSON only" },
       { role: "user", content: prompt }
     ],
-    temperature: 0.4
+    temperature: 0.5
   });
 
   try {
@@ -125,9 +131,13 @@ Target: ${input.bio_material}
       .trim();
 
     return JSON.parse(cleaned);
-  } catch {
+
+  } catch (e) {
+    console.error("AI ERROR", e);
     return {
-      executive_summary: "Analysis fallback",
+      executive_summary_overview: "Analysis fallback",
+      executive_summary_findings: "",
+      executive_summary_conclusion: "",
       key_risk: "Unknown",
       next_step: "Manual validation required"
     };
@@ -135,15 +145,17 @@ Target: ${input.bio_material}
 }
 
 // =========================
-// メインAPI
+// メイン
 // =========================
 app.post("/generate-report", async (req, res) => {
+
   try {
 
     const input = req.body;
 
-    // ✔ メーター用スコア
-    const score = 85;
+    // 🔥 スコア復活（2軸）
+    const scoreLeft = 78;
+    const scoreRight = 92;
 
     const aiData = await generateAIReport(input);
 
@@ -156,7 +168,12 @@ app.post("/generate-report", async (req, res) => {
 
       compatibility_level: "Moderate",
 
-      executive_summary: aiData.executive_summary,
+      // 🔥 Executive Summary 統合
+      executive_summary:
+        (aiData.executive_summary_overview || "") + " " +
+        (aiData.executive_summary_findings || "") + " " +
+        (aiData.executive_summary_conclusion || ""),
+
       key_risk: aiData.key_risk,
 
       processing_window: aiData.processing_window,
@@ -184,10 +201,12 @@ app.post("/generate-report", async (req, res) => {
 
       next_step: aiData.next_step,
 
+      // 🔥 ビジュアル完全復活
       base_image: "https://ilnautico.github.io/visual-base.png",
-      dynamic_overlay: generateOverlay(score),
+      dynamic_overlay: generateOverlay(scoreLeft, scoreRight),
 
-      pha_score: score
+      // 🔥 グラフ
+      pha_score: scoreRight
     });
 
     const browser = await puppeteer.launch({
@@ -237,6 +256,7 @@ const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
   console.log("🚀 Server running on", PORT);
 });
+
 const html_3man =`;
 <!DOCTYPE html>
 <html>
