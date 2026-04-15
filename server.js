@@ -63,46 +63,49 @@ function generateOverlay(scoreLeft, scoreRight) {
       <div style="font-size:16px; color:#d62c2c;">${scoreRight}</div>
     </div>
 
-    <!-- 青波（完全中央補正） -->
-    <svg style="
-      position:absolute;
-      left:50%;
-      transform:translateX(-60px);
-      bottom:85px;
-    " width="90" height="35" viewBox="0 0 90 35">
-      <path d="
-        M0 18
-        C15 2, 30 34, 45 18
-        C60 2, 75 34, 90 18
-      "
-      fill="none"
-      stroke="#4f7c8a"
-      stroke-width="3"
-      stroke-linecap="round"
-      opacity="0.9"
-      filter="drop-shadow(0 0 4px rgba(79,124,138,0.25))"
-      />
-    </svg>
+   // ===== 波（完全FIX）=====
+    
+/* 青波 */
+<svg style="
+  position:absolute;
+  left:50%;
+  transform:translateX(-80px);
+  bottom:110px;
+" width="90" height="35" viewBox="0 0 90 35">
+  <path d="
+    M0 18
+    C15 2, 30 34, 45 18
+    C60 2, 75 34, 90 18
+  "
+  fill="none"
+  stroke="#4f7c8a"
+  stroke-width="3"
+  stroke-linecap="round"
+  opacity="0.95"
+  filter="drop-shadow(0 0 6px rgba(79,124,138,0.35))"
+  />
+</svg>
 
-    <!-- 赤波（位置微調整） -->
-    <svg style="
-      position:absolute;
-      right:110px;
-      bottom:65px;
-    " width="90" height="35" viewBox="0 0 90 35">
-      <path d="
-        M0 18
-        C15 2, 30 34, 45 18
-        C60 2, 75 34, 90 18
-      "
-      fill="none"
-      stroke="#d62c2c"
-      stroke-width="3"
-      stroke-linecap="round"
-      opacity="0.9"
-      filter="drop-shadow(0 0 4px rgba(214,44,44,0.25))"
-      />
-    </svg>
+/* 赤波（中央に戻す） */
+<svg style="
+  position:absolute;
+  left:50%;
+  transform:translateX(120px);
+  bottom:95px;
+" width="90" height="35" viewBox="0 0 90 35">
+  <path d="
+    M0 18
+    C15 2, 30 34, 45 18
+    C60 2, 75 34, 90 18
+  "
+  fill="none"
+  stroke="#d62c2c"
+  stroke-width="3"
+  stroke-linecap="round"
+  opacity="0.95"
+  filter="drop-shadow(0 0 6px rgba(214,44,44,0.35))"
+  />
+</svg>
 
     <!-- メーター（完全右下FIX） -->
     <svg style="
