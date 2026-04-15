@@ -162,7 +162,7 @@ async function generateAIReport(input) {
   const prompt = `
 You are a senior polymer consultant.
 
-Return ONLY JSON.
+Return ONLY JSON.　
 
 {
   "executive_summary_overview": "",
