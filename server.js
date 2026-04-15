@@ -157,22 +157,25 @@ app.post("/generate-report", async (req, res) => {
 
     const html = injectHtml(htmlTemplate, {
 
-      client_name: input.client_name || "",
-      client_company: input.client_company || "",
-      client_country: input.client_country || "",
+  client_name: input.client_name || "",
+  client_company: input.client_company || "",
+  client_country: input.client_country || "",
 
-      application: input.application || "",
-      current_material: input.material || "",
-      bio_material: input.bio_material || "",
-      processing_method: input.processing || "",
+  application: input.application || "",
+  current_material: input.material || "",
+  bio_material: input.bio_material || "",
+  processing_method: input.processing || "",
 
-      dynamic_overlay: generateOverlay(scoreLeft, scoreRight),
+  base_image: "https://ilnautico.github.io/visual-base.png",
+  dynamic_overlay: generateOverlay(scoreLeft, scoreRight),
 
-      report_date: new Date().toISOString().split("T")[0],
-      report_id: "FV-" + Date.now(),
+  report_date: new Date().toISOString().split("T")[0],
+  report_id: "FV-" + Date.now(),
 
-      compatibility_level: "Moderate",
+  compatibility_level: "Moderate",
 
+  ...aiData
+});
       ...aiData
     });
 
