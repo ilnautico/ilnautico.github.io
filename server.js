@@ -31,18 +31,45 @@ const htmlTemplate = fs.readFileSync(
 );
 
 // =========================
-// メーター（完全版）
+// Overlay（数字＋波＋メーター）
 // =========================
 function generateOverlay(scoreLeft, scoreRight) {
   const angle = -90 + (scoreRight / 100) * 180;
 
-  return `
-  <div style="position:absolute;right:6%;bottom:6%;text-align:right;">
+  // 波の振幅（0〜30px程度に収める）
+  const amp = Math.max(4, Math.min(28, scoreLeft / 3));
 
-    <div style="font-size:12px;margin-bottom:4px;">
-      Score: ${scoreRight}
+  return `
+  <div style="position:absolute;right:4%;bottom:6%;text-align:right;">
+
+    <!-- 数値（2桁確実表示） -->
+    <div style="
+      font-size:14px;
+      margin-bottom:6px;
+      font-weight:600;
+      color:#333;
+      min-width:80px;
+    ">
+      Score: ${String(scoreRight).padStart(2, "0")}
     </div>
 
+    <!-- 波（スコア連動） -->
+    <div style="margin-bottom:6px;">
+      <svg width="140" height="40" viewBox="0 0 140 40">
+        <path d="
+          M0 20
+          Q20 ${20 - amp}, 40 20
+          T80 20
+          T120 20
+        "
+        fill="none"
+        stroke="#3b82a0"
+        stroke-width="2"
+        />
+      </svg>
+    </div>
+
+    <!-- メーター -->
     <svg viewBox="0 0 200 120" width="140" height="90">
       <defs>
         <linearGradient id="g">
@@ -58,6 +85,7 @@ function generateOverlay(scoreLeft, scoreRight) {
         <line x1="100" y1="100" x2="100" y2="25" stroke="#111" stroke-width="3"/>
       </g>
     </svg>
+
   </div>
   `;
 }
@@ -77,7 +105,7 @@ function injectHtml(template, data) {
 }
 
 // =========================
-// AI（フル構造復元）
+// AI生成（フル構造）
 // =========================
 async function generateAIReport(input) {
 
@@ -153,7 +181,7 @@ app.post("/generate-report", async (req, res) => {
 
     const input = req.body;
 
-    // 🔥 スコア復活（2軸）
+    // 🔥 スコア（2軸）
     const scoreLeft = 78;
     const scoreRight = 92;
 
@@ -168,7 +196,7 @@ app.post("/generate-report", async (req, res) => {
 
       compatibility_level: "Moderate",
 
-      // 🔥 Executive Summary 統合
+      // Executive Summary（統合）
       executive_summary:
         (aiData.executive_summary_overview || "") + " " +
         (aiData.executive_summary_findings || "") + " " +
@@ -201,11 +229,11 @@ app.post("/generate-report", async (req, res) => {
 
       next_step: aiData.next_step,
 
-      // 🔥 ビジュアル完全復活
+      // ビジュアル
       base_image: "https://ilnautico.github.io/visual-base.png",
       dynamic_overlay: generateOverlay(scoreLeft, scoreRight),
 
-      // 🔥 グラフ
+      // グラフ
       pha_score: scoreRight
     });
 
@@ -256,7 +284,6 @@ const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
   console.log("🚀 Server running on", PORT);
 });
-
 const html_3man =`;
 <!DOCTYPE html>
 <html>
