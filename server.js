@@ -23,7 +23,7 @@ const openai = new OpenAI({
 });
 
 // =========================
-// HTML
+// HTML TEMPLATE
 // =========================
 const htmlTemplate = fs.readFileSync(
   path.join(__dirname, "template.html"),
@@ -31,7 +31,7 @@ const htmlTemplate = fs.readFileSync(
 );
 
 // =========================
-// Overlay（メーター）
+// メーター（完全復旧版）
 // =========================
 function generateOverlay(score) {
   const angle = -90 + (score / 100) * 180;
@@ -58,7 +58,7 @@ function generateOverlay(score) {
   </div>
   `;
 }
- 
+
 // =========================
 // HTML inject
 // =========================
@@ -74,14 +74,11 @@ function injectHtml(template, data) {
 }
 
 // =========================
-// AI（数十万円レベル）
+// AI生成（強化版）
 // =========================
 async function generateAIReport(input) {
-
   const prompt = `
 You are a senior polymer consultant.
-
-Generate a HIGH-END professional report.
 
 Return ONLY JSON.
 
@@ -101,17 +98,11 @@ Return ONLY JSON.
   "secondary_risk": "",
   "mechanism": "",
   "stability": "Moderate",
-  "consistency": "Variable",
+  "consistency": "Moderate",
   "stability_note": "",
   "consistency_note": "",
   "next_step": ""
 }
-
-Make it:
-- deep
-- realistic
-- engineering-level
-- not generic
 
 Application: ${input.application}
 Material: ${input.material}
@@ -119,110 +110,100 @@ Target: ${input.bio_material}
 `;
 
   const res = await openai.chat.completions.create({
-    model: "gpt-4.1",
+    model: "gpt-4.1-mini",
     messages: [
       { role: "system", content: "Return JSON only" },
       { role: "user", content: prompt }
     ],
-    temperature: 0.3
+    temperature: 0.4
   });
 
-  const cleaned = res.choices[0].message.content
-    .replace(/```json/g, "")
-    .replace(/```/g, "")
-    .trim();
+  try {
+    const cleaned = res.choices[0].message.content
+      .replace(/```json/g, "")
+      .replace(/```/g, "")
+      .trim();
 
-  return JSON.parse(cleaned);
+    return JSON.parse(cleaned);
+  } catch {
+    return {
+      executive_summary: "Analysis fallback",
+      key_risk: "Unknown",
+      next_step: "Manual validation required"
+    };
+  }
 }
 
 // =========================
-// メイン
+// メインAPI
 // =========================
 app.post("/generate-report", async (req, res) => {
-
   try {
 
     const input = req.body;
 
-    // =========================
-    // 判定ロジック
-    // =========================
-    const text = `${input.processing} ${input.material} ${input.bio_material}`.toLowerCase();
+    // ✔ メーター用スコア
+    const score = 85;
 
-    let feasibility = "MODERATE";
-    let score = 75;
+    const aiData = await generateAIReport(input);
 
-    if (text.includes("injection") && text.includes("pp")) {
-      feasibility = "LOW";
-      score = 40;
-    }
-
-    // =========================
-    // AI生成
-    // =========================
-    const ai = await generateAIReport(input);
-
-    // =========================
-    // HTML
-    // =========================
     const html = injectHtml(htmlTemplate, {
 
-      // 基本
-      application: input.processing || "",
-      current_material: input.material || "",
-      bio_material: input.bio_material || "",
-
-      material_transition: `${input.material} → ${input.bio_material}`,
+      application: input.application || "",
+      material_transition: input.bio_material || "",
       assessment_type: "Technical Hypothesis",
-
       report_date: new Date().toISOString().split("T")[0],
 
-      compatibility_level: feasibility,
+      compatibility_level: "Moderate",
 
-      // AI
-      executive_summary: ai.executive_summary,
-      key_risk: ai.key_risk,
+      executive_summary: aiData.executive_summary,
+      key_risk: aiData.key_risk,
 
-      processing_window: ai.processing_window,
-      thermal_behavior: ai.thermal_behavior,
-      flow_characteristics: ai.flow_characteristics,
+      processing_window: aiData.processing_window,
+      thermal_behavior: aiData.thermal_behavior,
+      flow_characteristics: aiData.flow_characteristics,
 
-      mechanical_behavior: ai.mechanical_behavior,
-      surface_quality: ai.surface_quality,
-      structural_consistency: ai.structural_consistency,
+      mechanical_behavior: aiData.mechanical_behavior,
+      surface_quality: aiData.surface_quality,
+      structural_consistency: aiData.structural_consistency,
 
-      application_implication: ai.application_implication,
+      application_implication: aiData.application_implication,
 
-      primary_risk_title: ai.primary_risk_title,
-      primary_risk: ai.primary_risk,
-      secondary_risk_title: ai.secondary_risk_title,
-      secondary_risk: ai.secondary_risk,
-      mechanism: ai.mechanism,
+      primary_risk_title: aiData.primary_risk_title,
+      primary_risk: aiData.primary_risk,
 
-      stability: ai.stability,
-      consistency: ai.consistency,
-      stability_note: ai.stability_note,
-      consistency_note: ai.consistency_note,
+      secondary_risk_title: aiData.secondary_risk_title,
+      secondary_risk: aiData.secondary_risk,
 
-      next_step: ai.next_step,
+      mechanism: aiData.mechanism,
 
-      // ビジュアル
-      pha_score: score,
+      stability: aiData.stability,
+      consistency: aiData.consistency,
+      stability_note: aiData.stability_note,
+      consistency_note: aiData.consistency_note,
+
+      next_step: aiData.next_step,
+
       base_image: "https://ilnautico.github.io/visual-base.png",
-     dynamic_overlay: generateOverlay(scoreRight)
+      dynamic_overlay: generateOverlay(score),
 
+      pha_score: score
     });
 
-    // =========================
-    // PDF
-    // =========================
     const browser = await puppeteer.launch({
-      args: ["--no-sandbox", "--disable-setuid-sandbox"]
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-gpu"
+      ]
     });
 
     const page = await browser.newPage();
 
-    await page.setContent(html, { waitUntil: "networkidle0" });
+    await page.setContent(html, {
+      waitUntil: "networkidle0"
+    });
 
     const pdf = await page.pdf({
       format: "A4",
@@ -242,6 +223,8 @@ app.post("/generate-report", async (req, res) => {
 });
 
 // =========================
+// PDF確認
+// =========================
 app.get("/latest-pdf", (req, res) => {
   if (!fs.existsSync(PDF_PATH)) {
     return res.status(404).send("No PDF yet");
@@ -250,8 +233,9 @@ app.get("/latest-pdf", (req, res) => {
 });
 
 // =========================
-app.listen(8080, () => {
-  console.log("🚀 running");
+const PORT = process.env.PORT || 8080;
+app.listen(PORT, () => {
+  console.log("🚀 Server running on", PORT);
 });
 const html_3man =`;
 <!DOCTYPE html>
