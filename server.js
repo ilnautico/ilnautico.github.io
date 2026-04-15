@@ -66,7 +66,7 @@ function generateOverlay(scoreLeft, scoreRight) {
       <div style="font-size:16px; color:#d62c2c;">${scoreRight}</div>
     </div>
 
-    <!-- ===== 青波（完全復元位置）===== -->
+    <!-- ===== 青波（固定位置）===== -->
     <svg style="
       position:absolute;
       left:50%;
@@ -99,7 +99,7 @@ function generateOverlay(scoreLeft, scoreRight) {
 
     </svg>
 
-    <!-- ===== 赤波（完全復元位置）===== -->
+    <!-- ===== 赤波（固定位置）===== -->
     <svg style="
       position:absolute;
       right:150px;
@@ -131,11 +131,11 @@ function generateOverlay(scoreLeft, scoreRight) {
 
     </svg>
 
-    <!-- ===== メーター（完全復元）===== -->
+    <!-- ===== メーター（最終位置 FIX）===== -->
     <svg style="
       position:absolute;
-      right:120px;
-      bottom:45px;
+      right:160px;
+      bottom:55px;
     " viewBox="0 0 200 120" width="140" height="90">
 
       <defs>
@@ -146,7 +146,7 @@ function generateOverlay(scoreLeft, scoreRight) {
         </linearGradient>
       </defs>
 
-      <!-- 塗りつぶし型（元デザイン） -->
+      <!-- 元デザイン（塗り） -->
       <path d="M20 100 A80 80 0 0 1 180 100 L100 100 Z"
         fill="url(#g)"
       />
@@ -167,6 +167,7 @@ function generateOverlay(scoreLeft, scoreRight) {
   </div>
   `;
 }
+  
  
 // =========================
 // HTML inject
