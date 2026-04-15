@@ -37,6 +37,9 @@ function generateOverlay(scoreLeft, scoreRight) {
 
   const angle = -90 + (scoreRight * 1.8);
 
+  const ampLeft = Math.max(6, Math.min(18, scoreLeft / 4));
+  const ampRight = Math.max(6, Math.min(18, scoreRight / 4));
+
   return `
   <div style="position:absolute; left:0; top:0; width:100%; height:100%;">
 
@@ -63,103 +66,89 @@ function generateOverlay(scoreLeft, scoreRight) {
       <div style="font-size:16px; color:#d62c2c;">${scoreRight}</div>
     </div>
 
-   <!-- 青い波（左：完全復元＋少しリッチ） -->
-<svg style="
-  position:absolute;
-  left:50%;
-  bottom:98px;
-  transform:translateX(-110px);
-" width="95" height="30" viewBox="0 0 95 30">
-
-  <!-- 影 -->
-  <path d="
-    M0 15
-    C15 7, 25 23, 40 15
-    C55 7, 65 23, 80 15
-  "
-  fill="none"
-  stroke="rgba(0,0,0,0.06)"
-  stroke-width="4"
-  stroke-linecap="round"
-  />
-
-  <!-- 本体 -->
-  <path d="
-    M0 15
-    C15 7, 25 23, 40 15
-    C55 7, 65 23, 80 15
-  "
-  fill="none"
-  stroke="rgba(79,124,138,0.85)"
-  stroke-width="3"
-  stroke-linecap="round"
-  />
-
-  <!-- ハイライト -->
-  <path d="
-    M0 15
-    C15 7, 25 23, 40 15
-    C55 7, 65 23, 80 15
-  "
-  fill="none"
-  stroke="rgba(255,255,255,0.35)"
-  stroke-width="1.2"
-  transform="translate(0,-1.2)"
-  />
-
-</svg>
-
-<!-- 赤い波（右：完全復元＋統一感） -->
-<svg style="
-  position:absolute;
-  right:150px;
-  bottom:88px;   /* ← 中心より少し下 */
-" width="95" height="30" viewBox="0 0 95 30">
-
-  <!-- 影 -->
-  <path d="
-    M0 15
-    C15 7, 25 23, 40 15
-    C55 7, 65 23, 80 15
-  "
-  fill="none"
-  stroke="rgba(0,0,0,0.06)"
-  stroke-width="4"
-  stroke-linecap="round"
-  />
-
-  <!-- 本体 -->
-  <path d="
-    M0 15
-    C15 7, 25 23, 40 15
-    C55 7, 65 23, 80 15
-  "
-  fill="none"
-  stroke="rgba(214,44,44,0.9)"
-  stroke-width="3"
-  stroke-linecap="round"
-  />
-
-  <!-- ハイライト -->
-  <path d="
-    M0 15
-    C15 7, 25 23, 40 15
-    C55 7, 65 23, 80 15
-  "
-  fill="none"
-  stroke="rgba(255,255,255,0.25)"
-  stroke-width="1.2"
-  transform="translate(0,-1.2)"
-  />
-
-</svg>
-
-    <!-- メーター（完全復元） -->
+    <!-- ===== 青波（位置修正＋アニメ）===== -->
     <svg style="
-  position:absolute;
-  right:110px;   /* ← 左へ（80 → 110） */
-  bottom:10px;   /* ← 下げる（20 → 10） */
-" viewBox="0 0 200 120" width="160" height="100">
+      position:absolute;
+      left:50%;
+      bottom:98px;
+      transform:translateX(-60px);
+    " width="95" height="30" viewBox="0 0 95 30">
+
+      <path d="
+        M0 15
+        C15 ${15 - ampLeft}, 25 ${15 + ampLeft}, 40 15
+        C55 ${15 - ampLeft}, 65 ${15 + ampLeft}, 80 15
+      "
+      fill="none"
+      stroke="rgba(79,124,138,0.9)"
+      stroke-width="3"
+      stroke-linecap="round"
+      stroke-dasharray="4 4">
+
+        <animate attributeName="stroke-dashoffset"
+          from="0" to="20"
+          dur="2s"
+          repeatCount="indefinite"/>
+      </path>
+
+      <!-- ハイライト -->
+      <path d="
+        M0 15
+        C15 ${15 - ampLeft}, 25 ${15 + ampLeft}, 40 15
+        C55 ${15 - ampLeft}, 65 ${15 + ampLeft}, 80 15
+      "
+      fill="none"
+      stroke="rgba(255,255,255,0.3)"
+      stroke-width="1.2"
+      transform="translate(0,-1.2)"
+      />
+
+    </svg>
+
+    <!-- ===== 赤波（位置微調整＋アニメ）===== -->
+    <svg style="
+      position:absolute;
+      right:150px;
+      bottom:85px;
+    " width="95" height="30" viewBox="0 0 95 30">
+
+      <path d="
+        M0 15
+        C15 ${15 - ampRight}, 25 ${15 + ampRight}, 40 15
+        C55 ${15 - ampRight}, 65 ${15 + ampRight}, 80 15
+      "
+      fill="none"
+      stroke="rgba(214,44,44,0.9)"
+      stroke-width="3"
+      stroke-linecap="round"
+      stroke-dasharray="4 4">
+
+        <animate attributeName="stroke-dashoffset"
+          from="0" to="20"
+          dur="2.4s"
+          repeatCount="indefinite"/>
+      </path>
+
+      <!-- ハイライト -->
+      <path d="
+        M0 15
+        C15 ${15 - ampRight}, 25 ${15 + ampRight}, 40 15
+        C55 ${15 - ampRight}, 65 ${15 + ampRight}, 80 15
+      "
+      fill="none"
+      stroke="rgba(255,255,255,0.25)"
+      stroke-width="1.2"
+      transform="translate(0,-1.2)"
+      />
+
+    </svg>
+
+    <!-- ===== メーター（位置調整済）===== -->
+    <svg style="
+      position:absolute;
+      right:95px;
+      bottom:18px;
+    " viewBox="0 0 200 120" width="160" height="100">
 
       <defs>
         <linearGradient id="g">
@@ -169,20 +158,20 @@ function generateOverlay(scoreLeft, scoreRight) {
         </linearGradient>
       </defs>
 
-      <!-- ★ここ完全復元 -->
-      <path d="M20 100 A80 80 0 0 1 180 100 L100 100 Z"
-        fill="url(#g)"
+      <path d="M20 100 A80 80 0 0 1 180 100"
+        fill="none"
+        stroke="url(#g)"
+        stroke-width="18"
+        stroke-linecap="round"
       />
 
-      <!-- 針 -->
       <g transform="rotate(${angle} 100 100)">
         <line x1="100" y1="100" x2="100" y2="25"
           stroke="#111"
-          stroke-width="3"
+          stroke-width="2"
           stroke-linecap="round"/>
       </g>
 
-      <!-- 中心 -->
       <circle cx="100" cy="100" r="4" fill="#111"/>
 
     </svg>
@@ -190,7 +179,7 @@ function generateOverlay(scoreLeft, scoreRight) {
   </div>
   `;
 }
-
+ 
 // =========================
 // HTML inject
 // =========================
