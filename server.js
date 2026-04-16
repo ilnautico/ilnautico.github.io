@@ -68,8 +68,9 @@ function generateOverlay(scoreLeft, scoreRight) {
   <svg style="
     position:absolute;
     left:50%;
-    bottom:105px;
-    transform:translateX(-150px);
+bottom:115px;
+transform:translateX(-110px);
+   
   " width="90" height="35" viewBox="0 0 90 35">
     <path d="
       M0 18
@@ -89,8 +90,8 @@ function generateOverlay(scoreLeft, scoreRight) {
   <svg style="
     position:absolute;
     left:50%;
-    bottom:95px;
-    transform:translateX(150px);
+bottom:110px;
+transform:translateX(90px);
   " width="90" height="35" viewBox="0 0 90 35">
     <path d="
       M0 18
