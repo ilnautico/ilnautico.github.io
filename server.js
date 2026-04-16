@@ -38,6 +38,63 @@ function safe(v) {
 }
 
 // =========================
+// 🔥 OVERLAY（完全復元）
+// =========================
+function generateOverlay(scoreLeft, scoreRight) {
+
+  const angle = -90 + (scoreRight * 1.8);
+
+  return `
+<div style="position:absolute; left:0; top:0; width:100%; height:100%;">
+
+  <div style="position:absolute; top:40px; left:50%; transform:translateX(-180px); text-align:center;">
+    <div style="font-size:28px; color:#2f3a44;">230°C</div>
+    <div style="font-size:16px;">${scoreLeft}</div>
+  </div>
+
+  <div style="position:absolute; top:40px; left:50%; transform:translateX(180px); text-align:center;">
+    <div style="font-size:28px; color:#d62c2c;">180°C</div>
+    <div style="font-size:16px; color:#d62c2c;">${scoreRight}</div>
+  </div>
+
+  <svg style="position:absolute; left:50%; bottom:110px; transform:translateX(-60px);" width="90" height="35">
+    <path d="M0 18 C15 6, 30 30, 45 18 C60 6, 75 30, 90 18"
+    fill="none" stroke="#4f7c8a" stroke-width="3"/>
+  </svg>
+
+  <svg style="position:absolute; left:50%; bottom:100px; transform:translateX(90px);" width="90" height="35">
+    <path d="M0 18 C15 6, 30 30, 45 18 C60 6, 75 30, 90 18"
+    fill="none" stroke="#d62c2c" stroke-width="3"/>
+  </svg>
+
+  <svg style="position:absolute; right:60px; bottom:20px;" viewBox="0 0 200 120" width="140" height="90">
+
+    <defs>
+      <linearGradient id="g">
+        <stop offset="0%" stop-color="#22c55e"/>
+        <stop offset="50%" stop-color="#fde047"/>
+        <stop offset="100%" stop-color="#ef4444"/>
+      </linearGradient>
+    </defs>
+
+    <path d="M20 100 A80 80 0 0 1 180 100 L100 100 Z"
+      fill="url(#g)"
+    />
+
+    <g transform="rotate(${angle} 100 100)">
+      <line x1="100" y1="100" x2="100" y2="25"
+        stroke="#111"
+        stroke-width="3"/>
+    </g>
+
+    <circle cx="100" cy="100" r="4" fill="#111"/>
+  </svg>
+
+</div>
+`;
+}
+
+// =========================
 // 判定ロジック
 // =========================
 function calculateScore(text) {
@@ -99,15 +156,12 @@ app.post("/generate-report", async (req, res) => {
       input.bio_material
     ].join(" ").toLowerCase();
 
-    // =========================
-    // 評価
-    // =========================
     const score = calculateScore(text);
     const decisionData = determineDecision(score);
     const economic = calculateEconomic(score);
 
     // =========================
-    // ★★★ コンサル本文（完全版）★★★
+    // コンサル本文（完全版）
     // =========================
 
     const executive_summary = `
@@ -126,61 +180,6 @@ Economic Impact: ${economic}
 Proceeding without structured validation may lead to unstable production outcomes, increased material loss, and potential equipment stress. Therefore, a phased validation approach is strongly recommended prior to any commitment to scale.
 `;
 
-    const key_risk = `
-Thermal sensitivity and flow instability introduce variability in processing performance, particularly under non-uniform temperature distribution and fluctuating shear conditions.
-
-This may result in inconsistent product quality, increased defect rates, and reduced operational reliability if not properly controlled.
-`;
-
-    const processing_window = `
-The processing window is functionally viable but requires controlled validation due to its sensitivity to operating conditions.
-`;
-
-    const thermal_behavior = `
-The material exhibits moderate thermal sensitivity, with performance closely linked to exposure duration and temperature uniformity.
-`;
-
-    const flow_characteristics = `
-Flow behavior is subject to variability under changing shear conditions.
-`;
-
-    const primary_risk = `
-Thermal degradation risk is associated with prolonged exposure to elevated melt conditions.
-`;
-
-    const secondary_risk = `
-Flow instability may result in internal defects and structural inconsistency.
-`;
-
-    const mechanism = `
-Thermal degradation and shear-induced instability are dominant risk drivers.
-`;
-
-    const stability_note = `
-Material stability depends on controlled processing conditions.
-`;
-
-    const consistency_note = `
-Consistency varies with operational control accuracy.
-`;
-
-    const application_implication = `
-Suitable for controlled pilot implementation prior to full-scale production.
-`;
-
-    const next_step = `
-A structured validation approach is recommended:
-
-- Thermal stability validation
-- Flow consistency evaluation
-- Cooling impact assessment
-
-Phased validation is advised prior to production deployment.
-`;
-
-    // =========================
-    // HTML生成（壊さない）
-    // =========================
     const html = injectHtml(htmlTemplate, {
 
       application: safe(input.application),
@@ -190,34 +189,37 @@ Phased validation is advised prior to production deployment.
       compatibility_level: decisionData.level,
 
       executive_summary: executive_summary,
-      key_risk: key_risk,
 
-      processing_window: processing_window,
-      thermal_behavior: thermal_behavior,
-      flow_characteristics: flow_characteristics,
+      key_risk: `
+Thermal sensitivity and flow instability introduce variability in processing performance.
+`,
 
-      primary_risk: primary_risk,
-      secondary_risk: secondary_risk,
-      mechanism: mechanism,
+      processing_window: "Controlled validation required.",
+      thermal_behavior: "Moderate sensitivity.",
+      flow_characteristics: "Variable flow behavior.",
+
+      primary_risk: "Thermal degradation risk.",
+      secondary_risk: "Flow instability.",
+      mechanism: "Thermal + shear degradation.",
 
       stability: "Moderate",
-      stability_note: stability_note,
+      stability_note: "Depends on control.",
       consistency: "Moderate",
-      consistency_note: consistency_note,
+      consistency_note: "Varies with process.",
 
-      application_implication: application_implication,
-
-      next_step: next_step,
+      application_implication: "Pilot testing required.",
+      next_step: "Pilot validation recommended.",
 
       decision: decisionData.decision,
       economic_impact: economic,
 
-      pha_score: score
+      pha_score: score,
+
+      // 🔥 ここが今回の核心
+      dynamic_overlay: generateOverlay(score, score)
+
     });
 
-    // =========================
-    // Puppeteer
-    // =========================
     const browser = await puppeteer.launch({
       headless: true,
       args: [
@@ -259,7 +261,6 @@ app.get("/latest-pdf", (req, res) => {
   res.sendFile(PDF_PATH);
 });
 
-// =========================
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
   console.log("🚀 Server running on", PORT);
