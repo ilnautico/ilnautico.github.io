@@ -46,7 +46,6 @@ function generateOverlay(scoreLeft, scoreRight) {
 <div style="position:absolute; left:0; top:0; width:100%; height:100%;">
 
   <!-- 🔥 元の画像（これが消えてた原因） -->
-  <img src="https://i.imgur.com/8QfQ9QF.png"
        style="position:absolute; left:50%; top:55%; transform:translate(-50%,-50%); width:480px; opacity:0.95;" />
 
   <!-- 温度 -->
