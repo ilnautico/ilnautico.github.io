@@ -39,14 +39,11 @@ function safe(v) {
 // 🔥 OVERLAY（完全維持）
 // =========================
 function generateOverlay(scoreLeft, scoreRight) {
+
   const angle = -90 + (scoreRight * 1.8);
 
   return `
 <div style="position:absolute; left:0; top:0; width:100%; height:100%; pointer-events:none;">
-
-
-  <!-- 🔥 元の画像（これが消えてた原因） -->
-       style="position:absolute; left:50%; top:55%; transform:translate(-50%,-50%); width:480px; opacity:0.95;" />
 
   <!-- 温度 -->
   <div style="position:absolute; top:40px; left:50%; transform:translateX(-180px); text-align:center;">
