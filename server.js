@@ -3,6 +3,7 @@ import puppeteer from "puppeteer";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import OpenAI from "openai";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -15,7 +16,14 @@ app.use(express.urlencoded({ extended: true }));
 const PDF_PATH = "/tmp/latest.pdf";
 
 // =========================
-// TEMPLATE
+// OpenAI
+// =========================
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY
+});
+
+// =========================
+// HTML TEMPLATE（外部）
 // =========================
 const htmlTemplate = fs.readFileSync(
   path.join(__dirname, "template.html"),
@@ -23,14 +31,14 @@ const htmlTemplate = fs.readFileSync(
 );
 
 // =========================
-// SAFE
+// safe
 // =========================
 function safe(v) {
   return v || "";
 }
 
 // =========================
-// スコア
+// 判定ロジック
 // =========================
 function calculateScore(text) {
   let score = 100;
@@ -48,9 +56,6 @@ function calculateScore(text) {
   return Math.max(score, 0);
 }
 
-// =========================
-// 判定
-// =========================
 function determineDecision(score) {
   if (score >= 80) return { decision: "GO", level: "HIGH" };
   if (score >= 60) return { decision: "CONDITIONAL GO", level: "MODERATE" };
@@ -58,80 +63,11 @@ function determineDecision(score) {
   return { decision: "STOP", level: "LOW" };
 }
 
-// =========================
-// 経済影響
-// =========================
 function calculateEconomic(score) {
   if (score >= 80) return "+5–15%";
   if (score >= 60) return "+15–30%";
   if (score >= 40) return "+30–60%";
   return "+60%+";
-}
-
-// =========================
-// Overlay（完全維持）
-// =========================
-function generateOverlay(scoreLeft, scoreRight) {
-
-  const angle = -90 + (scoreRight * 1.8);
-
-  return `
-<div style="position:absolute; left:0; top:0; width:100%; height:100%;">
-
-  <div style="position:absolute; top:40px; left:50%; transform:translateX(-180px); text-align:center;">
-    <div style="font-size:28px; color:#2f3a44;">230°C</div>
-    <div style="font-size:16px; color:#5b6770;">${scoreLeft}</div>
-  </div>
-
-  <div style="position:absolute; top:40px; left:50%; transform:translateX(180px); text-align:center;">
-    <div style="font-size:28px; color:#d62c2c;">180°C</div>
-    <div style="font-size:16px; color:#d62c2c;">${scoreRight}</div>
-  </div>
-
-  <!-- 青波 -->
-  <svg style="position:absolute; left:50%; bottom:110px; transform:translateX(-60px);" width="90" height="35" viewBox="0 0 90 35">
-    <path d="M0 18 C15 6, 30 30, 45 18 C60 6, 75 30, 90 18"
-      fill="none"
-      stroke="#4f7c8a"
-      stroke-width="3"
-      opacity="0.9"
-    />
-  </svg>
-
-  <!-- 赤波 -->
-  <svg style="position:absolute; left:50%; bottom:100px; transform:translateX(90px);" width="90" height="35" viewBox="0 0 90 35">
-    <path d="M0 18 C15 6, 30 30, 45 18 C60 6, 75 30, 90 18"
-      fill="none"
-      stroke="#d62c2c"
-      stroke-width="3"
-      opacity="0.9"
-    />
-  </svg>
-
-  <!-- メーター -->
-  <svg style="position:absolute; right:60px; bottom:20px;" viewBox="0 0 200 120" width="140" height="90">
-    <defs>
-      <linearGradient id="g">
-        <stop offset="0%" stop-color="#22c55e"/>
-        <stop offset="50%" stop-color="#fde047"/>
-        <stop offset="100%" stop-color="#ef4444"/>
-      </linearGradient>
-    </defs>
-
-    <path d="M20 100 A80 80 0 0 1 180 100 L100 100 Z" fill="url(#g)"/>
-
-    <g transform="rotate(${angle} 100 100)">
-      <line x1="100" y1="100" x2="100" y2="25"
-        stroke="#111"
-        stroke-width="3"
-        stroke-linecap="round"/>
-    </g>
-
-    <circle cx="100" cy="100" r="4" fill="#111"/>
-  </svg>
-
-</div>
-`;
 }
 
 // =========================
@@ -163,18 +99,21 @@ app.post("/generate-report", async (req, res) => {
       input.bio_material
     ].join(" ").toLowerCase();
 
+    // =========================
+    // 評価
+    // =========================
     const score = calculateScore(text);
     const decisionData = determineDecision(score);
     const economic = calculateEconomic(score);
 
-    const scoreLeft = 78;
-    const scoreRight = score;
+    // =========================
+    // ★★★ コンサル本文（完全版）★★★
+    // =========================
 
-    // 🔥 完全復元＋強化版
-    const executiveSummary = `
+    const executive_summary = `
 This assessment indicates ${decisionData.level} feasibility for transitioning to the evaluated material under current conditions.
 
-From a technical perspective, the material demonstrates a baseline compatibility with the intended application. However, its behavior is highly dependent on processing stability, particularly in relation to thermal exposure and shear conditions.
+From a technical perspective, the material demonstrates baseline compatibility with the intended application. However, its behavior is highly dependent on processing stability, particularly in relation to thermal exposure and shear conditions.
 
 Deployment Decision: ${decisionData.decision}
 
@@ -184,57 +123,101 @@ Operationally, the key consideration lies not in whether the material can run, b
 
 Economic Impact: ${economic}
 
-Proceeding without structured validation may lead to unstable production outcomes, increased material loss, and potential equipment stress.
-
-Therefore, a phased validation approach is strongly recommended before any commitment to scale.
+Proceeding without structured validation may lead to unstable production outcomes, increased material loss, and potential equipment stress. Therefore, a phased validation approach is strongly recommended prior to any commitment to scale.
 `;
 
+    const key_risk = `
+Thermal sensitivity and flow instability introduce variability in processing performance, particularly under non-uniform temperature distribution and fluctuating shear conditions.
+
+This may result in inconsistent product quality, increased defect rates, and reduced operational reliability if not properly controlled.
+`;
+
+    const processing_window = `
+The processing window is functionally viable but requires controlled validation due to its sensitivity to operating conditions.
+`;
+
+    const thermal_behavior = `
+The material exhibits moderate thermal sensitivity, with performance closely linked to exposure duration and temperature uniformity.
+`;
+
+    const flow_characteristics = `
+Flow behavior is subject to variability under changing shear conditions.
+`;
+
+    const primary_risk = `
+Thermal degradation risk is associated with prolonged exposure to elevated melt conditions.
+`;
+
+    const secondary_risk = `
+Flow instability may result in internal defects and structural inconsistency.
+`;
+
+    const mechanism = `
+Thermal degradation and shear-induced instability are dominant risk drivers.
+`;
+
+    const stability_note = `
+Material stability depends on controlled processing conditions.
+`;
+
+    const consistency_note = `
+Consistency varies with operational control accuracy.
+`;
+
+    const application_implication = `
+Suitable for controlled pilot implementation prior to full-scale production.
+`;
+
+    const next_step = `
+A structured validation approach is recommended:
+
+- Thermal stability validation
+- Flow consistency evaluation
+- Cooling impact assessment
+
+Phased validation is advised prior to production deployment.
+`;
+
+    // =========================
+    // HTML生成（壊さない）
+    // =========================
     const html = injectHtml(htmlTemplate, {
 
-      application: input.application,
-      material_transition: input.bio_material,
-      assessment_type: "Technical Hypothesis",
+      application: safe(input.application),
+      material_transition: safe(input.bio_material),
       report_date: new Date().toISOString().split("T")[0],
 
       compatibility_level: decisionData.level,
-      executive_summary: executiveSummary,
 
-      // 🔥 Key Risk復元
-      key_risk: `
-Thermal sensitivity and flow instability introduce variability in processing performance, which may result in inconsistent product quality under uncontrolled conditions.
-`,
+      executive_summary: executive_summary,
+      key_risk: key_risk,
 
-      processing_window: "Controlled validation required.",
-      thermal_behavior: "Moderate sensitivity.",
-      flow_characteristics: "Variable flow behavior.",
+      processing_window: processing_window,
+      thermal_behavior: thermal_behavior,
+      flow_characteristics: flow_characteristics,
 
-      mechanical_behavior: "Conditionally acceptable.",
-      surface_quality: "May fluctuate.",
-      structural_consistency: "Needs validation.",
-
-      application_implication: "Pilot testing required.",
-
-      primary_risk_title: "Thermal Instability",
-      primary_risk: "Degradation risk under high temp.",
-
-      secondary_risk_title: "Flow Instability",
-      secondary_risk: "Internal defects possible.",
-
-      mechanism: "Thermal + shear degradation.",
+      primary_risk: primary_risk,
+      secondary_risk: secondary_risk,
+      mechanism: mechanism,
 
       stability: "Moderate",
-      stability_note: "Depends on control.",
+      stability_note: stability_note,
       consistency: "Moderate",
-      consistency_note: "Varies with process.",
+      consistency_note: consistency_note,
 
-      next_step: "Pilot validation recommended.",
+      application_implication: application_implication,
 
-      base_image: "https://ilnautico.github.io/visual-base.png",
-      dynamic_overlay: generateOverlay(scoreLeft, scoreRight),
+      next_step: next_step,
 
-      pha_score: scoreRight
+      decision: decisionData.decision,
+      economic_impact: economic,
+
+      pha_score: score
     });
 
+    // =========================
+    // Puppeteer
+    // =========================
     const browser = await puppeteer.launch({
       headless: true,
       args: [
@@ -266,6 +249,8 @@ Thermal sensitivity and flow instability introduce variability in processing per
   }
 });
 
+// =========================
+// GET
 // =========================
 app.get("/latest-pdf", (req, res) => {
   if (!fs.existsSync(PDF_PATH)) {
