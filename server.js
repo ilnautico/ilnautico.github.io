@@ -15,7 +15,7 @@ app.use(express.urlencoded({ extended: true }));
 const PDF_PATH = "/tmp/latest.pdf";
 
 // =========================
-// TEMPLATE（絶対1つだけ）
+// TEMPLATE
 // =========================
 const htmlTemplate = fs.readFileSync(
   path.join(__dirname, "template.html"),
@@ -30,7 +30,7 @@ function safe(v) {
 }
 
 // =========================
-// スコアロジック
+// スコア
 // =========================
 function calculateScore(text) {
   let score = 100;
@@ -59,7 +59,7 @@ function determineDecision(score) {
 }
 
 // =========================
-// Overlay（←ここ完全復元）
+// Overlay（完全保持）
 // =========================
 function generateOverlay(scoreLeft, scoreRight) {
 
@@ -68,37 +68,18 @@ function generateOverlay(scoreLeft, scoreRight) {
   return `
 <div style="position:absolute; left:0; top:0; width:100%; height:100%;">
 
-  <!-- 左 -->
-  <div style="
-    position:absolute;
-    top:40px;
-    left:50%;
-    transform:translateX(-180px);
-    text-align:center;
-  ">
+  <div style="position:absolute; top:40px; left:50%; transform:translateX(-180px); text-align:center;">
     <div style="font-size:28px; color:#2f3a44;">230°C</div>
     <div style="font-size:16px; color:#5b6770;">${scoreLeft}</div>
   </div>
 
-  <!-- 右 -->
-  <div style="
-    position:absolute;
-    top:40px;
-    left:50%;
-    transform:translateX(180px);
-    text-align:center;
-  ">
+  <div style="position:absolute; top:40px; left:50%; transform:translateX(180px); text-align:center;">
     <div style="font-size:28px; color:#d62c2c;">180°C</div>
     <div style="font-size:16px; color:#d62c2c;">${scoreRight}</div>
   </div>
 
-  <!-- 青波（完全そのまま） -->
-  <svg style="
-    position:absolute;
-    left:50%;
-    bottom:110px;
-    transform:translateX(-60px);
-  " width="90" height="35" viewBox="0 0 90 35">
+  <!-- 青波 -->
+  <svg style="position:absolute; left:50%; bottom:110px; transform:translateX(-60px);" width="90" height="35" viewBox="0 0 90 35">
     <path d="M0 18 C15 6, 30 30, 45 18 C60 6, 75 30, 90 18"
       fill="none"
       stroke="#4f7c8a"
@@ -107,13 +88,8 @@ function generateOverlay(scoreLeft, scoreRight) {
     />
   </svg>
 
-  <!-- 赤波（完全そのまま） -->
-  <svg style="
-    position:absolute;
-    left:50%;
-    bottom:100px;
-    transform:translateX(90px);
-  " width="90" height="35" viewBox="0 0 90 35">
+  <!-- 赤波 -->
+  <svg style="position:absolute; left:50%; bottom:100px; transform:translateX(90px);" width="90" height="35" viewBox="0 0 90 35">
     <path d="M0 18 C15 6, 30 30, 45 18 C60 6, 75 30, 90 18"
       fill="none"
       stroke="#d62c2c"
@@ -123,12 +99,7 @@ function generateOverlay(scoreLeft, scoreRight) {
   </svg>
 
   <!-- メーター -->
-  <svg style="
-    position:absolute;
-    right:60px;
-    bottom:20px;
-  " viewBox="0 0 200 120" width="140" height="90">
-
+  <svg style="position:absolute; right:60px; bottom:20px;" viewBox="0 0 200 120" width="140" height="90">
     <defs>
       <linearGradient id="g">
         <stop offset="0%" stop-color="#22c55e"/>
@@ -137,9 +108,7 @@ function generateOverlay(scoreLeft, scoreRight) {
       </linearGradient>
     </defs>
 
-    <path d="M20 100 A80 80 0 0 1 180 100 L100 100 Z"
-      fill="url(#g)"
-    />
+    <path d="M20 100 A80 80 0 0 1 180 100 L100 100 Z" fill="url(#g)"/>
 
     <g transform="rotate(${angle} 100 100)">
       <line x1="100" y1="100" x2="100" y2="25"
@@ -149,7 +118,6 @@ function generateOverlay(scoreLeft, scoreRight) {
     </g>
 
     <circle cx="100" cy="100" r="4" fill="#111"/>
-
   </svg>
 
 </div>
@@ -157,7 +125,7 @@ function generateOverlay(scoreLeft, scoreRight) {
 }
 
 // =========================
-// HTML inject
+// inject
 // =========================
 function injectHtml(template, data) {
   let html = template;
@@ -188,7 +156,8 @@ app.post("/generate-report", async (req, res) => {
     const score = calculateScore(text);
     const decisionData = determineDecision(score);
 
-    const scoreLeft = 100;
+    // 🔥 修正ポイント①
+    const scoreLeft = 78;
     const scoreRight = score;
 
     const executiveSummary = `
@@ -203,6 +172,10 @@ Further validation through pilot testing is recommended before full deployment.
 
       application: input.application,
       material_transition: input.bio_material,
+
+      // 🔥 修正ポイント②
+      assessment_type: "Technical Hypothesis",
+
       report_date: new Date().toISOString().split("T")[0],
 
       compatibility_level: decisionData.level,
@@ -235,7 +208,6 @@ Further validation through pilot testing is recommended before full deployment.
 
       next_step: "Pilot validation recommended.",
 
-      // 🔥ここが復元ポイント
       base_image: "https://ilnautico.github.io/visual-base.png",
       dynamic_overlay: generateOverlay(scoreLeft, scoreRight),
 
