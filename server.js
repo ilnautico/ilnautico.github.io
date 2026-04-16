@@ -62,46 +62,44 @@ function generateOverlay(scoreLeft, scoreRight) {
       <div style="font-size:16px; color:#d62c2c;">${scoreRight}</div>
     </div>
 
-    <!-- 🔵 青波（位置完全FIX＋透け感復元） -->
-    <svg style="
-      position:absolute;
-     <svg style="
+  <svg style="
+  position:absolute;
   left:330px;
   bottom:110px;
-    " width="90" height="35" viewBox="0 0 90 35">
-      <path d="
-        M0 18
-        C15 6, 30 30, 45 18
-        C60 6, 75 30, 90 18
-      "
-      fill="none"
-      stroke="#4f7c8a"
-      stroke-width="3"
-      stroke-linecap="round"
-      opacity="0.9"
-      filter="drop-shadow(0 0 6px rgba(79,124,138,0.35))"
-      />
-    </svg>
+" width="90" height="35" viewBox="0 0 90 35">
+  <path d="
+    M0 18
+    C15 6, 30 30, 45 18
+    C60 6, 75 30, 90 18
+  "
+  fill="none"
+  stroke="#4f7c8a"
+  stroke-width="3"
+  stroke-linecap="round"
+  opacity="0.9"
+  filter="drop-shadow(0 0 6px rgba(79,124,138,0.35))"
+/>
+</svg>
 
     <!-- 🔴 赤波（中央戻しFIX） -->
-    <svg style="
-      position:absolute;
-       left:520px;
+   <svg style="
+  position:absolute;
+  left:520px;
   bottom:95px;
-    " width="90" height="35" viewBox="0 0 90 35">
-      <path d="
-        M0 18
-        C15 6, 30 30, 45 18
-        C60 6, 75 30, 90 18
-      "
-      fill="none"
-      stroke="#d62c2c"
-      stroke-width="3"
-      stroke-linecap="round"
-      opacity="0.9"
-      filter="drop-shadow(0 0 6px rgba(214,44,44,0.35))"
-      />
-    </svg>
+" width="90" height="35" viewBox="0 0 90 35">
+  <path d="
+    M0 18
+    C15 6, 30 30, 45 18
+    C60 6, 75 30, 90 18
+  "
+  fill="none"
+  stroke="#d62c2c"
+  stroke-width="3"
+  stroke-linecap="round"
+  opacity="0.9"
+  filter="drop-shadow(0 0 6px rgba(214,44,44,0.35))"
+/>
+</svg>
 
     <!-- 🎯 メーター（右下・完全固定） -->
     <svg style="
