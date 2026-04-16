@@ -199,20 +199,34 @@ Thermal sensitivity and flow instability introduce variability in processing per
   // =========================
   // 🔥 ここが抜けてた（重要）
   // =========================
-  mechanical_behavior: "Conditionally acceptable.",
-  surface_quality: "May fluctuate depending on cooling.",
-  structural_consistency: "Requires validation under real conditions.",
+mechanical_behavior: `
+Mechanical performance is conditionally acceptable under controlled processing conditions, though variability may occur depending on thermal exposure and material stability.
+`,
 
-  // =========================
-  // 🔥 タイトル復元（これが一番重要）
-  // =========================
-  primary_risk_title: "Thermal Instability",
-  primary_risk: "Thermal degradation risk.",
+surface_quality: `
+Surface uniformity may fluctuate depending on cooling consistency and flow stability, particularly under non-uniform processing environments.
+`,
 
-  secondary_risk_title: "Flow Instability",
-  secondary_risk: "Flow instability.",
+structural_consistency: `
+Internal structural consistency requires validation under real processing conditions, as variability in shear and cooling behavior may introduce inconsistencies.
+`,
 
-  mechanism: "Thermal + shear degradation.",
+// =========================
+// 🔥 バルーン完全復元（ここが核）
+// =========================
+primary_risk_title: "Thermal Instability Under Elevated Conditions",
+primary_risk: `
+Degradation risk under high temperature conditions may lead to irreversible material breakdown within a single processing cycle if thermal exposure exceeds stability thresholds.
+`,
+
+secondary_risk_title: "Flow Variability and Structural Inconsistency",
+secondary_risk: `
+Internal defects and structural inconsistency may occur under unstable flow conditions, particularly when shear rates fluctuate during processing.
+`,
+
+mechanism: `
+Thermal degradation combined with shear-induced instability acts as the primary failure mechanism, requiring controlled validation before production deployment.
+`,
 
   // =========================
   // Quality
