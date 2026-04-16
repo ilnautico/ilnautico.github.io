@@ -23,7 +23,7 @@ const openai = new OpenAI({
 });
 
 // =========================
-// HTML TEMPLATE（外部1つに統一）
+// HTML TEMPLATE
 // =========================
 const htmlTemplate = fs.readFileSync(
   path.join(__dirname, "template.html"),
@@ -31,14 +31,14 @@ const htmlTemplate = fs.readFileSync(
 );
 
 // =========================
-// safe
+// SAFE（絶対必須）
 // =========================
 function safe(v) {
-  return v || "";
+  return v ?? "";
 }
 
 // =========================
-// 判定ロジック（追加）
+// SCORE
 // =========================
 function calculateScore(text) {
   let score = 100;
@@ -53,9 +53,12 @@ function calculateScore(text) {
   if (text.includes("pla")) score -= 10;
   if (text.includes("pha")) score -= 20;
 
-  return Math.max(score, 0);
+  return Math.max(score, 10);
 }
 
+// =========================
+// DECISION
+// =========================
 function determineDecision(score) {
   if (score >= 80) return { decision: "GO", level: "HIGH" };
   if (score >= 60) return { decision: "CONDITIONAL GO", level: "MODERATE" };
@@ -63,6 +66,9 @@ function determineDecision(score) {
   return { decision: "STOP", level: "LOW" };
 }
 
+// =========================
+// ECONOMIC
+// =========================
 function calculateEconomic(score) {
   if (score >= 80) return "+5–15%";
   if (score >= 60) return "+15–30%";
@@ -71,21 +77,73 @@ function calculateEconomic(score) {
 }
 
 // =========================
-// inject
+// OVERLAY（完全復元）
+// =========================
+function generateOverlay(score) {
+  const angle = -90 + (score * 1.8);
+
+  return `
+<div style="position:absolute; width:100%; height:100%;">
+
+  <div style="
+    position:absolute;
+    top:40px;
+    left:50%;
+    transform:translateX(-120px);
+    font-size:22px;
+    color:#2f3a44;
+  ">
+    ${score}
+  </div>
+
+  <svg style="
+    position:absolute;
+    right:60px;
+    bottom:30px;
+  " viewBox="0 0 200 120" width="120">
+
+    <defs>
+      <linearGradient id="g">
+        <stop offset="0%" stop-color="#22c55e"/>
+        <stop offset="50%" stop-color="#fde047"/>
+        <stop offset="100%" stop-color="#ef4444"/>
+      </linearGradient>
+    </defs>
+
+    <path d="M20 100 A80 80 0 0 1 180 100 L100 100 Z"
+      fill="url(#g)"
+    />
+
+    <g transform="rotate(${angle} 100 100)">
+      <line x1="100" y1="100" x2="100" y2="25"
+        stroke="#111"
+        stroke-width="3"
+      />
+    </g>
+
+    <circle cx="100" cy="100" r="4" fill="#111"/>
+
+  </svg>
+</div>
+`;
+}
+
+// =========================
+// HTML INJECT（壊れない版）
 // =========================
 function injectHtml(template, data) {
   let html = template;
-  for (const key in data) {
-    html = html.replace(
-      new RegExp(`{{\\s*${key}\\s*}}`, "g"),
-      safe(data[key])
-    );
-  }
+
+  Object.keys(data).forEach((key) => {
+    const value = safe(data[key]);
+    html = html.replace(new RegExp(`{{\\s*${key}\\s*}}`, "g"), value);
+  });
+
   return html;
 }
 
 // =========================
-// MAIN（1つに統一）
+// MAIN
 // =========================
 app.post("/generate-report", async (req, res) => {
 
@@ -99,69 +157,76 @@ app.post("/generate-report", async (req, res) => {
       input.bio_material
     ].join(" ").toLowerCase();
 
-    // =========================
-    // 評価
-    // =========================
     const score = calculateScore(text);
     const decisionData = determineDecision(score);
     const economic = calculateEconomic(score);
 
     // =========================
-    // Executive
+    // EXECUTIVE（完全復元）
     // =========================
     const executiveSummary = `
-This assessment indicates ${decisionData.level} feasibility.
+This assessment indicates ${decisionData.level} feasibility for transitioning to the evaluated material.
+
+While the material demonstrates acceptable thermal and mechanical characteristics,
+variability in flow behavior and sensitivity to processing conditions present operational risks.
 
 Deployment Decision: ${decisionData.decision}
 
 Economic Impact: ${economic}
 
-Further validation through pilot testing is recommended before full deployment.
+Further progression to production should be based on successful stability validation and process optimization outcomes.
 `;
 
     // =========================
-    // HTML生成
+    // HTML
     // =========================
     const html = injectHtml(htmlTemplate, {
 
-      application: input.application,
-      material_transition: input.bio_material,
+      application: safe(input.application),
+      material_transition: safe(input.bio_material),
       report_date: new Date().toISOString().split("T")[0],
 
       compatibility_level: decisionData.level,
       executive_summary: executiveSummary,
-      decision: decisionData.decision,
-      economic_impact: economic,
 
-      key_risk: "Thermal and flow instability risk exists.",
-      processing_window: "Controlled validation required.",
-      thermal_behavior: "Moderate sensitivity.",
-      flow_characteristics: "Variable flow behavior.",
+      key_risk: "Thermal sensitivity and flow instability may lead to inconsistent processing performance.",
 
-      mechanical_behavior: "Conditionally acceptable.",
-      surface_quality: "May fluctuate.",
-      structural_consistency: "Needs validation.",
+      processing_window: "Processing window requires controlled validation under pilot conditions.",
+      thermal_behavior: "Material shows moderate thermal sensitivity requiring stable temperature control.",
+      flow_characteristics: "Flow behavior may vary depending on shear stability.",
 
-      application_implication: "Pilot testing required.",
+      mechanical_behavior: "Mechanical performance is conditionally acceptable under controlled conditions.",
+      surface_quality: "Surface uniformity may fluctuate depending on cooling consistency.",
+      structural_consistency: "Internal consistency requires validation under real processing conditions.",
 
-      primary_risk_title: "Thermal Instability",
-      primary_risk: "Degradation risk under high temp.",
-      secondary_risk_title: "Flow Instability",
-      secondary_risk: "Internal defects possible.",
-      mechanism: "Thermal + shear degradation.",
+      application_implication: "Suitable for controlled pilot implementation before full production deployment.",
+
+      primary_risk_title: "Thermal Instability Under Elevated Conditions",
+      primary_risk: "Rapid degradation may occur under extended residence time.",
+      secondary_risk_title: "Flow Variability",
+      secondary_risk: "Internal defects may occur under unstable shear.",
+      mechanism: "Thermal degradation and shear instability mechanisms.",
 
       stability: "Moderate",
-      stability_note: "Depends on control.",
+      stability_note: "Dependent on controlled processing conditions.",
       consistency: "Moderate",
-      consistency_note: "Varies with process.",
+      consistency_note: "Varies with operational control accuracy.",
 
-      next_step: "Pilot validation recommended.",
+      next_step: `
+Phase 1: Material validation  
+Phase 2: Process stabilization  
+Phase 3: Production validation
+`,
+
+      // 👇 ここが最重要（画像復活）
+      base_image: "https://ilnautico.github.io/visual-base.png",
+      dynamic_overlay: generateOverlay(score),
 
       pha_score: score
     });
 
     // =========================
-    // Puppeteer（完全修正）
+    // Puppeteer（完全安定）
     // =========================
     const browser = await puppeteer.launch({
       headless: true,
@@ -204,7 +269,6 @@ app.get("/latest-pdf", (req, res) => {
   res.sendFile(PDF_PATH);
 });
 
-// =========================
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
   console.log("🚀 Server running on", PORT);
