@@ -141,7 +141,7 @@ function generateOverlay(scoreLeft, scoreRight) {
 
 </div>
 `;
- 
+ }
 // =========================
 // HTML inject
 // =========================
