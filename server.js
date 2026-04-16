@@ -2,13 +2,13 @@ import express from "express";
 import puppeteer from "puppeteer";
 import fs from "fs";
 import path from "path";
-import { fileURLToPath } from "url"; 　　　
+import { fileURLToPath } from "url";
 import OpenAI from "openai";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const app = express();　
+const app = express();
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -31,118 +31,66 @@ const htmlTemplate = fs.readFileSync(
 );
 
 // =========================
-// Overlay（数字＋波＋メーター）
+// 🔥 安全追加ロジック群
 // =========================
-function generateOverlay(scoreLeft, scoreRight) {
 
-  const angle = -90 + (scoreRight * 1.8);
+function buildExecutiveSummary() {
+  return {
+    overview: `
+This assessment indicates conditional feasibility for transitioning to the evaluated material.
+`,
+    findings: `
+While the material demonstrates acceptable thermal and mechanical characteristics, variability in flow behavior and sensitivity to processing conditions present operational risks.
+`,
+    conclusion: `
+Deployment Decision: CONDITIONAL GO
 
- return `
-<div style="position:absolute; left:0; top:0; width:100%; height:100%;">
+This material can proceed to pilot-scale validation under controlled processing conditions.
 
-  <!-- 左数値 -->
-  <div style="
-    position:absolute;
-    top:40px;
-    left:50%;
-    transform:translateX(-180px);
-    text-align:center;
-  ">
-    <div style="font-size:28px; color:#2f3a44;">230°C</div>
-    <div style="font-size:16px; color:#5b6770;">${scoreLeft}</div>
-  </div>
+Further progression to production should be based on successful stability validation and process optimization outcomes.
+`
+  };
+}
 
-  <!-- 右数値 -->
-  <div style="
-    position:absolute;
-    top:40px;
-    left:50%;
-    transform:translateX(180px);
-    text-align:center;
-  ">
-    <div style="font-size:28px; color:#d62c2c;">180°C</div>
-    <div style="font-size:16px; color:#d62c2c;">${scoreRight}</div>
-  </div>
+function buildRiskSection() {
+  return {
+    risk1_title: "Thermal Instability Under Elevated Conditions",
+    risk1_body: `
+If melt residence time exceeds stability threshold, rapid degradation may occur leading to irreversible mechanical loss within a single processing cycle.
+`,
+    risk2_title: "Flow Variability and Structural Inconsistency",
+    risk2_body: `
+Unstable shear conditions may result in internal defects and reduced product durability.
+`
+  };
+}
 
-  <!-- 🔵 青波（完全中央基準FIX） -->
-  <svg style="
-    position:absolute;
-    left:50%;
-bottom:110px;
-transform:translateX(-60px);
-   
-  " width="90" height="35" viewBox="0 0 90 35">
-    <path d="
-      M0 18
-      C15 6, 30 30, 45 18
-      C60 6, 75 30, 90 18
-    "
-    fill="none"
-    stroke="#4f7c8a"
-    stroke-width="3"
-    stroke-linecap="round"
-    opacity="0.9"
-    filter="drop-shadow(0 0 6px rgba(79,124,138,0.35))"
-    />
-  </svg>
+function buildNextStep() {
+  return `
+Execution Plan:
 
-  <!-- 🔴 赤波（中央位置に完全復帰） -->
-  <svg style="
-    position:absolute;
-  left:50%;
-bottom:100px;
-transform:translateX(90px);
-  " width="90" height="35" viewBox="0 0 90 35">
-    <path d="
-      M0 18
-      C15 6, 30 30, 45 18
-      C60 6, 75 30, 90 18
-    "
-    fill="none"
-    stroke="#d62c2c"
-    stroke-width="3"
-    stroke-linecap="round"
-    opacity="0.9"
-    filter="drop-shadow(0 0 6px rgba(214,44,44,0.35))"
-    />
-  </svg>
+Phase 1 (2 weeks)
+Material trial setup and baseline validation
 
-  <!-- 🎯 メーター（右下固定・ズレない） -->
-  <svg style="
-    position:absolute;
-    right:60px;
-    bottom:20px;
-  " viewBox="0 0 200 120" width="140" height="90">
+Phase 2 (4 weeks)
+Processing condition stabilization and variability assessment
 
-    <defs>
-      <linearGradient id="g">
-        <stop offset="0%" stop-color="#22c55e"/>
-        <stop offset="50%" stop-color="#fde047"/>
-        <stop offset="100%" stop-color="#ef4444"/>
-      </linearGradient>
-    </defs>
-
-    <!-- 半円 -->
-    <path d="M20 100 A80 80 0 0 1 180 100 L100 100 Z"
-      fill="url(#g)"
-    />
-
-    <!-- 針 -->
-    <g transform="rotate(${angle} 100 100)">
-      <line x1="100" y1="100" x2="100" y2="25"
-        stroke="#111"
-        stroke-width="3"
-        stroke-linecap="round"/>
-    </g>
-
-    <!-- 中心 -->
-    <circle cx="100" cy="100" r="4" fill="#111"/>
-
-  </svg>
-
-</div>
+Phase 3 (6 weeks)
+Production-level validation and consistency verification
 `;
- }
+}
+
+function buildFeasibilityExplanation() {
+  return `
+This recommendation is based on:
+
+• Moderate thermal stability within processing conditions  
+• Acceptable mechanical performance under controlled scenarios  
+• Identified risks in flow variability and thermal sensitivity  
+• Feasibility of mitigation through process optimization  
+`;
+}
+
 // =========================
 // HTML inject
 // =========================
@@ -165,7 +113,7 @@ async function generateAIReport(input) {
   const prompt = `
 You are a senior polymer consultant.
 
-Return ONLY JSON.　
+Return ONLY JSON.
 
 {
   "executive_summary_overview": "",
@@ -218,24 +166,24 @@ app.post("/generate-report", async (req, res) => {
 
     const input = req.body;
 
-    const scoreLeft = 78;
-    const scoreRight = 92;
-
     const aiData = await generateAIReport(input);
+
+    // 🔥 安全生成
+    const summary = buildExecutiveSummary();
+    const risks = buildRiskSection();
 
     const html = injectHtml(htmlTemplate, {
 
       application: input.application || "",
       material_transition: input.bio_material || "",
-      assessment_type: "Technical Hypothesis",
       report_date: new Date().toISOString().split("T")[0],
 
       compatibility_level: "Moderate",
 
-      executive_summary:
-        (aiData.executive_summary_overview || "") + " " +
-        (aiData.executive_summary_findings || "") + " " +
-        (aiData.executive_summary_conclusion || ""),
+      // 🔥 Executive Summary（差し替え）
+      executive_summary_overview: summary.overview,
+      executive_summary_findings: summary.findings,
+      executive_summary_conclusion: summary.conclusion,
 
       key_risk: aiData.key_risk,
 
@@ -252,25 +200,31 @@ app.post("/generate-report", async (req, res) => {
       primary_risk_title: aiData.primary_risk_title,
       primary_risk: aiData.primary_risk,
 
-      secondary_risk_title: aiData.secondary_risk_title,
-      secondary_risk: aiData.secondary_risk,
+      // 🔥 Risk差し替え
+      risk_1_title: risks.risk1_title,
+      risk_1_body: risks.risk1_body,
+      risk_2_title: risks.risk2_title,
+      risk_2_body: risks.risk2_body,
 
       mechanism: aiData.mechanism,
 
       stability: aiData.stability,
       consistency: aiData.consistency,
-      stability_note: aiData.stability_note,
-      consistency_note: aiData.consistency_note,
 
-      next_step: aiData.next_step,
+      // 🔥 Decision Basis
+      feasibility_explanation: buildFeasibilityExplanation(),
 
-      base_image: "https://ilnautico.github.io/visual-base.png",
-      dynamic_overlay: generateOverlay(scoreLeft, scoreRight),
+      // 🔥 Execution Plan
+      strategic_recommendation: buildNextStep(),
 
-      pha_score: scoreRight
+      next_step: aiData.next_step
     });
 
+    // =========================
+    // Puppeteer（完全修正）
+    // =========================
     const browser = await puppeteer.launch({
+      headless: true,
       args: [
         "--no-sandbox",
         "--disable-setuid-sandbox",
@@ -302,6 +256,9 @@ app.post("/generate-report", async (req, res) => {
   }
 });
 
+// =========================
+// PDF確認
+// =========================
 app.get("/latest-pdf", (req, res) => {
   if (!fs.existsSync(PDF_PATH)) {
     return res.status(404).send("No PDF yet");
