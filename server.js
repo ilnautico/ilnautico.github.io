@@ -31,63 +31,117 @@ const htmlTemplate = fs.readFileSync(
 );
 
 // =========================
-// 🔥 安全追加ロジック群
+// 安全関数（undefined防止）
 // =========================
-
-function buildExecutiveSummary() {
-  return {
-    overview: `
-This assessment indicates conditional feasibility for transitioning to the evaluated material.
-`,
-    findings: `
-While the material demonstrates acceptable thermal and mechanical characteristics, variability in flow behavior and sensitivity to processing conditions present operational risks.
-`,
-    conclusion: `
-Deployment Decision: CONDITIONAL GO
-
-This material can proceed to pilot-scale validation under controlled processing conditions.
-
-Further progression to production should be based on successful stability validation and process optimization outcomes.
-`
-  };
+function safe(v) {
+  return v || "";
 }
 
-function buildRiskSection() {
-  return {
-    risk1_title: "Thermal Instability Under Elevated Conditions",
-    risk1_body: `
-If melt residence time exceeds stability threshold, rapid degradation may occur leading to irreversible mechanical loss within a single processing cycle.
-`,
-    risk2_title: "Flow Variability and Structural Inconsistency",
-    risk2_body: `
-Unstable shear conditions may result in internal defects and reduced product durability.
-`
-  };
-}
+// =========================
+// Overlay（絶対固定）
+// =========================
+function generateOverlay(scoreLeft, scoreRight) {
 
-function buildNextStep() {
+  const angle = -90 + (scoreRight * 1.8);
+
   return `
-Execution Plan:
+<div style="position:absolute; left:0; top:0; width:100%; height:100%;">
 
-Phase 1 (2 weeks)
-Material trial setup and baseline validation
+  <!-- 左数値 -->
+  <div style="
+    position:absolute;
+    top:40px;
+    left:50%;
+    transform:translateX(-180px);
+    text-align:center;
+  ">
+    <div style="font-size:28px; color:#2f3a44;">230°C</div>
+    <div style="font-size:16px; color:#5b6770;">${scoreLeft}</div>
+  </div>
 
-Phase 2 (4 weeks)
-Processing condition stabilization and variability assessment
+  <!-- 右数値 -->
+  <div style="
+    position:absolute;
+    top:40px;
+    left:50%;
+    transform:translateX(180px);
+    text-align:center;
+  ">
+    <div style="font-size:28px; color:#d62c2c;">180°C</div>
+    <div style="font-size:16px; color:#d62c2c;">${scoreRight}</div>
+  </div>
 
-Phase 3 (6 weeks)
-Production-level validation and consistency verification
-`;
-}
+  <!-- 青波 -->
+  <svg style="
+    position:absolute;
+    left:50%;
+    bottom:110px;
+    transform:translateX(-60px);
+  " width="90" height="35" viewBox="0 0 90 35">
+    <path d="
+      M0 18
+      C15 6, 30 30, 45 18
+      C60 6, 75 30, 90 18
+    "
+    fill="none"
+    stroke="#4f7c8a"
+    stroke-width="3"
+    opacity="0.9"
+    filter="drop-shadow(0 0 6px rgba(79,124,138,0.35))"
+    />
+  </svg>
 
-function buildFeasibilityExplanation() {
-  return `
-This recommendation is based on:
+  <!-- 赤波 -->
+  <svg style="
+    position:absolute;
+    left:50%;
+    bottom:100px;
+    transform:translateX(90px);
+  " width="90" height="35" viewBox="0 0 90 35">
+    <path d="
+      M0 18
+      C15 6, 30 30, 45 18
+      C60 6, 75 30, 90 18
+    "
+    fill="none"
+    stroke="#d62c2c"
+    stroke-width="3"
+    opacity="0.9"
+    filter="drop-shadow(0 0 6px rgba(214,44,44,0.35))"
+    />
+  </svg>
 
-• Moderate thermal stability within processing conditions  
-• Acceptable mechanical performance under controlled scenarios  
-• Identified risks in flow variability and thermal sensitivity  
-• Feasibility of mitigation through process optimization  
+  <!-- メーター -->
+  <svg style="
+    position:absolute;
+    right:60px;
+    bottom:20px;
+  " viewBox="0 0 200 120" width="140" height="90">
+
+    <defs>
+      <linearGradient id="g">
+        <stop offset="0%" stop-color="#22c55e"/>
+        <stop offset="50%" stop-color="#fde047"/>
+        <stop offset="100%" stop-color="#ef4444"/>
+      </linearGradient>
+    </defs>
+
+    <path d="M20 100 A80 80 0 0 1 180 100 L100 100 Z"
+      fill="url(#g)"
+    />
+
+    <g transform="rotate(${angle} 100 100)">
+      <line x1="100" y1="100" x2="100" y2="25"
+        stroke="#111"
+        stroke-width="3"
+        stroke-linecap="round"/>
+    </g>
+
+    <circle cx="100" cy="100" r="4" fill="#111"/>
+
+  </svg>
+
+</div>
 `;
 }
 
@@ -99,62 +153,10 @@ function injectHtml(template, data) {
   for (const key in data) {
     html = html.replace(
       new RegExp(`{{\\s*${key}\\s*}}`, "g"),
-      data[key] ?? ""
+      safe(data[key])
     );
   }
   return html;
-}
-
-// =========================
-// AI生成
-// =========================
-async function generateAIReport(input) {
-
-  const prompt = `
-You are a senior polymer consultant.
-
-Return ONLY JSON.
-
-{
-  "executive_summary_overview": "",
-  "executive_summary_findings": "",
-  "executive_summary_conclusion": "",
-  "key_risk": "",
-  "processing_window": "",
-  "thermal_behavior": "",
-  "flow_characteristics": "",
-  "mechanical_behavior": "",
-  "surface_quality": "",
-  "structural_consistency": "",
-  "application_implication": "",
-  "primary_risk_title": "",
-  "primary_risk": "",
-  "secondary_risk_title": "",
-  "secondary_risk": "",
-  "mechanism": "",
-  "stability": "Moderate",
-  "consistency": "Moderate",
-  "stability_note": "",
-  "consistency_note": "",
-  "next_step": ""
-}
-`;
-
-  const res = await openai.chat.completions.create({
-    model: "gpt-4.1-mini",
-    messages: [
-      { role: "system", content: "Return JSON only" },
-      { role: "user", content: prompt }
-    ],
-    temperature: 0.5
-  });
-
-  const cleaned = res.choices[0].message.content
-    .replace(/```json/g, "")
-    .replace(/```/g, "")
-    .trim();
-
-  return JSON.parse(cleaned);
 }
 
 // =========================
@@ -166,62 +168,88 @@ app.post("/generate-report", async (req, res) => {
 
     const input = req.body;
 
-    const aiData = await generateAIReport(input);
+    const scoreLeft = 78;
+    const scoreRight = 92;
 
-    // 🔥 安全生成
-    const summary = buildExecutiveSummary();
-    const risks = buildRiskSection();
+    // =========================
+    // 完全統合コンサル内容
+    // =========================
+
+    const executive_summary = `
+This assessment indicates conditional feasibility for transitioning to the evaluated material.
+
+While the material demonstrates acceptable thermal and mechanical characteristics, variability in flow behavior and sensitivity to processing conditions present operational risks.
+
+Deployment Decision: CONDITIONAL GO
+
+This material can proceed to pilot-scale validation under controlled processing conditions.
+
+Further progression to production should be based on successful stability validation and process optimization outcomes.
+`;
 
     const html = injectHtml(htmlTemplate, {
 
-      application: input.application || "",
-      material_transition: input.bio_material || "",
+      application: safe(input.application),
+      material_transition: safe(input.bio_material),
+      assessment_type: "Technical Hypothesis",
       report_date: new Date().toISOString().split("T")[0],
 
       compatibility_level: "Moderate",
 
-      // 🔥 Executive Summary（差し替え）
-      executive_summary_overview: summary.overview,
-      executive_summary_findings: summary.findings,
-      executive_summary_conclusion: summary.conclusion,
+      executive_summary: executive_summary,
 
-      key_risk: aiData.key_risk,
+      key_risk: `
+Thermal sensitivity and flow instability may lead to inconsistent processing performance under uncontrolled conditions.
+`,
 
-      processing_window: aiData.processing_window,
-      thermal_behavior: aiData.thermal_behavior,
-      flow_characteristics: aiData.flow_characteristics,
+      processing_window: "Processing window requires controlled validation under pilot conditions.",
+      thermal_behavior: "Material shows moderate thermal sensitivity requiring stable temperature control.",
+      flow_characteristics: "Flow behavior may vary depending on shear stability.",
 
-      mechanical_behavior: aiData.mechanical_behavior,
-      surface_quality: aiData.surface_quality,
-      structural_consistency: aiData.structural_consistency,
+      mechanical_behavior: "Mechanical performance is conditionally acceptable under controlled conditions.",
+      surface_quality: "Surface uniformity may fluctuate depending on cooling consistency.",
+      structural_consistency: "Internal consistency requires validation under real processing conditions.",
 
-      application_implication: aiData.application_implication,
+      application_implication: "Suitable for controlled pilot implementation before full production deployment.",
 
-      primary_risk_title: aiData.primary_risk_title,
-      primary_risk: aiData.primary_risk,
+      primary_risk_title: "Thermal Instability Under Elevated Conditions",
+      primary_risk: `
+If melt residence time exceeds stability threshold, rapid degradation may occur leading to irreversible mechanical loss within a single processing cycle.
+`,
 
-      // 🔥 Risk差し替え
-      risk_1_title: risks.risk1_title,
-      risk_1_body: risks.risk1_body,
-      risk_2_title: risks.risk2_title,
-      risk_2_body: risks.risk2_body,
+      secondary_risk_title: "Flow Variability and Structural Inconsistency",
+      secondary_risk: `
+Unstable shear conditions may result in internal defects and reduced product durability.
+`,
 
-      mechanism: aiData.mechanism,
+      mechanism: "Thermal degradation and shear-induced instability mechanisms are dominant risk drivers.",
 
-      stability: aiData.stability,
-      consistency: aiData.consistency,
+      stability: "Moderate",
+      stability_note: "Stability is dependent on controlled processing conditions.",
+      consistency: "Moderate",
+      consistency_note: "Consistency varies with operational control accuracy.",
 
-      // 🔥 Decision Basis
-      feasibility_explanation: buildFeasibilityExplanation(),
+      next_step: `
+Execution Plan:
 
-      // 🔥 Execution Plan
-      strategic_recommendation: buildNextStep(),
+Phase 1 (2 weeks)
+Material trial setup and baseline validation
 
-      next_step: aiData.next_step
+Phase 2 (4 weeks)
+Processing condition stabilization and variability assessment
+
+Phase 3 (6 weeks)
+Production-level validation and consistency verification
+`,
+
+      base_image: "https://ilnautico.github.io/visual-base.png",
+      dynamic_overlay: generateOverlay(scoreLeft, scoreRight),
+
+      pha_score: scoreRight
     });
 
     // =========================
-    // Puppeteer（完全修正）
+    // Puppeteer（完全安定）
     // =========================
     const browser = await puppeteer.launch({
       headless: true,
@@ -235,9 +263,7 @@ app.post("/generate-report", async (req, res) => {
 
     const page = await browser.newPage();
 
-    await page.setContent(html, {
-      waitUntil: "networkidle0"
-    });
+    await page.setContent(html, { waitUntil: "networkidle0" });
 
     const pdf = await page.pdf({
       format: "A4",
@@ -256,8 +282,6 @@ app.post("/generate-report", async (req, res) => {
   }
 });
 
-// =========================
-// PDF確認
 // =========================
 app.get("/latest-pdf", (req, res) => {
   if (!fs.existsSync(PDF_PATH)) {
