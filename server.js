@@ -59,7 +59,17 @@ function determineDecision(score) {
 }
 
 // =========================
-// Overlay（完全保持）
+// 経済影響
+// =========================
+function calculateEconomic(score) {
+  if (score >= 80) return "+5–15%";
+  if (score >= 60) return "+15–30%";
+  if (score >= 40) return "+30–60%";
+  return "+60%+";
+}
+
+// =========================
+// Overlay（完全維持）
 // =========================
 function generateOverlay(scoreLeft, scoreRight) {
 
@@ -155,33 +165,44 @@ app.post("/generate-report", async (req, res) => {
 
     const score = calculateScore(text);
     const decisionData = determineDecision(score);
+    const economic = calculateEconomic(score);
 
-    // 🔥 修正ポイント①
     const scoreLeft = 78;
     const scoreRight = score;
 
+    // 🔥 完全復元＋強化版
     const executiveSummary = `
-This assessment indicates ${decisionData.level} feasibility.
+This assessment indicates ${decisionData.level} feasibility for transitioning to the evaluated material under current conditions.
+
+From a technical perspective, the material demonstrates a baseline compatibility with the intended application. However, its behavior is highly dependent on processing stability, particularly in relation to thermal exposure and shear conditions.
 
 Deployment Decision: ${decisionData.decision}
 
-Further validation through pilot testing is recommended before full deployment.
+At this stage, the transition should not be interpreted as production-ready. Instead, it represents a controlled feasibility scenario where further validation is essential.
+
+Operationally, the key consideration lies not in whether the material can run, but in whether it can run consistently within acceptable quality thresholds.
+
+Economic Impact: ${economic}
+
+Proceeding without structured validation may lead to unstable production outcomes, increased material loss, and potential equipment stress.
+
+Therefore, a phased validation approach is strongly recommended before any commitment to scale.
 `;
 
     const html = injectHtml(htmlTemplate, {
 
       application: input.application,
       material_transition: input.bio_material,
-
-      // 🔥 修正ポイント②
       assessment_type: "Technical Hypothesis",
-
       report_date: new Date().toISOString().split("T")[0],
 
       compatibility_level: decisionData.level,
       executive_summary: executiveSummary,
 
-      key_risk: "Thermal and flow instability risk exists.",
+      // 🔥 Key Risk復元
+      key_risk: `
+Thermal sensitivity and flow instability introduce variability in processing performance, which may result in inconsistent product quality under uncontrolled conditions.
+`,
 
       processing_window: "Controlled validation required.",
       thermal_behavior: "Moderate sensitivity.",
