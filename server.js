@@ -90,7 +90,7 @@ transform:translateX(-60px);
   <svg style="
     position:absolute;
   left:50%;
-bottom:115px;
+bottom:100px;
 transform:translateX(90px);
   " width="90" height="35" viewBox="0 0 90 35">
     <path d="
