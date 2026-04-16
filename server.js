@@ -23,7 +23,7 @@ const openai = new OpenAI({
 });
 
 // =========================
-// HTML TEMPLATE（外部）
+// HTML TEMPLATE
 // =========================
 const htmlTemplate = fs.readFileSync(
   path.join(__dirname, "template.html"),
@@ -31,14 +31,12 @@ const htmlTemplate = fs.readFileSync(
 );
 
 // =========================
-// safe
-// =========================
 function safe(v) {
   return v || "";
 }
 
 // =========================
-// 🔥 OVERLAY（完全復元）
+// 🔥 OVERLAY（完全維持）
 // =========================
 function generateOverlay(scoreLeft, scoreRight) {
 
@@ -68,7 +66,6 @@ function generateOverlay(scoreLeft, scoreRight) {
   </svg>
 
   <svg style="position:absolute; right:60px; bottom:20px;" viewBox="0 0 200 120" width="140" height="90">
-
     <defs>
       <linearGradient id="g">
         <stop offset="0%" stop-color="#22c55e"/>
@@ -77,14 +74,10 @@ function generateOverlay(scoreLeft, scoreRight) {
       </linearGradient>
     </defs>
 
-    <path d="M20 100 A80 80 0 0 1 180 100 L100 100 Z"
-      fill="url(#g)"
-    />
+    <path d="M20 100 A80 80 0 0 1 180 100 L100 100 Z" fill="url(#g)" />
 
     <g transform="rotate(${angle} 100 100)">
-      <line x1="100" y1="100" x2="100" y2="25"
-        stroke="#111"
-        stroke-width="3"/>
+      <line x1="100" y1="100" x2="100" y2="25" stroke="#111" stroke-width="3"/>
     </g>
 
     <circle cx="100" cy="100" r="4" fill="#111"/>
@@ -128,8 +121,6 @@ function calculateEconomic(score) {
 }
 
 // =========================
-// inject
-// =========================
 function injectHtml(template, data) {
   let html = template;
   for (const key in data) {
@@ -160,10 +151,6 @@ app.post("/generate-report", async (req, res) => {
     const decisionData = determineDecision(score);
     const economic = calculateEconomic(score);
 
-    // =========================
-    // コンサル本文（完全版）
-    // =========================
-
     const executive_summary = `
 This assessment indicates ${decisionData.level} feasibility for transitioning to the evaluated material under current conditions.
 
@@ -182,6 +169,9 @@ Proceeding without structured validation may lead to unstable production outcome
 
     const html = injectHtml(htmlTemplate, {
 
+      // 🔥 必須（ここ抜けると崩れる）
+      assessment_type: "Technical Hypothesis",
+
       application: safe(input.application),
       material_transition: safe(input.bio_material),
       report_date: new Date().toISOString().split("T")[0],
@@ -198,8 +188,17 @@ Thermal sensitivity and flow instability introduce variability in processing per
       thermal_behavior: "Moderate sensitivity.",
       flow_characteristics: "Variable flow behavior.",
 
+      // 🔥 ここが今回のバグ原因（復元）
+      mechanical_behavior: "Conditionally acceptable.",
+      surface_quality: "May fluctuate depending on cooling.",
+      structural_consistency: "Requires validation under real conditions.",
+
+      primary_risk_title: "Thermal Instability",
       primary_risk: "Thermal degradation risk.",
+
+      secondary_risk_title: "Flow Instability",
       secondary_risk: "Flow instability.",
+
       mechanism: "Thermal + shear degradation.",
 
       stability: "Moderate",
@@ -215,7 +214,6 @@ Thermal sensitivity and flow instability introduce variability in processing per
 
       pha_score: score,
 
-      // 🔥 ここが今回の核心
       dynamic_overlay: generateOverlay(score, score)
 
     });
@@ -251,8 +249,6 @@ Thermal sensitivity and flow instability introduce variability in processing per
   }
 });
 
-// =========================
-// GET
 // =========================
 app.get("/latest-pdf", (req, res) => {
   if (!fs.existsSync(PDF_PATH)) {
