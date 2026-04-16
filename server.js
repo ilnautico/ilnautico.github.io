@@ -38,8 +38,7 @@ function safe(v) {
 // =========================
 // 🔥 OVERLAY（完全維持）
 // =========================
-unction generateOverlay(scoreLeft, scoreRight) {
-
+function generateOverlay(scoreLeft, scoreRight) {
   const angle = -90 + (scoreRight * 1.8);
 
   return `
