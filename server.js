@@ -65,8 +65,9 @@ function generateOverlay(scoreLeft, scoreRight) {
     <!-- 🔵 青波（位置完全FIX＋透け感復元） -->
     <svg style="
       position:absolute;
-      left:360px;
-      bottom:105px;
+     <svg style="
+  left:330px;
+  bottom:110px;
     " width="90" height="35" viewBox="0 0 90 35">
       <path d="
         M0 18
@@ -85,8 +86,8 @@ function generateOverlay(scoreLeft, scoreRight) {
     <!-- 🔴 赤波（中央戻しFIX） -->
     <svg style="
       position:absolute;
-      left:560px;
-      bottom:90px;
+       left:520px;
+  bottom:95px;
     " width="90" height="35" viewBox="0 0 90 35">
       <path d="
         M0 18
