@@ -45,6 +45,18 @@ function generateOverlay(scoreLeft, scoreRight) {
   return `
 <div style="position:absolute; left:0; top:0; width:100%; height:100%; pointer-events:none;">
 
+  <!-- 🔥 完全復元画像（これが核） -->
+  <img src="https://i.imgur.com/8Q0vG6B.png"
+       style="
+         position:absolute;
+         left:50%;
+         top:55%;
+         transform:translate(-50%,-50%);
+         width:520px;
+         max-width:none;
+         opacity:0.95;
+       "
+  />
   <!-- 温度 -->
   <div style="position:absolute; top:40px; left:50%; transform:translateX(-180px); text-align:center;">
     <div style="font-size:28px; color:#2f3a44;">230°C</div>
