@@ -37,106 +37,110 @@ function generateOverlay(scoreLeft, scoreRight) {
 
   const angle = -90 + (scoreRight * 1.8);
 
-  return `
-  <div style="position:absolute; left:0; top:0; width:100%; height:100%;">
+ return `
+<div style="position:absolute; left:0; top:0; width:100%; height:100%;">
 
-    <!-- 左数値 -->
-    <div style="
-      position:absolute;
-      top:40px;
-      left:330px;
-      text-align:center;
-    ">
-      <div style="font-size:28px; color:#2f3a44;">230°C</div>
-      <div style="font-size:16px; color:#5b6770;">${scoreLeft}</div>
-    </div>
-
-    <!-- 右数値 -->
-    <div style="
-      position:absolute;
-      top:40px;
-      left:580px;
-      text-align:center;
-    ">
-      <div style="font-size:28px; color:#d62c2c;">180°C</div>
-      <div style="font-size:16px; color:#d62c2c;">${scoreRight}</div>
-    </div>
-
-  <svg style="
-  position:absolute;
-  left:330px;
-  bottom:110px;
-" width="90" height="35" viewBox="0 0 90 35">
-  <path d="
-    M0 18
-    C15 6, 30 30, 45 18
-    C60 6, 75 30, 90 18
-  "
-  fill="none"
-  stroke="#4f7c8a"
-  stroke-width="3"
-  stroke-linecap="round"
-  opacity="0.9"
-  filter="drop-shadow(0 0 6px rgba(79,124,138,0.35))"
-/>
-</svg>
-
-    <!-- 🔴 赤波（中央戻しFIX） -->
-   <svg style="
-  position:absolute;
-  left:520px;
-  bottom:95px;
-" width="90" height="35" viewBox="0 0 90 35">
-  <path d="
-    M0 18
-    C15 6, 30 30, 45 18
-    C60 6, 75 30, 90 18
-  "
-  fill="none"
-  stroke="#d62c2c"
-  stroke-width="3"
-  stroke-linecap="round"
-  opacity="0.9"
-  filter="drop-shadow(0 0 6px rgba(214,44,44,0.35))"
-/>
-</svg>
-
-    <!-- 🎯 メーター（右下・完全固定） -->
-    <svg style="
-      position:absolute;
-      right:80px;
-      bottom:30px;
-    " viewBox="0 0 200 120" width="140" height="90">
-
-      <defs>
-        <linearGradient id="g">
-          <stop offset="0%" stop-color="#22c55e"/>
-          <stop offset="50%" stop-color="#fde047"/>
-          <stop offset="100%" stop-color="#ef4444"/>
-        </linearGradient>
-      </defs>
-
-      <!-- 半円（元デザイン） -->
-      <path d="M20 100 A80 80 0 0 1 180 100 L100 100 Z"
-        fill="url(#g)"
-      />
-
-      <!-- 針 -->
-      <g transform="rotate(${angle} 100 100)">
-        <line x1="100" y1="100" x2="100" y2="25"
-          stroke="#111"
-          stroke-width="3"
-          stroke-linecap="round"/>
-      </g>
-
-      <!-- 中心 -->
-      <circle cx="100" cy="100" r="4" fill="#111"/>
-
-    </svg>
-
+  <!-- 左数値 -->
+  <div style="
+    position:absolute;
+    top:40px;
+    left:50%;
+    transform:translateX(-180px);
+    text-align:center;
+  ">
+    <div style="font-size:28px; color:#2f3a44;">230°C</div>
+    <div style="font-size:16px; color:#5b6770;">${scoreLeft}</div>
   </div>
-  `;
-}
+
+  <!-- 右数値 -->
+  <div style="
+    position:absolute;
+    top:40px;
+    left:50%;
+    transform:translateX(180px);
+    text-align:center;
+  ">
+    <div style="font-size:28px; color:#d62c2c;">180°C</div>
+    <div style="font-size:16px; color:#d62c2c;">${scoreRight}</div>
+  </div>
+
+  <!-- 🔵 青波（完全中央基準FIX） -->
+  <svg style="
+    position:absolute;
+    left:50%;
+    bottom:105px;
+    transform:translateX(-150px);
+  " width="90" height="35" viewBox="0 0 90 35">
+    <path d="
+      M0 18
+      C15 6, 30 30, 45 18
+      C60 6, 75 30, 90 18
+    "
+    fill="none"
+    stroke="#4f7c8a"
+    stroke-width="3"
+    stroke-linecap="round"
+    opacity="0.9"
+    filter="drop-shadow(0 0 6px rgba(79,124,138,0.35))"
+    />
+  </svg>
+
+  <!-- 🔴 赤波（中央位置に完全復帰） -->
+  <svg style="
+    position:absolute;
+    left:50%;
+    bottom:95px;
+    transform:translateX(150px);
+  " width="90" height="35" viewBox="0 0 90 35">
+    <path d="
+      M0 18
+      C15 6, 30 30, 45 18
+      C60 6, 75 30, 90 18
+    "
+    fill="none"
+    stroke="#d62c2c"
+    stroke-width="3"
+    stroke-linecap="round"
+    opacity="0.9"
+    filter="drop-shadow(0 0 6px rgba(214,44,44,0.35))"
+    />
+  </svg>
+
+  <!-- 🎯 メーター（右下固定・ズレない） -->
+  <svg style="
+    position:absolute;
+    right:60px;
+    bottom:20px;
+  " viewBox="0 0 200 120" width="140" height="90">
+
+    <defs>
+      <linearGradient id="g">
+        <stop offset="0%" stop-color="#22c55e"/>
+        <stop offset="50%" stop-color="#fde047"/>
+        <stop offset="100%" stop-color="#ef4444"/>
+      </linearGradient>
+    </defs>
+
+    <!-- 半円 -->
+    <path d="M20 100 A80 80 0 0 1 180 100 L100 100 Z"
+      fill="url(#g)"
+    />
+
+    <!-- 針 -->
+    <g transform="rotate(${angle} 100 100)">
+      <line x1="100" y1="100" x2="100" y2="25"
+        stroke="#111"
+        stroke-width="3"
+        stroke-linecap="round"/>
+    </g>
+
+    <!-- 中心 -->
+    <circle cx="100" cy="100" r="4" fill="#111"/>
+
+  </svg>
+
+</div>
+`;
  
 // =========================
 // HTML inject
