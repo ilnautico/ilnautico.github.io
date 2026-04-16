@@ -45,6 +45,11 @@ function generateOverlay(scoreLeft, scoreRight) {
   return `
 <div style="position:absolute; left:0; top:0; width:100%; height:100%;">
 
+  <!-- 🔥 元の画像（これが消えてた原因） -->
+  <img src="https://i.imgur.com/8QfQ9QF.png"
+       style="position:absolute; left:50%; top:55%; transform:translate(-50%,-50%); width:480px; opacity:0.95;" />
+
+  <!-- 温度 -->
   <div style="position:absolute; top:40px; left:50%; transform:translateX(-180px); text-align:center;">
     <div style="font-size:28px; color:#2f3a44;">230°C</div>
     <div style="font-size:16px;">${scoreLeft}</div>
@@ -55,6 +60,7 @@ function generateOverlay(scoreLeft, scoreRight) {
     <div style="font-size:16px; color:#d62c2c;">${scoreRight}</div>
   </div>
 
+  <!-- 波 -->
   <svg style="position:absolute; left:50%; bottom:110px; transform:translateX(-60px);" width="90" height="35">
     <path d="M0 18 C15 6, 30 30, 45 18 C60 6, 75 30, 90 18"
     fill="none" stroke="#4f7c8a" stroke-width="3"/>
@@ -65,6 +71,7 @@ function generateOverlay(scoreLeft, scoreRight) {
     fill="none" stroke="#d62c2c" stroke-width="3"/>
   </svg>
 
+  <!-- メーター -->
   <svg style="position:absolute; right:60px; bottom:20px;" viewBox="0 0 200 120" width="140" height="90">
     <defs>
       <linearGradient id="g">
@@ -74,10 +81,14 @@ function generateOverlay(scoreLeft, scoreRight) {
       </linearGradient>
     </defs>
 
-    <path d="M20 100 A80 80 0 0 1 180 100 L100 100 Z" fill="url(#g)" />
+    <path d="M20 100 A80 80 0 0 1 180 100 L100 100 Z"
+      fill="url(#g)"
+    />
 
     <g transform="rotate(${angle} 100 100)">
-      <line x1="100" y1="100" x2="100" y2="25" stroke="#111" stroke-width="3"/>
+      <line x1="100" y1="100" x2="100" y2="25"
+        stroke="#111"
+        stroke-width="3"/>
     </g>
 
     <circle cx="100" cy="100" r="4" fill="#111"/>
