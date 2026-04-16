@@ -68,7 +68,7 @@ function generateOverlay(scoreLeft, scoreRight) {
   <svg style="
     position:absolute;
     left:50%;
-bottom:115px;
+bottom:95px;
 transform:translateX(-110px);
    
   " width="90" height="35" viewBox="0 0 90 35">
@@ -89,9 +89,9 @@ transform:translateX(-110px);
   <!-- 🔴 赤波（中央位置に完全復帰） -->
   <svg style="
     position:absolute;
-    left:50%;
-bottom:110px;
-transform:translateX(90px);
+   left:50%;
+bottom:75px;
+transform:translateX(95px);
   " width="90" height="35" viewBox="0 0 90 35">
     <path d="
       M0 18
