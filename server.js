@@ -167,56 +167,76 @@ Economic Impact: ${economic}
 Proceeding without structured validation may lead to unstable production outcomes, increased material loss, and potential equipment stress. Therefore, a phased validation approach is strongly recommended prior to any commitment to scale.
 `;
 
-    const html = injectHtml(htmlTemplate, {
+const html = injectHtml(htmlTemplate, {
 
-      // 🔥 必須（ここ抜けると崩れる）
-      assessment_type: "Technical Hypothesis",
+  // =========================
+  // 基本
+  // =========================
+  assessment_type: "Technical Hypothesis",
 
-      application: safe(input.application),
-      material_transition: safe(input.bio_material),
-      report_date: new Date().toISOString().split("T")[0],
+  application: safe(input.application),
+  material_transition: safe(input.bio_material),
+  report_date: new Date().toISOString().split("T")[0],
 
-      compatibility_level: decisionData.level,
+  compatibility_level: decisionData.level,
 
-      executive_summary: executive_summary,
+  // =========================
+  // Executive
+  // =========================
+  executive_summary: executive_summary,
 
-      key_risk: `
+  key_risk: `
 Thermal sensitivity and flow instability introduce variability in processing performance.
 `,
 
-      processing_window: "Controlled validation required.",
-      thermal_behavior: "Moderate sensitivity.",
-      flow_characteristics: "Variable flow behavior.",
+  // =========================
+  // Processing
+  // =========================
+  processing_window: "Controlled validation required.",
+  thermal_behavior: "Moderate sensitivity.",
+  flow_characteristics: "Variable flow behavior.",
 
-      // 🔥 ここが今回のバグ原因（復元）
-      mechanical_behavior: "Conditionally acceptable.",
-      surface_quality: "May fluctuate depending on cooling.",
-      structural_consistency: "Requires validation under real conditions.",
+  // =========================
+  // 🔥 ここが抜けてた（重要）
+  // =========================
+  mechanical_behavior: "Conditionally acceptable.",
+  surface_quality: "May fluctuate depending on cooling.",
+  structural_consistency: "Requires validation under real conditions.",
 
-      primary_risk_title: "Thermal Instability",
-      primary_risk: "Thermal degradation risk.",
+  // =========================
+  // 🔥 タイトル復元（これが一番重要）
+  // =========================
+  primary_risk_title: "Thermal Instability",
+  primary_risk: "Thermal degradation risk.",
 
-      secondary_risk_title: "Flow Instability",
-      secondary_risk: "Flow instability.",
+  secondary_risk_title: "Flow Instability",
+  secondary_risk: "Flow instability.",
 
-      mechanism: "Thermal + shear degradation.",
+  mechanism: "Thermal + shear degradation.",
 
-      stability: "Moderate",
-      stability_note: "Depends on control.",
-      consistency: "Moderate",
-      consistency_note: "Varies with process.",
+  // =========================
+  // Quality
+  // =========================
+  stability: "Moderate",
+  stability_note: "Depends on control.",
+  consistency: "Moderate",
+  consistency_note: "Varies with process.",
 
-      application_implication: "Pilot testing required.",
-      next_step: "Pilot validation recommended.",
+  // =========================
+  application_implication: "Pilot testing required.",
+  next_step: "Pilot validation recommended.",
 
-      decision: decisionData.decision,
-      economic_impact: economic,
+  decision: decisionData.decision,
+  economic_impact: economic,
 
-      pha_score: score,
+  pha_score: score,
 
-      dynamic_overlay: generateOverlay(score, score)
+  // =========================
+  // 🔥 overlay（そのまま）
+  // =========================
+  dynamic_overlay: generateOverlay(score, score)
 
-    });
+});
 
     const browser = await puppeteer.launch({
       headless: true,
