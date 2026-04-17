@@ -122,6 +122,23 @@ function calculateScore(text) {
   return Math.max(score, 0);
 }
 
+// 🔥 抜けてたやつ（必須）
+function determineDecision(score) {
+  if (score >= 80) return { decision: "GO", level: "HIGH" };
+  if (score >= 60) return { decision: "CONDITIONAL GO", level: "MODERATE" };
+  if (score >= 40) return { decision: "HOLD", level: "MODERATE" };
+  return { decision: "STOP", level: "LOW" };
+}
+
+function calculateEconomic(score) {
+  if (score >= 80) return "+5–15%";
+  if (score >= 60) return "+15–30%";
+  if (score >= 40) return "+30–60%";
+  return "+60%+";
+}
+
+// =========================
+// MAIN
 // =========================
 app.post("/generate-report", async (req, res) => {
 
@@ -129,7 +146,7 @@ app.post("/generate-report", async (req, res) => {
 
     const input = req.body;
 
-    // 🔥 左右分離（ここが今回の本質修正）
+    // 🔥 左右分離（ここだけ追加）
     const textLeft = [
       input.application,
       input.material
@@ -143,7 +160,6 @@ app.post("/generate-report", async (req, res) => {
     const scoreLeft = calculateScore(textLeft);
     const scoreRight = calculateScore(textRight);
 
-    // 기존ロジック維持
     const score = scoreRight;
 
     const decisionData = determineDecision(score);
@@ -151,17 +167,17 @@ app.post("/generate-report", async (req, res) => {
 
     const html = injectHtml(htmlTemplate, {
 
-      application: safe(input.application),
-      material_transition: safe(input.bio_material),
+      application: input.application,
+      material_transition: input.bio_material,
+      report_date: new Date().toISOString().split("T")[0],
 
       compatibility_level: decisionData.level,
-
       decision: decisionData.decision,
       economic_impact: economic,
 
       pha_score: score,
 
-      // 🔥 完全連携（ここが最重要）
+      // 🔥 ここが連携の核
       dynamic_overlay: generateOverlay(scoreLeft, scoreRight)
 
     });
@@ -196,15 +212,6 @@ app.post("/generate-report", async (req, res) => {
     res.status(500).send("error");
   }
 });
-
-// =========================
-app.get("/latest-pdf", (req, res) => {
-  if (!fs.existsSync(PDF_PATH)) {
-    return res.status(404).send("No PDF yet");
-  }
-  res.sendFile(PDF_PATH);
-});
-
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
   console.log("🚀 Server running on", PORT);
