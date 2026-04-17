@@ -62,17 +62,29 @@ function generateOverlay(scoreLeft, scoreRight) {
     height:300px;
   ">
 
-    <!-- 左温度 -->
-    <div style="position:absolute; top:0; left:0; text-align:center;">
-      <div style="font-size:28px; color:#2f3a44;">230°C</div>
-      <div style="font-size:16px;">${scoreLeft}</div>
-    </div>
+    // 左数値（そのまま）
+<div style="
+  position:absolute;
+  top:40px;
+  left:50%;
+  transform:translateX(-180px);
+  text-align:center;
+">
+  <div style="font-size:28px; color:#2f3a44;">230°C</div>
+  <div style="font-size:16px; color:#5b6770;">${scoreLeft}</div>
+</div>
 
-    <!-- 右温度 -->
-    <div style="position:absolute; top:0; right:0; text-align:center;">
-      <div style="font-size:28px; color:#d62c2c;">180°C</div>
-      <div style="font-size:16px; color:#d62c2c;">${scoreRight}</div>
-    </div>
+// 右数値（そのまま）
+<div style="
+  position:absolute;
+  top:40px;
+  left:50%;
+  transform:translateX(180px);
+  text-align:center;
+">
+  <div style="font-size:28px; color:#d62c2c;">180°C</div>
+  <div style="font-size:16px; color:#d62c2c;">${scoreRight}</div>
+</div>
 
 
    // 🔵 青波
