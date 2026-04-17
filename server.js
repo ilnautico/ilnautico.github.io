@@ -42,10 +42,14 @@ function generateOverlay(scoreLeft, scoreRight) {
 
   const angle = -90 + (scoreRight * 1.8);
 
+  // ✅ 波の透明度だけ連携（形・位置は完全固定）
+  const blueOpacity = 0.5 + (scoreLeft / 200);   // 安定側
+  const redOpacity  = 1.2 - (scoreRight / 100);  // リスク側
+
   return `
 <div style="position:absolute; left:0; top:0; width:100%; height:100%; pointer-events:none;">
 
- <!-- 🔥 ベース画像 -->
+ <!-- 🔥 ベース画像（絶対触ってない） -->
 <img src="https://ilnautico.github.io/visual-base.png"
   style="
     position:absolute;
@@ -56,6 +60,7 @@ function generateOverlay(scoreLeft, scoreRight) {
     opacity:0.95;
   "
 />
+
   <!-- 左数値 -->
   <div style="
     position:absolute;
@@ -80,12 +85,13 @@ function generateOverlay(scoreLeft, scoreRight) {
     <div style="font-size:16px; color:#d62c2c;">${scoreRight}</div>
   </div>
 
-<!-- 🔵 青波 -->
+<!-- 🔵 青波（位置・形そのまま、opacityのみ連携） -->
 <svg style="
   position:absolute;
   left:50%;
   bottom:80px;
   transform:translateX(-70px);
+  opacity:${blueOpacity};
 " width="90" height="35">
   <path d="M0 18 C15 6, 30 30, 45 18 C60 6, 75 30, 90 18"
     fill="none"
@@ -93,12 +99,13 @@ function generateOverlay(scoreLeft, scoreRight) {
     stroke-width="3"/>
 </svg>
 
-<!-- 🔴 赤波 -->
+<!-- 🔴 赤波（位置・形そのまま、opacityのみ連携） -->
 <svg style="
   position:absolute;
   left:50%;
   bottom:80px;
   transform:translateX(110px);
+  opacity:${redOpacity};
 " width="90" height="35">
   <path d="M0 18 C15 6, 30 30, 45 18 C60 6, 75 30, 90 18"
     fill="none"
@@ -106,11 +113,11 @@ function generateOverlay(scoreLeft, scoreRight) {
     stroke-width="3"/>
 </svg>
 
-  <!-- 🎯 メーター -->
+  <!-- 🎯 メーター（完全そのまま） -->
   <svg style="
     position:absolute;
     right:60px;
- bottom:10px;
+    bottom:10px;
   " viewBox="0 0 200 120" width="140" height="90">
 
     <defs>
