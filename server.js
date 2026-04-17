@@ -15,97 +15,102 @@ app.use(express.urlencoded({ extended: true }));
 
 const PDF_PATH = "/tmp/latest.pdf";
 
-// =========================
-// OpenAI
-// =========================
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
 });
 
-// =========================
-// HTML TEMPLATE
-// =========================
 const htmlTemplate = fs.readFileSync(
   path.join(__dirname, "template.html"),
   "utf8"
 );
 
-// =========================
 function safe(v) {
   return v || "";
 }
 
-// =========================
-// OVERLAY
-// =========================
+//
+// 🔥 TEMPLATE非依存 overlay（完全固定版）
+//
 function generateOverlay(scoreLeft, scoreRight) {
 
   const safeRight = Math.max(0, Math.min(100, Number(scoreRight) || 0));
   const angle = -90 + (safeRight * 1.8);
 
   return `
-<div style="position:absolute; left:0; top:0; width:100%; height:100%; pointer-events:none;">
+<div style="
+  position:fixed;
+  top:0;
+  left:0;
+  width:100%;
+  height:100%;
+  pointer-events:none;
+  z-index:9999;
+">
 
   <img src="https://ilnautico.github.io/visual-base.png"
-    style="position:absolute; left:50%; top:55%; transform:translate(-50%,-50%); width:450px; opacity:0.95;"
+    style="
+      position:absolute;
+      left:50%;
+      top:38%;
+      transform:translate(-50%,-50%);
+      width:420px;
+      opacity:0.95;
+    "
   />
 
-  <div style="position:absolute; top:40px; left:50%; transform:translateX(-180px); text-align:center;">
-    <div style="font-size:28px; color:#2f3a44;">230°C</div>
-    <div style="font-size:16px; color:#5b6770;">${scoreLeft}</div>
+  <!-- 左温度 -->
+  <div style="position:absolute; top:120px; left:50%; transform:translateX(-180px); text-align:center;">
+    <div style="font-size:28px;">230°C</div>
+    <div>${scoreLeft}</div>
   </div>
 
-  <div style="position:absolute; top:40px; left:50%; transform:translateX(180px); text-align:center;">
+  <!-- 右温度 -->
+  <div style="position:absolute; top:120px; left:50%; transform:translateX(180px); text-align:center;">
     <div style="font-size:28px; color:#d62c2c;">180°C</div>
-    <div style="font-size:16px; color:#d62c2c;">${scoreRight}</div>
+    <div style="color:#d62c2c;">${scoreRight}</div>
   </div>
 
-  <svg style="position:absolute; right:60px; bottom:10px;" viewBox="0 0 200 120" width="140" height="90">
-    <defs>
-      <linearGradient id="g">
-        <stop offset="0%" stop-color="#22c55e"/>
-        <stop offset="50%" stop-color="#fde047"/>
-        <stop offset="100%" stop-color="#ef4444"/>
-      </linearGradient>
-    </defs>
+  <!-- 波 -->
+  <svg style="position:absolute; top:320px; left:50%; transform:translateX(-90px);" width="90" height="35">
+    <path d="M0 18 C15 6, 30 30, 45 18 C60 6, 75 30, 90 18"
+      fill="none"
+      stroke="#4f7c8a"
+      stroke-width="3"/>
+  </svg>
 
-    <path d="M20 100 A80 80 0 0 1 180 100 L100 100 Z" fill="url(#g)" />
+  <svg style="position:absolute; top:320px; left:50%; transform:translateX(90px);" width="90" height="35">
+    <path d="M0 18 C15 6, 30 30, 45 18 C60 6, 75 30, 90 18"
+      fill="none"
+      stroke="#d62c2c"
+      stroke-width="3"/>
+  </svg>
 
+  <!-- メーター -->
+  <svg style="position:absolute; right:60px; bottom:120px;" viewBox="0 0 200 120" width="140">
+    <path d="M20 100 A80 80 0 0 1 180 100 L100 100 Z"
+      fill="url(#g)"/>
     <g transform="rotate(${angle} 100 100)">
       <line x1="100" y1="100" x2="100" y2="30" stroke="#111" stroke-width="3"/>
     </g>
-
-    <circle cx="100" cy="100" r="4" fill="#111"/>
-
   </svg>
+
 </div>
 `;
 }
 
 // =========================
-// スコアロジック
+// ロジック
 // =========================
-function calculateScore(input) {
+function calculateScore(text) {
   let score = 100;
-  const text = Object.values(input).join(" ").toLowerCase();
 
   if (text.includes("pp")) score -= 20;
   if (text.includes("pe")) score -= 10;
   if (text.includes("pet")) score -= 30;
-
   if (text.includes("injection")) score -= 15;
   if (text.includes("film")) score -= 25;
-
-  if (text.includes("pla")) score -= 15;
-  if (text.includes("pha")) score -= 25;
-
-  // 🔥用途リスク
-  if (text.includes("microwave")) score -= 40;
-  if (text.includes("heat")) score -= 25;
-  if (text.includes("reheat")) score -= 40;
-
-  if (text.includes("dimensional")) score -= 25;
-  if (text.includes("rigidity")) score -= 15;
+  if (text.includes("pla")) score -= 10;
+  if (text.includes("pha")) score -= 20;
 
   return Math.max(score, 0);
 }
@@ -117,21 +122,10 @@ function determineDecision(score) {
   return { decision: "STOP", level: "LOW" };
 }
 
-function calculateEconomic(score) {
-  if (score >= 80) return "+5–15%";
-  if (score >= 60) return "+15–30%";
-  if (score >= 40) return "+30–60%";
-  return "+60%+";
-}
-
-// =========================
 function injectHtml(template, data) {
   let html = template;
   for (const key in data) {
-    html = html.replace(
-      new RegExp(`{{\\s*${key}\\s*}}`, "g"),
-      safe(data[key])
-    );
+    html = html.replace(new RegExp(`{{\\s*${key}\\s*}}`, "g"), safe(data[key]));
   }
   return html;
 }
@@ -145,92 +139,68 @@ app.post("/generate-report", async (req, res) => {
 
     const input = req.body;
 
-    const score = calculateScore(input);
+    const text = [
+      input.application,
+      input.material,
+      input.bio_material
+    ].join(" ").toLowerCase();
+
+    const score = calculateScore(text);
     const decisionData = determineDecision(score);
-    const economic = calculateEconomic(score);
 
-    // =========================
-    // AIプロンプト
-    // =========================
-    const prompt = `
-You are a senior technical consultant specializing in biodegradable plastics.
-
-Analyze the case deeply.
-
-Application: ${input.application}
-Product: ${input.product_type}
-Process: ${input.processing_method}
-Material: ${input.material}
-Target: ${input.bio_material}
-Mechanical: ${input.mechanical_requirement}
-Issues: ${input.known_issues}
-
-Focus on:
-- thermal resistance vs PP
-- reheating risk
-- dimensional stability
-
-Return ONLY JSON:
-
-{
-"executive_summary":"",
-"mechanical_behavior":"",
-"surface_quality":"",
-"structural_consistency":"",
-"primary_risk_title":"",
-"primary_risk":"",
-"secondary_risk_title":"",
-"secondary_risk":"",
-"mechanism":""
-}
-`;
-
-    const aiRes = await openai.chat.completions.create({
-      model: "gpt-4o",
-      messages: [{ role: "user", content: prompt }],
-      temperature: 0.4
+    // AI
+    const ai = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [{
+        role: "user",
+        content: "Explain risks of biodegradable plastics vs PP in detail."
+      }]
     });
-
-    // 🔥 JSON安全パース
-    const content = aiRes.choices[0].message.content;
-    const jsonMatch = content.match(/\{[\s\S]*\}/);
-    const aiData = JSON.parse(jsonMatch[0]);
 
     const html = injectHtml(htmlTemplate, {
 
-      executive_summary: aiData.executive_summary,
+      application: safe(input.application),
+      material_transition: safe(input.bio_material),
+      assessment_type: "Technical Hypothesis",
+      report_date: new Date().toISOString().split("T")[0],
 
-      mechanical_behavior: aiData.mechanical_behavior,
-      surface_quality: aiData.surface_quality,
-      structural_consistency: aiData.structural_consistency,
+      compatibility_level: decisionData.level,
 
-      primary_risk_title: aiData.primary_risk_title,
-      primary_risk: aiData.primary_risk,
-      secondary_risk_title: aiData.secondary_risk_title,
-      secondary_risk: aiData.secondary_risk,
-      mechanism: aiData.mechanism,
+      executive_summary: ai.choices[0].message.content,
+
+      // 🔥 全キー強制供給
+      processing_window: "Controlled validation required.",
+      thermal_behavior: "Moderate sensitivity.",
+      flow_characteristics: "Variable flow behavior.",
+      application_implication: "Pilot testing required.",
+      key_risk: "Thermal deformation and reheating instability.",
+
+      mechanical_behavior: ai.choices[0].message.content,
+      surface_quality: ai.choices[0].message.content,
+      structural_consistency: ai.choices[0].message.content,
+
+      primary_risk_title: "Thermal Deformation Risk",
+      primary_risk: ai.choices[0].message.content,
+
+      secondary_risk_title: "Reheating Instability",
+      secondary_risk: ai.choices[0].message.content,
+
+      mechanism: ai.choices[0].message.content,
 
       stability: "Moderate",
+      stability_note: "Depends on control.",
       consistency: "Moderate",
-      stability_note: "Depends on control",
-      consistency_note: "Varies with process",
+      consistency_note: "Varies with process.",
 
-      next_step: "Pilot validation recommended",
-      compatibility_level: decisionData.level,
       decision: decisionData.decision,
-      economic_impact: economic,
 
       dynamic_overlay: generateOverlay(score, score)
+
     });
 
     const browser = await puppeteer.launch({
       headless: "new",
-      args: [
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--disable-dev-shm-usage",
-        "--disable-gpu"
-      ]
+      args: ["--no-sandbox"]
     });
 
     const page = await browser.newPage();
@@ -257,18 +227,13 @@ Return ONLY JSON:
 
 });
 
-// =========================
 app.get("/latest-pdf", (req, res) => {
-  if (!fs.existsSync(PDF_PATH)) {
-    return res.status(404).send("No PDF yet");
-  }
+  if (!fs.existsSync(PDF_PATH)) return res.status(404).send("No PDF yet");
   res.sendFile(PDF_PATH);
 });
 
-const PORT = process.env.PORT || 8080;
-
-app.listen(PORT, () => {
-  console.log("🚀 Server running on", PORT);
+app.listen(8080, () => {
+  console.log("🚀 running");
 });
 const html_3man =`;
 <!DOCTYPE html>
