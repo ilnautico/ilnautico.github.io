@@ -162,7 +162,28 @@ app.post("/generate-report", async (req, res) => {
     // ---------------------
     // 🔥 一旦PDF切る（復旧優先）
     // ---------------------
-    res.send("OK");
+  const browser = await puppeteer.launch({
+  headless: "new",
+  args: ["--no-sandbox"]
+});
+
+const page = await browser.newPage();
+
+await page.setContent(html, {
+  waitUntil: "load",
+  timeout: 15000
+});
+
+const pdf = await page.pdf({
+  format: "A4",
+  printBackground: true
+});
+
+await browser.close();
+
+fs.writeFileSync(PDF_PATH, pdf);
+
+res.send("PDF generated");
 
   } catch (err) {
     console.error("❌ ERROR:", err);
