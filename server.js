@@ -132,11 +132,6 @@ function generateOverlay(scoreLeft, scoreRight) {
 </div>
 `;
 }
-
-
-</div>
-`;
-}
 // =========================
 // 判定ロジック
 // =========================
