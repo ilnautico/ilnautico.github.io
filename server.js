@@ -228,10 +228,7 @@ const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
   console.log("🚀 Server running on", PORT);
 });
-const PORT = process.env.PORT || 8080;
-app.listen(PORT, () => {
-  console.log("🚀 Server running on", PORT);
-});
+
 const html_3man =`;
 <!DOCTYPE html>
 <html>
