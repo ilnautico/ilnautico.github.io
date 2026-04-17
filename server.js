@@ -40,7 +40,8 @@ function safe(v) {
 // =========================
 function generateOverlay(scoreLeft, scoreRight) {
 
-  const angle = -90 + (scoreRight * 1.8);
+  // 🔥 針の正しい角度（水平スタートに修正）
+  const angle = (scoreRight * 1.8) - 90;
 
   return `
 <div style="
@@ -52,7 +53,7 @@ function generateOverlay(scoreLeft, scoreRight) {
   pointer-events:none;
 ">
 
-  <!-- 🔥 基準コンテナ（これが消えてたのが原因） -->
+  <!-- 🔥 中央基準コンテナ（これが全ての基準） -->
   <div style="
     position:absolute;
     left:50%;
@@ -62,10 +63,10 @@ function generateOverlay(scoreLeft, scoreRight) {
     height:240px;
   ">
 
-    <!-- 温度（左） -->
+    <!-- 左温度 -->
     <div style="
       position:absolute;
-      top:-10px;
+      top:-5px;
       left:0;
       text-align:center;
     ">
@@ -73,10 +74,10 @@ function generateOverlay(scoreLeft, scoreRight) {
       <div style="font-size:16px;">${scoreLeft}</div>
     </div>
 
-    <!-- 温度（右） -->
+    <!-- 右温度 -->
     <div style="
       position:absolute;
-      top:-10px;
+      top:-5px;
       right:0;
       text-align:center;
     ">
@@ -84,29 +85,35 @@ function generateOverlay(scoreLeft, scoreRight) {
       <div style="font-size:16px; color:#d62c2c;">${scoreRight}</div>
     </div>
 
-    <!-- 青波 -->
+    <!-- 🔵 青波（ここがズレ原因だった） -->
     <svg style="
       position:absolute;
-      left:120px;
-      bottom:40px;
+      left:140px;
+      top:140px;
     " width="90" height="35">
       <path d="M0 18 C15 6, 30 30, 45 18 C60 6, 75 30, 90 18"
-      fill="none" stroke="#4f7c8a" stroke-width="3"/>
+      fill="none"
+      stroke="#4f7c8a"
+      stroke-width="3"
+      stroke-linecap="round"/>
     </svg>
 
-    <!-- 赤波 -->
+    <!-- 🔴 赤波 -->
     <svg style="
       position:absolute;
-      right:120px;
-      bottom:40px;
+      right:140px;
+      top:140px;
     " width="90" height="35">
       <path d="M0 18 C15 6, 30 30, 45 18 C60 6, 75 30, 90 18"
-      fill="none" stroke="#d62c2c" stroke-width="3"/>
+      fill="none"
+      stroke="#d62c2c"
+      stroke-width="3"
+      stroke-linecap="round"/>
     </svg>
 
   </div>
 
-  <!-- 🎯 メーター（外側固定） -->
+  <!-- 🎯 メーター（完全固定） -->
   <svg style="
     position:absolute;
     right:60px;
@@ -121,14 +128,17 @@ function generateOverlay(scoreLeft, scoreRight) {
       </linearGradient>
     </defs>
 
+    <!-- 半円 -->
     <path d="M20 100 A80 80 0 0 1 180 100 L100 100 Z"
       fill="url(#g)"
     />
 
+    <!-- 🔥 針（中心固定＋正角度） -->
     <g transform="rotate(${angle} 100 100)">
-      <line x1="100" y1="100" x2="100" y2="25"
+      <line x1="100" y1="100" x2="100" y2="30"
         stroke="#111"
-        stroke-width="3"/>
+        stroke-width="3"
+        stroke-linecap="round"/>
     </g>
 
     <circle cx="100" cy="100" r="4" fill="#111"/>
