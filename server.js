@@ -315,16 +315,9 @@ Further validation is strongly recommended before scaling.
       timeout: 20000       // ← 安全対策
     });
 
-    const pdf = await page.pdf({
-      format: "A4",
-      printBackground: true
-    });
+   await browser.close();
 
-    await browser.close();
-
-    fs.writeFileSync(PDF_PATH, pdf);
-
-    res.send(pdf);
+res.send("OK");
 
   } catch (err) {
     console.error("❌ ERROR:", err);
