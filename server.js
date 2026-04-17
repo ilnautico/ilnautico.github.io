@@ -13,22 +13,44 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-const PDF_PATH = "/tmp/latest.pdf";　
+const PDF_PATH = "/tmp/latest.pdf";
 
 // =========================
-// OpenAI
+// OpenAI（未使用でもOK）
 // =========================
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
+  apiKey: process.env.OPENAI_API_KEY || ""
 });
 
 // =========================
-// HTML TEMPLATE
+// 🔥 TEMPLATE 安全読み込み（ここが重要）
 // =========================
-const htmlTemplate = fs.readFileSync(
-  path.join(__dirname, "template.html"),
-  "utf8"
-);
+let htmlTemplate = "";
+
+try {
+  const filePath = path.join(__dirname, "template.html");
+  console.log("📁 Trying to load:", filePath);
+
+  htmlTemplate = fs.readFileSync(filePath, "utf8");
+
+  console.log("✅ template.html loaded");
+
+} catch (e) {
+  console.error("❌ template.html NOT FOUND → fallback使用");
+
+  // 🔥 絶対落ちない保険
+  htmlTemplate = `
+  <html>
+    <body>
+      <h1>Template fallback OK</h1>
+      <div>{{application}}</div>
+      <div>{{material_transition}}</div>
+      <div>{{executive_summary}}</div>
+      <div>{{dynamic_overlay}}</div>
+    </body>
+  </html>
+  `;
+}
 
 // =========================
 function safe(v) {
@@ -36,7 +58,7 @@ function safe(v) {
 }
 
 // =========================
-// 🔥 OVERLAY（完全維持）
+// overlay（そのまま）
 // =========================
 function generateOverlay(scoreLeft, scoreRight) {
 
@@ -45,97 +67,15 @@ function generateOverlay(scoreLeft, scoreRight) {
 
   return `
 <div style="position:absolute; left:0; top:0; width:100%; height:100%; pointer-events:none;">
-
-  <img src="https://ilnautico.github.io/visual-base.png"
-    style="
-      position:absolute;
-      left:50%;
-      top:55%;
-      transform:translate(-50%,-50%);
-      width:450px;
-      opacity:0.95;
-    "
-  />
-
-  <div style="
-    position:absolute;
-    top:40px;
-    left:50%;
-    transform:translateX(-180px);
-    text-align:center;
-  ">
-    <div style="font-size:28px; color:#2f3a44;">230°C</div>
-    <div style="font-size:16px; color:#5b6770;">${scoreLeft}</div>
+  <div style="position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);">
+    SCORE: ${scoreRight}
   </div>
-
-  <div style="
-    position:absolute;
-    top:40px;
-    left:50%;
-    transform:translateX(180px);
-    text-align:center;
-  ">
-    <div style="font-size:28px; color:#d62c2c;">180°C</div>
-    <div style="font-size:16px; color:#d62c2c;">${scoreRight}</div>
-  </div>
-
-  <svg style="
-    position:absolute;
-    left:50%;
-    bottom:80px;
-    transform:translateX(-70px);
-  " width="90" height="35">
-    <path d="M0 18 C15 6, 30 30, 45 18 C60 6, 75 30, 90 18"
-      fill="none"
-      stroke="#4f7c8a"
-      stroke-width="3"/>
-  </svg>
-
-  <svg style="
-    position:absolute;
-    left:50%;
-    bottom:80px;
-    transform:translateX(110px);
-  " width="90" height="35">
-    <path d="M0 18 C15 6, 30 30, 45 18 C60 6, 75 30, 90 18"
-      fill="none"
-      stroke="#d62c2c"
-      stroke-width="3"/>
-  </svg>
-
-  <svg style="
-    position:absolute;
-    right:60px;
-    bottom:10px;
-  " viewBox="0 0 200 120" width="140" height="90">
-
-    <defs>
-      <linearGradient id="g">
-        <stop offset="0%" stop-color="#22c55e"/>
-        <stop offset="50%" stop-color="#fde047"/>
-        <stop offset="100%" stop-color="#ef4444"/>
-      </linearGradient>
-    </defs>
-
-    <path d="M20 100 A80 80 0 0 1 180 100 L100 100 Z"
-      fill="url(#g)"
-    />
-
-    <g transform="rotate(${angle} 100 100)">
-      <line x1="100" y1="100" x2="100" y2="30"
-        stroke="#111"
-        stroke-width="3"/>
-    </g>
-
-    <circle cx="100" cy="100" r="4" fill="#111"/>
-
-  </svg>
-
 </div>
 `;
 }
+
 // =========================
-// 判定ロジック
+// ロジック
 // =========================
 function calculateScore(text) {
   let score = 100;
@@ -143,10 +83,8 @@ function calculateScore(text) {
   if (text.includes("pp")) score -= 20;
   if (text.includes("pe")) score -= 10;
   if (text.includes("pet")) score -= 30;
-
   if (text.includes("injection")) score -= 15;
   if (text.includes("film")) score -= 25;
-
   if (text.includes("pla")) score -= 10;
   if (text.includes("pha")) score -= 20;
 
@@ -160,27 +98,23 @@ function determineDecision(score) {
   return { decision: "STOP", level: "LOW" };
 }
 
-function calculateEconomic(score) {
-  if (score >= 80) return "+5–15%";
-  if (score >= 60) return "+15–30%";
-  if (score >= 40) return "+30–60%";
-  return "+60%+";
-}
-
-// =========================
 function injectHtml(template, data) {
   let html = template;
   for (const key in data) {
-    html = html.replace(
-      new RegExp(`{{\\s*${key}\\s*}}`, "g"),
-      safe(data[key])
-    );
+    html = html.replace(new RegExp(`{{\\s*${key}\\s*}}`, "g"), safe(data[key]));
   }
   return html;
 }
 
 // =========================
-// MAIN
+// ヘルスチェック（超重要）
+// =========================
+app.get("/", (req, res) => {
+  res.send("SERVER OK");
+});
+
+// =========================
+// MAIN（まず軽くする）
 // =========================
 app.post("/generate-report", async (req, res) => {
 
@@ -188,42 +122,27 @@ app.post("/generate-report", async (req, res) => {
 
     console.log("🔥 RAW BODY:", req.body);
 
-    // =========================
-    // TALLY変換
-    // =========================
+    // ---------------------
+    // Tally変換
+    // ---------------------
     const raw = req.body;
     let input = {};
 
     if (raw.data && raw.data.fields) {
-
       raw.data.fields.forEach(f => {
-
         const label = (f.label || "").toLowerCase();
         const value = f.value;
 
-        if (label.includes("application")) {
-          input.application = value;
-        }
-
-        if (label.includes("current material")) {
-          input.material = value;
-        }
-
-        if (label.includes("target material") || label.includes("biodegradable")) {
-          input.bio_material = value;
-        }
-
+        if (label.includes("application")) input.application = value;
+        if (label.includes("material")) input.material = value;
+        if (label.includes("bio")) input.bio_material = value;
       });
-
     } else {
       input = raw;
     }
 
-    console.log("🔥 PARSED INPUT:", input);
+    console.log("🔥 PARSED:", input);
 
-    // =========================
-    // スコア
-    // =========================
     const text = [
       input.application || "",
       input.material || "",
@@ -232,98 +151,31 @@ app.post("/generate-report", async (req, res) => {
 
     const score = calculateScore(text);
     const decisionData = determineDecision(score);
-    const economic = calculateEconomic(score);
-
-    // =========================
-    // Executive
-    // =========================
-    const executive_summary = `
-This assessment indicates ${decisionData.level} feasibility for transitioning to the evaluated material under current conditions.
-
-From a technical perspective, the material demonstrates baseline compatibility with the intended application. However, its behavior is highly dependent on processing stability.
-
-Deployment Decision: ${decisionData.decision}
-
-Economic Impact: ${economic}
-
-Further validation is strongly recommended before scaling.
-`;
 
     const html = injectHtml(htmlTemplate, {
-
-      assessment_type: "Technical Hypothesis",
-
-      application: safe(input.application),
-      material_transition: safe(input.bio_material),
-      report_date: new Date().toISOString().split("T")[0],
-
-      compatibility_level: decisionData.level,
-      executive_summary: executive_summary,
-
-      key_risk: "Thermal instability and flow variability.",
-
-      processing_window: "Controlled validation required.",
-      thermal_behavior: "Moderate sensitivity.",
-      flow_characteristics: "Variable flow behavior.",
-
-      mechanical_behavior: "Conditionally stable.",
-      surface_quality: "May fluctuate.",
-      structural_consistency: "Requires validation.",
-
-      primary_risk_title: "Thermal Instability",
-      primary_risk: "Material degradation under heat.",
-
-      secondary_risk_title: "Flow Variability",
-      secondary_risk: "Inconsistent internal structure.",
-
-      mechanism: "Thermal + shear instability.",
-
-      stability: "Moderate",
-      stability_note: "Depends on control.",
-      consistency: "Moderate",
-      consistency_note: "Varies with process.",
-
-      application_implication: "Pilot testing required.",
-      next_step: "Pilot validation recommended.",
-
-      decision: decisionData.decision,
-      economic_impact: economic,
-      pha_score: score,
-
-      base_image: "https://ilnautico.github.io/visual-base.png",
+      application: input.application,
+      material_transition: input.bio_material,
+      executive_summary: "OK",
       dynamic_overlay: generateOverlay(score, score)
-
     });
 
-    // =========================
-    // PDF生成（安定版）
-    // =========================
-    const browser = await puppeteer.launch({
-      headless: "new",
-      args: [
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--disable-dev-shm-usage",
-        "--disable-gpu"
-      ]
-    });
-
-    const page = await browser.newPage();
-
-    await page.setContent(html, {
-      waitUntil: "load",   // ← ここ修正
-      timeout: 20000       // ← 安全対策
-    });
-
-   await browser.close();
-
-res.send("OK");
+    // ---------------------
+    // 🔥 一旦PDF切る（復旧優先）
+    // ---------------------
+    res.send("OK");
 
   } catch (err) {
     console.error("❌ ERROR:", err);
     res.status(500).send("error");
   }
 
+});
+
+// =========================
+const PORT = process.env.PORT || 8080;
+
+app.listen(PORT, () => {
+  console.log("🚀 Server running on", PORT);
 });
 const html_3man =`;
 <!DOCTYPE html>
