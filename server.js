@@ -40,91 +40,76 @@ function safe(v) {
 // =========================
 function generateOverlay(scoreLeft, scoreRight) {
 
-  const angle = -90 + (scoreRight * 1.8); // ←これ
+  const angle = -90 + (scoreRight * 1.8);
 
   return `
-<div style="
-  position:absolute;
-  left:0;
-  top:0;
-  width:100%;
-  height:100%;
-  pointer-events:none;
-">
+<div style="position:absolute; left:0; top:0; width:100%; height:100%; pointer-events:none;">
 
-  <!-- 🔥 中央基準（ここだけ重要） -->
+  <!-- 🔥 ベース画像（基準480px） -->
+  <img src="https://i.imgur.com/8Q0vG6B.png"
+    style="
+      position:absolute;
+      left:50%;
+      top:55%;
+      transform:translate(-50%,-50%);
+      width:480px;
+      opacity:0.95;
+    "
+  />
+
+  <!-- 左数値 -->
   <div style="
     position:absolute;
+    top:40px;
     left:50%;
-    top:50%;
-    transform:translate(-50%,-50%);
-    width:480px;
-    height:300px;
+    transform:translateX(-180px);
+    text-align:center;
   ">
+    <div style="font-size:28px; color:#2f3a44;">230°C</div>
+    <div style="font-size:16px; color:#5b6770;">${scoreLeft}</div>
+  </div>
 
-    // 左数値（そのまま）
-<div style="
-  position:absolute;
-  top:40px;
-  left:50%;
-  transform:translateX(-180px);
-  text-align:center;
-">
-  <div style="font-size:28px; color:#2f3a44;">230°C</div>
-  <div style="font-size:16px; color:#5b6770;">${scoreLeft}</div>
-</div>
+  <!-- 右数値 -->
+  <div style="
+    position:absolute;
+    top:40px;
+    left:50%;
+    transform:translateX(180px);
+    text-align:center;
+  ">
+    <div style="font-size:28px; color:#d62c2c;">180°C</div>
+    <div style="font-size:16px; color:#d62c2c;">${scoreRight}</div>
+  </div>
 
-// 右数値（そのまま）
-<div style="
-  position:absolute;
-  top:40px;
-  left:50%;
-  transform:translateX(180px);
-  text-align:center;
-">
-  <div style="font-size:28px; color:#d62c2c;">180°C</div>
-  <div style="font-size:16px; color:#d62c2c;">${scoreRight}</div>
-</div>
+  <!-- 🔵 青波 -->
+  <svg style="
+    position:absolute;
+    left:50%;
+    bottom:80px;
+    transform:translateX(-140px);
+  " width="90" height="35" viewBox="0 0 90 35">
+    <path d="M0 18 C15 6, 30 30, 45 18 C60 6, 75 30, 90 18"
+      fill="none"
+      stroke="#4f7c8a"
+      stroke-width="3"
+      stroke-linecap="round"/>
+  </svg>
 
+  <!-- 🔴 赤波 -->
+  <svg style="
+    position:absolute;
+    left:50%;
+    bottom:80px;
+    transform:translateX(80px);
+  " width="90" height="35" viewBox="0 0 90 35">
+    <path d="M0 18 C15 6, 30 30, 45 18 C60 6, 75 30, 90 18"
+      fill="none"
+      stroke="#d62c2c"
+      stroke-width="3"
+      stroke-linecap="round"/>
+  </svg>
 
-// 🔵 青波（左）
-<svg style="
-  position:absolute;
-  left:50%;
-  bottom:75px;
-  transform:translateX(-140px);
-" width="90" height="35" viewBox="0 0 90 35">
-  <path d="
-    M0 18
-    C15 6, 30 30, 45 18
-    C60 6, 75 30, 90 18
-  "
-  fill="none"
-  stroke="#4f7c8a"
-  stroke-width="3"
-  stroke-linecap="round"/>
-</svg>
-
-
-// 🔴 赤波（右）
-<svg style="
-  position:absolute;
-  left:50%;
-  bottom:75px;
-  transform:translateX(40px);
-" width="90" height="35" viewBox="0 0 90 35">
-  <path d="
-    M0 18
-    C15 6, 30 30, 45 18
-    C60 6, 75 30, 90 18
-  "
-  fill="none"
-  stroke="#d62c2c"
-  stroke-width="3"
-  stroke-linecap="round"/>
-</svg>
-
-  <!-- 🎯 メーター（これは正しい） -->
+  <!-- 🎯 メーター -->
   <svg style="
     position:absolute;
     right:60px;
