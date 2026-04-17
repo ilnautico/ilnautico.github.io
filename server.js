@@ -10,8 +10,12 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 
+// =========================
+// 🔥 ここが今回の核心（全部受け取る）
+// =========================
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(express.text({ type: "*/*" }));
 
 const PDF_PATH = "/tmp/latest.pdf";
 
@@ -23,32 +27,27 @@ const openai = new OpenAI({
 });
 
 // =========================
-// TEMPLATE（安全読み込み）
+// TEMPLATE（安全）
 // =========================
 let htmlTemplate = "";
 
 try {
   const filePath = path.join(__dirname, "template.html");
   console.log("📁 Trying to load:", filePath);
-
   htmlTemplate = fs.readFileSync(filePath, "utf8");
-
   console.log("✅ template.html loaded");
-
 } catch (e) {
-  console.error("❌ template.html NOT FOUND");
-
+  console.error("❌ template fallback");
   htmlTemplate = `
   <html>
     <body>
-      <h1>Fallback Template</h1>
-      <div>{{application}}</div>
-      <div>{{material_transition}}</div>
-      <div>{{executive_summary}}</div>
-      <div>{{dynamic_overlay}}</div>
+      <h1>Fallback</h1>
+      {{application}}
+      {{material_transition}}
+      {{executive_summary}}
+      {{dynamic_overlay}}
     </body>
-  </html>
-  `;
+  </html>`;
 }
 
 // =========================
@@ -57,20 +56,18 @@ function safe(v) {
 }
 
 // =========================
-// overlay（軽量版）
+// overlay
 // =========================
 function generateOverlay(scoreLeft, scoreRight) {
-
   const safeRight = Math.max(0, Math.min(100, Number(scoreRight) || 0));
-  const angle = -90 + (safeRight * 1.8);
+  const angle = -90 + safeRight * 1.8;
 
   return `
-<div style="position:absolute; left:0; top:0; width:100%; height:100%;">
-  <div style="position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);">
-    SCORE: ${scoreRight}
+<div style="position:absolute;width:100%;height:100%;">
+  <div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);">
+    SCORE: ${safeRight}
   </div>
-</div>
-`;
+</div>`;
 }
 
 // =========================
@@ -78,7 +75,6 @@ function generateOverlay(scoreLeft, scoreRight) {
 // =========================
 function calculateScore(text) {
   let score = 100;
-
   if (text.includes("pp")) score -= 20;
   if (text.includes("pe")) score -= 10;
   if (text.includes("pet")) score -= 30;
@@ -86,7 +82,6 @@ function calculateScore(text) {
   if (text.includes("film")) score -= 25;
   if (text.includes("pla")) score -= 10;
   if (text.includes("pha")) score -= 20;
-
   return Math.max(score, 0);
 }
 
@@ -113,32 +108,32 @@ app.get("/", (req, res) => {
 });
 
 // =========================
-// MAIN（デバッグ版）
+// MAIN
 // =========================
 app.post("/generate-report", async (req, res) => {
 
   try {
 
-    console.log("🔥 STEP 0: REQUEST RECEIVED");
+    console.log("🔥 HIT:", req.method, req.url);
+    console.log("🔥 RAW BODY:", req.body);
 
-    console.log("🔥 BODY FULL:", JSON.stringify(req.body, null, 2));
+    // =========================
+    // 🔥 BODY解析（完全対応）
+    // =========================
+    let raw = req.body;
 
-    const raw = req.body;
-
-    console.log("🔥 STEP 1: START PARSE");
+    if (typeof raw === "string") {
+      try {
+        raw = JSON.parse(raw);
+      } catch {
+        console.log("⚠️ 非JSON形式");
+      }
+    }
 
     let input = {};
 
-    // =========================
-    // Tally形式
-    // =========================
     if (raw.data && raw.data.fields) {
-
-      console.log("🔥 STEP 2: TALLY FORMAT DETECTED");
-
-      raw.data.fields.forEach((f, i) => {
-        console.log(`🔥 FIELD ${i}:`, f);
-
+      raw.data.fields.forEach(f => {
         const label = (f.label || "").toLowerCase();
         const value = f.value;
 
@@ -146,15 +141,11 @@ app.post("/generate-report", async (req, res) => {
         if (label.includes("material")) input.material = value;
         if (label.includes("bio")) input.bio_material = value;
       });
-
     } else {
-
-      console.log("🔥 STEP 2: DIRECT JSON FORMAT");
-
       input = raw;
     }
 
-    console.log("🔥 STEP 3: PARSED INPUT:", input);
+    console.log("🔥 PARSED:", input);
 
     const text = [
       input.application || "",
@@ -162,35 +153,62 @@ app.post("/generate-report", async (req, res) => {
       input.bio_material || ""
     ].join(" ").toLowerCase();
 
-    console.log("🔥 STEP 4: TEXT:", text);
-
     const score = calculateScore(text);
-
-    console.log("🔥 STEP 5: SCORE:", score);
-
     const decisionData = determineDecision(score);
-
-    console.log("🔥 STEP 6: DECISION:", decisionData);
 
     const html = injectHtml(htmlTemplate, {
       application: input.application,
       material_transition: input.bio_material,
-      executive_summary: "DEBUG MODE",
+      executive_summary: decisionData.decision,
       dynamic_overlay: generateOverlay(score, score)
     });
 
-    console.log("🔥 STEP 7: HTML GENERATED");
+    // =========================
+    // 🔥 安定版PDF生成
+    // =========================
+    const browser = await puppeteer.launch({
+      headless: "new",
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-gpu"
+      ]
+    });
 
-    // =========================
-    // 一旦PDF止める（重要）
-    // =========================
-    res.send("DEBUG OK");
+    const page = await browser.newPage();
+
+    await page.setContent(html, {
+      waitUntil: "load",
+      timeout: 15000
+    });
+
+    const pdf = await page.pdf({
+      format: "A4",
+      printBackground: true
+    });
+
+    await browser.close();
+
+    fs.writeFileSync(PDF_PATH, pdf);
+
+    res.send("PDF generated");
 
   } catch (err) {
     console.error("❌ ERROR:", err);
     res.status(500).send("error");
   }
 
+});
+
+// =========================
+// PDF取得
+// =========================
+app.get("/latest-pdf", (req, res) => {
+  if (!fs.existsSync(PDF_PATH)) {
+    return res.status(404).send("No PDF yet");
+  }
+  res.sendFile(PDF_PATH);
 });
 
 // =========================
