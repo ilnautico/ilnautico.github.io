@@ -87,12 +87,12 @@ function generateOverlay(scoreLeft, scoreRight) {
 </div>
 
 
-   // 🔵 青波（左）
+  // 🔵 青波（左）
 <svg style="
   position:absolute;
   left:50%;
-  bottom:90px;
-  transform:translateX(-120px);
+  bottom:70px;
+  transform:translateX(-150px);
 " width="90" height="35" viewBox="0 0 90 35">
   <path d="
     M0 18
@@ -110,8 +110,8 @@ function generateOverlay(scoreLeft, scoreRight) {
 <svg style="
   position:absolute;
   left:50%;
-  bottom:90px;
-  transform:translateX(60px);
+  bottom:70px;
+  transform:translateX(90px);
 " width="90" height="35" viewBox="0 0 90 35">
   <path d="
     M0 18
@@ -123,6 +123,7 @@ function generateOverlay(scoreLeft, scoreRight) {
   stroke-width="3"
   stroke-linecap="round"/>
 </svg>
+
   <!-- 🎯 メーター（これは正しい） -->
   <svg style="
     position:absolute;
