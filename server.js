@@ -40,8 +40,7 @@ function safe(v) {
 // =========================
 function generateOverlay(scoreLeft, scoreRight) {
 
-  const safeRight = Math.max(0, Math.min(100, Number(scoreRight) || 0));
-  const angle = -90 + (safeRight * 1.8);
+  const angle = -90 + (scoreRight * 1.8);
 
   return `
 <div style="position:absolute; left:0; top:0; width:100%; height:100%; pointer-events:none;">
@@ -57,58 +56,31 @@ function generateOverlay(scoreLeft, scoreRight) {
     "
   />
 
-  <div style="
-    position:absolute;
-    top:40px;
-    left:50%;
-    transform:translateX(-180px);
-    text-align:center;
-  ">
+  <div style="position:absolute; top:40px; left:50%; transform:translateX(-180px); text-align:center;">
     <div style="font-size:28px; color:#2f3a44;">230°C</div>
     <div style="font-size:16px; color:#5b6770;">${scoreLeft}</div>
   </div>
 
-  <div style="
-    position:absolute;
-    top:40px;
-    left:50%;
-    transform:translateX(180px);
-    text-align:center;
-  ">
+  <div style="position:absolute; top:40px; left:50%; transform:translateX(180px); text-align:center;">
     <div style="font-size:28px; color:#d62c2c;">180°C</div>
     <div style="font-size:16px; color:#d62c2c;">${scoreRight}</div>
   </div>
 
-  <svg style="
-    position:absolute;
-    left:50%;
-    bottom:80px;
-    transform:translateX(-70px);
-  " width="90" height="35">
+  <svg style="position:absolute; left:50%; bottom:80px; transform:translateX(-70px);" width="90" height="35">
     <path d="M0 18 C15 6, 30 30, 45 18 C60 6, 75 30, 90 18"
       fill="none"
       stroke="#4f7c8a"
       stroke-width="3"/>
   </svg>
 
-  <svg style="
-    position:absolute;
-    left:50%;
-    bottom:80px;
-    transform:translateX(110px);
-  " width="90" height="35">
+  <svg style="position:absolute; left:50%; bottom:80px; transform:translateX(110px);" width="90" height="35">
     <path d="M0 18 C15 6, 30 30, 45 18 C60 6, 75 30, 90 18"
       fill="none"
       stroke="#d62c2c"
       stroke-width="3"/>
   </svg>
 
-  <svg style="
-    position:absolute;
-    right:60px;
-    bottom:10px;
-  " viewBox="0 0 200 120" width="140" height="90">
-
+  <svg style="position:absolute; right:60px; bottom:10px;" viewBox="0 0 200 120" width="140" height="90">
     <defs>
       <linearGradient id="g">
         <stop offset="0%" stop-color="#22c55e"/>
@@ -117,14 +89,10 @@ function generateOverlay(scoreLeft, scoreRight) {
       </linearGradient>
     </defs>
 
-    <path d="M20 100 A80 80 0 0 1 180 100 L100 100 Z"
-      fill="url(#g)"
-    />
+    <path d="M20 100 A80 80 0 0 1 180 100 L100 100 Z" fill="url(#g)" />
 
     <g transform="rotate(${angle} 100 100)">
-      <line x1="100" y1="100" x2="100" y2="30"
-        stroke="#111"
-        stroke-width="3"/>
+      <line x1="100" y1="100" x2="100" y2="30" stroke="#111" stroke-width="3"/>
     </g>
 
     <circle cx="100" cy="100" r="4" fill="#111"/>
