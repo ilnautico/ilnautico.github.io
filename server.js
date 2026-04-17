@@ -45,17 +45,17 @@ function generateOverlay(scoreLeft, scoreRight) {
   return `
 <div style="position:absolute; left:0; top:0; width:100%; height:100%; pointer-events:none;">
 
-  <!-- 🔥 ベース画像（基準480px） -->
-  <img src="https://i.imgur.com/8Q0vG6B.png"
-    style="
-      position:absolute;
-      left:50%;
-      top:55%;
-      transform:translate(-50%,-50%);
-      width:480px;
-      opacity:0.95;
-    "
-  />
+  <!-- 🔥 ベース画像（完全復元） -->
+<img src="https://ilnautico.github.io/visual-base.png"
+  style="
+    position:absolute;
+    left:50%;
+    top:55%;
+    transform:translate(-50%,-50%);
+    width:480px;
+    opacity:0.95;
+  "
+/>
 
   <!-- 左数値 -->
   <div style="
