@@ -45,18 +45,17 @@ function generateOverlay(scoreLeft, scoreRight) {
   return `
 <div style="position:absolute; left:0; top:0; width:100%; height:100%; pointer-events:none;">
 
-  <!-- 🔥 ベース画像（完全復元） -->
+ <!-- 🔥 ベース画像 -->
 <img src="https://ilnautico.github.io/visual-base.png"
   style="
     position:absolute;
     left:50%;
     top:55%;
     transform:translate(-50%,-50%);
-    width:480px;
+    width:460px;
     opacity:0.95;
   "
 />
-
   <!-- 左数値 -->
   <div style="
     position:absolute;
@@ -82,32 +81,31 @@ function generateOverlay(scoreLeft, scoreRight) {
   </div>
 
   <!-- 🔵 青波 -->
-  <svg style="
-    position:absolute;
-    left:50%;
-    bottom:80px;
-    transform:translateX(-140px);
-  " width="90" height="35" viewBox="0 0 90 35">
-    <path d="M0 18 C15 6, 30 30, 45 18 C60 6, 75 30, 90 18"
-      fill="none"
-      stroke="#4f7c8a"
-      stroke-width="3"
-      stroke-linecap="round"/>
-  </svg>
+ <!-- 🔵 青波 -->
+<svg style="
+  position:absolute;
+  left:50%;
+  bottom:80px;
+  transform:translateX(-110px);
+" width="90" height="35">
+  <path d="M0 18 C15 6, 30 30, 45 18 C60 6, 75 30, 90 18"
+    fill="none"
+    stroke="#4f7c8a"
+    stroke-width="3"/>
+</svg>
 
-  <!-- 🔴 赤波 -->
-  <svg style="
-    position:absolute;
-    left:50%;
-    bottom:80px;
-    transform:translateX(80px);
-  " width="90" height="35" viewBox="0 0 90 35">
-    <path d="M0 18 C15 6, 30 30, 45 18 C60 6, 75 30, 90 18"
-      fill="none"
-      stroke="#d62c2c"
-      stroke-width="3"
-      stroke-linecap="round"/>
-  </svg>
+<!-- 🔴 赤波 -->
+<svg style="
+  position:absolute;
+  left:50%;
+  bottom:80px;
+  transform:translateX(110px);
+" width="90" height="35">
+  <path d="M0 18 C15 6, 30 30, 45 18 C60 6, 75 30, 90 18"
+    fill="none"
+    stroke="#d62c2c"
+    stroke-width="3"/>
+</svg>
 
   <!-- 🎯 メーター -->
   <svg style="
