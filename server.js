@@ -74,30 +74,28 @@ function generateOverlay(scoreLeft, scoreRight) {
       <div style="font-size:16px; color:#d62c2c;">${scoreRight}</div>
     </div>
 
-    <!-- 🔵 青波（完全復元位置） -->
-    <svg style="
-      position:absolute;
-      left:140px;
-      top:190px;
-    " width="90" height="35">
-      <path d="M0 18 C15 6, 30 30, 45 18 C60 6, 75 30, 90 18"
-      fill="none"
-      stroke="#4f7c8a"
-      stroke-width="3"/>
-    </svg>
 
-    <!-- 🔴 赤波 -->
-    <svg style="
-      position:absolute;
-      right:140px;
-      top:190px;
-    " width="90" height="35">
-      <path d="M0 18 C15 6, 30 30, 45 18 C60 6, 75 30, 90 18"
-      fill="none"
-      stroke="#d62c2c"
-      stroke-width="3"/>
-    </svg>
+   // 🔵 青波
+<svg style="
+  position:absolute;
+  left:50%;
+  top:62%;
+  transform:translateX(-70px);
+" width="90" height="35">
+  <path d="M0 18 C15 6, 30 30, 45 18 C60 6, 75 30, 90 18"
+  fill="none" stroke="#4f7c8a" stroke-width="3"/>
+</svg>
 
+// 🔴 赤波
+<svg style="
+  position:absolute;
+  left:50%;
+  top:62%;
+  transform:translateX(70px);
+" width="90" height="35">
+  <path d="M0 18 C15 6, 30 30, 45 18 C60 6, 75 30, 90 18"
+  fill="none" stroke="#d62c2c" stroke-width="3"/>
+</svg>
   </div>
 
   <!-- 🎯 メーター（これは正しい） -->
