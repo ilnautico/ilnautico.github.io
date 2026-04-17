@@ -10,8 +10,57 @@ app.use(express.urlencoded({ extended: true }));
 const PDF_PATH = "/tmp/latest.pdf";
 
 // =========================
-// Overlay（グラフィック）
+// 🔥 HTMLテンプレ（これが無いと全部死ぬ）
+const htmlTemplate = `
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>FairVia Report</title>
+<style>
+body {
+  font-family: Arial, sans-serif;
+  padding: 40px;
+  position: relative;
+}
+h2 {
+  margin-bottom: 10px;
+}
+.section {
+  margin-bottom: 20px;
+}
+</style>
+</head>
+
+<body>
+
+<h2>{{assessment_type}}</h2>
+
+<div class="section">
+  {{executive_summary}}
+</div>
+
+<div class="section">
+  <strong>Key Risk</strong><br>
+  {{key_risk}}
+</div>
+
+<div class="section">
+  <strong>Next Step</strong><br>
+  {{next_step}}
+</div>
+
+<!-- グラフィック -->
+<div>
+  {{dynamic_overlay}}
+</div>
+
+</body>
+</html>
+`;
+
 // =========================
+// Overlay
 function generateOverlay(scoreLeft, scoreRight) {
 
   const angle = -90 + (scoreRight * 1.8);
@@ -31,46 +80,20 @@ function generateOverlay(scoreLeft, scoreRight) {
   />
 
   <div style="position:absolute; top:40px; left:50%; transform:translateX(-180px); text-align:center;">
-    <div style="font-size:28px; color:#2f3a44;">230°C</div>
-    <div style="font-size:16px; color:#5b6770;">${scoreLeft}</div>
+    <div style="font-size:28px;">230°C</div>
+    <div>${scoreLeft}</div>
   </div>
 
   <div style="position:absolute; top:40px; left:50%; transform:translateX(180px); text-align:center;">
-    <div style="font-size:28px; color:#d62c2c;">180°C</div>
-    <div style="font-size:16px; color:#d62c2c;">${scoreRight}</div>
+    <div style="font-size:28px; color:red;">180°C</div>
+    <div>${scoreRight}</div>
   </div>
 
-  <svg style="position:absolute; left:50%; bottom:80px; transform:translateX(-70px);" width="90" height="35">
-    <path d="M0 18 C15 6, 30 30, 45 18 C60 6, 75 30, 90 18"
-      fill="none"
-      stroke="#4f7c8a"
-      stroke-width="3"/>
-  </svg>
-
-  <svg style="position:absolute; left:50%; bottom:80px; transform:translateX(110px);" width="90" height="35">
-    <path d="M0 18 C15 6, 30 30, 45 18 C60 6, 75 30, 90 18"
-      fill="none"
-      stroke="#d62c2c"
-      stroke-width="3"/>
-  </svg>
-
-  <svg style="position:absolute; right:60px; bottom:10px;" viewBox="0 0 200 120" width="140" height="90">
-    <defs>
-      <linearGradient id="g">
-        <stop offset="0%" stop-color="#22c55e"/>
-        <stop offset="50%" stop-color="#fde047"/>
-        <stop offset="100%" stop-color="#ef4444"/>
-      </linearGradient>
-    </defs>
-
-    <path d="M20 100 A80 80 0 0 1 180 100 L100 100 Z" fill="url(#g)" />
-
+  <svg style="position:absolute; right:60px; bottom:10px;" viewBox="0 0 200 120" width="140">
+    <path d="M20 100 A80 80 0 0 1 180 100 L100 100 Z" fill="lightgray"/>
     <g transform="rotate(${angle} 100 100)">
-      <line x1="100" y1="100" x2="100" y2="30" stroke="#111" stroke-width="3"/>
+      <line x1="100" y1="100" x2="100" y2="30" stroke="black"/>
     </g>
-
-    <circle cx="100" cy="100" r="4" fill="#111"/>
-
   </svg>
 
 </div>
@@ -79,7 +102,6 @@ function generateOverlay(scoreLeft, scoreRight) {
 
 // =========================
 // ロジック
-// =========================
 function calculateScore(text) {
   let score = 100;
 
@@ -110,7 +132,6 @@ function calculateEconomic(score) {
 
 // =========================
 // HTML差し込み
-// =========================
 function injectHtml(template, data) {
   let html = template;
   for (const key in data) {
@@ -121,66 +142,44 @@ function injectHtml(template, data) {
 
 // =========================
 // MAIN
-// =========================
 app.post("/generate-report", async (req, res) => {
 
   try {
 
     const input = req.body;
 
-    const text = [
-      input.application || "",
-      input.material || "",
-      input.bio_material || ""
-    ].join(" ").toLowerCase();
+    const scoreLeft = calculateScore((input.material || "").toLowerCase());
+    const scoreRight = calculateScore((input.bio_material || "").toLowerCase());
 
-    const score = calculateScore(text);
-    const decisionData = determineDecision(score);
-    const economic = calculateEconomic(score);
+    const decisionData = determineDecision(scoreRight);
+    const economic = calculateEconomic(scoreRight);
 
     const executive_summary = `
-This assessment indicates ${decisionData.level} feasibility for transitioning to the evaluated material under current conditions.
-
-From a technical perspective, the material demonstrates baseline compatibility with the intended application. However, its behavior is highly dependent on processing stability, particularly in relation to thermal exposure and shear conditions.
+This assessment indicates ${decisionData.level} feasibility.
 
 Deployment Decision: ${decisionData.decision}
 
-At this stage, the transition should not be interpreted as production-ready. Instead, it represents a controlled feasibility scenario where further validation is essential.
-
-Operationally, the key consideration lies not in whether the material can run, but in whether it can run consistently within acceptable quality thresholds.
-
 Economic Impact: ${economic}
-
-Proceeding without structured validation may lead to unstable production outcomes, increased material loss, and potential equipment stress. Therefore, a phased validation approach is strongly recommended prior to any commitment to scale.
 `;
 
     const html = injectHtml(htmlTemplate, {
-      executive_summary: executive_summary,
-      key_risk: "Thermal sensitivity and flow instability introduce variability.",
-      next_step: "Pilot validation recommended.",
-      dynamic_overlay: generateOverlay(score, score)
+      assessment_type: "Technical Hypothesis",
+      executive_summary,
+      key_risk: "Thermal instability risk",
+      next_step: "Pilot validation recommended",
+      dynamic_overlay: generateOverlay(scoreLeft, scoreRight)
     });
 
     const browser = await puppeteer.launch({
       headless: "new",
-      args: [
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--disable-dev-shm-usage",
-        "--disable-gpu"
-      ]
+      args: ["--no-sandbox"]
     });
 
     const page = await browser.newPage();
 
-    await page.setContent(html, {
-      waitUntil: ["networkidle0", "load"]
-    });
+    await page.setContent(html);
 
-    const pdf = await page.pdf({
-      format: "A4",
-      printBackground: true
-    });
+    const pdf = await page.pdf({ format: "A4" });
 
     await browser.close();
 
@@ -197,7 +196,6 @@ Proceeding without structured validation may lead to unstable production outcome
 
 // =========================
 // PDF取得
-// =========================
 app.get("/latest-pdf", (req, res) => {
   if (!fs.existsSync(PDF_PATH)) {
     return res.status(404).send("No PDF yet");
