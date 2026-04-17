@@ -16,7 +16,7 @@ app.use(express.urlencoded({ extended: true }));
 const PDF_PATH = "/tmp/latest.pdf";
 
 // =========================
-// OpenAI
+// OpenAI（未使用でも残す）
 // =========================
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
@@ -36,12 +36,14 @@ function safe(v) {
 }
 
 // =========================
-// 🔥 OVERLAY（完全維持）
+// OVERLAY（完全維持）
 // =========================
 function generateOverlay(scoreLeft, scoreRight) {
 
   const safeRight = Math.max(0, Math.min(100, Number(scoreRight) || 0));
-  const angle = -90 + (safeRight * 1.8);
+
+  // 🔥 正しい位置（60〜70に来る）
+  const angle = -90 + (safeRight * 1.4);
 
   return `
 <div style="position:absolute; left:0; top:0; width:100%; height:100%; pointer-events:none;">
@@ -57,57 +59,31 @@ function generateOverlay(scoreLeft, scoreRight) {
     "
   />
 
-  <div style="
-    position:absolute;
-    top:40px;
-    left:50%;
-    transform:translateX(-180px);
-    text-align:center;
-  ">
+  <div style="position:absolute; top:40px; left:50%; transform:translateX(-180px); text-align:center;">
     <div style="font-size:28px; color:#2f3a44;">230°C</div>
     <div style="font-size:16px; color:#5b6770;">${scoreLeft}</div>
   </div>
 
-  <div style="
-    position:absolute;
-    top:40px;
-    left:50%;
-    transform:translateX(180px);
-    text-align:center;
-  ">
+  <div style="position:absolute; top:40px; left:50%; transform:translateX(180px); text-align:center;">
     <div style="font-size:28px; color:#d62c2c;">180°C</div>
     <div style="font-size:16px; color:#d62c2c;">${scoreRight}</div>
   </div>
 
-  <svg style="
-    position:absolute;
-    left:50%;
-    bottom:80px;
-    transform:translateX(-70px);
-  " width="90" height="35">
+  <svg style="position:absolute; left:50%; bottom:80px; transform:translateX(-70px);" width="90" height="35">
     <path d="M0 18 C15 6, 30 30, 45 18 C60 6, 75 30, 90 18"
       fill="none"
       stroke="#4f7c8a"
       stroke-width="3"/>
   </svg>
 
-  <svg style="
-    position:absolute;
-    left:50%;
-    bottom:80px;
-    transform:translateX(110px);
-  " width="90" height="35">
+  <svg style="position:absolute; left:50%; bottom:80px; transform:translateX(110px);" width="90" height="35">
     <path d="M0 18 C15 6, 30 30, 45 18 C60 6, 75 30, 90 18"
       fill="none"
       stroke="#d62c2c"
       stroke-width="3"/>
   </svg>
 
-  <svg style="
-    position:absolute;
-    right:60px;
-    bottom:10px;
-  " viewBox="0 0 200 120" width="140" height="90">
+  <svg style="position:absolute; right:60px; bottom:10px;" viewBox="0 0 200 120" width="140" height="90">
 
     <defs>
       <linearGradient id="g">
@@ -117,14 +93,10 @@ function generateOverlay(scoreLeft, scoreRight) {
       </linearGradient>
     </defs>
 
-    <path d="M20 100 A80 80 0 0 1 180 100 L100 100 Z"
-      fill="url(#g)"
-    />
+    <path d="M20 100 A80 80 0 0 1 180 100 L100 100 Z" fill="url(#g)" />
 
     <g transform="rotate(${angle} 100 100)">
-      <line x1="100" y1="100" x2="100" y2="30"
-        stroke="#111"
-        stroke-width="3"/>
+      <line x1="100" y1="100" x2="100" y2="30" stroke="#111" stroke-width="3"/>
     </g>
 
     <circle cx="100" cy="100" r="4" fill="#111"/>
@@ -144,26 +116,12 @@ function calculateScore(text) {
   if (text.includes("pp")) score -= 20;
   if (text.includes("pe")) score -= 10;
   if (text.includes("pet")) score -= 30;
-
   if (text.includes("injection")) score -= 15;
   if (text.includes("film")) score -= 25;
-
   if (text.includes("pla")) score -= 10;
   if (text.includes("pha")) score -= 20;
 
   return Math.max(score, 0);
-}
-
-// 🔥 左右スコア分離
-function calculateLeftScore(text) {
-  let score = 100;
-  if (text.includes("pp")) score = 90;
-  if (text.includes("pe")) score = 80;
-  return score;
-}
-
-function calculateRightScore(text) {
-  return calculateScore(text);
 }
 
 function determineDecision(score) {
@@ -180,6 +138,8 @@ function calculateEconomic(score) {
   return "+60%+";
 }
 
+// =========================
+// HTML差し込み
 // =========================
 function injectHtml(template, data) {
   let html = template;
@@ -202,16 +162,14 @@ app.post("/generate-report", async (req, res) => {
     const input = req.body;
 
     const text = [
-      input.application,
-      input.material,
-      input.bio_material
+      input.application || "",
+      input.material || "",
+      input.bio_material || ""
     ].join(" ").toLowerCase();
 
-    const scoreLeft = calculateLeftScore(text);
-    const scoreRight = calculateRightScore(text);
-
-    const decisionData = determineDecision(scoreRight);
-    const economic = calculateEconomic(scoreRight);
+    const score = calculateScore(text);
+    const decisionData = determineDecision(score);
+    const economic = calculateEconomic(score);
 
     const executive_summary = `
 This assessment indicates ${decisionData.level} feasibility for transitioning to the evaluated material under current conditions.
@@ -220,18 +178,71 @@ From a technical perspective, the material demonstrates baseline compatibility w
 
 Deployment Decision: ${decisionData.decision}
 
+At this stage, the transition should not be interpreted as production-ready. Instead, it represents a controlled feasibility scenario where further validation is essential.
+
+Operationally, the key consideration lies not in whether the material can run, but in whether it can run consistently within acceptable quality thresholds.
+
 Economic Impact: ${economic}
 
-Proceeding without structured validation is not recommended.
+Proceeding without structured validation may lead to unstable production outcomes, increased material loss, and potential equipment stress. Therefore, a phased validation approach is strongly recommended prior to any commitment to scale.
 `;
 
     const html = injectHtml(htmlTemplate, {
 
-      executive_summary,
-      key_risk: "Thermal instability and flow variability",
-      next_step: "Pilot validation recommended",
+      assessment_type: "Technical Hypothesis",
+      application: safe(input.application),
+      material_transition: safe(input.bio_material),
+      report_date: new Date().toISOString().split("T")[0],
+      compatibility_level: decisionData.level,
 
-      dynamic_overlay: generateOverlay(scoreLeft, scoreRight)
+      executive_summary,
+
+      key_risk: `
+Thermal sensitivity and flow instability introduce variability in processing performance.
+`,
+
+      processing_window: "Controlled validation required.",
+      thermal_behavior: "Moderate sensitivity.",
+      flow_characteristics: "Variable flow behavior.",
+
+      mechanical_behavior: `
+Mechanical performance is conditionally acceptable under controlled processing conditions.
+`,
+
+      surface_quality: `
+Surface uniformity may fluctuate depending on cooling consistency.
+`,
+
+      structural_consistency: `
+Internal consistency requires validation under real processing conditions.
+`,
+
+      primary_risk_title: "Thermal Instability Under Elevated Conditions",
+      primary_risk: `
+Material degradation may occur under high temperature exposure.
+`,
+
+      secondary_risk_title: "Flow Variability",
+      secondary_risk: `
+Unstable flow may cause inconsistency in structure.
+`,
+
+      mechanism: `
+Thermal + shear instability is the core mechanism.
+`,
+
+      stability: "Moderate",
+      stability_note: "Depends on control.",
+      consistency: "Moderate",
+      consistency_note: "Varies with process.",
+
+      application_implication: "Pilot testing required.",
+      next_step: "Pilot validation recommended.",
+
+      decision: decisionData.decision,
+      economic_impact: economic,
+
+      dynamic_overlay: generateOverlay(score, score)
 
     });
 
@@ -266,6 +277,7 @@ Proceeding without structured validation is not recommended.
     console.error(err);
     res.status(500).send("error");
   }
+
 });
 
 // =========================
@@ -276,7 +288,9 @@ app.get("/latest-pdf", (req, res) => {
   res.sendFile(PDF_PATH);
 });
 
+// =========================
 const PORT = process.env.PORT || 8080;
+
 app.listen(PORT, () => {
   console.log("🚀 Server running on", PORT);
 });
