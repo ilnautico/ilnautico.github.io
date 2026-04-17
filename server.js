@@ -41,6 +41,8 @@ function safe(v) {
 // =========================
 // Overlay（そのまま）
 // =========================
+// =========================
+// Overlay（そのまま）
 function generateOverlay(scoreLeft, scoreRight) {
 
   const angle = -90 + (scoreRight * 1.8);
@@ -108,16 +110,17 @@ function generateOverlay(scoreLeft, scoreRight) {
 
 
 // =========================
-// ロジック
-// =========================
+// ロジック（削除なし）
 function calculateScore(text) {
   let score = 100;
 
   if (text.includes("pp")) score -= 20;
   if (text.includes("pe")) score -= 10;
   if (text.includes("pet")) score -= 30;
+
   if (text.includes("injection")) score -= 15;
   if (text.includes("film")) score -= 25;
+
   if (text.includes("pla")) score -= 10;
   if (text.includes("pha")) score -= 20;
 
@@ -152,7 +155,6 @@ function injectHtml(template, data) {
 
 // =========================
 // MAIN
-// =========================
 app.post("/generate-report", async (req, res) => {
 
   try {
@@ -168,14 +170,36 @@ app.post("/generate-report", async (req, res) => {
     const decisionData = determineDecision(scoreRight);
     const economic = calculateEconomic(scoreRight);
 
+    // 🔥復元：ここが今回の核心
+    const executive_summary = `
+This assessment indicates ${decisionData.level} feasibility for transitioning to the evaluated material under current conditions.
+
+From a technical perspective, the material demonstrates baseline compatibility with the intended application. However, its behavior is highly dependent on processing stability.
+
+Deployment Decision: ${decisionData.decision}
+
+Economic Impact: ${economic}
+`;
+
     const html = injectHtml(htmlTemplate, {
+
+      // 基本
+      assessment_type: "Technical Hypothesis",
       application: input.application,
       material_transition: input.bio_material,
       report_date: new Date().toISOString().split("T")[0],
+
       compatibility_level: decisionData.level,
+
+      // 🔥ここ復元
+      executive_summary: executive_summary,
+      key_risk: "Thermal sensitivity and flow instability introduce variability.",
+
       decision: decisionData.decision,
       economic_impact: economic,
+
       dynamic_overlay: generateOverlay(scoreLeft, scoreRight)
+
     });
 
     const browser = await puppeteer.launch({
@@ -213,8 +237,7 @@ app.post("/generate-report", async (req, res) => {
 
 
 // =========================
-// PDF取得（←これが消えてたら終わる）
-// =========================
+// PDF取得（復元）
 app.get("/latest-pdf", (req, res) => {
   if (!fs.existsSync(PDF_PATH)) {
     return res.status(404).send("No PDF yet");
