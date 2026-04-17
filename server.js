@@ -16,7 +16,7 @@ app.use(express.urlencoded({ extended: true }));
 const PDF_PATH = "/tmp/latest.pdf";
 
 // =========================
-// OpenAI（未使用でも残す）
+// OpenAI
 // =========================
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
@@ -36,27 +36,18 @@ function safe(v) {
 }
 
 // =========================
-// OVERLAY（完全維持）
+// 🔥 OVERLAY
 // =========================
 function generateOverlay(scoreLeft, scoreRight) {
 
   const safeRight = Math.max(0, Math.min(100, Number(scoreRight) || 0));
-
-  // 🔥 正しい位置（60〜70に来る）
-  const angle = -90 + (safeRight * 1.4);
+  const angle = -90 + (safeRight * 1.8);
 
   return `
 <div style="position:absolute; left:0; top:0; width:100%; height:100%; pointer-events:none;">
 
   <img src="https://ilnautico.github.io/visual-base.png"
-    style="
-      position:absolute;
-      left:50%;
-      top:55%;
-      transform:translate(-50%,-50%);
-      width:450px;
-      opacity:0.95;
-    "
+    style="position:absolute; left:50%; top:55%; transform:translate(-50%,-50%); width:450px; opacity:0.95;"
   />
 
   <div style="position:absolute; top:40px; left:50%; transform:translateX(-180px); text-align:center;">
@@ -69,22 +60,7 @@ function generateOverlay(scoreLeft, scoreRight) {
     <div style="font-size:16px; color:#d62c2c;">${scoreRight}</div>
   </div>
 
-  <svg style="position:absolute; left:50%; bottom:80px; transform:translateX(-70px);" width="90" height="35">
-    <path d="M0 18 C15 6, 30 30, 45 18 C60 6, 75 30, 90 18"
-      fill="none"
-      stroke="#4f7c8a"
-      stroke-width="3"/>
-  </svg>
-
-  <svg style="position:absolute; left:50%; bottom:80px; transform:translateX(110px);" width="90" height="35">
-    <path d="M0 18 C15 6, 30 30, 45 18 C60 6, 75 30, 90 18"
-      fill="none"
-      stroke="#d62c2c"
-      stroke-width="3"/>
-  </svg>
-
   <svg style="position:absolute; right:60px; bottom:10px;" viewBox="0 0 200 120" width="140" height="90">
-
     <defs>
       <linearGradient id="g">
         <stop offset="0%" stop-color="#22c55e"/>
@@ -102,24 +78,35 @@ function generateOverlay(scoreLeft, scoreRight) {
     <circle cx="100" cy="100" r="4" fill="#111"/>
 
   </svg>
-
 </div>
 `;
 }
 
 // =========================
-// 判定ロジック
+// 🔥 スコア（強化版）
 // =========================
-function calculateScore(text) {
+function calculateScore(input) {
   let score = 100;
+  const text = Object.values(input).join(" ").toLowerCase();
 
   if (text.includes("pp")) score -= 20;
   if (text.includes("pe")) score -= 10;
   if (text.includes("pet")) score -= 30;
+
   if (text.includes("injection")) score -= 15;
   if (text.includes("film")) score -= 25;
-  if (text.includes("pla")) score -= 10;
-  if (text.includes("pha")) score -= 20;
+
+  if (text.includes("pla")) score -= 15;
+  if (text.includes("pha")) score -= 25;
+
+  // 🔥用途リスク
+  if (text.includes("microwave")) score -= 40;
+  if (text.includes("heat")) score -= 25;
+  if (text.includes("reheat")) score -= 40;
+
+  // 🔥要求性能
+  if (text.includes("dimensional")) score -= 25;
+  if (text.includes("rigidity")) score -= 15;
 
   return Math.max(score, 0);
 }
@@ -138,8 +125,6 @@ function calculateEconomic(score) {
   return "+60%+";
 }
 
-// =========================
-// HTML差し込み
 // =========================
 function injectHtml(template, data) {
   let html = template;
@@ -161,89 +146,79 @@ app.post("/generate-report", async (req, res) => {
 
     const input = req.body;
 
-    const text = [
-      input.application || "",
-      input.material || "",
-      input.bio_material || ""
-    ].join(" ").toLowerCase();
-
-    const score = calculateScore(text);
+    const score = calculateScore(input);
     const decisionData = determineDecision(score);
     const economic = calculateEconomic(score);
 
-    const executive_summary = `
-This assessment indicates ${decisionData.level} feasibility for transitioning to the evaluated material under current conditions.
+    // =========================
+    // 🔥 AIプロンプト
+    // =========================
+    const prompt = `
+You are a senior technical consultant.
 
-From a technical perspective, the material demonstrates baseline compatibility with the intended application. However, its behavior is highly dependent on processing stability, particularly in relation to thermal exposure and shear conditions.
+Analyze the following case deeply.
 
-Deployment Decision: ${decisionData.decision}
+Application: ${input.application}
+Product: ${input.product_type}
+Process: ${input.processing_method}
+Material: ${input.material}
+Target: ${input.bio_material}
+Mechanical: ${input.mechanical_requirement}
+Issues: ${input.known_issues}
 
-At this stage, the transition should not be interpreted as production-ready. Instead, it represents a controlled feasibility scenario where further validation is essential.
+Focus on:
+- thermal resistance vs PP
+- reheating risk
+- dimensional stability
 
-Operationally, the key consideration lies not in whether the material can run, but in whether it can run consistently within acceptable quality thresholds.
+Return JSON only:
 
-Economic Impact: ${economic}
-
-Proceeding without structured validation may lead to unstable production outcomes, increased material loss, and potential equipment stress. Therefore, a phased validation approach is strongly recommended prior to any commitment to scale.
+{
+"executive_summary":"",
+"mechanical_behavior":"",
+"surface_quality":"",
+"structural_consistency":"",
+"primary_risk_title":"",
+"primary_risk":"",
+"secondary_risk_title":"",
+"secondary_risk":"",
+"mechanism":""
+}
 `;
+
+    const aiRes = await openai.chat.completions.create({
+      model: "gpt-5.3",
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.4
+    });
+
+    const aiData = JSON.parse(aiRes.choices[0].message.content);
 
     const html = injectHtml(htmlTemplate, {
 
-      assessment_type: "Technical Hypothesis",
-      application: safe(input.application),
-      material_transition: safe(input.bio_material),
-      report_date: new Date().toISOString().split("T")[0],
-      compatibility_level: decisionData.level,
+      executive_summary: aiData.executive_summary,
 
-      executive_summary,
+      mechanical_behavior: aiData.mechanical_behavior,
+      surface_quality: aiData.surface_quality,
+      structural_consistency: aiData.structural_consistency,
 
-      key_risk: `
-Thermal sensitivity and flow instability introduce variability in processing performance.
-`,
-
-      processing_window: "Controlled validation required.",
-      thermal_behavior: "Moderate sensitivity.",
-      flow_characteristics: "Variable flow behavior.",
-
-      mechanical_behavior: `
-Mechanical performance is conditionally acceptable under controlled processing conditions.
-`,
-
-      surface_quality: `
-Surface uniformity may fluctuate depending on cooling consistency.
-`,
-
-      structural_consistency: `
-Internal consistency requires validation under real processing conditions.
-`,
-
-      primary_risk_title: "Thermal Instability Under Elevated Conditions",
-      primary_risk: `
-Material degradation may occur under high temperature exposure.
-`,
-
-      secondary_risk_title: "Flow Variability",
-      secondary_risk: `
-Unstable flow may cause inconsistency in structure.
-`,
-
-      mechanism: `
-Thermal + shear instability is the core mechanism.
-`,
+      primary_risk_title: aiData.primary_risk_title,
+      primary_risk: aiData.primary_risk,
+      secondary_risk_title: aiData.secondary_risk_title,
+      secondary_risk: aiData.secondary_risk,
+      mechanism: aiData.mechanism,
 
       stability: "Moderate",
-      stability_note: "Depends on control.",
       consistency: "Moderate",
-      consistency_note: "Varies with process.",
+      stability_note: "Depends on control",
+      consistency_note: "Varies with process",
 
-      application_implication: "Pilot testing required.",
-      next_step: "Pilot validation recommended.",
-
+      next_step: "Pilot validation recommended",
+      compatibility_level: decisionData.level,
       decision: decisionData.decision,
       economic_impact: economic,
 
       dynamic_overlay: generateOverlay(score, score)
-
     });
 
     const browser = await puppeteer.launch({
@@ -288,9 +263,7 @@ app.get("/latest-pdf", (req, res) => {
   res.sendFile(PDF_PATH);
 });
 
-// =========================
 const PORT = process.env.PORT || 8080;
-
 app.listen(PORT, () => {
   console.log("🚀 Server running on", PORT);
 });
