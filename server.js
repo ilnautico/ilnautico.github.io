@@ -185,19 +185,59 @@ function injectHtml(template, data) {
 app.post("/generate-report", async (req, res) => {
 
   try {
- console.log("🔥 BODY:", req.body); 
-    const input = req.body;
 
+    console.log("🔥 RAW BODY:", req.body);
+
+    // =========================
+    // 🔥 TALLY変換（追加）
+    // =========================
+    const raw = req.body;
+    let input = {};
+
+    if (raw.data && raw.data.fields) {
+
+      raw.data.fields.forEach(f => {
+
+        const label = (f.label || "").toLowerCase();
+        const value = f.value;
+
+        if (label.includes("application")) {
+          input.application = value;
+        }
+
+        if (label.includes("current material")) {
+          input.material = value;
+        }
+
+        if (label.includes("target material") || label.includes("biodegradable")) {
+          input.bio_material = value;
+        }
+
+      });
+
+    } else {
+      // 直接POST対応（curlなど）
+      input = raw;
+    }
+
+    console.log("🔥 PARSED INPUT:", input);
+
+    // =========================
+    // スコアロジック（既存）
+    // =========================
     const text = [
-      input.application,
-      input.material,
-      input.bio_material
+      input.application || "",
+      input.material || "",
+      input.bio_material || ""
     ].join(" ").toLowerCase();
 
     const score = calculateScore(text);
     const decisionData = determineDecision(score);
     const economic = calculateEconomic(score);
 
+    // =========================
+    // Executive（既存）
+    // =========================
     const executive_summary = `
 This assessment indicates ${decisionData.level} feasibility for transitioning to the evaluated material under current conditions.
 
@@ -214,107 +254,91 @@ Economic Impact: ${economic}
 Proceeding without structured validation may lead to unstable production outcomes, increased material loss, and potential equipment stress. Therefore, a phased validation approach is strongly recommended prior to any commitment to scale.
 `;
 
-const html = injectHtml(htmlTemplate, {
+    // =========================
+    // HTML生成（既存）
+    // =========================
+    const html = injectHtml(htmlTemplate, {
 
-  // =========================
-  // 基本
-  // =========================
-  assessment_type: "Technical Hypothesis",
+      assessment_type: "Technical Hypothesis",
 
-  application: safe(input.application),
-  material_transition: safe(input.bio_material),
-  report_date: new Date().toISOString().split("T")[0],
+      application: safe(input.application),
+      material_transition: safe(input.bio_material),
+      report_date: new Date().toISOString().split("T")[0],
 
-  compatibility_level: decisionData.level,
+      compatibility_level: decisionData.level,
 
-  // =========================
-  // Executive
-  // =========================
-  executive_summary: executive_summary,
+      executive_summary: executive_summary,
 
-  key_risk: `
+      key_risk: `
 Thermal sensitivity and flow instability introduce variability in processing performance.
 `,
 
-  // =========================
-  // Processing
-  // =========================
-  processing_window: "Controlled validation required.",
-  thermal_behavior: "Moderate sensitivity.",
-  flow_characteristics: "Variable flow behavior.",
+      processing_window: "Controlled validation required.",
+      thermal_behavior: "Moderate sensitivity.",
+      flow_characteristics: "Variable flow behavior.",
 
-  // =========================
-  // 🔥 ここが抜けてた（重要）
-  // =========================
-mechanical_behavior: `
+      mechanical_behavior: `
 Mechanical performance is conditionally acceptable under controlled processing conditions, though variability may occur depending on thermal exposure and material stability.
 `,
 
-surface_quality: `
-Surface uniformity may fluctuate depending on cooling consistency and flow stability, particularly under non-uniform processing environments.
+      surface_quality: `
+Surface uniformity may fluctuate depending on cooling consistency and flow stability.
 `,
 
-structural_consistency: `
-Internal structural consistency requires validation under real processing conditions, as variability in shear and cooling behavior may introduce inconsistencies.
+      structural_consistency: `
+Internal structural consistency requires validation under real processing conditions.
 `,
 
-// =========================
-// 🔥 バルーン完全復元（ここが核）
-// =========================
-primary_risk_title: "Thermal Instability Under Elevated Conditions",
-primary_risk: `
-Degradation risk under high temperature conditions may lead to irreversible material breakdown within a single processing cycle if thermal exposure exceeds stability thresholds.
+      primary_risk_title: "Thermal Instability Under Elevated Conditions",
+      primary_risk: `
+Degradation risk under high temperature conditions may lead to material breakdown.
 `,
 
-secondary_risk_title: "Flow Variability and Structural Inconsistency",
-secondary_risk: `
-Internal defects and structural inconsistency may occur under unstable flow conditions, particularly when shear rates fluctuate during processing.
+      secondary_risk_title: "Flow Variability and Structural Inconsistency",
+      secondary_risk: `
+Structural inconsistency may occur under unstable flow conditions.
 `,
 
-mechanism: `
-Thermal degradation combined with shear-induced instability acts as the primary failure mechanism, requiring controlled validation before production deployment.
+      mechanism: `
+Thermal degradation combined with shear instability is the core mechanism.
 `,
 
-  // =========================
-  // Quality
-  // =========================
-  stability: "Moderate",
-  stability_note: "Depends on control.",
-  consistency: "Moderate",
-  consistency_note: "Varies with process.",
+      stability: "Moderate",
+      stability_note: "Depends on control.",
+      consistency: "Moderate",
+      consistency_note: "Varies with process.",
 
-  // =========================
-  application_implication: "Pilot testing required.",
-  next_step: "Pilot validation recommended.",
+      application_implication: "Pilot testing required.",
+      next_step: "Pilot validation recommended.",
 
-  decision: decisionData.decision,
-  economic_impact: economic,
+      decision: decisionData.decision,
+      economic_impact: economic,
 
-  pha_score: score,
+      pha_score: score,
 
-  // =========================
-  // 🔥 overlay（そのまま）
-  // =========================
- base_image: "https://ilnautico.github.io/visual-base.png",
-  dynamic_overlay: generateOverlay(score, score)
+      base_image: "https://ilnautico.github.io/visual-base.png",
+      dynamic_overlay: generateOverlay(score, score)
 
-});
+    });
 
-  const browser = await puppeteer.launch({
-  headless: "new", // ← これが今回の修正ポイント
-  args: [
-    "--no-sandbox",
-    "--disable-setuid-sandbox",
-    "--disable-dev-shm-usage",
-    "--disable-gpu"
-  ]
-});
+    // =========================
+    // PDF生成（既存）
+    // =========================
+    const browser = await puppeteer.launch({
+      headless: "new",
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-gpu"
+      ]
+    });
 
     const page = await browser.newPage();
 
-   await page.setContent(html, {
-  waitUntil: ["networkidle0", "load"]
-});
+    await page.setContent(html, {
+      waitUntil: ["networkidle0", "load"]
+    });
 
     const pdf = await page.pdf({
       format: "A4",
@@ -331,19 +355,7 @@ Thermal degradation combined with shear-induced instability acts as the primary 
     console.error(err);
     res.status(500).send("error");
   }
-});
 
-// =========================
-app.get("/latest-pdf", (req, res) => {
-  if (!fs.existsSync(PDF_PATH)) {
-    return res.status(404).send("No PDF yet");
-  }
-  res.sendFile(PDF_PATH);
-});
-
-const PORT = process.env.PORT || 8080;
-app.listen(PORT, () => {
-  console.log("🚀 Server running on", PORT);
 });
 const html_3man =`;
 <!DOCTYPE html>
