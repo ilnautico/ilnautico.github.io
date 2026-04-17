@@ -189,7 +189,7 @@ app.post("/generate-report", async (req, res) => {
     console.log("🔥 RAW BODY:", req.body);
 
     // =========================
-    // 🔥 TALLY変換（追加）
+    // TALLY変換
     // =========================
     const raw = req.body;
     let input = {};
@@ -216,14 +216,13 @@ app.post("/generate-report", async (req, res) => {
       });
 
     } else {
-      // 直接POST対応（curlなど）
       input = raw;
     }
 
     console.log("🔥 PARSED INPUT:", input);
 
     // =========================
-    // スコアロジック（既存）
+    // スコア
     // =========================
     const text = [
       input.application || "",
@@ -236,27 +235,20 @@ app.post("/generate-report", async (req, res) => {
     const economic = calculateEconomic(score);
 
     // =========================
-    // Executive（既存）
+    // Executive
     // =========================
     const executive_summary = `
 This assessment indicates ${decisionData.level} feasibility for transitioning to the evaluated material under current conditions.
 
-From a technical perspective, the material demonstrates baseline compatibility with the intended application. However, its behavior is highly dependent on processing stability, particularly in relation to thermal exposure and shear conditions.
+From a technical perspective, the material demonstrates baseline compatibility with the intended application. However, its behavior is highly dependent on processing stability.
 
 Deployment Decision: ${decisionData.decision}
 
-At this stage, the transition should not be interpreted as production-ready. Instead, it represents a controlled feasibility scenario where further validation is essential.
-
-Operationally, the key consideration lies not in whether the material can run, but in whether it can run consistently within acceptable quality thresholds.
-
 Economic Impact: ${economic}
 
-Proceeding without structured validation may lead to unstable production outcomes, increased material loss, and potential equipment stress. Therefore, a phased validation approach is strongly recommended prior to any commitment to scale.
+Further validation is strongly recommended before scaling.
 `;
 
-    // =========================
-    // HTML生成（既存）
-    // =========================
     const html = injectHtml(htmlTemplate, {
 
       assessment_type: "Technical Hypothesis",
@@ -266,42 +258,25 @@ Proceeding without structured validation may lead to unstable production outcome
       report_date: new Date().toISOString().split("T")[0],
 
       compatibility_level: decisionData.level,
-
       executive_summary: executive_summary,
 
-      key_risk: `
-Thermal sensitivity and flow instability introduce variability in processing performance.
-`,
+      key_risk: "Thermal instability and flow variability.",
 
       processing_window: "Controlled validation required.",
       thermal_behavior: "Moderate sensitivity.",
       flow_characteristics: "Variable flow behavior.",
 
-      mechanical_behavior: `
-Mechanical performance is conditionally acceptable under controlled processing conditions, though variability may occur depending on thermal exposure and material stability.
-`,
+      mechanical_behavior: "Conditionally stable.",
+      surface_quality: "May fluctuate.",
+      structural_consistency: "Requires validation.",
 
-      surface_quality: `
-Surface uniformity may fluctuate depending on cooling consistency and flow stability.
-`,
+      primary_risk_title: "Thermal Instability",
+      primary_risk: "Material degradation under heat.",
 
-      structural_consistency: `
-Internal structural consistency requires validation under real processing conditions.
-`,
+      secondary_risk_title: "Flow Variability",
+      secondary_risk: "Inconsistent internal structure.",
 
-      primary_risk_title: "Thermal Instability Under Elevated Conditions",
-      primary_risk: `
-Degradation risk under high temperature conditions may lead to material breakdown.
-`,
-
-      secondary_risk_title: "Flow Variability and Structural Inconsistency",
-      secondary_risk: `
-Structural inconsistency may occur under unstable flow conditions.
-`,
-
-      mechanism: `
-Thermal degradation combined with shear instability is the core mechanism.
-`,
+      mechanism: "Thermal + shear instability.",
 
       stability: "Moderate",
       stability_note: "Depends on control.",
@@ -313,7 +288,6 @@ Thermal degradation combined with shear instability is the core mechanism.
 
       decision: decisionData.decision,
       economic_impact: economic,
-
       pha_score: score,
 
       base_image: "https://ilnautico.github.io/visual-base.png",
@@ -322,7 +296,7 @@ Thermal degradation combined with shear instability is the core mechanism.
     });
 
     // =========================
-    // PDF生成（既存）
+    // PDF生成（安定版）
     // =========================
     const browser = await puppeteer.launch({
       headless: "new",
@@ -337,7 +311,8 @@ Thermal degradation combined with shear instability is the core mechanism.
     const page = await browser.newPage();
 
     await page.setContent(html, {
-      waitUntil: ["networkidle0", "load"]
+      waitUntil: "load",   // ← ここ修正
+      timeout: 20000       // ← 安全対策
     });
 
     const pdf = await page.pdf({
@@ -352,7 +327,7 @@ Thermal degradation combined with shear instability is the core mechanism.
     res.send(pdf);
 
   } catch (err) {
-    console.error(err);
+    console.error("❌ ERROR:", err);
     res.status(500).send("error");
   }
 
