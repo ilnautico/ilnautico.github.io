@@ -42,7 +42,7 @@ function generateOverlay(scoreLeft, scoreRight) {
 
   // ✅ 数値連動（安全）
   const safeScore = Math.max(0, Math.min(100, Number(scoreRight) || 0));
-  const angle = -90 + (safeScore * 1.8);
+const angle = -90 + (safeScore * 1.8);
 
   return `
 <div style="position:absolute; left:0; top:0; width:100%; height:100%; pointer-events:none;">
