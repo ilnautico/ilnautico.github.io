@@ -36,7 +36,7 @@ function safe(v) {
 }
 
 // =========================
-// 🔥 OVERLAY
+// OVERLAY
 // =========================
 function generateOverlay(scoreLeft, scoreRight) {
 
@@ -83,7 +83,7 @@ function generateOverlay(scoreLeft, scoreRight) {
 }
 
 // =========================
-// 🔥 スコア（強化版）
+// スコアロジック
 // =========================
 function calculateScore(input) {
   let score = 100;
@@ -104,7 +104,6 @@ function calculateScore(input) {
   if (text.includes("heat")) score -= 25;
   if (text.includes("reheat")) score -= 40;
 
-  // 🔥要求性能
   if (text.includes("dimensional")) score -= 25;
   if (text.includes("rigidity")) score -= 15;
 
@@ -151,12 +150,12 @@ app.post("/generate-report", async (req, res) => {
     const economic = calculateEconomic(score);
 
     // =========================
-    // 🔥 AIプロンプト
+    // AIプロンプト
     // =========================
     const prompt = `
-You are a senior technical consultant.
+You are a senior technical consultant specializing in biodegradable plastics.
 
-Analyze the following case deeply.
+Analyze the case deeply.
 
 Application: ${input.application}
 Product: ${input.product_type}
@@ -171,7 +170,7 @@ Focus on:
 - reheating risk
 - dimensional stability
 
-Return JSON only:
+Return ONLY JSON:
 
 {
 "executive_summary":"",
@@ -187,12 +186,15 @@ Return JSON only:
 `;
 
     const aiRes = await openai.chat.completions.create({
-      model: "gpt-5.3",
+      model: "gpt-4o",
       messages: [{ role: "user", content: prompt }],
       temperature: 0.4
     });
 
-    const aiData = JSON.parse(aiRes.choices[0].message.content);
+    // 🔥 JSON安全パース
+    const content = aiRes.choices[0].message.content;
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    const aiData = JSON.parse(jsonMatch[0]);
 
     const html = injectHtml(htmlTemplate, {
 
@@ -264,6 +266,7 @@ app.get("/latest-pdf", (req, res) => {
 });
 
 const PORT = process.env.PORT || 8080;
+
 app.listen(PORT, () => {
   console.log("🚀 Server running on", PORT);
 });
