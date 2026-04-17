@@ -80,8 +80,7 @@ function generateOverlay(scoreLeft, scoreRight) {
     <div style="font-size:16px; color:#d62c2c;">${scoreRight}</div>
   </div>
 
-  <!-- 🔵 青波 -->
- <!-- 🔵 青波 -->
+<!-- 🔵 青波 -->
 <svg style="
   position:absolute;
   left:50%;
