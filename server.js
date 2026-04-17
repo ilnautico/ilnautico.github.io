@@ -102,6 +102,7 @@ function generateOverlay(scoreLeft, scoreRight) {
 </div>
 `;
 }
+
 // =========================
 // 判定ロジック
 // =========================
@@ -121,34 +122,6 @@ function calculateScore(text) {
   return Math.max(score, 0);
 }
 
-function determineDecision(score) {
-  if (score >= 80) return { decision: "GO", level: "HIGH" };
-  if (score >= 60) return { decision: "CONDITIONAL GO", level: "MODERATE" };
-  if (score >= 40) return { decision: "HOLD", level: "MODERATE" };
-  return { decision: "STOP", level: "LOW" };
-}
-
-function calculateEconomic(score) {
-  if (score >= 80) return "+5–15%";
-  if (score >= 60) return "+15–30%";
-  if (score >= 40) return "+30–60%";
-  return "+60%+";
-}
-
-// =========================
-function injectHtml(template, data) {
-  let html = template;
-  for (const key in data) {
-    html = html.replace(
-      new RegExp(`{{\\s*${key}\\s*}}`, "g"),
-      safe(data[key])
-    );
-  }
-  return html;
-}
-
-// =========================
-// MAIN
 // =========================
 app.post("/generate-report", async (req, res) => {
 
@@ -156,133 +129,58 @@ app.post("/generate-report", async (req, res) => {
 
     const input = req.body;
 
-    const text = [
+    // 🔥 左右分離（ここが今回の本質修正）
+    const textLeft = [
       input.application,
-      input.material,
+      input.material
+    ].join(" ").toLowerCase();
+
+    const textRight = [
+      input.application,
       input.bio_material
     ].join(" ").toLowerCase();
 
-    const score = calculateScore(text);
+    const scoreLeft = calculateScore(textLeft);
+    const scoreRight = calculateScore(textRight);
+
+    // 기존ロジック維持
+    const score = scoreRight;
+
     const decisionData = determineDecision(score);
     const economic = calculateEconomic(score);
 
-    const executive_summary = `
-This assessment indicates ${decisionData.level} feasibility for transitioning to the evaluated material under current conditions.
+    const html = injectHtml(htmlTemplate, {
 
-From a technical perspective, the material demonstrates baseline compatibility with the intended application. However, its behavior is highly dependent on processing stability, particularly in relation to thermal exposure and shear conditions.
+      application: safe(input.application),
+      material_transition: safe(input.bio_material),
 
-Deployment Decision: ${decisionData.decision}
+      compatibility_level: decisionData.level,
 
-At this stage, the transition should not be interpreted as production-ready. Instead, it represents a controlled feasibility scenario where further validation is essential.
+      decision: decisionData.decision,
+      economic_impact: economic,
 
-Operationally, the key consideration lies not in whether the material can run, but in whether it can run consistently within acceptable quality thresholds.
+      pha_score: score,
 
-Economic Impact: ${economic}
+      // 🔥 完全連携（ここが最重要）
+      dynamic_overlay: generateOverlay(scoreLeft, scoreRight)
 
-Proceeding without structured validation may lead to unstable production outcomes, increased material loss, and potential equipment stress. Therefore, a phased validation approach is strongly recommended prior to any commitment to scale.
-`;
+    });
 
-const html = injectHtml(htmlTemplate, {
-
-  // =========================
-  // 基本
-  // =========================
-  assessment_type: "Technical Hypothesis",
-
-  application: safe(input.application),
-  material_transition: safe(input.bio_material),
-  report_date: new Date().toISOString().split("T")[0],
-
-  compatibility_level: decisionData.level,
-
-  // =========================
-  // Executive
-  // =========================
-  executive_summary: executive_summary,
-
-  key_risk: `
-Thermal sensitivity and flow instability introduce variability in processing performance.
-`,
-
-  // =========================
-  // Processing
-  // =========================
-  processing_window: "Controlled validation required.",
-  thermal_behavior: "Moderate sensitivity.",
-  flow_characteristics: "Variable flow behavior.",
-
-  // =========================
-  // 🔥 ここが抜けてた（重要）
-  // =========================
-mechanical_behavior: `
-Mechanical performance is conditionally acceptable under controlled processing conditions, though variability may occur depending on thermal exposure and material stability.
-`,
-
-surface_quality: `
-Surface uniformity may fluctuate depending on cooling consistency and flow stability, particularly under non-uniform processing environments.
-`,
-
-structural_consistency: `
-Internal structural consistency requires validation under real processing conditions, as variability in shear and cooling behavior may introduce inconsistencies.
-`,
-
-// =========================
-// 🔥 バルーン完全復元（ここが核）
-// =========================
-primary_risk_title: "Thermal Instability Under Elevated Conditions",
-primary_risk: `
-Degradation risk under high temperature conditions may lead to irreversible material breakdown within a single processing cycle if thermal exposure exceeds stability thresholds.
-`,
-
-secondary_risk_title: "Flow Variability and Structural Inconsistency",
-secondary_risk: `
-Internal defects and structural inconsistency may occur under unstable flow conditions, particularly when shear rates fluctuate during processing.
-`,
-
-mechanism: `
-Thermal degradation combined with shear-induced instability acts as the primary failure mechanism, requiring controlled validation before production deployment.
-`,
-
-  // =========================
-  // Quality
-  // =========================
-  stability: "Moderate",
-  stability_note: "Depends on control.",
-  consistency: "Moderate",
-  consistency_note: "Varies with process.",
-
-  // =========================
-  application_implication: "Pilot testing required.",
-  next_step: "Pilot validation recommended.",
-
-  decision: decisionData.decision,
-  economic_impact: economic,
-
-  pha_score: score,
-
-  // =========================
-  // 🔥 overlay（そのまま）
-  // =========================
- base_image: "https://ilnautico.github.io/visual-base.png",
-  dynamic_overlay: generateOverlay(score, score)
-
-});
-
-  const browser = await puppeteer.launch({
-  headless: "new", // ← これが今回の修正ポイント
-  args: [
-    "--no-sandbox",
-    "--disable-setuid-sandbox",
-    "--disable-dev-shm-usage",
-    "--disable-gpu"
-  ]
-});
+    const browser = await puppeteer.launch({
+      headless: "new",
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-gpu"
+      ]
+    });
 
     const page = await browser.newPage();
 
-   await page.setContent(html, {
-  waitUntil: ["networkidle0", "load"]
-});
+    await page.setContent(html, {
+      waitUntil: ["networkidle0", "load"]
+    });
 
     const pdf = await page.pdf({
       format: "A4",
@@ -290,8 +188,6 @@ Thermal degradation combined with shear-induced instability acts as the primary 
     });
 
     await browser.close();
-
-    fs.writeFileSync(PDF_PATH, pdf);
 
     res.send(pdf);
 
