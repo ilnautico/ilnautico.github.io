@@ -39,22 +39,33 @@ function safe(v) {
 // 🔥 OVERLAY（完全維持）
 // =========================
 function generateOverlay(scoreLeft, scoreRight) {
+
   const angle = -90 + (scoreRight * 1.8);
 
   return `
-<div style="position:absolute; left:0; top:0; width:100%; height:100%; pointer-events:none;">
+<div style="
+  position:absolute;
+  left:0;
+  top:0;
+  width:100%;
+  height:100%;
+  pointer-events:none;
+">
 
+  <!-- 🔥 ベース画像（絶対固定） -->
   <img src="https://ilnautico.github.io/visual-base.png"
     style="
       position:absolute;
       left:50%;
       top:55%;
-      transform:translate(-50%,-50%);　
-      width:450px;
-      opacity:0.95;
+      transform:translate(-50%,-50%);
+      width:420px;   /* ← 安定サイズ */
+      max-width:none;
+      display:block;
     "
   />
 
+  <!-- 左 -->
   <div style="
     position:absolute;
     top:40px;
@@ -63,9 +74,10 @@ function generateOverlay(scoreLeft, scoreRight) {
     text-align:center;
   ">
     <div style="font-size:28px; color:#2f3a44;">230°C</div>
-    <div style="font-size:16px; color:#5b6770;">${scoreLeft}</div>
+    <div style="font-size:16px;">${scoreLeft}</div>
   </div>
 
+  <!-- 右 -->
   <div style="
     position:absolute;
     top:40px;
@@ -77,11 +89,12 @@ function generateOverlay(scoreLeft, scoreRight) {
     <div style="font-size:16px; color:#d62c2c;">${scoreRight}</div>
   </div>
 
+  <!-- 🔵 波 -->
   <svg style="
     position:absolute;
     left:50%;
-    bottom:80px;
-    transform:translateX(-70px);
+    bottom:90px;
+    transform:translateX(-60px);
   " width="90" height="35">
     <path d="M0 18 C15 6, 30 30, 45 18 C60 6, 75 30, 90 18"
       fill="none"
@@ -89,11 +102,12 @@ function generateOverlay(scoreLeft, scoreRight) {
       stroke-width="3"/>
   </svg>
 
+  <!-- 🔴 波 -->
   <svg style="
     position:absolute;
     left:50%;
-    bottom:80px;
-    transform:translateX(110px);
+    bottom:90px;
+    transform:translateX(100px);
   " width="90" height="35">
     <path d="M0 18 C15 6, 30 30, 45 18 C60 6, 75 30, 90 18"
       fill="none"
@@ -101,10 +115,11 @@ function generateOverlay(scoreLeft, scoreRight) {
       stroke-width="3"/>
   </svg>
 
+  <!-- 🎯 メーター -->
   <svg style="
     position:absolute;
     right:60px;
-    bottom:10px;
+    bottom:15px;
   " viewBox="0 0 200 120" width="140" height="90">
 
     <defs>
