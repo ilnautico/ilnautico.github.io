@@ -45,6 +45,8 @@ function safe(v) {
 // Overlay（そのまま）
 // =========================
 // Overlay（壊さない）
+// =========================
+// Overlay（完全連動版）
 function generateOverlay(scoreLeft, scoreRight) {
 
   const angle = -90 + (scoreRight * 1.8);
@@ -63,16 +65,19 @@ function generateOverlay(scoreLeft, scoreRight) {
     "
   />
 
+  <!-- 左 -->
   <div style="position:absolute; top:40px; left:50%; transform:translateX(-180px); text-align:center;">
     <div style="font-size:28px; color:#2f3a44;">230°C</div>
     <div style="font-size:16px; color:#5b6770;">${scoreLeft}</div>
   </div>
 
+  <!-- 右 -->
   <div style="position:absolute; top:40px; left:50%; transform:translateX(180px); text-align:center;">
     <div style="font-size:28px; color:#d62c2c;">180°C</div>
     <div style="font-size:16px; color:#d62c2c;">${scoreRight}</div>
   </div>
 
+  <!-- 波（視覚はそのまま固定） -->
   <svg style="position:absolute; left:50%; bottom:80px; transform:translateX(-70px);" width="90" height="35">
     <path d="M0 18 C15 6, 30 30, 45 18 C60 6, 75 30, 90 18"
       fill="none"
@@ -87,6 +92,7 @@ function generateOverlay(scoreLeft, scoreRight) {
       stroke-width="3"/>
   </svg>
 
+  <!-- メーター -->
   <svg style="position:absolute; right:60px; bottom:10px;" viewBox="0 0 200 120" width="140" height="90">
     <defs>
       <linearGradient id="g">
@@ -110,7 +116,7 @@ function generateOverlay(scoreLeft, scoreRight) {
 }
 
 // =========================
-// 判定ロジック
+// スコアロジック
 function calculateScore(text) {
   let score = 100;
 
@@ -159,23 +165,22 @@ app.post("/generate-report", async (req, res) => {
 
     const input = req.body;
 
-    const text = [
-      input.application,
-      input.material,
-      input.bio_material
-    ].join(" ").toLowerCase();
+    // 🔥 左右分離（ここが今回の核心）
+    const scoreLeft = calculateScore((input.material || "").toLowerCase());
+    const scoreRight = calculateScore((input.bio_material || "").toLowerCase());
 
-    const score = calculateScore(text);
-    const decisionData = determineDecision(score);
-    const economic = calculateEconomic(score);
+    const decisionData = determineDecision(scoreRight);
+    const economic = calculateEconomic(scoreRight);
 
-    // 🔥 完全復元 Executive
+    // 🔥 完全版 Executive（フル復元）
     const executive_summary = `
 This assessment indicates ${decisionData.level} feasibility for transitioning to the evaluated material under current conditions.
 
 From a technical perspective, the material demonstrates baseline compatibility with the intended application. However, its behavior is highly dependent on processing stability, particularly in relation to thermal exposure and shear conditions.
 
-Deployment Decision: ${decisionData.decision} at this stage, the transition should not be interpreted as production-ready. Instead, it represents a controlled feasibility scenario where further validation is essential.
+Deployment Decision: ${decisionData.decision}
+
+At this stage, the transition should not be interpreted as production-ready. Instead, it represents a controlled feasibility scenario where further validation is essential.
 
 Operationally, the key consideration lies not in whether the material can run, but in whether it can run consistently within acceptable quality thresholds.
 
@@ -183,7 +188,11 @@ Economic Impact: ${economic}
 
 Proceeding without structured validation may lead to unstable production outcomes, increased material loss, and potential equipment stress.
 
+This may also introduce variability in product quality, including inconsistency in structural integrity, surface uniformity, and mechanical performance.
+
 Therefore, a phased validation approach is strongly recommended prior to any commitment to scale.
+
+It is also advisable to conduct pilot trials under controlled conditions to establish process stability before full-scale deployment.
 `;
 
     const html = injectHtml(htmlTemplate, {
@@ -198,24 +207,22 @@ Therefore, a phased validation approach is strongly recommended prior to any com
       executive_summary,
       key_risk: "Thermal sensitivity and flow instability introduce variability.",
 
-      // Failure
       primary_risk_title: "Thermal Instability Under Elevated Conditions",
       primary_risk: "Material degradation may occur under high temperature exposure.",
+
       secondary_risk_title: "Flow Variability",
       secondary_risk: "Unstable flow may cause inconsistency in structure.",
+
       mechanism: "Thermal + shear interaction drives instability.",
 
-      // Processing
       processing_window: "Controlled validation required.",
       thermal_behavior: "Moderate sensitivity.",
       flow_characteristics: "Variable flow behavior.",
 
-      // Product
       mechanical_behavior: "Conditionally acceptable.",
       surface_quality: "May fluctuate.",
       structural_consistency: "Requires validation.",
 
-      // Quality
       stability: "Moderate",
       stability_note: "Depends on control.",
       consistency: "Moderate",
@@ -227,7 +234,7 @@ Therefore, a phased validation approach is strongly recommended prior to any com
       decision: decisionData.decision,
       economic_impact: economic,
 
-      dynamic_overlay: generateOverlay(score, score)
+      dynamic_overlay: generateOverlay(scoreLeft, scoreRight)
     });
 
     const browser = await puppeteer.launch({
@@ -256,6 +263,20 @@ Therefore, a phased validation approach is strongly recommended prior to any com
     fs.writeFileSync(PDF_PATH, pdf);
 
     res.send(pdf);
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("error");
+  }
+});
+
+// =========================
+app.get("/latest-pdf", (req, res) => {
+  if (!fs.existsSync(PDF_PATH)) {
+    return res.status(404).send("No PDF yet");
+  }
+  res.sendFile(PDF_PATH);
+});
 
   } catch (err) {
     console.error(err);
