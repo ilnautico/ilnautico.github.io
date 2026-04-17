@@ -45,7 +45,6 @@ function generateOverlay(scoreLeft, scoreRight) {
   return `
 <div style="position:absolute; left:0; top:0; width:100%; height:100%; pointer-events:none;">
 
- <!-- 🔥 ベース画像（完全固定） -->
 <img src="https://ilnautico.github.io/visual-base.png"
   style="
     position:absolute;
@@ -57,7 +56,6 @@ function generateOverlay(scoreLeft, scoreRight) {
   "
 />
 
-  <!-- 左数値 -->
   <div style="
     position:absolute;
     top:40px;
@@ -69,7 +67,6 @@ function generateOverlay(scoreLeft, scoreRight) {
     <div style="font-size:16px; color:#5b6770;">${scoreLeft}</div>
   </div>
 
-  <!-- 右数値 -->
   <div style="
     position:absolute;
     top:40px;
@@ -81,7 +78,6 @@ function generateOverlay(scoreLeft, scoreRight) {
     <div style="font-size:16px; color:#d62c2c;">${scoreRight}</div>
   </div>
 
-<!-- 🔵 青波（完全固定） -->
 <svg style="
   position:absolute;
   left:50%;
@@ -94,7 +90,6 @@ function generateOverlay(scoreLeft, scoreRight) {
     stroke-width="3"/>
 </svg>
 
-<!-- 🔴 赤波（完全固定） -->
 <svg style="
   position:absolute;
   left:50%;
@@ -107,7 +102,6 @@ function generateOverlay(scoreLeft, scoreRight) {
     stroke-width="3"/>
 </svg>
 
-  <!-- 🎯 メーター（唯一の動的要素） -->
   <svg style="
     position:absolute;
     right:60px;
