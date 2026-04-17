@@ -278,7 +278,6 @@ app.get("/latest-pdf", (req, res) => {
   res.sendFile(PDF_PATH);
 });
 
-  } catch (err) {
     console.error(err);
     res.status(500).send("error");
   }
