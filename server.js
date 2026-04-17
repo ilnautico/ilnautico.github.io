@@ -52,7 +52,7 @@ function generateOverlay(scoreLeft, scoreRight) {
     left:50%;
     top:55%;
     transform:translate(-50%,-50%);
-    width:460px;
+    width:450px;
     opacity:0.95;
   "
 />
@@ -85,7 +85,7 @@ function generateOverlay(scoreLeft, scoreRight) {
   position:absolute;
   left:50%;
   bottom:80px;
-  transform:translateX(-110px);
+  transform:translateX(-90px);
 " width="90" height="35">
   <path d="M0 18 C15 6, 30 30, 45 18 C60 6, 75 30, 90 18"
     fill="none"
