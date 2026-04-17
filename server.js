@@ -185,7 +185,7 @@ function injectHtml(template, data) {
 app.post("/generate-report", async (req, res) => {
 
   try {
-
+ console.log("🔥 BODY:", req.body); 
     const input = req.body;
 
     const text = [
