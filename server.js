@@ -134,7 +134,7 @@ function generateOverlay(scoreLeft, scoreRight) {
 `;
 }
 
-  <!-- 🎯 メーター（完全そのまま） -->
+
   <svg style="
     position:absolute;
     right:60px;
