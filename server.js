@@ -133,33 +133,6 @@ function generateOverlay(scoreLeft, scoreRight) {
 `;
 }
 
-  <svg style="
-    position:absolute;
-    right:60px;
-    bottom:10px;
-  " viewBox="0 0 200 120" width="140" height="90">
-
-    <defs>
-      <linearGradient id="g">
-        <stop offset="0%" stop-color="#22c55e"/>
-        <stop offset="50%" stop-color="#fde047"/>
-        <stop offset="100%" stop-color="#ef4444"/>
-      </linearGradient>
-    </defs>
-
-    <path d="M20 100 A80 80 0 0 1 180 100 L100 100 Z"
-      fill="url(#g)"
-    />
-
-    <g transform="rotate(${angle} 100 100)">
-      <line x1="100" y1="100" x2="100" y2="30"
-        stroke="#111"
-        stroke-width="3"/>
-    </g>
-
-    <circle cx="100" cy="100" r="4" fill="#111"/>
-
-  </svg>
 
 </div>
 `;
