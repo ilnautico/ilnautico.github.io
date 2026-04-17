@@ -42,14 +42,10 @@ function generateOverlay(scoreLeft, scoreRight) {
 
   const angle = -90 + (scoreRight * 1.8);
 
-  // ✅ 波の透明度だけ連携（形・位置は完全固定）
-  const blueOpacity = 0.5 + (scoreLeft / 200);   // 安定側
-  const redOpacity  = 1.2 - (scoreRight / 100);  // リスク側
-
   return `
 <div style="position:absolute; left:0; top:0; width:100%; height:100%; pointer-events:none;">
 
- <!-- 🔥 ベース画像（絶対触ってない） -->
+ <!-- 🔥 ベース画像（完全固定） -->
 <img src="https://ilnautico.github.io/visual-base.png"
   style="
     position:absolute;
@@ -85,13 +81,12 @@ function generateOverlay(scoreLeft, scoreRight) {
     <div style="font-size:16px; color:#d62c2c;">${scoreRight}</div>
   </div>
 
-<!-- 🔵 青波（位置・形そのまま、opacityのみ連携） -->
+<!-- 🔵 青波（完全固定） -->
 <svg style="
   position:absolute;
   left:50%;
   bottom:80px;
   transform:translateX(-70px);
-  opacity:${blueOpacity};
 " width="90" height="35">
   <path d="M0 18 C15 6, 30 30, 45 18 C60 6, 75 30, 90 18"
     fill="none"
@@ -99,19 +94,51 @@ function generateOverlay(scoreLeft, scoreRight) {
     stroke-width="3"/>
 </svg>
 
-<!-- 🔴 赤波（位置・形そのまま、opacityのみ連携） -->
+<!-- 🔴 赤波（完全固定） -->
 <svg style="
   position:absolute;
   left:50%;
   bottom:80px;
   transform:translateX(110px);
-  opacity:${redOpacity};
 " width="90" height="35">
   <path d="M0 18 C15 6, 30 30, 45 18 C60 6, 75 30, 90 18"
     fill="none"
     stroke="#d62c2c"
     stroke-width="3"/>
 </svg>
+
+  <!-- 🎯 メーター（唯一の動的要素） -->
+  <svg style="
+    position:absolute;
+    right:60px;
+    bottom:10px;
+  " viewBox="0 0 200 120" width="140" height="90">
+
+    <defs>
+      <linearGradient id="g">
+        <stop offset="0%" stop-color="#22c55e"/>
+        <stop offset="50%" stop-color="#fde047"/>
+        <stop offset="100%" stop-color="#ef4444"/>
+      </linearGradient>
+    </defs>
+
+    <path d="M20 100 A80 80 0 0 1 180 100 L100 100 Z"
+      fill="url(#g)"
+    />
+
+    <g transform="rotate(${angle} 100 100)">
+      <line x1="100" y1="100" x2="100" y2="30"
+        stroke="#111"
+        stroke-width="3"/>
+    </g>
+
+    <circle cx="100" cy="100" r="4" fill="#111"/>
+
+  </svg>
+
+</div>
+`;
+}
 
   <!-- 🎯 メーター（完全そのまま） -->
   <svg style="
