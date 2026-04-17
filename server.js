@@ -40,6 +40,7 @@ function safe(v) {
 // =========================
 // =========================
 // Overlay（そのまま）
+// =========================
 function generateOverlay(scoreLeft, scoreRight) {
 
   const angle = -90 + (scoreRight * 1.8);
@@ -105,26 +106,24 @@ function generateOverlay(scoreLeft, scoreRight) {
 `;
 }
 
+
 // =========================
-// スコア
+// ロジック
+// =========================
 function calculateScore(text) {
   let score = 100;
 
   if (text.includes("pp")) score -= 20;
   if (text.includes("pe")) score -= 10;
   if (text.includes("pet")) score -= 30;
-
   if (text.includes("injection")) score -= 15;
   if (text.includes("film")) score -= 25;
-
   if (text.includes("pla")) score -= 10;
   if (text.includes("pha")) score -= 20;
 
   return Math.max(score, 0);
 }
 
-// =========================
-// 判定
 function determineDecision(score) {
   if (score >= 80) return { decision: "GO", level: "HIGH" };
   if (score >= 60) return { decision: "CONDITIONAL GO", level: "MODERATE" };
@@ -132,8 +131,6 @@ function determineDecision(score) {
   return { decision: "STOP", level: "LOW" };
 }
 
-// =========================
-// 経済
 function calculateEconomic(score) {
   if (score >= 80) return "+5–15%";
   if (score >= 60) return "+15–30%";
@@ -141,62 +138,44 @@ function calculateEconomic(score) {
   return "+60%+";
 }
 
-// =========================
-// HTML注入（←今回抜けてた）
 function injectHtml(template, data) {
   let html = template;
-
   for (const key in data) {
     html = html.replace(
       new RegExp(`{{\\s*${key}\\s*}}`, "g"),
       data[key] ?? ""
     );
   }
-
   return html;
 }
 
+
 // =========================
 // MAIN
+// =========================
 app.post("/generate-report", async (req, res) => {
 
   try {
 
     const input = req.body;
 
-    // 左右分離
-    const textLeft = [
-      input.application,
-      input.material
-    ].join(" ").toLowerCase();
-
-    const textRight = [
-      input.application,
-      input.bio_material
-    ].join(" ").toLowerCase();
+    const textLeft = [input.application, input.material].join(" ").toLowerCase();
+    const textRight = [input.application, input.bio_material].join(" ").toLowerCase();
 
     const scoreLeft = calculateScore(textLeft);
     const scoreRight = calculateScore(textRight);
 
-    const score = scoreRight;
-
-    const decisionData = determineDecision(score);
-    const economic = calculateEconomic(score);
+    const decisionData = determineDecision(scoreRight);
+    const economic = calculateEconomic(scoreRight);
 
     const html = injectHtml(htmlTemplate, {
-
       application: input.application,
       material_transition: input.bio_material,
       report_date: new Date().toISOString().split("T")[0],
-
       compatibility_level: decisionData.level,
       decision: decisionData.decision,
       economic_impact: economic,
-
-      pha_score: score,
-
       dynamic_overlay: generateOverlay(scoreLeft, scoreRight)
-
     });
 
     const browser = await puppeteer.launch({
@@ -222,12 +201,32 @@ app.post("/generate-report", async (req, res) => {
 
     await browser.close();
 
+    fs.writeFileSync(PDF_PATH, pdf);
+
     res.send(pdf);
 
   } catch (err) {
     console.error(err);
     res.status(500).send("error");
   }
+});
+
+
+// =========================
+// PDF取得（←これが消えてたら終わる）
+// =========================
+app.get("/latest-pdf", (req, res) => {
+  if (!fs.existsSync(PDF_PATH)) {
+    return res.status(404).send("No PDF yet");
+  }
+  res.sendFile(PDF_PATH);
+});
+
+
+// =========================
+const PORT = process.env.PORT || 8080;
+app.listen(PORT, () => {
+  console.log("🚀 Server running on", PORT);
 });
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
