@@ -13,93 +13,129 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-const PDF_PATH = "/tmp/latest.pdf";
+const PDF_PATH = "/tmp/latest.pdf";　
 
+// =========================
+// OpenAI
+// =========================
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
 });
 
+// =========================
+// HTML TEMPLATE
+// =========================
 const htmlTemplate = fs.readFileSync(
   path.join(__dirname, "template.html"),
   "utf8"
 );
 
+// =========================
 function safe(v) {
   return v || "";
 }
 
-//
-// 🔥 TEMPLATE非依存 overlay（完全固定版）
-//
+// =========================
+// 🔥 OVERLAY（完全維持）
+// =========================
 function generateOverlay(scoreLeft, scoreRight) {
 
   const safeRight = Math.max(0, Math.min(100, Number(scoreRight) || 0));
   const angle = -90 + (safeRight * 1.8);
 
   return `
-<div style="
-  position:fixed;
-  top:0;
-  left:0;
-  width:100%;
-  height:100%;
-  pointer-events:none;
-  z-index:9999;
-">
+<div style="position:absolute; left:0; top:0; width:100%; height:100%; pointer-events:none;">
 
   <img src="https://ilnautico.github.io/visual-base.png"
     style="
       position:absolute;
       left:50%;
-      top:38%;
+      top:55%;
       transform:translate(-50%,-50%);
-      width:420px;
+      width:450px;
       opacity:0.95;
     "
   />
 
-  <!-- 左温度 -->
-  <div style="position:absolute; top:120px; left:50%; transform:translateX(-180px); text-align:center;">
-    <div style="font-size:28px;">230°C</div>
-    <div>${scoreLeft}</div>
+  <div style="
+    position:absolute;
+    top:40px;
+    left:50%;
+    transform:translateX(-180px);
+    text-align:center;
+  ">
+    <div style="font-size:28px; color:#2f3a44;">230°C</div>
+    <div style="font-size:16px; color:#5b6770;">${scoreLeft}</div>
   </div>
 
-  <!-- 右温度 -->
-  <div style="position:absolute; top:120px; left:50%; transform:translateX(180px); text-align:center;">
+  <div style="
+    position:absolute;
+    top:40px;
+    left:50%;
+    transform:translateX(180px);
+    text-align:center;
+  ">
     <div style="font-size:28px; color:#d62c2c;">180°C</div>
-    <div style="color:#d62c2c;">${scoreRight}</div>
+    <div style="font-size:16px; color:#d62c2c;">${scoreRight}</div>
   </div>
 
-  <!-- 波 -->
-  <svg style="position:absolute; top:320px; left:50%; transform:translateX(-90px);" width="90" height="35">
+  <svg style="
+    position:absolute;
+    left:50%;
+    bottom:80px;
+    transform:translateX(-70px);
+  " width="90" height="35">
     <path d="M0 18 C15 6, 30 30, 45 18 C60 6, 75 30, 90 18"
       fill="none"
       stroke="#4f7c8a"
       stroke-width="3"/>
   </svg>
 
-  <svg style="position:absolute; top:320px; left:50%; transform:translateX(90px);" width="90" height="35">
+  <svg style="
+    position:absolute;
+    left:50%;
+    bottom:80px;
+    transform:translateX(110px);
+  " width="90" height="35">
     <path d="M0 18 C15 6, 30 30, 45 18 C60 6, 75 30, 90 18"
       fill="none"
       stroke="#d62c2c"
       stroke-width="3"/>
   </svg>
 
-  <!-- メーター -->
-  <svg style="position:absolute; right:60px; bottom:120px;" viewBox="0 0 200 120" width="140">
+  <svg style="
+    position:absolute;
+    right:60px;
+    bottom:10px;
+  " viewBox="0 0 200 120" width="140" height="90">
+
+    <defs>
+      <linearGradient id="g">
+        <stop offset="0%" stop-color="#22c55e"/>
+        <stop offset="50%" stop-color="#fde047"/>
+        <stop offset="100%" stop-color="#ef4444"/>
+      </linearGradient>
+    </defs>
+
     <path d="M20 100 A80 80 0 0 1 180 100 L100 100 Z"
-      fill="url(#g)"/>
+      fill="url(#g)"
+    />
+
     <g transform="rotate(${angle} 100 100)">
-      <line x1="100" y1="100" x2="100" y2="30" stroke="#111" stroke-width="3"/>
+      <line x1="100" y1="100" x2="100" y2="30"
+        stroke="#111"
+        stroke-width="3"/>
     </g>
+
+    <circle cx="100" cy="100" r="4" fill="#111"/>
+
   </svg>
 
 </div>
 `;
 }
-
 // =========================
-// ロジック
+// 判定ロジック
 // =========================
 function calculateScore(text) {
   let score = 100;
@@ -107,8 +143,10 @@ function calculateScore(text) {
   if (text.includes("pp")) score -= 20;
   if (text.includes("pe")) score -= 10;
   if (text.includes("pet")) score -= 30;
+
   if (text.includes("injection")) score -= 15;
   if (text.includes("film")) score -= 25;
+
   if (text.includes("pla")) score -= 10;
   if (text.includes("pha")) score -= 20;
 
@@ -122,10 +160,21 @@ function determineDecision(score) {
   return { decision: "STOP", level: "LOW" };
 }
 
+function calculateEconomic(score) {
+  if (score >= 80) return "+5–15%";
+  if (score >= 60) return "+15–30%";
+  if (score >= 40) return "+30–60%";
+  return "+60%+";
+}
+
+// =========================
 function injectHtml(template, data) {
   let html = template;
   for (const key in data) {
-    html = html.replace(new RegExp(`{{\\s*${key}\\s*}}`, "g"), safe(data[key]));
+    html = html.replace(
+      new RegExp(`{{\\s*${key}\\s*}}`, "g"),
+      safe(data[key])
+    );
   }
   return html;
 }
@@ -147,67 +196,125 @@ app.post("/generate-report", async (req, res) => {
 
     const score = calculateScore(text);
     const decisionData = determineDecision(score);
+    const economic = calculateEconomic(score);
 
-    // AI
-    const ai = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [{
-        role: "user",
-        content: "Explain risks of biodegradable plastics vs PP in detail."
-      }]
-    });
+    const executive_summary = `
+This assessment indicates ${decisionData.level} feasibility for transitioning to the evaluated material under current conditions.
 
-    const html = injectHtml(htmlTemplate, {
+From a technical perspective, the material demonstrates baseline compatibility with the intended application. However, its behavior is highly dependent on processing stability, particularly in relation to thermal exposure and shear conditions.
 
-      application: safe(input.application),
-      material_transition: safe(input.bio_material),
-      assessment_type: "Technical Hypothesis",
-      report_date: new Date().toISOString().split("T")[0],
+Deployment Decision: ${decisionData.decision}
 
-      compatibility_level: decisionData.level,
+At this stage, the transition should not be interpreted as production-ready. Instead, it represents a controlled feasibility scenario where further validation is essential.
 
-      executive_summary: ai.choices[0].message.content,
+Operationally, the key consideration lies not in whether the material can run, but in whether it can run consistently within acceptable quality thresholds.
 
-      // 🔥 全キー強制供給
-      processing_window: "Controlled validation required.",
-      thermal_behavior: "Moderate sensitivity.",
-      flow_characteristics: "Variable flow behavior.",
-      application_implication: "Pilot testing required.",
-      key_risk: "Thermal deformation and reheating instability.",
+Economic Impact: ${economic}
 
-      mechanical_behavior: ai.choices[0].message.content,
-      surface_quality: ai.choices[0].message.content,
-      structural_consistency: ai.choices[0].message.content,
+Proceeding without structured validation may lead to unstable production outcomes, increased material loss, and potential equipment stress. Therefore, a phased validation approach is strongly recommended prior to any commitment to scale.
+`;
 
-      primary_risk_title: "Thermal Deformation Risk",
-      primary_risk: ai.choices[0].message.content,
+const html = injectHtml(htmlTemplate, {
 
-      secondary_risk_title: "Reheating Instability",
-      secondary_risk: ai.choices[0].message.content,
+  // =========================
+  // 基本
+  // =========================
+  assessment_type: "Technical Hypothesis",
 
-      mechanism: ai.choices[0].message.content,
+  application: safe(input.application),
+  material_transition: safe(input.bio_material),
+  report_date: new Date().toISOString().split("T")[0],
 
-      stability: "Moderate",
-      stability_note: "Depends on control.",
-      consistency: "Moderate",
-      consistency_note: "Varies with process.",
+  compatibility_level: decisionData.level,
 
-      decision: decisionData.decision,
+  // =========================
+  // Executive
+  // =========================
+  executive_summary: executive_summary,
 
-      dynamic_overlay: generateOverlay(score, score)
+  key_risk: `
+Thermal sensitivity and flow instability introduce variability in processing performance.
+`,
 
-    });
+  // =========================
+  // Processing
+  // =========================
+  processing_window: "Controlled validation required.",
+  thermal_behavior: "Moderate sensitivity.",
+  flow_characteristics: "Variable flow behavior.",
 
-    const browser = await puppeteer.launch({
-      headless: "new",
-      args: ["--no-sandbox"]
-    });
+  // =========================
+  // 🔥 ここが抜けてた（重要）
+  // =========================
+mechanical_behavior: `
+Mechanical performance is conditionally acceptable under controlled processing conditions, though variability may occur depending on thermal exposure and material stability.
+`,
+
+surface_quality: `
+Surface uniformity may fluctuate depending on cooling consistency and flow stability, particularly under non-uniform processing environments.
+`,
+
+structural_consistency: `
+Internal structural consistency requires validation under real processing conditions, as variability in shear and cooling behavior may introduce inconsistencies.
+`,
+
+// =========================
+// 🔥 バルーン完全復元（ここが核）
+// =========================
+primary_risk_title: "Thermal Instability Under Elevated Conditions",
+primary_risk: `
+Degradation risk under high temperature conditions may lead to irreversible material breakdown within a single processing cycle if thermal exposure exceeds stability thresholds.
+`,
+
+secondary_risk_title: "Flow Variability and Structural Inconsistency",
+secondary_risk: `
+Internal defects and structural inconsistency may occur under unstable flow conditions, particularly when shear rates fluctuate during processing.
+`,
+
+mechanism: `
+Thermal degradation combined with shear-induced instability acts as the primary failure mechanism, requiring controlled validation before production deployment.
+`,
+
+  // =========================
+  // Quality
+  // =========================
+  stability: "Moderate",
+  stability_note: "Depends on control.",
+  consistency: "Moderate",
+  consistency_note: "Varies with process.",
+
+  // =========================
+  application_implication: "Pilot testing required.",
+  next_step: "Pilot validation recommended.",
+
+  decision: decisionData.decision,
+  economic_impact: economic,
+
+  pha_score: score,
+
+  // =========================
+  // 🔥 overlay（そのまま）
+  // =========================
+ base_image: "https://ilnautico.github.io/visual-base.png",
+  dynamic_overlay: generateOverlay(score, score)
+
+});
+
+  const browser = await puppeteer.launch({
+  headless: "new", // ← これが今回の修正ポイント
+  args: [
+    "--no-sandbox",
+    "--disable-setuid-sandbox",
+    "--disable-dev-shm-usage",
+    "--disable-gpu"
+  ]
+});
 
     const page = await browser.newPage();
 
-    await page.setContent(html, {
-      waitUntil: ["networkidle0", "load"]
-    });
+   await page.setContent(html, {
+  waitUntil: ["networkidle0", "load"]
+});
 
     const pdf = await page.pdf({
       format: "A4",
@@ -224,16 +331,19 @@ app.post("/generate-report", async (req, res) => {
     console.error(err);
     res.status(500).send("error");
   }
-
 });
 
+// =========================
 app.get("/latest-pdf", (req, res) => {
-  if (!fs.existsSync(PDF_PATH)) return res.status(404).send("No PDF yet");
+  if (!fs.existsSync(PDF_PATH)) {
+    return res.status(404).send("No PDF yet");
+  }
   res.sendFile(PDF_PATH);
 });
 
-app.listen(8080, () => {
-  console.log("🚀 running");
+const PORT = process.env.PORT || 8080;
+app.listen(PORT, () => {
+  console.log("🚀 Server running on", PORT);
 });
 const html_3man =`;
 <!DOCTYPE html>
