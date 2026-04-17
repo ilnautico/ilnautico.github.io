@@ -1,52 +1,17 @@
 import express from "express";
 import puppeteer from "puppeteer";
 import fs from "fs";
-import path from "path";
-import { fileURLToPath } from "url";
-import OpenAI from "openai";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 const app = express();
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-const PDF_PATH = "/tmp/latest.pdf";　
+const PDF_PATH = "/tmp/latest.pdf";
 
 // =========================
-// OpenAI
+// Overlay（グラフィック）
 // =========================
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
-});
-
-// =========================
-// HTML TEMPLATE
-// =========================
-const htmlTemplate = fs.readFileSync(
-  path.join(__dirname, "template.html"),
-  "utf8"
-);
-
-// =========================
-function safe(v) {
-  return v || "";
-}
-
-// =========================
-// 🔥 OVERLAY（完全維持）
-// =========================
-// =========================
-// Overlay（そのまま）
-// =========================
-// =========================
-// Overlay（そのまま）
-// =========================
-// Overlay（壊さない）
-// =========================
-// Overlay（完全連動版）
 function generateOverlay(scoreLeft, scoreRight) {
 
   const angle = -90 + (scoreRight * 1.8);
@@ -65,19 +30,16 @@ function generateOverlay(scoreLeft, scoreRight) {
     "
   />
 
-  <!-- 左 -->
   <div style="position:absolute; top:40px; left:50%; transform:translateX(-180px); text-align:center;">
     <div style="font-size:28px; color:#2f3a44;">230°C</div>
     <div style="font-size:16px; color:#5b6770;">${scoreLeft}</div>
   </div>
 
-  <!-- 右 -->
   <div style="position:absolute; top:40px; left:50%; transform:translateX(180px); text-align:center;">
     <div style="font-size:28px; color:#d62c2c;">180°C</div>
     <div style="font-size:16px; color:#d62c2c;">${scoreRight}</div>
   </div>
 
-  <!-- 波（視覚はそのまま固定） -->
   <svg style="position:absolute; left:50%; bottom:80px; transform:translateX(-70px);" width="90" height="35">
     <path d="M0 18 C15 6, 30 30, 45 18 C60 6, 75 30, 90 18"
       fill="none"
@@ -92,7 +54,6 @@ function generateOverlay(scoreLeft, scoreRight) {
       stroke-width="3"/>
   </svg>
 
-  <!-- メーター -->
   <svg style="position:absolute; right:60px; bottom:10px;" viewBox="0 0 200 120" width="140" height="90">
     <defs>
       <linearGradient id="g">
@@ -109,6 +70,7 @@ function generateOverlay(scoreLeft, scoreRight) {
     </g>
 
     <circle cx="100" cy="100" r="4" fill="#111"/>
+
   </svg>
 
 </div>
@@ -116,17 +78,16 @@ function generateOverlay(scoreLeft, scoreRight) {
 }
 
 // =========================
-// スコアロジック
+// ロジック
+// =========================
 function calculateScore(text) {
   let score = 100;
 
   if (text.includes("pp")) score -= 20;
   if (text.includes("pe")) score -= 10;
   if (text.includes("pet")) score -= 30;
-
   if (text.includes("injection")) score -= 15;
   if (text.includes("film")) score -= 25;
-
   if (text.includes("pla")) score -= 10;
   if (text.includes("pha")) score -= 20;
 
@@ -149,6 +110,7 @@ function calculateEconomic(score) {
 
 // =========================
 // HTML差し込み
+// =========================
 function injectHtml(template, data) {
   let html = template;
   for (const key in data) {
@@ -159,20 +121,23 @@ function injectHtml(template, data) {
 
 // =========================
 // MAIN
+// =========================
 app.post("/generate-report", async (req, res) => {
 
   try {
 
     const input = req.body;
 
-    // 🔥 左右分離（ここが今回の核心）
-    const scoreLeft = calculateScore((input.material || "").toLowerCase());
-    const scoreRight = calculateScore((input.bio_material || "").toLowerCase());
+    const text = [
+      input.application || "",
+      input.material || "",
+      input.bio_material || ""
+    ].join(" ").toLowerCase();
 
-    const decisionData = determineDecision(scoreRight);
-    const economic = calculateEconomic(scoreRight);
+    const score = calculateScore(text);
+    const decisionData = determineDecision(score);
+    const economic = calculateEconomic(score);
 
-    // 🔥 完全版 Executive（フル復元）
     const executive_summary = `
 This assessment indicates ${decisionData.level} feasibility for transitioning to the evaluated material under current conditions.
 
@@ -186,55 +151,14 @@ Operationally, the key consideration lies not in whether the material can run, b
 
 Economic Impact: ${economic}
 
-Proceeding without structured validation may lead to unstable production outcomes, increased material loss, and potential equipment stress.
-
-This may also introduce variability in product quality, including inconsistency in structural integrity, surface uniformity, and mechanical performance.
-
-Therefore, a phased validation approach is strongly recommended prior to any commitment to scale.
-
-It is also advisable to conduct pilot trials under controlled conditions to establish process stability before full-scale deployment.
+Proceeding without structured validation may lead to unstable production outcomes, increased material loss, and potential equipment stress. Therefore, a phased validation approach is strongly recommended prior to any commitment to scale.
 `;
 
     const html = injectHtml(htmlTemplate, {
-
-      assessment_type: "Technical Hypothesis",
-      application: input.application,
-      material_transition: input.bio_material,
-      report_date: new Date().toISOString().split("T")[0],
-
-      compatibility_level: decisionData.level,
-
-      executive_summary,
+      executive_summary: executive_summary,
       key_risk: "Thermal sensitivity and flow instability introduce variability.",
-
-      primary_risk_title: "Thermal Instability Under Elevated Conditions",
-      primary_risk: "Material degradation may occur under high temperature exposure.",
-
-      secondary_risk_title: "Flow Variability",
-      secondary_risk: "Unstable flow may cause inconsistency in structure.",
-
-      mechanism: "Thermal + shear interaction drives instability.",
-
-      processing_window: "Controlled validation required.",
-      thermal_behavior: "Moderate sensitivity.",
-      flow_characteristics: "Variable flow behavior.",
-
-      mechanical_behavior: "Conditionally acceptable.",
-      surface_quality: "May fluctuate.",
-      structural_consistency: "Requires validation.",
-
-      stability: "Moderate",
-      stability_note: "Depends on control.",
-      consistency: "Moderate",
-      consistency_note: "Varies with process.",
-
-      application_implication: "Pilot testing required.",
       next_step: "Pilot validation recommended.",
-
-      decision: decisionData.decision,
-      economic_impact: economic,
-
-      dynamic_overlay: generateOverlay(scoreLeft, scoreRight)
+      dynamic_overlay: generateOverlay(score, score)
     });
 
     const browser = await puppeteer.launch({
@@ -268,21 +192,11 @@ It is also advisable to conduct pilot trials under controlled conditions to esta
     console.error(err);
     res.status(500).send("error");
   }
+
 });
 
 // =========================
-app.get("/latest-pdf", (req, res) => {
-  if (!fs.existsSync(PDF_PATH)) {
-    return res.status(404).send("No PDF yet");
-  }
-  res.sendFile(PDF_PATH);
-});
-
-    console.error(err);
-    res.status(500).send("error");
-  }
-});
-
+// PDF取得
 // =========================
 app.get("/latest-pdf", (req, res) => {
   if (!fs.existsSync(PDF_PATH)) {
@@ -293,6 +207,7 @@ app.get("/latest-pdf", (req, res) => {
 
 // =========================
 const PORT = process.env.PORT || 8080;
+
 app.listen(PORT, () => {
   console.log("🚀 Server running on", PORT);
 });
