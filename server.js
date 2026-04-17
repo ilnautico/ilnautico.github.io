@@ -299,7 +299,7 @@ Thermal degradation combined with shear-induced instability acts as the primary 
   // =========================
   // 🔥 overlay（そのまま）
   // =========================
-  base_image: "https://i.imgur.com/8Q0vG6B.png",
+  base_image: "<img src="https://ilnautico.github.io/visual-base.png",
   dynamic_overlay: generateOverlay(score, score)
 
 });
