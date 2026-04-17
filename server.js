@@ -16,14 +16,14 @@ app.use(express.urlencoded({ extended: true }));
 const PDF_PATH = "/tmp/latest.pdf";
 
 // =========================
-// OpenAI（未使用でもOK）
+// OpenAI
 // =========================
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY || ""
 });
 
 // =========================
-// 🔥 TEMPLATE 安全読み込み（ここが重要）
+// TEMPLATE（安全読み込み）
 // =========================
 let htmlTemplate = "";
 
@@ -36,13 +36,12 @@ try {
   console.log("✅ template.html loaded");
 
 } catch (e) {
-  console.error("❌ template.html NOT FOUND → fallback使用");
+  console.error("❌ template.html NOT FOUND");
 
-  // 🔥 絶対落ちない保険
   htmlTemplate = `
   <html>
     <body>
-      <h1>Template fallback OK</h1>
+      <h1>Fallback Template</h1>
       <div>{{application}}</div>
       <div>{{material_transition}}</div>
       <div>{{executive_summary}}</div>
@@ -58,7 +57,7 @@ function safe(v) {
 }
 
 // =========================
-// overlay（そのまま）
+// overlay（軽量版）
 // =========================
 function generateOverlay(scoreLeft, scoreRight) {
 
@@ -66,7 +65,7 @@ function generateOverlay(scoreLeft, scoreRight) {
   const angle = -90 + (safeRight * 1.8);
 
   return `
-<div style="position:absolute; left:0; top:0; width:100%; height:100%; pointer-events:none;">
+<div style="position:absolute; left:0; top:0; width:100%; height:100%;">
   <div style="position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);">
     SCORE: ${scoreRight}
   </div>
@@ -107,14 +106,14 @@ function injectHtml(template, data) {
 }
 
 // =========================
-// ヘルスチェック（超重要）
+// ヘルスチェック
 // =========================
 app.get("/", (req, res) => {
   res.send("SERVER OK");
 });
 
 // =========================
-// MAIN（まず軽くする）
+// MAIN（デバッグ版）
 // =========================
 app.post("/generate-report", async (req, res) => {
 
@@ -122,15 +121,20 @@ app.post("/generate-report", async (req, res) => {
 
     console.log("🔥 STEP 0: REQUEST RECEIVED");
 
-    console.log("🔥 STEP 1: RAW BODY", JSON.stringify(req.body));
+    console.log("🔥 BODY FULL:", JSON.stringify(req.body, null, 2));
 
     const raw = req.body;
 
-    console.log("🔥 STEP 2: START PARSE");
+    console.log("🔥 STEP 1: START PARSE");
 
     let input = {};
 
+    // =========================
+    // Tally形式
+    // =========================
     if (raw.data && raw.data.fields) {
+
+      console.log("🔥 STEP 2: TALLY FORMAT DETECTED");
 
       raw.data.fields.forEach((f, i) => {
         console.log(`🔥 FIELD ${i}:`, f);
@@ -144,10 +148,13 @@ app.post("/generate-report", async (req, res) => {
       });
 
     } else {
+
+      console.log("🔥 STEP 2: DIRECT JSON FORMAT");
+
       input = raw;
     }
 
-    console.log("🔥 STEP 3: PARSED INPUT", input);
+    console.log("🔥 STEP 3: PARSED INPUT:", input);
 
     const text = [
       input.application || "",
@@ -155,13 +162,15 @@ app.post("/generate-report", async (req, res) => {
       input.bio_material || ""
     ].join(" ").toLowerCase();
 
-    console.log("🔥 STEP 4: TEXT", text);
+    console.log("🔥 STEP 4: TEXT:", text);
 
     const score = calculateScore(text);
-    console.log("🔥 STEP 5: SCORE", score);
+
+    console.log("🔥 STEP 5: SCORE:", score);
 
     const decisionData = determineDecision(score);
-    console.log("🔥 STEP 6: DECISION", decisionData);
+
+    console.log("🔥 STEP 6: DECISION:", decisionData);
 
     const html = injectHtml(htmlTemplate, {
       application: input.application,
@@ -172,7 +181,9 @@ app.post("/generate-report", async (req, res) => {
 
     console.log("🔥 STEP 7: HTML GENERATED");
 
-    // ❗ここで一旦止める（Puppeteerを切る）
+    // =========================
+    // 一旦PDF止める（重要）
+    // =========================
     res.send("DEBUG OK");
 
   } catch (err) {
