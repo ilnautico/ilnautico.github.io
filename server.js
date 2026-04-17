@@ -120,16 +120,21 @@ app.post("/generate-report", async (req, res) => {
 
   try {
 
-    console.log("🔥 RAW BODY:", req.body);
+    console.log("🔥 STEP 0: REQUEST RECEIVED");
 
-    // ---------------------
-    // Tally変換
-    // ---------------------
+    console.log("🔥 STEP 1: RAW BODY", JSON.stringify(req.body));
+
     const raw = req.body;
+
+    console.log("🔥 STEP 2: START PARSE");
+
     let input = {};
 
     if (raw.data && raw.data.fields) {
-      raw.data.fields.forEach(f => {
+
+      raw.data.fields.forEach((f, i) => {
+        console.log(`🔥 FIELD ${i}:`, f);
+
         const label = (f.label || "").toLowerCase();
         const value = f.value;
 
@@ -137,11 +142,12 @@ app.post("/generate-report", async (req, res) => {
         if (label.includes("material")) input.material = value;
         if (label.includes("bio")) input.bio_material = value;
       });
+
     } else {
       input = raw;
     }
 
-    console.log("🔥 PARSED:", input);
+    console.log("🔥 STEP 3: PARSED INPUT", input);
 
     const text = [
       input.application || "",
@@ -149,41 +155,25 @@ app.post("/generate-report", async (req, res) => {
       input.bio_material || ""
     ].join(" ").toLowerCase();
 
+    console.log("🔥 STEP 4: TEXT", text);
+
     const score = calculateScore(text);
+    console.log("🔥 STEP 5: SCORE", score);
+
     const decisionData = determineDecision(score);
+    console.log("🔥 STEP 6: DECISION", decisionData);
 
     const html = injectHtml(htmlTemplate, {
       application: input.application,
       material_transition: input.bio_material,
-      executive_summary: "OK",
+      executive_summary: "DEBUG MODE",
       dynamic_overlay: generateOverlay(score, score)
     });
 
-    // ---------------------
-    // 🔥 一旦PDF切る（復旧優先）
-    // ---------------------
-  const browser = await puppeteer.launch({
-  headless: "new",
-  args: ["--no-sandbox"]
-});
+    console.log("🔥 STEP 7: HTML GENERATED");
 
-const page = await browser.newPage();
-
-await page.setContent(html, {
-  waitUntil: "load",
-  timeout: 15000
-});
-
-const pdf = await page.pdf({
-  format: "A4",
-  printBackground: true
-});
-
-await browser.close();
-
-fs.writeFileSync(PDF_PATH, pdf);
-
-res.send("PDF generated");
+    // ❗ここで一旦止める（Puppeteerを切る）
+    res.send("DEBUG OK");
 
   } catch (err) {
     console.error("❌ ERROR:", err);
