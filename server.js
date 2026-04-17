@@ -43,6 +43,8 @@ function safe(v) {
 // =========================
 // =========================
 // Overlay（そのまま）
+// =========================
+// Overlay（壊さない）
 function generateOverlay(scoreLeft, scoreRight) {
 
   const angle = -90 + (scoreRight * 1.8);
@@ -101,16 +103,14 @@ function generateOverlay(scoreLeft, scoreRight) {
     </g>
 
     <circle cx="100" cy="100" r="4" fill="#111"/>
-
   </svg>
 
 </div>
 `;
 }
 
-
 // =========================
-// ロジック（削除なし）
+// 判定ロジック
 function calculateScore(text) {
   let score = 100;
 
@@ -141,17 +141,15 @@ function calculateEconomic(score) {
   return "+60%+";
 }
 
+// =========================
+// HTML差し込み
 function injectHtml(template, data) {
   let html = template;
   for (const key in data) {
-    html = html.replace(
-      new RegExp(`{{\\s*${key}\\s*}}`, "g"),
-      data[key] ?? ""
-    );
+    html = html.replace(new RegExp(`{{\\s*${key}\\s*}}`, "g"), data[key]);
   }
   return html;
 }
-
 
 // =========================
 // MAIN
@@ -161,29 +159,35 @@ app.post("/generate-report", async (req, res) => {
 
     const input = req.body;
 
-    const textLeft = [input.application, input.material].join(" ").toLowerCase();
-    const textRight = [input.application, input.bio_material].join(" ").toLowerCase();
+    const text = [
+      input.application,
+      input.material,
+      input.bio_material
+    ].join(" ").toLowerCase();
 
-    const scoreLeft = calculateScore(textLeft);
-    const scoreRight = calculateScore(textRight);
+    const score = calculateScore(text);
+    const decisionData = determineDecision(score);
+    const economic = calculateEconomic(score);
 
-    const decisionData = determineDecision(scoreRight);
-    const economic = calculateEconomic(scoreRight);
-
-    // 🔥復元：ここが今回の核心
+    // 🔥 完全復元 Executive
     const executive_summary = `
 This assessment indicates ${decisionData.level} feasibility for transitioning to the evaluated material under current conditions.
 
-From a technical perspective, the material demonstrates baseline compatibility with the intended application. However, its behavior is highly dependent on processing stability.
+From a technical perspective, the material demonstrates baseline compatibility with the intended application. However, its behavior is highly dependent on processing stability, particularly in relation to thermal exposure and shear conditions.
 
-Deployment Decision: ${decisionData.decision}
+Deployment Decision: ${decisionData.decision} at this stage, the transition should not be interpreted as production-ready. Instead, it represents a controlled feasibility scenario where further validation is essential.
+
+Operationally, the key consideration lies not in whether the material can run, but in whether it can run consistently within acceptable quality thresholds.
 
 Economic Impact: ${economic}
+
+Proceeding without structured validation may lead to unstable production outcomes, increased material loss, and potential equipment stress.
+
+Therefore, a phased validation approach is strongly recommended prior to any commitment to scale.
 `;
 
     const html = injectHtml(htmlTemplate, {
 
-      // 基本
       assessment_type: "Technical Hypothesis",
       application: input.application,
       material_transition: input.bio_material,
@@ -191,15 +195,39 @@ Economic Impact: ${economic}
 
       compatibility_level: decisionData.level,
 
-      // 🔥ここ復元
-      executive_summary: executive_summary,
+      executive_summary,
       key_risk: "Thermal sensitivity and flow instability introduce variability.",
+
+      // Failure
+      primary_risk_title: "Thermal Instability Under Elevated Conditions",
+      primary_risk: "Material degradation may occur under high temperature exposure.",
+      secondary_risk_title: "Flow Variability",
+      secondary_risk: "Unstable flow may cause inconsistency in structure.",
+      mechanism: "Thermal + shear interaction drives instability.",
+
+      // Processing
+      processing_window: "Controlled validation required.",
+      thermal_behavior: "Moderate sensitivity.",
+      flow_characteristics: "Variable flow behavior.",
+
+      // Product
+      mechanical_behavior: "Conditionally acceptable.",
+      surface_quality: "May fluctuate.",
+      structural_consistency: "Requires validation.",
+
+      // Quality
+      stability: "Moderate",
+      stability_note: "Depends on control.",
+      consistency: "Moderate",
+      consistency_note: "Varies with process.",
+
+      application_implication: "Pilot testing required.",
+      next_step: "Pilot validation recommended.",
 
       decision: decisionData.decision,
       economic_impact: economic,
 
-      dynamic_overlay: generateOverlay(scoreLeft, scoreRight)
-
+      dynamic_overlay: generateOverlay(score, score)
     });
 
     const browser = await puppeteer.launch({
@@ -235,16 +263,13 @@ Economic Impact: ${economic}
   }
 });
 
-
 // =========================
-// PDF取得（復元）
 app.get("/latest-pdf", (req, res) => {
   if (!fs.existsSync(PDF_PATH)) {
     return res.status(404).send("No PDF yet");
   }
   res.sendFile(PDF_PATH);
 });
-
 
 // =========================
 const PORT = process.env.PORT || 8080;
