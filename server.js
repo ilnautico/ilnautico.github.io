@@ -40,7 +40,7 @@ function safe(v) {
 // =========================
 function generateOverlay(scoreLeft, scoreRight) {
 
-  const angle = (scoreRight * 1.8) - 90;
+  const angle = -90 + (scoreRight * 1.8); // ←これ
 
   return `
 <div style="
