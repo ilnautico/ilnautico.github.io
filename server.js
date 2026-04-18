@@ -3,7 +3,6 @@ import puppeteer from "puppeteer";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import OpenAI from "openai";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -16,28 +15,16 @@ app.use(express.urlencoded({ extended: true }));
 const PDF_PATH = "/tmp/latest.pdf";
 
 // =========================
-// OpenAI（未使用だが保持）
-// =========================
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
-});
-
-// =========================
-// HTML TEMPLATE
+// TEMPLATE
 // =========================
 const templatePath = path.join(__dirname, "template.html");
-console.log("📁 Trying to load:", templatePath);
-
 const htmlTemplate = fs.readFileSync(templatePath, "utf8");
-console.log("✅ template.html loaded");
 
 // =========================
-function safe(v) {
-  return v || "";
-}
+const safe = (v) => v || "";
 
 // =========================
-// 🔥 Overlay（変更なし）
+// OVERLAY（そのまま）
 // =========================
 function generateOverlay(scoreLeft, scoreRight) {
 
@@ -46,40 +33,27 @@ function generateOverlay(scoreLeft, scoreRight) {
 
   return `
 <div style="position:absolute; left:0; top:0; width:100%; height:100%; pointer-events:none;">
-  <img src="https://ilnautico.github.io/visual-base.png"
-    style="position:absolute; left:50%; top:55%; transform:translate(-50%,-50%); width:450px; opacity:0.95;" />
+<img src="https://ilnautico.github.io/visual-base.png"
+style="position:absolute; left:50%; top:55%; transform:translate(-50%,-50%); width:450px;" />
 
-  <div style="position:absolute; top:40px; left:50%; transform:translateX(-180px); text-align:center;">
-    <div style="font-size:28px;">230°C</div>
-    <div>${scoreLeft}</div>
-  </div>
+<div style="position:absolute; top:40px; left:50%; transform:translateX(-180px); text-align:center;">
+<div>230°C</div><div>${scoreLeft}</div></div>
 
-  <div style="position:absolute; top:40px; left:50%; transform:translateX(180px); text-align:center;">
-    <div style="font-size:28px; color:red;">180°C</div>
-    <div style="color:red;">${scoreRight}</div>
-  </div>
+<div style="position:absolute; top:40px; left:50%; transform:translateX(180px); text-align:center;">
+<div style="color:red;">180°C</div><div style="color:red;">${scoreRight}</div></div>
 
-  <svg style="position:absolute; right:60px; bottom:10px;" viewBox="0 0 200 120" width="140">
-    <defs>
-      <linearGradient id="g">
-        <stop offset="0%" stop-color="#22c55e"/>
-        <stop offset="50%" stop-color="#fde047"/>
-        <stop offset="100%" stop-color="#ef4444"/>
-      </linearGradient>
-    </defs>
-
-    <path d="M20 100 A80 80 0 0 1 180 100 L100 100 Z" fill="url(#g)"/>
-
-    <g transform="rotate(${angle} 100 100)">
-      <line x1="100" y1="100" x2="100" y2="30" stroke="#111" stroke-width="3"/>
-    </g>
-  </svg>
+<svg style="position:absolute; right:60px; bottom:10px;" viewBox="0 0 200 120" width="140">
+<path d="M20 100 A80 80 0 0 1 180 100 L100 100 Z" fill="url(#g)"/>
+<g transform="rotate(${angle} 100 100)">
+<line x1="100" y1="100" x2="100" y2="30" stroke="#111" stroke-width="3"/>
+</g>
+</svg>
 </div>
 `;
 }
 
 // =========================
-// スコア
+// SCORE
 // =========================
 function calculateScore(text) {
   let score = 100;
@@ -105,58 +79,65 @@ function determineDecision(score) {
 }
 
 // =========================
-// 🔥 文章生成ロジック（追加）
+// 🔥 FULL GENERATORS（全部接続）
 // =========================
-function generateExecutive(score, decision, economic) {
-
-  if (score >= 80) {
-    return `This assessment indicates HIGH feasibility. Deployment Decision: ${decision}.
-Material demonstrates stable compatibility with minimal operational risk. Economic Impact: ${economic}.`;
-  }
-
-  if (score >= 60) {
-    return `This assessment indicates MODERATE feasibility. Deployment Decision: ${decision}.
-Material behavior shows moderate operational risk. Economic Impact: ${economic}.
-A structured validation phase is recommended.`;
-  }
-
-  return `This assessment indicates LOW feasibility. Deployment Decision: ${decision}.
-Material instability expected under processing conditions. Economic Impact: ${economic}.
-Transition is not recommended without major modification.`;
-}
-
-function generateRisk(score) {
+function generateAll(score, decision) {
 
   if (score >= 80) {
     return {
+      executive: `HIGH feasibility. Deployment: ${decision}. Stable performance expected.`,
+      processing_window: "Stable processing window.",
+      thermal: "Thermally stable.",
+      flow: "Consistent flow.",
+      mechanical: "Stable mechanical performance.",
+      surface: "Uniform surface.",
+      structural: "Stable structure.",
+      implication: "Ready for pilot scaling.",
       primary: "Minor thermal sensitivity.",
-      secondary: "Low variability."
+      secondary: "Low variability.",
+      mechanism: "Minor thermal response.",
+      next: "Proceed to pilot validation."
     };
   }
 
   if (score >= 60) {
     return {
-      primary: "Thermal instability under elevated conditions.",
-      secondary: "Flow variability under shear fluctuation."
+      executive: `MODERATE feasibility. Deployment: ${decision}. Controlled validation required.`,
+      processing_window: "Controlled processing required.",
+      thermal: "Moderate sensitivity.",
+      flow: "Variable flow behaviour.",
+      mechanical: "Conditionally stable.",
+      surface: "Possible variability.",
+      structural: "Requires validation.",
+      implication: "Pilot testing required.",
+      primary: "Thermal instability risk.",
+      secondary: "Flow variability.",
+      mechanism: "Thermal + shear instability.",
+      next: "Pilot validation recommended."
     };
   }
 
   return {
-    primary: "High degradation risk.",
-    secondary: "Severe structural instability."
+    executive: `LOW feasibility. Deployment: ${decision}. High instability expected.`,
+    processing_window: "Narrow processing window.",
+    thermal: "High sensitivity.",
+    flow: "Unstable flow.",
+    mechanical: "Unstable performance.",
+    surface: "Surface inconsistency.",
+    structural: "Structural instability.",
+    implication: "Not recommended.",
+    primary: "Severe degradation risk.",
+    secondary: "Critical instability.",
+    mechanism: "Failure under stress.",
+    next: "Re-evaluate material."
   };
 }
 
 // =========================
-// HTML inject
-// =========================
 function injectHtml(template, data) {
   let html = template;
   for (const key in data) {
-    html = html.replace(
-      new RegExp(`{{\\s*${key}\\s*}}`, "g"),
-      safe(data[key])
-    );
+    html = html.replace(new RegExp(`{{\\s*${key}\\s*}}`, "g"), safe(data[key]));
   }
   return html;
 }
@@ -168,41 +149,24 @@ app.post("/generate-report", async (req, res) => {
 
   try {
 
-    console.log("🔥 RAW BODY:", req.body);
+    let input = req.body;
 
-    let input = {};
-    const raw = req.body;
-
-    if (raw.data && raw.data.fields) {
-      raw.data.fields.forEach(f => {
+    if (input.data && input.data.fields) {
+      const parsed = {};
+      input.data.fields.forEach(f => {
         const label = (f.label || "").toLowerCase();
-        const value = f.value;
-
-        if (label.includes("application")) input.application = value;
-        if (label.includes("material")) input.material = value;
-        if (label.includes("target") || label.includes("bio")) input.bio_material = value;
+        if (label.includes("application")) parsed.application = f.value;
+        if (label.includes("material")) parsed.material = f.value;
+        if (label.includes("target")) parsed.bio_material = f.value;
       });
-    } else {
-      input = raw;
+      input = parsed;
     }
 
-    console.log("🔥 PARSED:", input);
-
-    const text = [
-      input.application || "",
-      input.material || "",
-      input.bio_material || ""
-    ].join(" ").toLowerCase();
+    const text = `${input.application} ${input.material} ${input.bio_material}`.toLowerCase();
 
     const score = calculateScore(text);
     const decisionData = determineDecision(score);
-
-    const economic =
-      score >= 80 ? "+5–15%" :
-      score >= 60 ? "+15–30%" :
-      score >= 40 ? "+30–60%" : "+60%+";
-
-    const risk = generateRisk(score);
+    const gen = generateAll(score, decisionData.decision);
 
     const html = injectHtml(htmlTemplate, {
 
@@ -211,42 +175,47 @@ app.post("/generate-report", async (req, res) => {
       report_date: new Date().toISOString().split("T")[0],
 
       compatibility_level: decisionData.level,
-      executive_summary: generateExecutive(score, decisionData.decision, economic),
 
-      key_risk: risk.primary,
+      executive_summary: gen.executive,
+
+      processing_window: gen.processing_window,
+      thermal_behavior: gen.thermal,
+      flow_characteristics: gen.flow,
+
+      mechanical_behavior: gen.mechanical,
+      surface_quality: gen.surface,
+      structural_consistency: gen.structural,
+
+      application_implication: gen.implication,
 
       primary_risk_title: "Primary Risk",
-      primary_risk: risk.primary,
+      primary_risk: gen.primary,
 
       secondary_risk_title: "Secondary Risk",
-      secondary_risk: risk.secondary,
+      secondary_risk: gen.secondary,
 
-      mechanism: "Thermal + shear instability.",
+      mechanism: gen.mechanism,
 
       stability: "Moderate",
+      stability_note: "Depends on conditions.",
       consistency: "Moderate",
+      consistency_note: "Process dependent.",
+
+      next_step: gen.next,
 
       decision: decisionData.decision,
-      economic_impact: economic,
 
       dynamic_overlay: generateOverlay(score, score)
     });
 
     const browser = await puppeteer.launch({
       headless: "new",
-      args: [
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--disable-dev-shm-usage",
-        "--disable-gpu"
-      ]
+      args: ["--no-sandbox","--disable-dev-shm-usage"]
     });
 
     const page = await browser.newPage();
 
-    await page.setContent(html, {
-      waitUntil: ["domcontentloaded"]
-    });
+    await page.setContent(html, { waitUntil: "domcontentloaded" });
 
     const pdf = await page.pdf({
       format: "A4",
@@ -261,7 +230,7 @@ app.post("/generate-report", async (req, res) => {
     res.send(pdf);
 
   } catch (err) {
-    console.error("🔥 ERROR:", err);
+    console.error(err);
     res.status(500).send("error");
   }
 
@@ -269,15 +238,12 @@ app.post("/generate-report", async (req, res) => {
 
 // =========================
 app.get("/latest-pdf", (req, res) => {
-  if (!fs.existsSync(PDF_PATH)) {
-    return res.status(404).send("No PDF yet");
-  }
+  if (!fs.existsSync(PDF_PATH)) return res.status(404).send("No PDF yet");
   res.sendFile(PDF_PATH);
 });
 
-const PORT = process.env.PORT || 8080;
-app.listen(PORT, () => {
-  console.log("🚀 Server running on", PORT);
+app.listen(process.env.PORT || 8080, () => {
+  console.log("🚀 Server running");
 });
 const html_3man =`;
 <!DOCTYPE html>
