@@ -77,39 +77,43 @@ function generateOverlay(scores) {
   const angle = -90 + total * 1.8;
 
   return `
-<div style="width:100%; text-align:center;">
-<svg width="700" height="240" viewBox="0 0 700 240">
+<div style="width:100%; display:flex; justify-content:center; align-items:center; margin-top:20px;">
 
-<text x="150" y="60" font-size="28" text-anchor="middle">230°C</text>
-<text x="150" y="90" font-size="16" text-anchor="middle">${thermal}</text>
+<svg width="720" height="260" viewBox="0 0 720 260">
 
-<text x="550" y="60" font-size="28" fill="#d62c2c" text-anchor="middle">180°C</text>
-<text x="550" y="90" font-size="16" fill="#d62c2c" text-anchor="middle">${flow}</text>
+<!-- LEFT -->
+<text x="160" y="70" font-size="28" text-anchor="middle">230°C</text>
+<text x="160" y="100" font-size="16" text-anchor="middle">${thermal}</text>
 
-<path d="M80 140 Q120 120 160 140 T240 140"
+<!-- RIGHT -->
+<text x="560" y="70" font-size="28" fill="#d62c2c" text-anchor="middle">180°C</text>
+<text x="560" y="100" font-size="16" fill="#d62c2c" text-anchor="middle">${flow}</text>
+
+<!-- LEFT WAVE -->
+<path d="M80 160 Q120 130 160 160 T240 160"
 stroke="#4f7c8a" fill="none" stroke-width="3"/>
 
-<path d="M460 140 Q500 120 540 140 T620 140"
+<!-- RIGHT WAVE -->
+<path d="M480 160 Q520 130 560 160 T640 160"
 stroke="#d62c2c" fill="none" stroke-width="3"/>
 
-<g transform="translate(260,120)">
-<path d="M0 80 A80 80 0 0 1 160 80 L80 80 Z"
-fill="url(#grad)"/>
+<!-- METER CENTER -->
+<g transform="translate(280,130)">
+  <path d="M0 80 A80 80 0 0 1 160 80 L80 80 Z" fill="url(#grad)"/>
 
-<g transform="rotate(${angle} 80 80)">
-<line x1="80" y1="80" x2="80" y2="20"
-stroke="#111" stroke-width="3"/>
-</g>
+  <g transform="rotate(${angle} 80 80)">
+    <line x1="80" y1="80" x2="80" y2="20" stroke="#111" stroke-width="3"/>
+  </g>
 
-<circle cx="80" cy="80" r="4" fill="#111"/>
+  <circle cx="80" cy="80" r="4" fill="#111"/>
 </g>
 
 <defs>
-<linearGradient id="grad">
-<stop offset="0%" stop-color="#22c55e"/>
-<stop offset="50%" stop-color="#fde047"/>
-<stop offset="100%" stop-color="#ef4444"/>
-</linearGradient>
+  <linearGradient id="grad">
+    <stop offset="0%" stop-color="#22c55e"/>
+    <stop offset="50%" stop-color="#fde047"/>
+    <stop offset="100%" stop-color="#ef4444"/>
+  </linearGradient>
 </defs>
 
 </svg>
