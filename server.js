@@ -1,7 +1,7 @@
 import express from "express";
 import puppeteer from "puppeteer";
 import fs from "fs";
-import path from "path";
+import path from "path";n
 import { fileURLToPath } from "url";
 
 const __filename = fileURLToPath(import.meta.url);
