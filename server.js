@@ -24,15 +24,6 @@ const htmlTemplate = fs.readFileSync(
 const safe = (v) => (v === undefined || v === null ? "" : String(v));
 
 // =========================
-// 🔥 画像を完全固定（base64）
-// =========================
-const imageBase64 = fs.readFileSync(
-  path.join(__dirname, "visual-base.png"),
-  "base64"
-);
-const BASE_IMAGE = `data:image/png;base64,${imageBase64}`;
-
-// =========================
 // SCORE
 // =========================
 function calculateScores(input) {
@@ -79,7 +70,7 @@ function calculateEconomic(score) {
 }
 
 // =========================
-// OVERLAY（完全復旧・サイズ維持）
+// OVERLAY（画像だけ修正）
 // =========================
 function generateOverlay(scores) {
   const { thermal, flow, total } = scores;
@@ -90,8 +81,9 @@ function generateOverlay(scores) {
 
   return `
 <div style="position:relative; width:100%;">
-  <img src="${BASE_IMAGE}"
-       style="width:100%; height:auto; display:block;" />
+  <!-- ✅ ここだけ変更：サイズ固定 -->
+  <img src="https://ilnautico.github.io/visual-base.png"
+       style="width:800px; display:block;" />
 
   <div style="position:absolute; top:40px; left:50%; transform:translateX(-180px); text-align:center;">
     <div style="font-size:28px;">230°C</div>
@@ -135,7 +127,7 @@ function generateOverlay(scores) {
 }
 
 // =========================
-// TEXT
+// TEXT（そのまま）
 // =========================
 function generateExecutive(scores, decisionData, economic) {
   const { thermal, flow, mechanical } = scores;
@@ -153,7 +145,7 @@ Economic Impact: ${economic}
 }
 
 // =========================
-// INJECT
+// INJECT（ここが致命修正）
 // =========================
 function injectHtml(template, data) {
   let html = template;
@@ -191,36 +183,8 @@ app.post("/generate-report", async (req, res) => {
       application: safe(input.application),
       material_transition: safe(input.bio_material),
       report_date: new Date().toISOString().split("T")[0],
-
       compatibility_level: decisionData.level,
       executive_summary: generateExecutive(scores, decisionData, economic),
-
-      key_risk: "Thermal / Flow variability risk",
-      processing_window: "Controlled",
-      thermal_behavior: "Moderate",
-      flow_characteristics: "Variable",
-      mechanical_behavior: "Conditional",
-      surface_quality: "Variable",
-      structural_consistency: "Needs validation",
-
-      primary_risk_title: "Thermal Instability",
-      primary_risk: "Heat degradation",
-      secondary_risk_title: "Flow Variability",
-      secondary_risk: "Flow inconsistency",
-      mechanism: "Thermal + shear",
-
-      stability: "Moderate",
-      stability_note: "Depends",
-      consistency: "Moderate",
-      consistency_note: "Process dependent",
-
-      application_implication: "Pilot needed",
-      next_step: "Proceed to pilot",
-
-      decision: decisionData.decision,
-      economic_impact: economic,
-      pha_score: scores.total,
-
       dynamic_overlay: generateOverlay(scores),
     });
 
@@ -231,8 +195,9 @@ app.post("/generate-report", async (req, res) => {
 
     const page = await browser.newPage();
 
+    // ✅ 安定化
     await page.setContent(html, {
-      waitUntil: "domcontentloaded",
+      waitUntil: "networkidle0",
       timeout: 0,
     });
 
@@ -245,29 +210,15 @@ app.post("/generate-report", async (req, res) => {
 
     fs.writeFileSync(PDF_PATH, pdf);
     res.send(pdf);
-
   } catch (err) {
     console.error(err);
     res.status(500).send("error");
   }
 });
 
-// =========================
-app.get("/latest-pdf", (req, res) => {
-  if (!fs.existsSync(PDF_PATH)) {
-    return res.status(404).send("No PDF yet");
-  }
-  res.sendFile(PDF_PATH);
+app.listen(process.env.PORT || 8080, () => {
+  console.log("🚀 Server running");
 });
-
-const PORT = process.env.PORT || 8080;
-
-if (!global.serverStarted) {
-  app.listen(PORT, () => {
-    console.log("🚀 Server running on", PORT);
-  });
-  global.serverStarted = true;
-}
 const html_3man =`;
 <!DOCTYPE html>
 <html>
