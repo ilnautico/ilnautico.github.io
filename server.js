@@ -1,5 +1,5 @@
 import express from "express";
-import puppeteer from "puppeteer";
+import puppeteer from "puppeteer";　　
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -19,7 +19,7 @@ const htmlTemplate = fs.readFileSync(
 );
 
 // =========================
-// SAFE
+// 安全値（穴あき完全防止）
 // =========================
 const safe = (v, fallback = "-") => {
   if (v === undefined || v === null || v === "") return fallback;
@@ -70,7 +70,7 @@ function calculateEconomic(score) {
 }
 
 // =========================
-// VISUAL（完全固定版）
+// VISUAL（ズレない版）
 // =========================
 function generateOverlay(scores) {
   const { thermal, flow, total } = scores;
@@ -80,16 +80,29 @@ function generateOverlay(scores) {
 <div style="
   position:relative;
   width:100%;
-  height:240px;
+  height:240px; /* ←ここ重要：テンプレと合わせた */
 ">
+
+  <!-- 背景（バルーン絶対表示） -->
+  <img src="https://ilnautico.github.io/visual-base.png"
+       style="
+         position:absolute;
+         top:0;
+         left:0;
+         width:100%;
+         height:100%;
+         object-fit:contain;
+         z-index:0;
+       " />
 
   <!-- LEFT -->
   <div style="
     position:absolute;
-    left:100px;
-    top:50px;
-    width:150px;
+    left:120px;
+    top:60px;
+    width:160px;
     text-align:center;
+    z-index:2;
   ">
     <div style="font-size:28px;">230°C</div>
     <div style="font-size:16px;">${thermal}</div>
@@ -103,10 +116,11 @@ function generateOverlay(scores) {
   <!-- RIGHT -->
   <div style="
     position:absolute;
-    right:100px;
-    top:50px;
-    width:150px;
+    right:120px;
+    top:60px;
+    width:160px;
     text-align:center;
+    z-index:2;
   ">
     <div style="font-size:28px; color:#d62c2c;">180°C</div>
     <div style="font-size:16px; color:#d62c2c;">${flow}</div>
@@ -121,10 +135,11 @@ function generateOverlay(scores) {
   <div style="
     position:absolute;
     left:50%;
-    top:120px;
+    top:130px;
     transform:translateX(-50%);
+    z-index:2;
   ">
-    <svg width="220" height="140" viewBox="0 0 200 120">
+    <svg width="200" height="120" viewBox="0 0 200 120">
 
       <defs>
         <linearGradient id="grad">
@@ -164,7 +179,10 @@ Mechanical stability (${scores.mechanical}): Structurally stable.
 
 Deployment Decision: ${decision.decision}
 
-Primary risk is process variability under real-world conditions.
+Primary risk is process variability under real-world conditions, which may lead to:
+- Product inconsistency
+- Scrap increase
+- Efficiency loss
 
 Economic Impact: ${economic}
 
@@ -180,19 +198,47 @@ function injectHtml(template, data) {
     return safe(data[key]);
   });
 }
-
 // =========================
 // MAIN
 // =========================
 app.post("/generate-report", async (req, res) => {
   try {
-    let input = req.body;
+   let input = req.body;
+
+    if (input?.data?.fields) {
+      const parsed = {};
+
+      input.data.fields.forEach((f) => {
+        const label = (f.label || "").toLowerCase();
+
+        if (label.includes("application")) {
+          parsed.application = f.value;
+        }
+
+        if (label.includes("material") && !label.includes("bio")) {
+          parsed.material = f.value;
+        }
+
+        if (label.includes("bio") || label.includes("target")) {
+          parsed.bio_material = f.value;
+        }
+      });
+
+      input = parsed;
+    }
+
 
     const scores = calculateScores(input);
     const decision = determineDecision(scores.total);
     const economic = calculateEconomic(scores.total);
 
+    const keyRisk =
+      scores.total > 70
+        ? "Minor process fluctuation impacting stability."
+        : "Thermal instability and inconsistency risk.";
+
     const html = injectHtml(htmlTemplate, {
+      assessment_type: "Technical Hypothesis",
       application: safe(input.application),
       material_transition: safe(input.bio_material),
       report_date: new Date().toISOString().split("T")[0],
@@ -200,7 +246,37 @@ app.post("/generate-report", async (req, res) => {
       compatibility_level: decision.level,
       executive_summary: generateExecutive(scores, decision, economic),
 
-      key_risk: "Process variability",
+      key_risk: keyRisk,
+
+      processing_window: "Stable processing window expected.",
+      thermal_behavior: "Thermally stable under controlled conditions.",
+      flow_characteristics: "Stable flow characteristics.",
+
+      mechanical_behavior: "Stable mechanical performance.",
+      surface_quality: "Uniform surface finish achievable.",
+      structural_consistency: "Stable structural integrity.",
+
+      primary_risk_title: "Process Variability",
+      primary_risk: "Minor fluctuation impacting stability.",
+
+      secondary_risk_title: "Operational Sensitivity",
+      secondary_risk: "Dependent on process control.",
+
+      mechanism: "Thermal + flow instability",
+
+      stability: "Moderate",
+      stability_note: "Depends on processing control.",
+
+      consistency: "Moderate",
+      consistency_note: "Process dependent.",
+
+      application_implication: "Pilot testing required.",
+      next_step: "Proceed to controlled pilot validation.",
+
+      decision: decision.decision,
+      economic_impact: economic,
+
+      pha_score: scores.total,
 
       dynamic_overlay: generateOverlay(scores),
     });
@@ -210,16 +286,7 @@ app.post("/generate-report", async (req, res) => {
     });
 
     const page = await browser.newPage();
-
-    // 🔥 ズレ防止
-    await page.setViewport({
-      width: 1200,
-      height: 1600
-    });
-
-    await page.setContent(html, {
-      waitUntil: "networkidle0"
-    });
+    await page.setContent(html, { waitUntil: "domcontentloaded" });
 
     const pdf = await page.pdf({
       format: "A4",
@@ -249,6 +316,31 @@ app.get("/latest-pdf", (req, res) => {
 app.listen(process.env.PORT || 8080, () => {
   console.log("Server running");
 });
+const html_3man =`;
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>FairVia Report</title>
+</head>
+
+<body>
+<h1>{{client_name}}</h1>
+<p>{{client_company}}</p>
+<p>{{client_country}}</p>
+
+<h2>Feasibility: {{feasibility_level}}</h2>
+
+<p>{{executive_summary_overview}}</p>
+<p>{{executive_summary_findings}}</p>
+<p>{{executive_summary_conclusion}}</p>
+Editing server.js file contents
+
+</body>
+</html>
+;
+const html = 
+const html_3man =`;
 <!DOCTYPE html>
 <html>
 <head>
