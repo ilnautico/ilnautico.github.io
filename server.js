@@ -80,19 +80,19 @@ function generateOverlay(scores) {
   return `
 <div style="
   position:relative;
-  width:100%;
+  width:700px;
   height:260px;
+  margin:0 auto;
 ">
 
-  <!-- 背景（確実表示） -->
+  <!-- 背景 -->
   <img src="https://ilnautico.github.io/visual-base.png"
     style="
+      width:700px;
+      height:260px;
       position:absolute;
       top:0;
       left:0;
-      width:100%;
-      height:100%;
-      object-fit:contain;
       z-index:1;
     "
   />
@@ -101,13 +101,13 @@ function generateOverlay(scores) {
   <div style="
     position:absolute;
     left:110px;
-    top:55px;
+    top:60px;
     width:160px;
     text-align:center;
     z-index:3;
   ">
     <div style="font-size:30px;">230°C</div>
-    <div style="font-size:16px;">${thermal}</div>
+    <div>${thermal}</div>
 
     <svg width="140" height="60">
       <path d="M10 40 Q40 10 70 40 T130 40"
@@ -118,14 +118,14 @@ function generateOverlay(scores) {
   <!-- RIGHT -->
   <div style="
     position:absolute;
-    right:110px;
-    top:55px;
+    left:430px;
+    top:60px;
     width:160px;
     text-align:center;
     z-index:3;
   ">
     <div style="font-size:30px; color:#d62c2c;">180°C</div>
-    <div style="font-size:16px; color:#d62c2c;">${flow}</div>
+    <div style="color:#d62c2c;">${flow}</div>
 
     <svg width="140" height="60">
       <path d="M10 40 Q40 10 70 40 T130 40"
@@ -133,16 +133,14 @@ function generateOverlay(scores) {
     </svg>
   </div>
 
-  <!-- CENTER METER -->
+  <!-- METER -->
   <div style="
     position:absolute;
-    left:50%;
-    top:140px;
-    transform:translateX(-50%);
+    left:260px;
+    top:120px;
     z-index:3;
   ">
-    <svg width="220" height="120" viewBox="0 0 200 120">
-
+    <svg width="200" height="120" viewBox="0 0 200 120">
       <defs>
         <linearGradient id="grad">
           <stop offset="0%" stop-color="#22c55e"/>
