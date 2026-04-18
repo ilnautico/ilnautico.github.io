@@ -260,10 +260,14 @@ app.get("/latest-pdf", (req, res) => {
   res.sendFile(PDF_PATH);
 });
 
-app.listen(process.env.PORT || 8080, () => {
-  console.log("🚀 Server running");
-});
-app.listen(process.env.PORT || 8080);
+const PORT = process.env.PORT || 8080;
+
+if (!global.serverStarted) {
+  app.listen(PORT, () => {
+    console.log("🚀 Server running on", PORT);
+  });
+  global.serverStarted = true;
+}
 const html_3man =`;
 <!DOCTYPE html>
 <html>
