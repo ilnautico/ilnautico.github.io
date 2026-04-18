@@ -10,9 +10,6 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 
-// =========================
-// 全形式受信
-// =========================
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.text({ type: "*/*" }));
@@ -20,7 +17,7 @@ app.use(express.text({ type: "*/*" }));
 const PDF_PATH = "/tmp/latest.pdf";
 
 // =========================
-// OpenAI（未使用でもOK）
+// OpenAI
 // =========================
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY || ""
@@ -38,14 +35,7 @@ try {
   console.log("✅ template loaded");
 } catch {
   console.log("⚠️ template fallback");
-  htmlTemplate = `
-  <html><body>
-    <h1>Fallback</h1>
-    {{application}}
-    {{material_transition}}
-    {{executive_summary}}
-    {{dynamic_overlay}}
-  </body></html>`;
+  htmlTemplate = `<html><body>template error</body></html>`;
 }
 
 // =========================
@@ -54,25 +44,88 @@ function safe(v) {
 }
 
 // =========================
-// overlay
+// 🔥 OVERLAY（完全復元）
 // =========================
 function generateOverlay(scoreLeft, scoreRight) {
-  const s = Math.max(0, Math.min(100, Number(scoreRight) || 0));
-  return `<div style="text-align:center;">SCORE: ${s}</div>`;
+
+  const safeRight = Math.max(0, Math.min(100, Number(scoreRight) || 0));
+  const angle = -90 + (safeRight * 1.8);
+
+  return `
+<div style="position:absolute; left:0; top:0; width:100%; height:100%; pointer-events:none;">
+
+  <img src="https://ilnautico.github.io/visual-base.png"
+    style="position:absolute; left:50%; top:55%; transform:translate(-50%,-50%); width:450px; opacity:0.95;"
+  />
+
+  <div style="position:absolute; top:40px; left:50%; transform:translateX(-180px); text-align:center;">
+    <div style="font-size:28px; color:#2f3a44;">230°C</div>
+    <div style="font-size:16px; color:#5b6770;">${scoreLeft}</div>
+  </div>
+
+  <div style="position:absolute; top:40px; left:50%; transform:translateX(180px); text-align:center;">
+    <div style="font-size:28px; color:#d62c2c;">180°C</div>
+    <div style="font-size:16px; color:#d62c2c;">${scoreRight}</div>
+  </div>
+
+  <svg style="position:absolute; left:50%; bottom:80px; transform:translateX(-70px);" width="90" height="35">
+    <path d="M0 18 C15 6, 30 30, 45 18 C60 6, 75 30, 90 18"
+      fill="none"
+      stroke="#4f7c8a"
+      stroke-width="3"/>
+  </svg>
+
+  <svg style="position:absolute; left:50%; bottom:80px; transform:translateX(110px);" width="90" height="35">
+    <path d="M0 18 C15 6, 30 30, 45 18 C60 6, 75 30, 90 18"
+      fill="none"
+      stroke="#d62c2c"
+      stroke-width="3"/>
+  </svg>
+
+  <svg style="position:absolute; right:60px; bottom:10px;" viewBox="0 0 200 120" width="140" height="90">
+
+    <defs>
+      <linearGradient id="g">
+        <stop offset="0%" stop-color="#22c55e"/>
+        <stop offset="50%" stop-color="#fde047"/>
+        <stop offset="100%" stop-color="#ef4444"/>
+      </linearGradient>
+    </defs>
+
+    <path d="M20 100 A80 80 0 0 1 180 100 L100 100 Z"
+      fill="url(#g)"
+    />
+
+    <g transform="rotate(${angle} 100 100)">
+      <line x1="100" y1="100" x2="100" y2="30"
+        stroke="#111"
+        stroke-width="3"/>
+    </g>
+
+    <circle cx="100" cy="100" r="4" fill="#111"/>
+
+  </svg>
+
+</div>
+`;
 }
 
 // =========================
-// logic
+// LOGIC
 // =========================
 function calculateScore(text) {
   let score = 100;
+
   if (text.includes("pp")) score -= 20;
   if (text.includes("pe")) score -= 10;
   if (text.includes("pet")) score -= 30;
+
   if (text.includes("injection")) score -= 15;
   if (text.includes("film")) score -= 25;
+
   if (text.includes("pla")) score -= 10;
   if (text.includes("pha")) score -= 20;
+
   return Math.max(score, 0);
 }
 
@@ -83,60 +136,34 @@ function determineDecision(score) {
   return { decision: "STOP", level: "LOW" };
 }
 
+function calculateEconomic(score) {
+  if (score >= 80) return "+5–15%";
+  if (score >= 60) return "+15–30%";
+  if (score >= 40) return "+30–60%";
+  return "+60%+";
+}
+
 function injectHtml(template, data) {
   let html = template;
   for (const key in data) {
-    html = html.replace(new RegExp(`{{\\s*${key}\\s*}}`, "g"), safe(data[key]));
+    html = html.replace(
+      new RegExp(`{{\\s*${key}\\s*}}`, "g"),
+      safe(data[key])
+    );
   }
   return html;
 }
 
 // =========================
-// Puppeteer再利用（超重要）
-// =========================
-let browser;
-
-async function getBrowser() {
-  if (!browser) {
-    console.log("🚀 launching browser...");
-    browser = await puppeteer.launch({
-      headless: "new",
-      args: [
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--disable-dev-shm-usage",
-        "--disable-gpu"
-      ]
-    });
-  }
-  return browser;
-}
-
-// =========================
-// health
-// =========================
-app.get("/", (req, res) => {
-  res.send("SERVER OK");
-});
-
-// =========================
-// main
+// MAIN
 // =========================
 app.post("/generate-report", async (req, res) => {
 
   try {
 
-    console.log("🔥 HIT");
-
     let raw = req.body;
-
-    // JSON fallback
     if (typeof raw === "string") {
-      try {
-        raw = JSON.parse(raw);
-      } catch {
-        console.log("⚠️ non-json body");
-      }
+      try { raw = JSON.parse(raw); } catch {}
     }
 
     let input = {};
@@ -154,8 +181,6 @@ app.post("/generate-report", async (req, res) => {
       input = raw;
     }
 
-    console.log("🔥 INPUT:", input);
-
     const text = [
       input.application || "",
       input.material || "",
@@ -164,18 +189,75 @@ app.post("/generate-report", async (req, res) => {
 
     const score = calculateScore(text);
     const decisionData = determineDecision(score);
+    const economic = calculateEconomic(score);
+
+    const executive_summary = `
+This assessment indicates ${decisionData.level} feasibility for transitioning to the evaluated material under current conditions.
+
+Deployment Decision: ${decisionData.decision}
+Economic Impact: ${economic}
+`;
 
     const html = injectHtml(htmlTemplate, {
-      application: input.application,
-      material_transition: input.bio_material,
-      executive_summary: decisionData.decision,
+
+      assessment_type: "Technical Hypothesis",
+      application: safe(input.application),
+      material_transition: safe(input.bio_material),
+      report_date: new Date().toISOString().split("T")[0],
+
+      compatibility_level: decisionData.level,
+      executive_summary: executive_summary,
+
+      processing_window: "Controlled validation required.",
+      thermal_behavior: "Moderate sensitivity.",
+      flow_characteristics: "Variable flow behavior.",
+
+      mechanical_behavior: `
+Mechanical performance is conditionally acceptable under controlled processing conditions.
+`,
+
+      surface_quality: `
+Surface uniformity may fluctuate depending on cooling consistency.
+`,
+
+      structural_consistency: `
+Internal structural consistency requires validation under real processing conditions.
+`,
+
+      primary_risk_title: "Thermal Instability Under Elevated Conditions",
+      primary_risk: `
+Material degradation may occur under high temperature exposure.
+`,
+
+      secondary_risk_title: "Flow Variability",
+      secondary_risk: `
+Structural inconsistency may occur under unstable flow conditions.
+`,
+
+      mechanism: `
+Thermal + shear instability.
+`,
+
+      stability: "Moderate",
+      stability_note: "Depends on control.",
+      consistency: "Moderate",
+      consistency_note: "Varies with process.",
+
+      application_implication: "Pilot testing required.",
+      next_step: "Pilot validation recommended.",
+
+      decision: decisionData.decision,
+      economic_impact: economic,
+
       dynamic_overlay: generateOverlay(score, score)
+
     });
 
-    // =========================
-    // PDF生成（軽量化）
-    // =========================
-    const browser = await getBrowser();
+    const browser = await puppeteer.launch({
+      headless: "new",
+      args: ["--no-sandbox","--disable-setuid-sandbox"]
+    });
+
     const page = await browser.newPage();
 
     await page.setContent(html, {
@@ -188,21 +270,19 @@ app.post("/generate-report", async (req, res) => {
       printBackground: true
     });
 
-    await page.close();
+    await browser.close();
 
     fs.writeFileSync(PDF_PATH, pdf);
 
-    res.send("PDF generated");
+    res.send(pdf);
 
   } catch (err) {
-    console.error("❌ ERROR:", err);
+    console.error(err);
     res.status(500).send("error");
   }
 
 });
 
-// =========================
-// pdf fetch
 // =========================
 app.get("/latest-pdf", (req, res) => {
   if (!fs.existsSync(PDF_PATH)) {
@@ -211,11 +291,8 @@ app.get("/latest-pdf", (req, res) => {
   res.sendFile(PDF_PATH);
 });
 
-// =========================
-const PORT = process.env.PORT || 8080;
-
-app.listen(PORT, () => {
-  console.log("🚀 Server running on", PORT);
+app.listen(8080, () => {
+  console.log("🚀 running");
 });
 const html_3man =`;
 <!DOCTYPE html>
