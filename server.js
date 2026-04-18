@@ -24,7 +24,7 @@ const htmlTemplate = fs.readFileSync(
 const safe = (v) => (v === undefined || v === null ? "" : String(v));
 
 // =========================
-// SCORE
+// SCORE（そのまま）
 // =========================
 function calculateScores(input) {
   let thermal = 85;
@@ -70,7 +70,7 @@ function calculateEconomic(score) {
 }
 
 // =========================
-// OVERLAY（画像だけ修正）
+// OVERLAY（そのまま）
 // =========================
 function generateOverlay(scores) {
   const { thermal, flow, total } = scores;
@@ -81,9 +81,8 @@ function generateOverlay(scores) {
 
   return `
 <div style="position:relative; width:100%;">
-  <!-- ✅ ここだけ変更：サイズ固定 -->
   <img src="https://ilnautico.github.io/visual-base.png"
-       style="width:800px; display:block;" />
+       style="width:100%; height:auto; display:block;" />
 
   <div style="position:absolute; top:40px; left:50%; transform:translateX(-180px); text-align:center;">
     <div style="font-size:28px;">230°C</div>
@@ -145,7 +144,7 @@ Economic Impact: ${economic}
 }
 
 // =========================
-// INJECT（ここが致命修正）
+// INJECT（そのまま）
 // =========================
 function injectHtml(template, data) {
   let html = template;
@@ -188,14 +187,19 @@ app.post("/generate-report", async (req, res) => {
       dynamic_overlay: generateOverlay(scores),
     });
 
+    // 🔥 ここだけ強化
     const browser = await puppeteer.launch({
       headless: "new",
-      args: ["--no-sandbox", "--disable-dev-shm-usage"],
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-gpu"
+      ]
     });
 
     const page = await browser.newPage();
 
-    // ✅ 安定化
     await page.setContent(html, {
       waitUntil: "networkidle0",
       timeout: 0,
@@ -206,14 +210,27 @@ app.post("/generate-report", async (req, res) => {
       printBackground: true,
     });
 
+    // 🔥 確認ログ
+    console.log("PDF size:", pdf.length);
+
     await browser.close();
 
     fs.writeFileSync(PDF_PATH, pdf);
+
     res.send(pdf);
+
   } catch (err) {
-    console.error(err);
+    console.error("ERROR:", err); // 🔥 強化
     res.status(500).send("error");
   }
+});
+
+// =========================
+app.get("/latest-pdf", (req, res) => {
+  if (!fs.existsSync(PDF_PATH)) {
+    return res.status(404).send("No PDF yet");
+  }
+  res.sendFile(PDF_PATH);
 });
 
 app.listen(process.env.PORT || 8080, () => {
