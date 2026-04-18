@@ -60,7 +60,7 @@ function calculateScores(input) {
 function determineDecision(score) {
   if (score >= 75) return { decision: "GO", level: "HIGH" };
   if (score >= 55) return { decision: "CONDITIONAL GO", level: "MODERATE" };
-  return { decision: "HOLD", level: "LOW" };
+  return { decision: "HOLD", level: "LOW" };　
 }
 
 function calculateEconomic(score) {
