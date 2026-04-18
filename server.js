@@ -24,7 +24,16 @@ const htmlTemplate = fs.readFileSync(
 const safe = (v) => (v === undefined || v === null ? "" : String(v));
 
 // =========================
-// SCORE（分解）
+// 🔥 画像を完全固定（base64）
+// =========================
+const imageBase64 = fs.readFileSync(
+  path.join(__dirname, "visual-base.png"),
+  "base64"
+);
+const BASE_IMAGE = `data:image/png;base64,${imageBase64}`;
+
+// =========================
+// SCORE
 // =========================
 function calculateScores(input) {
   let thermal = 85;
@@ -70,7 +79,7 @@ function calculateEconomic(score) {
 }
 
 // =========================
-// OVERLAY（完全復旧）
+// OVERLAY（完全復旧・サイズ維持）
 // =========================
 function generateOverlay(scores) {
   const { thermal, flow, total } = scores;
@@ -81,11 +90,9 @@ function generateOverlay(scores) {
 
   return `
 <div style="position:relative; width:100%;">
-  <!-- 画像：元サイズ維持 -->
-  <img src="https://ilnautico.github.io/visual-base.png"
+  <img src="${BASE_IMAGE}"
        style="width:100%; height:auto; display:block;" />
 
-  <!-- 温度表示 -->
   <div style="position:absolute; top:40px; left:50%; transform:translateX(-180px); text-align:center;">
     <div style="font-size:28px;">230°C</div>
     <div style="font-size:16px;">${thermal}</div>
@@ -96,19 +103,16 @@ function generateOverlay(scores) {
     <div style="font-size:16px; color:#d62c2c;">${flow}</div>
   </div>
 
-  <!-- 波（thermal） -->
   <svg style="position:absolute; left:50%; top:58%; transform:translateX(-120px);" width="120" height="40">
     <path d="M0 20 C20 ${20-ampL}, 40 ${20+ampL}, 60 20 C80 ${20-ampL}, 100 ${20+ampL}, 120 20"
       stroke="#4f7c8a" fill="none" stroke-width="3"/>
   </svg>
 
-  <!-- 波（flow） -->
   <svg style="position:absolute; left:50%; top:58%; transform:translateX(60px);" width="120" height="40">
     <path d="M0 20 C20 ${20-ampR}, 40 ${20+ampR}, 60 20 C80 ${20-ampR}, 100 ${20+ampR}, 120 20"
       stroke="#d62c2c" fill="none" stroke-width="3"/>
   </svg>
 
-  <!-- メータ -->
   <svg style="position:absolute; right:60px; bottom:20px;" viewBox="0 0 200 120" width="140" height="90">
     <defs>
       <linearGradient id="g">
@@ -131,7 +135,7 @@ function generateOverlay(scores) {
 }
 
 // =========================
-// TEXT（プロ仕様）
+// TEXT
 // =========================
 function generateExecutive(scores, decisionData, economic) {
   const { thermal, flow, mechanical } = scores;
@@ -139,19 +143,12 @@ function generateExecutive(scores, decisionData, economic) {
   return `
 This assessment indicates ${decisionData.level} feasibility for transitioning to the evaluated material under current processing conditions.
 
-While baseline compatibility is achievable, operational stability is not inherently guaranteed and is dependent on thermal exposure, flow behavior, and mechanical consistency.
-
 Thermal stability score: ${thermal}
 Flow stability score: ${flow}
 Mechanical stability score: ${mechanical}
 
 Deployment Decision: ${decisionData.decision}
-
-Operational consistency remains the primary limiting factor. Variability in melt behavior and process conditions may lead to inconsistency in product quality and increased scrap rates.
-
 Economic Impact: ${economic}
-
-A structured pilot validation phase is strongly recommended prior to any scale-up decision.
 `;
 }
 
@@ -161,7 +158,7 @@ A structured pilot validation phase is strongly recommended prior to any scale-u
 function injectHtml(template, data) {
   let html = template;
   for (const key in data) {
-    html = html.replace(new RegExp({{\\s*${key}\\s*}}, "g"), safe(data[key]));
+    html = html.replace(new RegExp(`{{\\s*${key}\\s*}}`, "g"), safe(data[key]));
   }
   return html;
 }
@@ -173,7 +170,6 @@ app.post("/generate-report", async (req, res) => {
   try {
     let input = req.body;
 
-    // Tally対応
     if (input?.data?.fields) {
       const parsed = {};
       input.data.fields.forEach((f) => {
@@ -199,62 +195,30 @@ app.post("/generate-report", async (req, res) => {
       compatibility_level: decisionData.level,
       executive_summary: generateExecutive(scores, decisionData, economic),
 
-      key_risk:
-        scores.thermal < 60
-          ? "Thermal instability and degradation risk."
-          : "Flow variability under operational conditions.",
-
-      processing_window:
-        scores.total > 70
-          ? "Stable processing window expected."
-          : "Controlled processing conditions required.",
-
-      thermal_behavior:
-        scores.thermal > 70
-          ? "Thermally stable under controlled conditions."
-          : "Thermal sensitivity present.",
-
-      flow_characteristics:
-        scores.flow > 70
-          ? "Stable flow characteristics."
-          : "Variable flow behavior observed.",
-
-      mechanical_behavior:
-        scores.mechanical > 70
-          ? "Stable mechanical performance."
-          : "Conditionally stable mechanical behavior.",
-
-      surface_quality:
-        scores.flow > 70
-          ? "Uniform surface finish achievable."
-          : "Surface variability possible.",
-
-      structural_consistency:
-        scores.mechanical > 70
-          ? "Stable structural integrity."
-          : "Requires validation under load.",
+      key_risk: "Thermal / Flow variability risk",
+      processing_window: "Controlled",
+      thermal_behavior: "Moderate",
+      flow_characteristics: "Variable",
+      mechanical_behavior: "Conditional",
+      surface_quality: "Variable",
+      structural_consistency: "Needs validation",
 
       primary_risk_title: "Thermal Instability",
-      primary_risk:
-        "Material degradation under elevated temperature conditions.",
-
+      primary_risk: "Heat degradation",
       secondary_risk_title: "Flow Variability",
-      secondary_risk:
-        "Inconsistent melt behavior leading to quality fluctuation.",
-
-      mechanism: "Combined thermal and shear instability.",
+      secondary_risk: "Flow inconsistency",
+      mechanism: "Thermal + shear",
 
       stability: "Moderate",
-      stability_note: "Depends on processing control.",
+      stability_note: "Depends",
       consistency: "Moderate",
-      consistency_note: "Process dependent.",
+      consistency_note: "Process dependent",
 
-      application_implication: "Pilot testing required.",
-      next_step: "Proceed to controlled pilot validation.",
+      application_implication: "Pilot needed",
+      next_step: "Proceed to pilot",
 
       decision: decisionData.decision,
       economic_impact: economic,
-
       pha_score: scores.total,
 
       dynamic_overlay: generateOverlay(scores),
@@ -281,6 +245,7 @@ app.post("/generate-report", async (req, res) => {
 
     fs.writeFileSync(PDF_PATH, pdf);
     res.send(pdf);
+
   } catch (err) {
     console.error(err);
     res.status(500).send("error");
@@ -298,7 +263,6 @@ app.get("/latest-pdf", (req, res) => {
 app.listen(process.env.PORT || 8080, () => {
   console.log("🚀 Server running");
 });
-
 app.listen(process.env.PORT || 8080);
 const html_3man =`;
 <!DOCTYPE html>
