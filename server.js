@@ -15,7 +15,7 @@ app.use(express.urlencoded({ extended: true }));
 const PDF_PATH = "/tmp/latest.pdf";
 
 // =========================
-// TEMPLATE
+// TEMPLATE（触らない）
 // =========================
 const htmlTemplate = fs.readFileSync(
   path.join(__dirname, "template.html"),
@@ -23,7 +23,7 @@ const htmlTemplate = fs.readFileSync(
 );
 
 // =========================
-// SAFE
+// SAFE（穴あき防止）
 // =========================
 const safe = (v, fallback = "-") => {
   if (v === undefined || v === null || v === "") return fallback;
@@ -74,7 +74,7 @@ function calculateEconomic(score) {
 }
 
 // =========================
-// VISUAL（最終安定版）
+// VISUAL（バルーン維持・ズレ防止）
 // =========================
 function generateOverlay(scores) {
   const { thermal, flow, total } = scores;
@@ -83,9 +83,11 @@ function generateOverlay(scores) {
   return `
 <div style="position:relative;width:100%;height:240px;">
 
+  <!-- 背景（バルーン） -->
   <img src="https://ilnautico.github.io/visual-base.png"
        style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:contain;z-index:0;" />
 
+  <!-- LEFT -->
   <div style="position:absolute;left:120px;top:60px;text-align:center;z-index:2;">
     <div style="font-size:28px;">230°C</div>
     <div style="font-size:16px;">${thermal}</div>
@@ -95,6 +97,7 @@ function generateOverlay(scores) {
     </svg>
   </div>
 
+  <!-- RIGHT -->
   <div style="position:absolute;right:120px;top:60px;text-align:center;z-index:2;">
     <div style="font-size:28px;color:#d62c2c;">180°C</div>
     <div style="font-size:16px;color:#d62c2c;">${flow}</div>
@@ -104,9 +107,9 @@ function generateOverlay(scores) {
     </svg>
   </div>
 
+  <!-- CENTER -->
   <div style="position:absolute;left:50%;top:130px;transform:translateX(-50%);z-index:2;">
     <svg width="200" height="120" viewBox="0 0 200 120">
-
       <defs>
         <linearGradient id="grad">
           <stop offset="0%" stop-color="#22c55e"/>
@@ -124,7 +127,6 @@ function generateOverlay(scores) {
       </g>
 
       <circle cx="100" cy="100" r="4" fill="#111"/>
-
     </svg>
   </div>
 
@@ -164,12 +166,11 @@ app.post("/generate-report", async (req, res) => {
   try {
     let input = req.body;
 
-    // Tally対応
+    // フォーム対応
     if (input?.data?.fields) {
       const parsed = {};
       input.data.fields.forEach((f) => {
         const label = (f.label || "").toLowerCase();
-
         if (label.includes("application")) parsed.application = f.value;
         if (label.includes("material") && !label.includes("bio")) parsed.material = f.value;
         if (label.includes("bio") || label.includes("target")) parsed.bio_material = f.value;
@@ -225,6 +226,7 @@ app.get("/latest-pdf", (req, res) => {
 app.listen(process.env.PORT || 8080, () => {
   console.log("🚀 Server running");
 });
+
 <!DOCTYPE html>
 <html>
 <head>
