@@ -179,9 +179,7 @@ app.post("/generate-report", async (req, res) => {
       executive_summary: generateExecutive(scores, decision, economic),
 
       key_risk:
-        scores.thermal < 70
-          ? "Thermal instability under operational conditions."
-          : "Process variability under real-world conditions.",
+         failure.primary_risk,
 
       processing_window:
         scores.total > 70
