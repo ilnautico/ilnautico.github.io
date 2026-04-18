@@ -132,21 +132,41 @@ function generateExecutive(scores, decisionData, economic) {
   const { thermal, flow, mechanical } = scores;
 
   return `
-This assessment indicates ${decisionData.level} feasibility for transitioning to the evaluated material under current processing conditions.
+This assessment indicates ${decisionData.level} feasibility for transitioning to the evaluated material within the current processing framework.
 
-While baseline compatibility is achievable, operational stability is not inherently guaranteed and is dependent on thermal exposure, flow behavior, and mechanical consistency.
+The material demonstrates baseline compatibility with existing systems; however, performance stability is not inherently guaranteed and remains condition-dependent.
 
-Thermal stability score: ${thermal}
-Flow stability score: ${flow}
-Mechanical stability score: ${mechanical}
+Thermal stability (${thermal}) suggests ${
+    thermal >= 70
+      ? "adequate resistance under controlled thermal exposure"
+      : "potential degradation risk under elevated temperature conditions"
+  }.
+
+Flow behavior (${flow}) indicates ${
+    flow >= 70
+      ? "consistent melt flow and process stability"
+      : "variability that may affect dimensional and surface consistency"
+  }.
+
+Mechanical stability (${mechanical}) reflects ${
+    mechanical >= 70
+      ? "sufficient structural integrity for standard applications"
+      : "dependency on controlled conditions for maintaining structural performance"
+  }.
 
 Deployment Decision: ${decisionData.decision}
 
-Operational consistency remains the primary limiting factor. Variability in melt behavior and process conditions may lead to inconsistency in product quality and increased scrap rates.
+Operational risk is primarily driven by ${
+    flow < 70
+      ? "flow inconsistency"
+      : thermal < 70
+      ? "thermal sensitivity"
+      : "process variability under real-world conditions"
+  }, which may result in quality fluctuation and increased process inefficiency.
 
 Economic Impact: ${economic}
 
-A structured pilot validation phase is strongly recommended prior to any scale-up decision.
+A controlled pilot validation phase is strongly recommended to confirm reproducibility, optimize process parameters, and assess scalability prior to commercial deployment.
 `;
 }
 
