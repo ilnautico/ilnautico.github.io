@@ -1,77 +1,3 @@
-import express from "express";
-import puppeteer from "puppeteer";　　
-import fs from "fs";
-import path from "path";
-import { fileURLToPath } from "url";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-const app = express();
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-
-const PDF_PATH = "/tmp/latest.pdf";
-
-const htmlTemplate = fs.readFileSync(
-  path.join(__dirname, "template.html"),
-  "utf8"
-);
-
-// =========================
-// 安全値（穴あき完全防止）
-// =========================
-const safe = (v, fallback = "-") => {
-  if (v === undefined || v === null || v === "") return fallback;
-  return String(v);
-};
-
-// =========================
-// SCORE
-// =========================
-function calculateScores(input) {
-  let thermal = 85;
-  let flow = 85;
-  let mechanical = 85;
-
-  const mat = (input.material || "").toLowerCase();
-  const bio = (input.bio_material || "").toLowerCase();
-  const appType = (input.application || "").toLowerCase();
-
-  if (mat.includes("pp")) thermal -= 10;
-  if (mat.includes("pe")) thermal -= 5;
-  if (mat.includes("pet")) thermal -= 25;
-
-  if (bio.includes("pla")) thermal -= 10;
-  if (bio.includes("pha")) flow -= 10;
-
-  if (appType.includes("film")) flow -= 15;
-  if (appType.includes("injection")) mechanical -= 10;
-
-  thermal = Math.max(0, Math.min(100, thermal));
-  flow = Math.max(0, Math.min(100, flow));
-  mechanical = Math.max(0, Math.min(100, mechanical));
-
-  const total = Math.round((thermal + flow + mechanical) / 3);
-
-  return { thermal, flow, mechanical, total };
-}
-
-function determineDecision(score) {
-  if (score >= 75) return { decision: "GO", level: "HIGH" };
-  if (score >= 55) return { decision: "CONDITIONAL GO", level: "MODERATE" };
-  return { decision: "HOLD", level: "LOW" };
-}
-
-function calculateEconomic(score) {
-  if (score >= 75) return "+5–15%";
-  if (score >= 55) return "+15–30%";
-  return "+30%+";
-}
-
-// =========================
-// VISUAL（ズレない版）
-// =========================
 function generateOverlay(scores) {
   const { thermal, flow, total } = scores;
   const angle = -90 + total * 1.8;
@@ -80,33 +6,65 @@ function generateOverlay(scores) {
 <div style="
   position:relative;
   width:100%;
-  height:260px;
+  height:240px; /* ←ここ重要：テンプレと合わせた */
 ">
 
+  <!-- 背景（バルーン絶対表示） -->
+  <img src="https://ilnautico.github.io/visual-base.png"
+       style="
+         position:absolute;
+         top:0;
+         left:0;
+         width:100%;
+         height:100%;
+         object-fit:contain;
+         z-index:0;
+       " />
+
   <!-- LEFT -->
-  <div style="position:absolute; left:15%; top:20%; text-align:center;">
+  <div style="
+    position:absolute;
+    left:120px;
+    top:60px;
+    width:160px;
+    text-align:center;
+    z-index:2;
+  ">
     <div style="font-size:28px;">230°C</div>
     <div style="font-size:16px;">${thermal}</div>
 
     <svg width="140" height="60">
       <path d="M10 40 Q40 10 70 40 T130 40"
-      stroke="#4f7c8a" fill="none" stroke-width="3"/>
+        stroke="#4f7c8a" fill="none" stroke-width="3"/>
     </svg>
   </div>
 
   <!-- RIGHT -->
-  <div style="position:absolute; right:15%; top:20%; text-align:center;">
+  <div style="
+    position:absolute;
+    right:120px;
+    top:60px;
+    width:160px;
+    text-align:center;
+    z-index:2;
+  ">
     <div style="font-size:28px; color:#d62c2c;">180°C</div>
     <div style="font-size:16px; color:#d62c2c;">${flow}</div>
 
     <svg width="140" height="60">
       <path d="M10 40 Q40 10 70 40 T130 40"
-      stroke="#d62c2c" fill="none" stroke-width="3"/>
+        stroke="#d62c2c" fill="none" stroke-width="3"/>
     </svg>
   </div>
 
-  <!-- CENTER METER -->
-  <div style="position:absolute; left:50%; top:45%; transform:translate(-50%,-50%);">
+  <!-- CENTER -->
+  <div style="
+    position:absolute;
+    left:50%;
+    top:130px;
+    transform:translateX(-50%);
+    z-index:2;
+  ">
     <svg width="200" height="120" viewBox="0 0 200 120">
 
       <defs>
@@ -118,11 +76,11 @@ function generateOverlay(scores) {
       </defs>
 
       <path d="M20 100 A80 80 0 0 1 180 100 L100 100 Z"
-      fill="url(#grad)"/>
+        fill="url(#grad)"/>
 
       <g transform="rotate(${angle} 100 100)">
         <line x1="100" y1="100" x2="100" y2="30"
-        stroke="#111" stroke-width="3"/>
+          stroke="#111" stroke-width="3"/>
       </g>
 
       <circle cx="100" cy="100" r="4" fill="#111"/>
@@ -133,157 +91,6 @@ function generateOverlay(scores) {
 </div>
 `;
 }
-
-// =========================
-// EXECUTIVE
-// =========================
-function generateExecutive(scores, decision, economic) {
-  return `
-This assessment indicates ${decision.level} feasibility for transitioning to the evaluated material within the current processing framework.
-
-Thermal behavior (${scores.thermal}): Thermally stable under controlled conditions.
-Flow behavior (${scores.flow}): Stable melt flow and processing.
-Mechanical stability (${scores.mechanical}): Structurally stable.
-
-Deployment Decision: ${decision.decision}
-
-Primary risk is process variability under real-world conditions, which may lead to:
-- Product inconsistency
-- Scrap increase
-- Efficiency loss
-
-Economic Impact: ${economic}
-
-A controlled pilot validation phase is strongly recommended prior to commercial deployment.
-`;
-}
-
-// =========================
-// INJECT
-// =========================
-function injectHtml(template, data) {
-  return template.replace(/{{\s*(\w+)\s*}}/g, (_, key) => {
-    return safe(data[key]);
-  });
-}
-// =========================
-// MAIN
-// =========================
-app.post("/generate-report", async (req, res) => {
-  try {
-   let input = req.body;
-
-    if (input?.data?.fields) {
-      const parsed = {};
-
-      input.data.fields.forEach((f) => {
-        const label = (f.label || "").toLowerCase();
-
-        if (label.includes("application")) {
-          parsed.application = f.value;
-        }
-
-        if (label.includes("material") && !label.includes("bio")) {
-          parsed.material = f.value;
-        }
-
-        if (label.includes("bio") || label.includes("target")) {
-          parsed.bio_material = f.value;
-        }
-      });
-
-      input = parsed;
-    }
-
-
-    const scores = calculateScores(input);
-    const decision = determineDecision(scores.total);
-    const economic = calculateEconomic(scores.total);
-
-    const keyRisk =
-      scores.total > 70
-        ? "Minor process fluctuation impacting stability."
-        : "Thermal instability and inconsistency risk.";
-
-    const html = injectHtml(htmlTemplate, {
-      assessment_type: "Technical Hypothesis",
-      application: safe(input.application),
-      material_transition: safe(input.bio_material),
-      report_date: new Date().toISOString().split("T")[0],
-
-      compatibility_level: decision.level,
-      executive_summary: generateExecutive(scores, decision, economic),
-
-      key_risk: keyRisk,
-
-      processing_window: "Stable processing window expected.",
-      thermal_behavior: "Thermally stable under controlled conditions.",
-      flow_characteristics: "Stable flow characteristics.",
-
-      mechanical_behavior: "Stable mechanical performance.",
-      surface_quality: "Uniform surface finish achievable.",
-      structural_consistency: "Stable structural integrity.",
-
-      primary_risk_title: "Process Variability",
-      primary_risk: "Minor fluctuation impacting stability.",
-
-      secondary_risk_title: "Operational Sensitivity",
-      secondary_risk: "Dependent on process control.",
-
-      mechanism: "Thermal + flow instability",
-
-      stability: "Moderate",
-      stability_note: "Depends on processing control.",
-
-      consistency: "Moderate",
-      consistency_note: "Process dependent.",
-
-      application_implication: "Pilot testing required.",
-      next_step: "Proceed to controlled pilot validation.",
-
-      decision: decision.decision,
-      economic_impact: economic,
-
-      pha_score: scores.total,
-
-      dynamic_overlay: generateOverlay(scores),
-    });
-
-    const browser = await puppeteer.launch({
-      args: ["--no-sandbox", "--disable-setuid-sandbox"]
-    });
-
-    const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: "domcontentloaded" });
-
-    const pdf = await page.pdf({
-      format: "A4",
-      printBackground: true
-    });
-
-    await browser.close();
-
-    fs.writeFileSync(PDF_PATH, pdf);
-
-    res.send(pdf);
-
-  } catch (err) {
-    console.error(err);
-    res.status(500).send("error");
-  }
-});
-
-// =========================
-app.get("/latest-pdf", (req, res) => {
-  if (!fs.existsSync(PDF_PATH)) {
-    return res.status(404).send("No PDF yet");
-  }
-  res.sendFile(PDF_PATH);
-});
-
-app.listen(process.env.PORT || 8080, () => {
-  console.log("Server running");
-});
 const html_3man =`;
 <!DOCTYPE html>
 <html>
