@@ -3,131 +3,101 @@ import puppeteer from "puppeteer";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import OpenAI from "openai";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 const PDF_PATH = "/tmp/latest.pdf";
-
-// =========================
-// OpenAI
-// =========================
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
-});
-
-// =========================
-// TEMPLATE
-// =========================
-console.log("📁 Trying to load:", path.join(__dirname, "template.html"));
 
 const htmlTemplate = fs.readFileSync(
   path.join(__dirname, "template.html"),
   "utf8"
 );
 
-console.log("✅ template.html loaded");
+const safe = (v) => (v === undefined || v === null ? "" : String(v));
 
-// =========================
-// 🔥 画像（絶対消えない）
-const baseImage = fs.readFileSync(
-  path.join(__dirname, "visual-base.png"),
-  { encoding: "base64" }
-);
-
-const imageSrc = `data:image/png;base64,${baseImage}`;
-
-// =========================
-function safe(v) {
-  return v || "";
-}
-
-// =========================
-// 🔥 スコア（強化版）
 function calculateScores(input) {
+  let thermal = 85;
+  let flow = 85;
+  let mechanical = 85;
 
-  let base = 100;
-
-  const material = (input.material || "").toLowerCase();
+  const mat = (input.material || "").toLowerCase();
   const bio = (input.bio_material || "").toLowerCase();
-  const app = (input.application || "").toLowerCase();
+  const appType = (input.application || "").toLowerCase();
 
-  // material補正
-  if (material.includes("pp")) base -= 15;
-  if (material.includes("pe")) base -= 10;
-  if (material.includes("pet")) base -= 30;
+  if (mat.includes("pp")) thermal -= 10;
+  if (mat.includes("pe")) thermal -= 5;
+  if (mat.includes("pet")) thermal -= 25;
 
-  if (bio.includes("pla")) base -= 10;
-  if (bio.includes("pha")) base -= 20;
+  if (bio.includes("pla")) thermal -= 10;
+  if (bio.includes("pha")) flow -= 10;
 
-  // process補正
-  if (app.includes("injection")) base -= 10;
-  if (app.includes("film")) base -= 20;
+  if (appType.includes("film")) flow -= 15;
+  if (appType.includes("injection")) mechanical -= 10;
+  if (appType.includes("blow")) flow -= 10;
 
-  base = Math.max(20, base);
+  thermal = Math.max(0, Math.min(100, thermal));
+  flow = Math.max(0, Math.min(100, flow));
+  mechanical = Math.max(0, Math.min(100, mechanical));
 
-  const thermal = base;
-  const flow = base - (app.includes("film") ? 10 : 0);
-  const total = Math.round((thermal + flow) / 2);
+  const total = Math.round((thermal + flow + mechanical) / 3);
 
-  return { thermal, flow, total };
+  return { thermal, flow, mechanical, total };
 }
 
-// =========================
-// 判定
 function determineDecision(score) {
-  if (score >= 80) return { decision: "GO", level: "HIGH" };
-  if (score >= 60) return { decision: "CONDITIONAL GO", level: "MODERATE" };
+  if (score >= 75) return { decision: "GO", level: "HIGH" };
+  if (score >= 55) return { decision: "CONDITIONAL GO", level: "MODERATE" };
   if (score >= 40) return { decision: "HOLD", level: "MODERATE" };
   return { decision: "STOP", level: "LOW" };
 }
 
-// =========================
-// 🔥 OVERLAY（完全復旧）
-function generateOverlay(scores) {
+function calculateEconomic(score) {
+  if (score >= 75) return "+5–15%";
+  if (score >= 55) return "+15–30%";
+  if (score >= 40) return "+30–60%";
+  return "+60%+";
+}
 
+// 🔥 完全安定 overlay
+function generateOverlay(scores) {
   const { thermal, flow, total } = scores;
 
   const angle = -90 + (total * 1.8);
-
   const ampL = 6 + (100 - thermal) * 0.25;
   const ampR = 6 + (100 - flow) * 0.25;
 
+  const imagePath = `file://${__dirname}/visual-base.png`;
+
   return `
 <div style="position:relative; width:100%;">
+  <img src="${imagePath}" style="width:100%; height:auto; display:block;" />
 
-  <img src="${imageSrc}" style="width:100%; display:block;" />
-
-  <!-- 温度 -->
   <div style="position:absolute; top:40px; left:50%; transform:translateX(-180px); text-align:center;">
     <div style="font-size:28px;">230°C</div>
-    <div>${thermal}</div>
+    <div style="font-size:16px;">${thermal}</div>
   </div>
 
   <div style="position:absolute; top:40px; left:50%; transform:translateX(180px); text-align:center;">
-    <div style="font-size:28px; color:red;">180°C</div>
-    <div style="color:red;">${flow}</div>
+    <div style="font-size:28px; color:#d62c2c;">180°C</div>
+    <div style="font-size:16px; color:#d62c2c;">${flow}</div>
   </div>
 
-  <!-- 波 -->
-  <svg style="position:absolute; left:50%; top:60%; transform:translateX(-120px);" width="120" height="40">
+  <svg style="position:absolute; left:50%; top:58%; transform:translateX(-120px);" width="120" height="40">
     <path d="M0 20 C20 ${20-ampL}, 40 ${20+ampL}, 60 20 C80 ${20-ampL}, 100 ${20+ampL}, 120 20"
       stroke="#4f7c8a" fill="none" stroke-width="3"/>
   </svg>
 
-  <svg style="position:absolute; left:50%; top:60%; transform:translateX(60px);" width="120" height="40">
+  <svg style="position:absolute; left:50%; top:58%; transform:translateX(60px);" width="120" height="40">
     <path d="M0 20 C20 ${20-ampR}, 40 ${20+ampR}, 60 20 C80 ${20-ampR}, 100 ${20+ampR}, 120 20"
       stroke="#d62c2c" fill="none" stroke-width="3"/>
   </svg>
 
-  <!-- メータ -->
-  <svg style="position:absolute; right:60px; bottom:20px;" viewBox="0 0 200 120" width="140">
+  <svg style="position:absolute; right:60px; bottom:20px;" viewBox="0 0 200 120" width="140" height="90">
     <defs>
       <linearGradient id="g">
         <stop offset="0%" stop-color="#22c55e"/>
@@ -136,129 +106,85 @@ function generateOverlay(scores) {
       </linearGradient>
     </defs>
 
-    <path d="M20 100 A80 80 0 0 1 180 100 L100 100 Z"
-      fill="url(#g)" />
+    <path d="M20 100 A80 80 0 0 1 180 100 L100 100 Z" fill="url(#g)"/>
 
     <g transform="rotate(${angle} 100 100)">
-      <line x1="100" y1="100" x2="100" y2="30"
-        stroke="#111" stroke-width="3"/>
+      <line x1="100" y1="100" x2="100" y2="30" stroke="#111" stroke-width="3"/>
     </g>
 
     <circle cx="100" cy="100" r="4" fill="#111"/>
   </svg>
-
 </div>
 `;
 }
 
-// =========================
+function generateExecutive(scores, decisionData, economic) {
+  return `
+This assessment indicates ${decisionData.level} feasibility.
+
+Thermal: ${scores.thermal}
+Flow: ${scores.flow}
+Mechanical: ${scores.mechanical}
+
+Decision: ${decisionData.decision}
+Economic Impact: ${economic}
+`;
+}
+
 function injectHtml(template, data) {
   let html = template;
   for (const key in data) {
-    html = html.replace(
-      new RegExp(`{{\\s*${key}\\s*}}`, "g"),
-      safe(data[key])
-    );
+    html = html.replace(new RegExp(`{{\\s*${key}\\s*}}`, "g"), safe(data[key]));
   }
   return html;
 }
 
-// =========================
-// MAIN
-// =========================
 app.post("/generate-report", async (req, res) => {
-
   try {
-
     const input = req.body;
 
     const scores = calculateScores(input);
     const decisionData = determineDecision(scores.total);
+    const economic = calculateEconomic(scores.total);
 
     const html = injectHtml(htmlTemplate, {
-
-      application: safe(input.application),
-      material_transition: safe(input.bio_material),
+      assessment_type: "Technical Hypothesis",
+      application: input.application,
+      material_transition: input.bio_material,
       report_date: new Date().toISOString().split("T")[0],
-
       compatibility_level: decisionData.level,
-      decision: decisionData.decision,
-
-      processing_window: "Controlled validation required.",
-      thermal_behavior: "Moderate sensitivity.",
-      flow_characteristics: "Variable flow behavior.",
-
-      mechanical_behavior: "Conditionally stable performance.",
-      surface_quality: "Possible variability in finish.",
-      structural_consistency: "Requires validation.",
-
-      application_implication: "Pilot validation required.",
-
-      primary_risk_title: "Thermal Instability",
-      primary_risk: "Material degradation under heat exposure.",
-      secondary_risk_title: "Flow Variability",
-      secondary_risk: "Inconsistent melt behavior.",
-      mechanism: "Thermal + shear instability.",
-
-      stability: "Moderate",
-      stability_note: "Depends on processing control.",
-      consistency: "Moderate",
-      consistency_note: "Process dependent.",
-
-      next_step: "Proceed to controlled pilot validation.",
-
-      dynamic_overlay: generateOverlay(scores)
-
+      executive_summary: generateExecutive(scores, decisionData, economic),
+      dynamic_overlay: generateOverlay(scores),
     });
 
     const browser = await puppeteer.launch({
-      args: [
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--disable-dev-shm-usage",
-        "--disable-gpu"
-      ]
+      headless: "new",
+      args: ["--no-sandbox", "--disable-dev-shm-usage"],
     });
 
     const page = await browser.newPage();
 
     await page.setContent(html, {
-      waitUntil: "domcontentloaded",
-      timeout: 0
+      waitUntil: "networkidle0",
+      timeout: 0,
     });
 
     const pdf = await page.pdf({
       format: "A4",
-      printBackground: true
+      printBackground: true,
     });
 
     await browser.close();
 
     fs.writeFileSync(PDF_PATH, pdf);
-
     res.send(pdf);
-
   } catch (err) {
     console.error(err);
     res.status(500).send("error");
   }
-
 });
 
-// =========================
-// PDF取得
-// =========================
-app.get("/latest-pdf", (req, res) => {
-  if (!fs.existsSync(PDF_PATH)) {
-    return res.status(404).send("No PDF yet");
-  }
-  res.sendFile(PDF_PATH);
-});
-
-// =========================
-app.listen(8080, () => {
-  console.log("🚀 Server running on 8080");
-});
+app.listen(process.env.PORT || 8080);
 const html_3man =`;
 <!DOCTYPE html>
 <html>
