@@ -13,6 +13,9 @@ app.use(express.urlencoded({ extended: true }));
 
 const PDF_PATH = "/tmp/latest.pdf";
 
+// =========================
+// TEMPLATE
+// =========================
 const htmlTemplate = fs.readFileSync(
   path.join(__dirname, "template.html"),
   "utf8"
@@ -20,9 +23,9 @@ const htmlTemplate = fs.readFileSync(
 
 const safe = (v) => (v === undefined || v === null ? "" : String(v));
 
-/* =========================
-   SCORE
-========================= */
+// =========================
+// SCORE
+// =========================
 function calculateScores(input) {
   let thermal = 85;
   let flow = 85;
@@ -52,6 +55,9 @@ function calculateScores(input) {
   return { thermal, flow, mechanical, total };
 }
 
+// =========================
+// DECISION
+// =========================
 function determineDecision(score) {
   if (score >= 75) return { decision: "GO", level: "HIGH" };
   if (score >= 55) return { decision: "CONDITIONAL GO", level: "MODERATE" };
@@ -66,20 +72,99 @@ function calculateEconomic(score) {
   return "+60%+";
 }
 
-/* =========================
-   TEXT
-========================= */
-function generateExecutive(scores, decisionData, economic) {
+// =========================
+// INTERPRET（ブレ防止）
+// =========================
+function interpretThermal(score) {
+  if (score > 75) return "Thermally robust under standard processing conditions.";
+  if (score > 60) return "Moderate thermal stability requiring controlled conditions.";
+  return "Thermally sensitive with degradation risk.";
+}
+
+function interpretFlow(score) {
+  if (score > 75) return "Consistent melt flow and stable processing.";
+  if (score > 60) return "Moderate flow variability under dynamic conditions.";
+  return "Highly variable flow behavior impacting consistency.";
+}
+
+function interpretMechanical(score) {
+  if (score > 75) return "Stable mechanical integrity.";
+  if (score > 60) return "Conditionally stable mechanical performance.";
+  return "Mechanical instability under operational stress.";
+}
+
+// =========================
+// RISK
+// =========================
+function deriveRisks(scores) {
+  const arr = [
+    { key: "thermal", value: scores.thermal, label: "Thermal Instability" },
+    { key: "flow", value: scores.flow, label: "Flow Variability" },
+    { key: "mechanical", value: scores.mechanical, label: "Mechanical Instability" }
+  ];
+
+  arr.sort((a, b) => a.value - b.value);
+
+  return {
+    primary: arr[0],
+    secondary: arr[1]
+  };
+}
+
+// =========================
+// ROOT CAUSE
+// =========================
+function deriveRootCause(scores) {
+  if (scores.flow < 70) return "inconsistent melt viscosity under dynamic shear conditions";
+  if (scores.thermal < 70) return "thermal degradation under prolonged heat exposure";
+  if (scores.mechanical < 70) return "insufficient structural integrity under stress";
+  return "minor process variability";
+}
+
+// =========================
+// IMPACT
+// =========================
+function deriveImpact(scores) {
+  const impacts = [];
+
+  if (scores.flow < 75) {
+    impacts.push("increased gauge variation");
+    impacts.push("seal inconsistency");
+  }
+
+  if (scores.thermal < 75) {
+    impacts.push("material degradation");
+  }
+
+  if (scores.mechanical < 75) {
+    impacts.push("reduced structural durability");
+  }
+
+  return impacts.length ? impacts : ["minor operational variability"];
+}
+
+// =========================
+// EXECUTIVE（完全版）
+// =========================
+function generateExecutive(scores, decisionData, economic, risks) {
+  const root = deriveRootCause(scores);
+  const impacts = deriveImpact(scores);
+
   return `
 This assessment indicates ${decisionData.level} feasibility for transitioning to the evaluated material within the current processing framework.
 
-Thermal stability (${scores.thermal}) indicates controlled resistance to heat exposure.
-Flow stability (${scores.flow}) suggests moderate to stable melt behavior.
-Mechanical stability (${scores.mechanical}) reflects structurally acceptable performance.
+Thermal behavior (${scores.thermal}): ${interpretThermal(scores.thermal)}
+Flow behavior (${scores.flow}): ${interpretFlow(scores.flow)}
+Mechanical stability (${scores.mechanical}): ${interpretMechanical(scores.mechanical)}
 
 Deployment Decision: ${decisionData.decision}
 
-The primary limiting factor is process variability under real-world conditions.
+The primary limiting factor is ${risks.primary.label}, driven by ${root}.
+
+This condition leads to:
+- ${impacts.join("\n- ")}
+
+These effects may reduce process stability and increase production variability.
 
 Economic Impact: ${economic}
 
@@ -87,20 +172,38 @@ A controlled pilot validation phase is strongly recommended prior to commercial 
 `;
 }
 
-/* =========================
-   INJECT
-========================= */
+// =========================
+// FAILURE
+// =========================
+function generateFailureAnalysis(risks) {
+  return {
+    primary_risk_title: risks.primary.label,
+    primary_risk: "Material instability under operational conditions.",
+    secondary_risk_title: risks.secondary.label,
+    secondary_risk: "Process variability affecting consistency.",
+    mechanism: `${risks.primary.key} + ${risks.secondary.key} instability`
+  };
+}
+
+// =========================
+// INJECT（穴あき防止）
+// =========================
 function injectHtml(template, data) {
   let html = template;
+
   for (const key in data) {
     html = html.replace(new RegExp(`{{\\s*${key}\\s*}}`, "g"), safe(data[key]));
   }
+
+  // 未置換タグを強制削除（←ここが重要）
+  html = html.replace(/{{[^}]+}}/g, "");
+
   return html;
 }
 
-/* =========================
-   MAIN
-========================= */
+// =========================
+// MAIN
+// =========================
 app.post("/generate-report", async (req, res) => {
   try {
     let input = req.body;
@@ -119,86 +222,55 @@ app.post("/generate-report", async (req, res) => {
     const scores = calculateScores(input);
     const decisionData = determineDecision(scores.total);
     const economic = calculateEconomic(scores.total);
+    const risks = deriveRisks(scores);
+    const failure = generateFailureAnalysis(risks);
 
     const html = injectHtml(htmlTemplate, {
-      assessment_type: "Technical Hypothesis",
       application: safe(input.application),
       material_transition: safe(input.bio_material),
       report_date: new Date().toISOString().split("T")[0],
 
       compatibility_level: decisionData.level,
-      executive_summary: generateExecutive(scores, decisionData, economic),
+      executive_summary: generateExecutive(scores, decisionData, economic, risks),
 
-      key_risk: "Flow variability under operational conditions.",
+      ...failure,
 
-      primary_risk_title: "Thermal Instability",
-      primary_risk: "Material degradation under elevated temperature conditions.",
+      processing_window: "Stable processing window expected.",
+      thermal_behavior: interpretThermal(scores.thermal),
+      flow_characteristics: interpretFlow(scores.flow),
+      mechanical_behavior: interpretMechanical(scores.mechanical),
 
-      secondary_risk_title: "Flow Variability",
-      secondary_risk: "Inconsistent melt behavior leading to quality fluctuation.",
-
-      mechanism: "Combined thermal and shear instability.",
-
-      processing_window:
-        scores.total > 70
-          ? "Stable processing window expected."
-          : "Controlled processing conditions required.",
-
-      thermal_behavior:
-        scores.thermal > 70
-          ? "Thermally stable under controlled conditions."
-          : "Thermal sensitivity present.",
-
-      flow_characteristics:
-        scores.flow > 70
-          ? "Stable flow characteristics."
-          : "Variable flow behavior observed.",
-
-      mechanical_behavior:
-        scores.mechanical > 70
-          ? "Stable mechanical performance."
-          : "Conditionally stable mechanical behavior.",
-
-      surface_quality:
-        scores.flow > 70
-          ? "Uniform surface finish achievable."
-          : "Surface variability possible.",
-
-      structural_consistency:
-        scores.mechanical > 70
-          ? "Stable structural integrity."
-          : "Requires validation under load.",
+      surface_quality: "Uniform surface finish achievable.",
+      structural_consistency: "Stable structural integrity.",
 
       application_implication: "Pilot testing required.",
 
       stability: "Moderate",
       stability_note: "Depends on processing control.",
-
       consistency: "Moderate",
       consistency_note: "Process dependent.",
-
-      next_step: "Proceed to controlled pilot validation.",
 
       decision: decisionData.decision,
       economic_impact: economic,
       pha_score: scores.total,
+
+      dynamic_overlay: "" // ← 最後に画像入れる
     });
 
     const browser = await puppeteer.launch({
-      headless: "new",
-      args: ["--no-sandbox", "--disable-dev-shm-usage"],
+      args: ["--no-sandbox", "--disable-dev-shm-usage"]
     });
 
     const page = await browser.newPage();
 
     await page.setContent(html, {
       waitUntil: "domcontentloaded",
-      timeout: 0,
+      timeout: 0
     });
 
     const pdf = await page.pdf({
       format: "A4",
-      printBackground: true,
+      printBackground: true
     });
 
     await browser.close();
@@ -212,6 +284,9 @@ app.post("/generate-report", async (req, res) => {
   }
 });
 
+// =========================
+// PDF取得
+// =========================
 app.get("/latest-pdf", (req, res) => {
   if (!fs.existsSync(PDF_PATH)) {
     return res.status(404).send("No PDF yet");
@@ -219,6 +294,9 @@ app.get("/latest-pdf", (req, res) => {
   res.sendFile(PDF_PATH);
 });
 
+// =========================
+// 起動
+// =========================
 app.listen(process.env.PORT || 8080, () => {
   console.log("🚀 Server running");
 });
