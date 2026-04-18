@@ -28,38 +28,82 @@ function safe(v) {
 }
 
 // =========================
-// 🔥 完全安定 OVERLAY
+// 🔥 スコア分解
 // =========================
-function generateOverlay(score) {
+function calculateScores(input) {
 
-  const s = Math.max(0, Math.min(100, Number(score) || 0));
-  const angle = -90 + (s * 1.8);
+  let thermal = 80;
+  let flow = 80;
+  let mechanical = 80;
+
+  const mat = (input.material || "").toLowerCase();
+  const bio = (input.bio_material || "").toLowerCase();
+  const app = (input.application || "").toLowerCase();
+
+  // material影響
+  if (mat.includes("pp")) thermal -= 10;
+  if (mat.includes("pet")) thermal -= 20;
+
+  if (bio.includes("pla")) thermal -= 15;
+  if (bio.includes("pha")) flow -= 20;
+
+  // process影響
+  if (app.includes("film")) flow -= 15;
+  if (app.includes("injection")) mechanical -= 10;
+
+  thermal = Math.max(0, thermal);
+  flow = Math.max(0, flow);
+  mechanical = Math.max(0, mechanical);
+
+  const total = Math.round((thermal + flow + mechanical) / 3);
+
+  return { thermal, flow, mechanical, total };
+}
+
+// =========================
+function determineDecision(score) {
+  if (score >= 75) return { decision: "GO", level: "HIGH" };
+  if (score >= 55) return { decision: "CONDITIONAL GO", level: "MODERATE" };
+  if (score >= 40) return { decision: "HOLD", level: "MODERATE" };
+  return { decision: "STOP", level: "LOW" };
+}
+
+// =========================
+// 🔥 overlay（完全連動版）
+// =========================
+function generateOverlay(scores) {
+
+  const { thermal, flow, total } = scores;
+
+  const angle = -90 + (total * 1.8);
+
+  const waveLeft = 20 + (100 - thermal) * 0.3;
+  const waveRight = 20 + (100 - flow) * 0.3;
 
   return `
-<div style="position:relative; width:100%; height:260px;">
+<div style="position:relative; width:100%; height:260px; overflow:hidden;">
 
-  <!-- BASE IMAGE -->
   <img src="https://ilnautico.github.io/visual-base.png"
-       style="width:100%; position:absolute; top:0; left:0;" />
+       style="width:100%; height:260px; object-fit:cover;" />
 
-  <!-- SCORE TEXT -->
-  <div style="position:absolute; top:30px; left:35%; font-size:26px;">
-    230°C<br><span style="font-size:14px;">${s}</span>
+  <!-- 温度表示 -->
+  <div style="position:absolute; top:30px; left:35%;">
+    230°C<br><span>${thermal}</span>
   </div>
 
-  <div style="position:absolute; top:30px; right:25%; color:red; font-size:26px;">
-    180°C<br><span style="font-size:14px;">${s}</span>
+  <div style="position:absolute; top:30px; right:25%; color:red;">
+    180°C<br><span>${flow}</span>
   </div>
 
-  <!-- 波（左） -->
+  <!-- 波（thermal） -->
   <svg style="position:absolute; bottom:70px; left:40%;" width="100" height="40">
-    <path d="M0 20 C20 0, 40 40, 60 20 C80 0, 100 40, 120 20"
+    <path d="M0 20 C20 ${waveLeft}, 40 ${40-waveLeft}, 60 20"
       stroke="#4f7c8a" fill="none" stroke-width="3"/>
   </svg>
 
-  <!-- 波（右） -->
+  <!-- 波（flow） -->
   <svg style="position:absolute; bottom:70px; right:30%;" width="100" height="40">
-    <path d="M0 20 C20 0, 40 40, 60 20 C80 0, 100 40, 120 20"
+    <path d="M0 20 C20 ${waveRight}, 40 ${40-waveRight}, 60 20"
       stroke="#d62c2c" fill="none" stroke-width="3"/>
   </svg>
 
@@ -93,37 +137,6 @@ function generateOverlay(score) {
 }
 
 // =========================
-// スコア（強化版）
-// =========================
-function calculateScore(input) {
-
-  let score = 80;
-
-  const mat = (input.material || "").toLowerCase();
-  const bio = (input.bio_material || "").toLowerCase();
-  const app = (input.application || "").toLowerCase();
-
-  if (mat.includes("pp")) score -= 10;
-  if (mat.includes("pe")) score -= 5;
-  if (mat.includes("pet")) score -= 20;
-
-  if (bio.includes("pla")) score -= 10;
-  if (bio.includes("pha")) score -= 15;
-
-  if (app.includes("film")) score -= 15;
-  if (app.includes("injection")) score -= 10;
-
-  return Math.max(0, Math.min(100, score));
-}
-
-function determineDecision(score) {
-  if (score >= 75) return { decision: "GO", level: "HIGH" };
-  if (score >= 55) return { decision: "CONDITIONAL GO", level: "MODERATE" };
-  if (score >= 40) return { decision: "HOLD", level: "MODERATE" };
-  return { decision: "STOP", level: "LOW" };
-}
-
-// =========================
 function injectHtml(template, data) {
   let html = template;
   for (const key in data) {
@@ -145,9 +158,7 @@ app.post("/generate-report", async (req, res) => {
     const raw = req.body;
     let input = {};
 
-    // Tally対応
     if (raw.data && raw.data.fields) {
-
       raw.data.fields.forEach(f => {
         const label = (f.label || "").toLowerCase();
         const val = f.value;
@@ -156,25 +167,25 @@ app.post("/generate-report", async (req, res) => {
         if (label.includes("material")) input.material = val;
         if (label.includes("biodegradable")) input.bio_material = val;
       });
-
     } else {
       input = raw;
     }
 
-    const score = calculateScore(input);
-    const decisionData = determineDecision(score);
+    const scores = calculateScores(input);
+    const decisionData = determineDecision(scores.total);
 
-    // 🔥 文章復元（濃い版）
+    // 🔥 文章（スコア連動）
     const executive_summary = `
-This assessment indicates ${decisionData.level} feasibility for transitioning to the evaluated material.
+This assessment indicates ${decisionData.level} feasibility.
 
-The material demonstrates baseline compatibility, but operational stability remains dependent on processing control, thermal exposure, and flow behavior.
+Thermal stability score: ${scores.thermal}
+Flow stability score: ${scores.flow}
+
+The transition shows variable stability depending on processing conditions.
 
 Deployment Decision: ${decisionData.decision}
 
-At this stage, the transition represents a controlled feasibility scenario, not a production-ready state.
-
-Economic considerations and process consistency must be validated through structured pilot testing before scale-up.
+A structured pilot validation is recommended before scale-up.
 `;
 
     const html = injectHtml(htmlTemplate, {
@@ -187,18 +198,43 @@ Economic considerations and process consistency must be validated through struct
       compatibility_level: decisionData.level,
       executive_summary: executive_summary,
 
-      key_risk: "Thermal instability and flow variability under real processing conditions.",
+      key_risk:
+        scores.thermal < 50
+          ? "Thermal instability risk."
+          : "Flow variability risk.",
 
-      processing_window: "Controlled validation required.",
-      thermal_behavior: "Moderate sensitivity.",
-      flow_characteristics: "Variable flow behavior.",
+      processing_window:
+        scores.total > 70
+          ? "Stable processing window."
+          : "Controlled processing required.",
 
-      mechanical_behavior: "Conditionally stable performance.",
-      surface_quality: "Possible variability in finish.",
-      structural_consistency: "Requires validation.",
+      thermal_behavior:
+        scores.thermal > 70
+          ? "Thermally stable."
+          : "Thermal sensitivity present.",
+
+      flow_characteristics:
+        scores.flow > 70
+          ? "Stable flow."
+          : "Variable flow behavior.",
+
+      mechanical_behavior:
+        scores.mechanical > 70
+          ? "Stable mechanical performance."
+          : "Conditionally stable.",
+
+      surface_quality:
+        scores.flow > 70
+          ? "Uniform surface."
+          : "Surface variability possible.",
+
+      structural_consistency:
+        scores.mechanical > 70
+          ? "Stable structure."
+          : "Requires validation.",
 
       primary_risk_title: "Thermal Instability",
-      primary_risk: "Material degradation under heat exposure.",
+      primary_risk: "Material degradation under heat.",
 
       secondary_risk_title: "Flow Variability",
       secondary_risk: "Inconsistent melt behavior.",
@@ -206,19 +242,19 @@ Economic considerations and process consistency must be validated through struct
       mechanism: "Thermal + shear instability.",
 
       stability: "Moderate",
-      stability_note: "Depends on processing control.",
+      stability_note: "Depends on control.",
       consistency: "Moderate",
       consistency_note: "Process dependent.",
 
-      application_implication: "Pilot validation required.",
+      application_implication: "Pilot testing required.",
       next_step: "Proceed to controlled pilot testing.",
 
       decision: decisionData.decision,
       economic_impact: "+15–30%",
 
-      pha_score: score,
+      pha_score: scores.total,
 
-      dynamic_overlay: generateOverlay(score)
+      dynamic_overlay: generateOverlay(scores)
 
     });
 
