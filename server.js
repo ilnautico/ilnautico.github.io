@@ -154,7 +154,30 @@ function injectHtml(template, data) {
 // =========================
 app.post("/generate-report", async (req, res) => {
   try {
-    const input = req.body;
+   let input = req.body;
+
+    if (input?.data?.fields) {
+      const parsed = {};
+
+      input.data.fields.forEach((f) => {
+        const label = (f.label || "").toLowerCase();
+
+        if (label.includes("application")) {
+          parsed.application = f.value;
+        }
+
+        if (label.includes("material") && !label.includes("bio")) {
+          parsed.material = f.value;
+        }
+
+        if (label.includes("bio") || label.includes("target")) {
+          parsed.bio_material = f.value;
+        }
+      });
+
+      input = parsed;
+    }
+
 
     const scores = calculateScores(input);
     const decision = determineDecision(scores.total);
