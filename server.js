@@ -17,127 +17,120 @@ const PDF_PATH = "/tmp/latest.pdf";
 // =========================
 // TEMPLATE
 // =========================
-const templatePath = path.join(__dirname, "template.html");
-const htmlTemplate = fs.readFileSync(templatePath, "utf8");
+const htmlTemplate = fs.readFileSync(
+  path.join(__dirname, "template.html"),
+  "utf8"
+);
 
 // =========================
-const safe = (v) => v || "";
+function safe(v) {
+  return v || "";
+}
 
 // =========================
-// OVERLAY（そのまま）
+// 🔥 完全安定 OVERLAY
 // =========================
-function generateOverlay(scoreLeft, scoreRight) {
+function generateOverlay(score) {
 
-  const safeRight = Math.max(0, Math.min(100, Number(scoreRight) || 0));
-  const angle = -90 + (safeRight * 1.8);
+  const s = Math.max(0, Math.min(100, Number(score) || 0));
+  const angle = -90 + (s * 1.8);
 
   return `
-<div style="position:absolute; left:0; top:0; width:100%; height:100%; pointer-events:none;">
-<img src="https://ilnautico.github.io/visual-base.png"
-style="position:absolute; left:50%; top:55%; transform:translate(-50%,-50%); width:450px;" />
+<div style="position:relative; width:100%; height:260px;">
 
-<div style="position:absolute; top:40px; left:50%; transform:translateX(-180px); text-align:center;">
-<div>230°C</div><div>${scoreLeft}</div></div>
+  <!-- BASE IMAGE -->
+  <img src="https://ilnautico.github.io/visual-base.png"
+       style="width:100%; position:absolute; top:0; left:0;" />
 
-<div style="position:absolute; top:40px; left:50%; transform:translateX(180px); text-align:center;">
-<div style="color:red;">180°C</div><div style="color:red;">${scoreRight}</div></div>
+  <!-- SCORE TEXT -->
+  <div style="position:absolute; top:30px; left:35%; font-size:26px;">
+    230°C<br><span style="font-size:14px;">${s}</span>
+  </div>
 
-<svg style="position:absolute; right:60px; bottom:10px;" viewBox="0 0 200 120" width="140">
-<path d="M20 100 A80 80 0 0 1 180 100 L100 100 Z" fill="url(#g)"/>
-<g transform="rotate(${angle} 100 100)">
-<line x1="100" y1="100" x2="100" y2="30" stroke="#111" stroke-width="3"/>
-</g>
-</svg>
+  <div style="position:absolute; top:30px; right:25%; color:red; font-size:26px;">
+    180°C<br><span style="font-size:14px;">${s}</span>
+  </div>
+
+  <!-- 波（左） -->
+  <svg style="position:absolute; bottom:70px; left:40%;" width="100" height="40">
+    <path d="M0 20 C20 0, 40 40, 60 20 C80 0, 100 40, 120 20"
+      stroke="#4f7c8a" fill="none" stroke-width="3"/>
+  </svg>
+
+  <!-- 波（右） -->
+  <svg style="position:absolute; bottom:70px; right:30%;" width="100" height="40">
+    <path d="M0 20 C20 0, 40 40, 60 20 C80 0, 100 40, 120 20"
+      stroke="#d62c2c" fill="none" stroke-width="3"/>
+  </svg>
+
+  <!-- メータ -->
+  <svg style="position:absolute; right:40px; bottom:10px;" viewBox="0 0 200 120" width="140" height="90">
+
+    <defs>
+      <linearGradient id="g">
+        <stop offset="0%" stop-color="#22c55e"/>
+        <stop offset="50%" stop-color="#fde047"/>
+        <stop offset="100%" stop-color="#ef4444"/>
+      </linearGradient>
+    </defs>
+
+    <path d="M20 100 A80 80 0 0 1 180 100 L100 100 Z"
+      fill="url(#g)"
+    />
+
+    <g transform="rotate(${angle} 100 100)">
+      <line x1="100" y1="100" x2="100" y2="30"
+        stroke="#111"
+        stroke-width="3"/>
+    </g>
+
+    <circle cx="100" cy="100" r="4" fill="#111"/>
+
+  </svg>
+
 </div>
 `;
 }
 
 // =========================
-// SCORE
+// スコア（強化版）
 // =========================
-function calculateScore(text) {
-  let score = 100;
+function calculateScore(input) {
 
-  if (text.includes("pp")) score -= 20;
-  if (text.includes("pe")) score -= 10;
-  if (text.includes("pet")) score -= 30;
+  let score = 80;
 
-  if (text.includes("injection")) score -= 15;
-  if (text.includes("film")) score -= 25;
+  const mat = (input.material || "").toLowerCase();
+  const bio = (input.bio_material || "").toLowerCase();
+  const app = (input.application || "").toLowerCase();
 
-  if (text.includes("pla")) score -= 10;
-  if (text.includes("pha")) score -= 20;
+  if (mat.includes("pp")) score -= 10;
+  if (mat.includes("pe")) score -= 5;
+  if (mat.includes("pet")) score -= 20;
 
-  return Math.max(score, 0);
+  if (bio.includes("pla")) score -= 10;
+  if (bio.includes("pha")) score -= 15;
+
+  if (app.includes("film")) score -= 15;
+  if (app.includes("injection")) score -= 10;
+
+  return Math.max(0, Math.min(100, score));
 }
 
 function determineDecision(score) {
-  if (score >= 80) return { decision: "GO", level: "HIGH" };
-  if (score >= 60) return { decision: "CONDITIONAL GO", level: "MODERATE" };
+  if (score >= 75) return { decision: "GO", level: "HIGH" };
+  if (score >= 55) return { decision: "CONDITIONAL GO", level: "MODERATE" };
   if (score >= 40) return { decision: "HOLD", level: "MODERATE" };
   return { decision: "STOP", level: "LOW" };
-}
-
-// =========================
-// 🔥 FULL GENERATORS（全部接続）
-// =========================
-function generateAll(score, decision) {
-
-  if (score >= 80) {
-    return {
-      executive: `HIGH feasibility. Deployment: ${decision}. Stable performance expected.`,
-      processing_window: "Stable processing window.",
-      thermal: "Thermally stable.",
-      flow: "Consistent flow.",
-      mechanical: "Stable mechanical performance.",
-      surface: "Uniform surface.",
-      structural: "Stable structure.",
-      implication: "Ready for pilot scaling.",
-      primary: "Minor thermal sensitivity.",
-      secondary: "Low variability.",
-      mechanism: "Minor thermal response.",
-      next: "Proceed to pilot validation."
-    };
-  }
-
-  if (score >= 60) {
-    return {
-      executive: `MODERATE feasibility. Deployment: ${decision}. Controlled validation required.`,
-      processing_window: "Controlled processing required.",
-      thermal: "Moderate sensitivity.",
-      flow: "Variable flow behaviour.",
-      mechanical: "Conditionally stable.",
-      surface: "Possible variability.",
-      structural: "Requires validation.",
-      implication: "Pilot testing required.",
-      primary: "Thermal instability risk.",
-      secondary: "Flow variability.",
-      mechanism: "Thermal + shear instability.",
-      next: "Pilot validation recommended."
-    };
-  }
-
-  return {
-    executive: `LOW feasibility. Deployment: ${decision}. High instability expected.`,
-    processing_window: "Narrow processing window.",
-    thermal: "High sensitivity.",
-    flow: "Unstable flow.",
-    mechanical: "Unstable performance.",
-    surface: "Surface inconsistency.",
-    structural: "Structural instability.",
-    implication: "Not recommended.",
-    primary: "Severe degradation risk.",
-    secondary: "Critical instability.",
-    mechanism: "Failure under stress.",
-    next: "Re-evaluate material."
-  };
 }
 
 // =========================
 function injectHtml(template, data) {
   let html = template;
   for (const key in data) {
-    html = html.replace(new RegExp(`{{\\s*${key}\\s*}}`, "g"), safe(data[key]));
+    html = html.replace(
+      new RegExp(`{{\\s*${key}\\s*}}`, "g"),
+      safe(data[key])
+    );
   }
   return html;
 }
@@ -149,73 +142,100 @@ app.post("/generate-report", async (req, res) => {
 
   try {
 
-    let input = req.body;
+    const raw = req.body;
+    let input = {};
 
-    if (input.data && input.data.fields) {
-      const parsed = {};
-      input.data.fields.forEach(f => {
+    // Tally対応
+    if (raw.data && raw.data.fields) {
+
+      raw.data.fields.forEach(f => {
         const label = (f.label || "").toLowerCase();
-        if (label.includes("application")) parsed.application = f.value;
-        if (label.includes("material")) parsed.material = f.value;
-        if (label.includes("target")) parsed.bio_material = f.value;
+        const val = f.value;
+
+        if (label.includes("application")) input.application = val;
+        if (label.includes("material")) input.material = val;
+        if (label.includes("biodegradable")) input.bio_material = val;
       });
-      input = parsed;
+
+    } else {
+      input = raw;
     }
 
-    const text = `${input.application} ${input.material} ${input.bio_material}`.toLowerCase();
-
-    const score = calculateScore(text);
+    const score = calculateScore(input);
     const decisionData = determineDecision(score);
-    const gen = generateAll(score, decisionData.decision);
+
+    // 🔥 文章復元（濃い版）
+    const executive_summary = `
+This assessment indicates ${decisionData.level} feasibility for transitioning to the evaluated material.
+
+The material demonstrates baseline compatibility, but operational stability remains dependent on processing control, thermal exposure, and flow behavior.
+
+Deployment Decision: ${decisionData.decision}
+
+At this stage, the transition represents a controlled feasibility scenario, not a production-ready state.
+
+Economic considerations and process consistency must be validated through structured pilot testing before scale-up.
+`;
 
     const html = injectHtml(htmlTemplate, {
 
+      assessment_type: "Technical Hypothesis",
       application: safe(input.application),
       material_transition: safe(input.bio_material),
       report_date: new Date().toISOString().split("T")[0],
 
       compatibility_level: decisionData.level,
+      executive_summary: executive_summary,
 
-      executive_summary: gen.executive,
+      key_risk: "Thermal instability and flow variability under real processing conditions.",
 
-      processing_window: gen.processing_window,
-      thermal_behavior: gen.thermal,
-      flow_characteristics: gen.flow,
+      processing_window: "Controlled validation required.",
+      thermal_behavior: "Moderate sensitivity.",
+      flow_characteristics: "Variable flow behavior.",
 
-      mechanical_behavior: gen.mechanical,
-      surface_quality: gen.surface,
-      structural_consistency: gen.structural,
+      mechanical_behavior: "Conditionally stable performance.",
+      surface_quality: "Possible variability in finish.",
+      structural_consistency: "Requires validation.",
 
-      application_implication: gen.implication,
+      primary_risk_title: "Thermal Instability",
+      primary_risk: "Material degradation under heat exposure.",
 
-      primary_risk_title: "Primary Risk",
-      primary_risk: gen.primary,
+      secondary_risk_title: "Flow Variability",
+      secondary_risk: "Inconsistent melt behavior.",
 
-      secondary_risk_title: "Secondary Risk",
-      secondary_risk: gen.secondary,
-
-      mechanism: gen.mechanism,
+      mechanism: "Thermal + shear instability.",
 
       stability: "Moderate",
-      stability_note: "Depends on conditions.",
+      stability_note: "Depends on processing control.",
       consistency: "Moderate",
       consistency_note: "Process dependent.",
 
-      next_step: gen.next,
+      application_implication: "Pilot validation required.",
+      next_step: "Proceed to controlled pilot testing.",
 
       decision: decisionData.decision,
+      economic_impact: "+15–30%",
 
-      dynamic_overlay: generateOverlay(score, score)
+      pha_score: score,
+
+      dynamic_overlay: generateOverlay(score)
+
     });
 
     const browser = await puppeteer.launch({
       headless: "new",
-      args: ["--no-sandbox","--disable-dev-shm-usage"]
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage"
+      ]
     });
 
     const page = await browser.newPage();
 
-    await page.setContent(html, { waitUntil: "domcontentloaded" });
+    await page.setContent(html, {
+      waitUntil: ["load", "networkidle0"]
+    });
 
     const pdf = await page.pdf({
       format: "A4",
@@ -226,7 +246,6 @@ app.post("/generate-report", async (req, res) => {
 
     fs.writeFileSync(PDF_PATH, pdf);
 
-    res.setHeader("Content-Type", "application/pdf");
     res.send(pdf);
 
   } catch (err) {
@@ -238,12 +257,15 @@ app.post("/generate-report", async (req, res) => {
 
 // =========================
 app.get("/latest-pdf", (req, res) => {
-  if (!fs.existsSync(PDF_PATH)) return res.status(404).send("No PDF yet");
+  if (!fs.existsSync(PDF_PATH)) {
+    return res.status(404).send("No PDF yet");
+  }
   res.sendFile(PDF_PATH);
 });
 
-app.listen(process.env.PORT || 8080, () => {
-  console.log("🚀 Server running");
+const PORT = process.env.PORT || 8080;
+app.listen(PORT, () => {
+  console.log("🚀 Server running on", PORT);
 });
 const html_3man =`;
 <!DOCTYPE html>
