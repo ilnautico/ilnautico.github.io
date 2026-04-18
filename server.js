@@ -316,29 +316,6 @@ app.get("/latest-pdf", (req, res) => {
 app.listen(process.env.PORT || 8080, () => {
   console.log("Server running");
 });
-const html_3man =`;
-<!DOCTYPE html>
-<html>
-<head>
-<meta charset="UTF-8">
-<title>FairVia Report</title>
-</head>
-
-<body>
-<h1>{{client_name}}</h1>
-<p>{{client_company}}</p>
-<p>{{client_country}}</p>
-
-<h2>Feasibility: {{feasibility_level}}</h2>
-
-<p>{{executive_summary_overview}}</p>
-<p>{{executive_summary_findings}}</p>
-<p>{{executive_summary_conclusion}}</p>
-Editing server.js file contents
-
-</body>
-</html>
-;
 const html = 
 const html_3man =`;
 <!DOCTYPE html>
