@@ -21,7 +21,12 @@ const htmlTemplate = fs.readFileSync(
   "utf8"
 );
 
-const safe = (v) => (v === undefined || v === null ? "" : String(v));
+// =========================
+// SAFETY
+// =========================
+const required = (v, fallback = "-") => {
+  return v && String(v).trim() !== "" ? String(v) : fallback;
+};
 
 // =========================
 // SCORE
@@ -73,7 +78,7 @@ function calculateEconomic(score) {
 }
 
 // =========================
-// INTERPRET（ブレ防止）
+// INTERPRET
 // =========================
 function interpretThermal(score) {
   if (score > 75) return "Thermally robust under standard processing conditions.";
@@ -111,9 +116,6 @@ function deriveRisks(scores) {
   };
 }
 
-// =========================
-// ROOT CAUSE
-// =========================
 function deriveRootCause(scores) {
   if (scores.flow < 70) return "inconsistent melt viscosity under dynamic shear conditions";
   if (scores.thermal < 70) return "thermal degradation under prolonged heat exposure";
@@ -121,30 +123,18 @@ function deriveRootCause(scores) {
   return "minor process variability";
 }
 
-// =========================
-// IMPACT
-// =========================
 function deriveImpact(scores) {
   const impacts = [];
 
-  if (scores.flow < 75) {
-    impacts.push("increased gauge variation");
-    impacts.push("seal inconsistency");
-  }
-
-  if (scores.thermal < 75) {
-    impacts.push("material degradation");
-  }
-
-  if (scores.mechanical < 75) {
-    impacts.push("reduced structural durability");
-  }
+  if (scores.flow < 75) impacts.push("increased gauge variation", "seal inconsistency");
+  if (scores.thermal < 75) impacts.push("material degradation");
+  if (scores.mechanical < 75) impacts.push("reduced structural durability");
 
   return impacts.length ? impacts : ["minor operational variability"];
 }
 
 // =========================
-// EXECUTIVE（完全版）
+// EXECUTIVE
 // =========================
 function generateExecutive(scores, decisionData, economic, risks) {
   const root = deriveRootCause(scores);
@@ -173,30 +163,20 @@ A controlled pilot validation phase is strongly recommended prior to commercial 
 }
 
 // =========================
-// FAILURE
-// =========================
-function generateFailureAnalysis(risks) {
-  return {
-    primary_risk_title: risks.primary.label,
-    primary_risk: "Material instability under operational conditions.",
-    secondary_risk_title: risks.secondary.label,
-    secondary_risk: "Process variability affecting consistency.",
-    mechanism: `${risks.primary.key} + ${risks.secondary.key} instability`
-  };
-}
-
-// =========================
-// INJECT（穴あき防止）
+// INJECT（完全防御）
 // =========================
 function injectHtml(template, data) {
   let html = template;
 
   for (const key in data) {
-    html = html.replace(new RegExp(`{{\\s*${key}\\s*}}`, "g"), safe(data[key]));
+    html = html.replace(
+      new RegExp(`{{\\s*${key}\\s*}}`, "g"),
+      required(data[key])
+    );
   }
 
-  // 未置換タグを強制削除（←ここが重要）
-  html = html.replace(/{{[^}]+}}/g, "");
+  // 未置換タグを全て潰す
+  html = html.replace(/{{[^}]+}}/g, "-");
 
   return html;
 }
@@ -223,19 +203,21 @@ app.post("/generate-report", async (req, res) => {
     const decisionData = determineDecision(scores.total);
     const economic = calculateEconomic(scores.total);
     const risks = deriveRisks(scores);
-    const failure = generateFailureAnalysis(risks);
 
-    const html = injectHtml(htmlTemplate, {
-      application: safe(input.application),
-      material_transition: safe(input.bio_material),
+    const data = {
+      application: required(input.application, "Not specified"),
+      material_transition: required(input.bio_material, "Not specified"),
       report_date: new Date().toISOString().split("T")[0],
 
       compatibility_level: decisionData.level,
       executive_summary: generateExecutive(scores, decisionData, economic, risks),
 
-      ...failure,
+      key_risk: `${risks.primary.label} driven by ${deriveRootCause(scores)}`,
 
-      processing_window: "Stable processing window expected.",
+      processing_window: scores.total > 70
+        ? "Stable processing window expected."
+        : "Controlled processing required.",
+
       thermal_behavior: interpretThermal(scores.thermal),
       flow_characteristics: interpretFlow(scores.flow),
       mechanical_behavior: interpretMechanical(scores.mechanical),
@@ -254,8 +236,10 @@ app.post("/generate-report", async (req, res) => {
       economic_impact: economic,
       pha_score: scores.total,
 
-      dynamic_overlay: "" // ← 最後に画像入れる
-    });
+      dynamic_overlay: "" // ← 今は空（次で復元）
+    };
+
+    const html = injectHtml(htmlTemplate, data);
 
     const browser = await puppeteer.launch({
       args: ["--no-sandbox", "--disable-dev-shm-usage"]
@@ -276,6 +260,7 @@ app.post("/generate-report", async (req, res) => {
     await browser.close();
 
     fs.writeFileSync(PDF_PATH, pdf);
+
     res.send(pdf);
 
   } catch (err) {
@@ -285,7 +270,7 @@ app.post("/generate-report", async (req, res) => {
 });
 
 // =========================
-// PDF取得
+// GET PDF
 // =========================
 app.get("/latest-pdf", (req, res) => {
   if (!fs.existsSync(PDF_PATH)) {
@@ -295,7 +280,7 @@ app.get("/latest-pdf", (req, res) => {
 });
 
 // =========================
-// 起動
+// START
 // =========================
 app.listen(process.env.PORT || 8080, () => {
   console.log("🚀 Server running");
