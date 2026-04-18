@@ -23,33 +23,30 @@ const htmlTemplate = fs.readFileSync(
 );
 
 // =========================
-function safe(v) {
-  return v || "";
-}
+const safe = (v) => v || "";
 
 // =========================
 // 🔥 スコア分解
 // =========================
 function calculateScores(input) {
 
-  let thermal = 80;
-  let flow = 80;
-  let mechanical = 80;
+  let thermal = 85;
+  let flow = 85;
+  let mechanical = 85;
 
   const mat = (input.material || "").toLowerCase();
   const bio = (input.bio_material || "").toLowerCase();
-  const app = (input.application || "").toLowerCase();
+  const appType = (input.application || "").toLowerCase();
 
-  // material影響
   if (mat.includes("pp")) thermal -= 10;
-  if (mat.includes("pet")) thermal -= 20;
+  if (mat.includes("pet")) thermal -= 25;
+  if (mat.includes("pe")) thermal -= 5;
 
-  if (bio.includes("pla")) thermal -= 15;
-  if (bio.includes("pha")) flow -= 20;
+  if (bio.includes("pla")) thermal -= 10;
+  if (bio.includes("pha")) flow -= 10;
 
-  // process影響
-  if (app.includes("film")) flow -= 15;
-  if (app.includes("injection")) mechanical -= 10;
+  if (appType.includes("film")) flow -= 15;
+  if (appType.includes("injection")) mechanical -= 10;
 
   thermal = Math.max(0, thermal);
   flow = Math.max(0, flow);
@@ -69,7 +66,7 @@ function determineDecision(score) {
 }
 
 // =========================
-// 🔥 overlay（完全連動版）
+// 🔥 OVERLAY 完全復旧
 // =========================
 function generateOverlay(scores) {
 
@@ -77,39 +74,36 @@ function generateOverlay(scores) {
 
   const angle = -90 + (total * 1.8);
 
-  const waveLeft = 20 + (100 - thermal) * 0.3;
-  const waveRight = 20 + (100 - flow) * 0.3;
+  const ampL = 6 + (100 - thermal) * 0.2;
+  const ampR = 6 + (100 - flow) * 0.2;
 
   return `
-<div style="position:relative; width:100%; height:260px; overflow:hidden;">
+<div style="position:relative; width:100%;">
 
   <img src="https://ilnautico.github.io/visual-base.png"
-       style="width:100%; height:260px; object-fit:cover;" />
+    style="width:100%; height:auto; display:block;" />
 
-  <!-- 温度表示 -->
-  <div style="position:absolute; top:30px; left:35%;">
-    230°C<br><span>${thermal}</span>
+  <div style="position:absolute; top:40px; left:50%; transform:translateX(-180px); text-align:center;">
+    <div style="font-size:28px;">230°C</div>
+    <div>${thermal}</div>
   </div>
 
-  <div style="position:absolute; top:30px; right:25%; color:red;">
-    180°C<br><span>${flow}</span>
+  <div style="position:absolute; top:40px; left:50%; transform:translateX(180px); text-align:center;">
+    <div style="font-size:28px; color:red;">180°C</div>
+    <div style="color:red;">${flow}</div>
   </div>
 
-  <!-- 波（thermal） -->
-  <svg style="position:absolute; bottom:70px; left:40%;" width="100" height="40">
-    <path d="M0 20 C20 ${waveLeft}, 40 ${40-waveLeft}, 60 20"
+  <svg style="position:absolute; left:50%; top:55%; transform:translateX(-120px);" width="100" height="40">
+    <path d="M0 20 C20 ${20-ampL}, 40 ${20+ampL}, 60 20"
       stroke="#4f7c8a" fill="none" stroke-width="3"/>
   </svg>
 
-  <!-- 波（flow） -->
-  <svg style="position:absolute; bottom:70px; right:30%;" width="100" height="40">
-    <path d="M0 20 C20 ${waveRight}, 40 ${40-waveRight}, 60 20"
+  <svg style="position:absolute; left:50%; top:55%; transform:translateX(60px);" width="100" height="40">
+    <path d="M0 20 C20 ${20-ampR}, 40 ${20+ampR}, 60 20"
       stroke="#d62c2c" fill="none" stroke-width="3"/>
   </svg>
 
-  <!-- メータ -->
-  <svg style="position:absolute; right:40px; bottom:10px;" viewBox="0 0 200 120" width="140" height="90">
-
+  <svg style="position:absolute; right:60px; bottom:20px;" viewBox="0 0 200 120" width="140">
     <defs>
       <linearGradient id="g">
         <stop offset="0%" stop-color="#22c55e"/>
@@ -118,18 +112,14 @@ function generateOverlay(scores) {
       </linearGradient>
     </defs>
 
-    <path d="M20 100 A80 80 0 0 1 180 100 L100 100 Z"
-      fill="url(#g)"
-    />
+    <path d="M20 100 A80 80 0 0 1 180 100 L100 100 Z" fill="url(#g)"/>
 
     <g transform="rotate(${angle} 100 100)">
       <line x1="100" y1="100" x2="100" y2="30"
-        stroke="#111"
-        stroke-width="3"/>
+        stroke="#111" stroke-width="3"/>
     </g>
 
     <circle cx="100" cy="100" r="4" fill="#111"/>
-
   </svg>
 
 </div>
@@ -137,13 +127,56 @@ function generateOverlay(scores) {
 }
 
 // =========================
+// 🔥 Executive（復元＋強化）
+// =========================
+function generateExecutive(score, decision, economic) {
+
+  if (score >= 75) {
+    return `This assessment indicates HIGH feasibility for transitioning to the evaluated material.
+
+The material demonstrates strong baseline compatibility and stable behavior under expected processing conditions.
+
+Deployment Decision: ${decision}
+
+Operational risk is limited, with variability mainly within standard industrial tolerances.
+
+Economic Impact: ${economic}
+
+A structured pilot validation phase is recommended to confirm repeatability prior to full-scale deployment.`;
+  }
+
+  if (score >= 55) {
+    return `This assessment indicates MODERATE feasibility for transitioning to the evaluated material.
+
+While compatibility is achievable, the material shows sensitivity to thermal and flow conditions.
+
+Deployment Decision: ${decision}
+
+Process control will be critical to maintain stability.
+
+Economic Impact: ${economic}
+
+A controlled pilot validation is strongly recommended before scale-up.`;
+  }
+
+  return `This assessment indicates LOW feasibility for transitioning to the evaluated material.
+
+Material instability is expected under standard processing conditions.
+
+Deployment Decision: ${decision}
+
+Significant process adaptation would be required.
+
+Economic Impact: ${economic}
+
+Further evaluation is necessary before proceeding.`;
+}
+
+// =========================
 function injectHtml(template, data) {
   let html = template;
   for (const key in data) {
-    html = html.replace(
-      new RegExp(`{{\\s*${key}\\s*}}`, "g"),
-      safe(data[key])
-    );
+    html = html.replace(new RegExp(`{{\\s*${key}\\s*}}`, "g"), safe(data[key]));
   }
   return html;
 }
@@ -155,86 +188,66 @@ app.post("/generate-report", async (req, res) => {
 
   try {
 
-    const raw = req.body;
-    let input = {};
+    let input = req.body;
 
-    if (raw.data && raw.data.fields) {
-      raw.data.fields.forEach(f => {
+    if (input.data && input.data.fields) {
+      const parsed = {};
+      input.data.fields.forEach(f => {
         const label = (f.label || "").toLowerCase();
-        const val = f.value;
-
-        if (label.includes("application")) input.application = val;
-        if (label.includes("material")) input.material = val;
-        if (label.includes("biodegradable")) input.bio_material = val;
+        if (label.includes("application")) parsed.application = f.value;
+        if (label.includes("material")) parsed.material = f.value;
+        if (label.includes("bio")) parsed.bio_material = f.value;
       });
-    } else {
-      input = raw;
+      input = parsed;
     }
 
     const scores = calculateScores(input);
     const decisionData = determineDecision(scores.total);
 
-    // 🔥 文章（スコア連動）
-    const executive_summary = `
-This assessment indicates ${decisionData.level} feasibility.
-
-Thermal stability score: ${scores.thermal}
-Flow stability score: ${scores.flow}
-
-The transition shows variable stability depending on processing conditions.
-
-Deployment Decision: ${decisionData.decision}
-
-A structured pilot validation is recommended before scale-up.
-`;
+    const economic =
+      scores.total >= 75 ? "+5–15%" :
+      scores.total >= 55 ? "+15–30%" :
+      scores.total >= 40 ? "+30–60%" : "+60%+";
 
     const html = injectHtml(htmlTemplate, {
 
-      assessment_type: "Technical Hypothesis",
       application: safe(input.application),
       material_transition: safe(input.bio_material),
       report_date: new Date().toISOString().split("T")[0],
 
       compatibility_level: decisionData.level,
-      executive_summary: executive_summary,
+      executive_summary: generateExecutive(scores.total, decisionData.decision, economic),
 
-      key_risk:
-        scores.thermal < 50
-          ? "Thermal instability risk."
-          : "Flow variability risk.",
+      key_risk: scores.thermal < 60
+        ? "Thermal instability risk."
+        : "Flow variability under operational conditions.",
 
-      processing_window:
-        scores.total > 70
-          ? "Stable processing window."
-          : "Controlled processing required.",
+      processing_window: scores.total > 70
+        ? "Stable processing window."
+        : "Controlled processing required.",
 
-      thermal_behavior:
-        scores.thermal > 70
-          ? "Thermally stable."
-          : "Thermal sensitivity present.",
+      thermal_behavior: scores.thermal > 70
+        ? "Thermally stable."
+        : "Thermal sensitivity present.",
 
-      flow_characteristics:
-        scores.flow > 70
-          ? "Stable flow."
-          : "Variable flow behavior.",
+      flow_characteristics: scores.flow > 70
+        ? "Stable flow."
+        : "Variable flow behavior.",
 
-      mechanical_behavior:
-        scores.mechanical > 70
-          ? "Stable mechanical performance."
-          : "Conditionally stable.",
+      mechanical_behavior: scores.mechanical > 70
+        ? "Stable mechanical performance."
+        : "Conditionally stable.",
 
-      surface_quality:
-        scores.flow > 70
-          ? "Uniform surface."
-          : "Surface variability possible.",
+      surface_quality: scores.flow > 70
+        ? "Uniform surface."
+        : "Surface variability possible.",
 
-      structural_consistency:
-        scores.mechanical > 70
-          ? "Stable structure."
-          : "Requires validation.",
+      structural_consistency: scores.mechanical > 70
+        ? "Stable structure."
+        : "Requires validation.",
 
       primary_risk_title: "Thermal Instability",
-      primary_risk: "Material degradation under heat.",
+      primary_risk: "Material degradation under heat exposure.",
 
       secondary_risk_title: "Flow Variability",
       secondary_risk: "Inconsistent melt behavior.",
@@ -242,15 +255,15 @@ A structured pilot validation is recommended before scale-up.
       mechanism: "Thermal + shear instability.",
 
       stability: "Moderate",
-      stability_note: "Depends on control.",
+      stability_note: "Depends on processing control.",
       consistency: "Moderate",
       consistency_note: "Process dependent.",
 
       application_implication: "Pilot testing required.",
-      next_step: "Proceed to controlled pilot testing.",
+      next_step: "Proceed to controlled pilot validation.",
 
       decision: decisionData.decision,
-      economic_impact: "+15–30%",
+      economic_impact: economic,
 
       pha_score: scores.total,
 
@@ -260,11 +273,7 @@ A structured pilot validation is recommended before scale-up.
 
     const browser = await puppeteer.launch({
       headless: "new",
-      args: [
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--disable-dev-shm-usage"
-      ]
+      args: ["--no-sandbox", "--disable-dev-shm-usage"]
     });
 
     const page = await browser.newPage();
@@ -299,9 +308,8 @@ app.get("/latest-pdf", (req, res) => {
   res.sendFile(PDF_PATH);
 });
 
-const PORT = process.env.PORT || 8080;
-app.listen(PORT, () => {
-  console.log("🚀 Server running on", PORT);
+app.listen(process.env.PORT || 8080, () => {
+  console.log("🚀 Server running");
 });
 const html_3man =`;
 <!DOCTYPE html>
