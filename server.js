@@ -16,14 +16,7 @@ app.use(express.urlencoded({ extended: true }));
 const PDF_PATH = "/tmp/latest.pdf";
 
 // =========================
-// OpenAI
-// =========================
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
-});
-
-// =========================
-// TEMPLATE LOAD（落ち防止ログ付き）
+// TEMPLATE
 // =========================
 const templatePath = path.join(__dirname, "template.html");
 console.log("📁 Trying to load:", templatePath);
@@ -37,30 +30,23 @@ function safe(v) {
 }
 
 // =========================
-// 🔥 OVERLAY（修正版）
+// 🔥 OVERLAY 完成版
 // =========================
 function generateOverlay(scoreLeft, scoreRight) {
 
   const safeRight = Math.max(0, Math.min(100, Number(scoreRight) || 0));
 
-  // 👉 角度修正（逆転）
-  const angle = 90 - (safeRight * 1.8);
+  // 👉 メータ調整（完成版）
+  const angle = 110 - (safeRight * 2);
 
-  // 👉 波形修正
-  const amplitude = 4 + ((100 - safeRight) / 10);
+  // 👉 波強化
+  const amplitude = 6 + ((100 - safeRight) / 8);
 
   return `
 <div style="position:absolute; left:0; top:0; width:100%; height:100%; pointer-events:none;">
 
   <img src="https://ilnautico.github.io/visual-base.png"
-    style="
-      position:absolute;
-      left:50%;
-      top:55%;
-      transform:translate(-50%,-50%);
-      width:450px;
-      opacity:0.95;
-    "
+    style="position:absolute; left:50%; top:55%; transform:translate(-50%,-50%); width:450px;"
   />
 
   <div style="position:absolute; top:40px; left:50%; transform:translateX(-180px); text-align:center;">
@@ -73,24 +59,19 @@ function generateOverlay(scoreLeft, scoreRight) {
     <div style="color:#d62c2c;">${scoreRight}</div>
   </div>
 
-  <!-- 波 左 -->
+  <!-- 波 -->
   <svg style="position:absolute; left:50%; bottom:80px; transform:translateX(-70px);" width="90" height="35">
     <path d="M0 18 C15 ${18 - amplitude}, 30 ${18 + amplitude}, 45 18 C60 ${18 - amplitude}, 75 ${18 + amplitude}, 90 18"
-      fill="none"
-      stroke="#4f7c8a"
-      stroke-width="3"/>
+      fill="none" stroke="#4f7c8a" stroke-width="3"/>
   </svg>
 
-  <!-- 波 右 -->
   <svg style="position:absolute; left:50%; bottom:80px; transform:translateX(110px);" width="90" height="35">
     <path d="M0 18 C15 ${18 - amplitude}, 30 ${18 + amplitude}, 45 18 C60 ${18 - amplitude}, 75 ${18 + amplitude}, 90 18"
-      fill="none"
-      stroke="#d62c2c"
-      stroke-width="3"/>
+      fill="none" stroke="#d62c2c" stroke-width="3"/>
   </svg>
 
   <!-- メータ -->
-  <svg style="position:absolute; right:60px; bottom:10px;" viewBox="0 0 200 120" width="140" height="90">
+  <svg style="position:absolute; right:60px; bottom:10px;" viewBox="0 0 200 120" width="140">
     <defs>
       <linearGradient id="g">
         <stop offset="0%" stop-color="#22c55e"/>
@@ -113,7 +94,7 @@ function generateOverlay(scoreLeft, scoreRight) {
 }
 
 // =========================
-// スコア強化
+// スコア（完成版）
 // =========================
 function calculateScoreAdvanced(input) {
 
@@ -133,9 +114,7 @@ function calculateScoreAdvanced(input) {
   if (app.includes("injection")) score -= 10;
   if (app.includes("film")) score -= 20;
 
-  if (app.includes("microwave") || app.includes("heat")) {
-    score -= 25;
-  }
+  if (app.includes("microwave") || app.includes("heat")) score -= 25;
 
   return Math.max(score, 0);
 }
@@ -156,13 +135,9 @@ function calculateEconomic(score) {
 }
 
 // =========================
-// 技術文章生成
+// 技術文章（完成版）
 // =========================
 function generateNarrative(input, score, decisionData) {
-
-  let riskLevel = "moderate";
-  if (score < 50) riskLevel = "high";
-  if (score > 75) riskLevel = "low";
 
   return {
     executive_summary: `
@@ -170,48 +145,26 @@ This assessment indicates ${decisionData.level} feasibility.
 
 Deployment Decision: ${decisionData.decision}
 
-Material behavior suggests ${riskLevel} operational risk.
+Material behavior suggests moderate operational risk.
 
 Economic Impact: ${calculateEconomic(score)}
 
-A structured validation phase is recommended.
+Operational consistency remains the key limiting factor in real production environments.
+
+A structured validation phase is strongly recommended.
 `,
 
-    processing_window: score > 70
-      ? "Stable processing window expected."
-      : "Narrow processing window requiring control.",
+    processing_window: "Controlled processing required.",
+    thermal_behavior: "Thermal sensitivity present.",
+    flow_characteristics: "Variable flow behavior.",
 
-    thermal_behavior: score > 70
-      ? "Thermally stable."
-      : "Thermally sensitive.",
+    mechanical_behavior: "Conditionally stable performance.",
+    surface_quality: "Potential variability in finish.",
+    structural_consistency: "Requires validation.",
 
-    flow_characteristics: score > 70
-      ? "Stable flow."
-      : "Variable flow behavior.",
-
-    mechanical_behavior: score > 70
-      ? "Stable mechanical performance."
-      : "Variable mechanical performance.",
-
-    surface_quality: score > 70
-      ? "Uniform surface."
-      : "Surface inconsistency risk.",
-
-    structural_consistency: score > 70
-      ? "Stable structure."
-      : "Structural variability risk.",
-
-    primary_risk: score > 70
-      ? "Minor risk."
-      : "Thermal instability.",
-
-    secondary_risk: score > 70
-      ? "Low variability."
-      : "Flow instability.",
-
-    mechanism: score > 70
-      ? "Minor sensitivity."
-      : "Thermal + shear instability."
+    primary_risk: "Thermal instability under elevated conditions.",
+    secondary_risk: "Flow inconsistency risk.",
+    mechanism: "Thermal + shear instability."
   };
 }
 
@@ -219,10 +172,7 @@ A structured validation phase is recommended.
 function injectHtml(template, data) {
   let html = template;
   for (const key in data) {
-    html = html.replace(
-      new RegExp(`{{\\s*${key}\\s*}}`, "g"),
-      safe(data[key])
-    );
+    html = html.replace(new RegExp(`{{\\s*${key}\\s*}}`, "g"), safe(data[key]));
   }
   return html;
 }
@@ -234,13 +184,10 @@ app.post("/generate-report", async (req, res) => {
 
   try {
 
-    console.log("🔥 RAW BODY:", req.body);
-
     const raw = req.body;
     let input = {};
 
     if (raw.data && raw.data.fields) {
-
       raw.data.fields.forEach(f => {
         const label = (f.label || "").toLowerCase();
         const value = f.value;
@@ -249,12 +196,9 @@ app.post("/generate-report", async (req, res) => {
         if (label.includes("material")) input.material = value;
         if (label.includes("bio")) input.bio_material = value;
       });
-
     } else {
       input = raw;
     }
-
-    console.log("🔥 PARSED INPUT:", input);
 
     const score = calculateScoreAdvanced(input);
     const decisionData = determineDecision(score);
@@ -282,12 +226,19 @@ app.post("/generate-report", async (req, res) => {
       surface_quality: narrative.surface_quality,
       structural_consistency: narrative.structural_consistency,
 
+      primary_risk_title: "Thermal Instability",
+      secondary_risk_title: "Flow Variability",
+
       primary_risk: narrative.primary_risk,
       secondary_risk: narrative.secondary_risk,
       mechanism: narrative.mechanism,
 
       stability: "Moderate",
       consistency: "Moderate",
+      stability_note: "Depends on control.",
+      consistency_note: "Varies with process.",
+
+      key_risk: narrative.primary_risk,
 
       application_implication: "Pilot testing required.",
       next_step: "Pilot validation recommended.",
@@ -303,20 +254,12 @@ app.post("/generate-report", async (req, res) => {
 
     const browser = await puppeteer.launch({
       headless: "new",
-      args: [
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--disable-dev-shm-usage",
-        "--disable-gpu"
-      ]
+      args: ["--no-sandbox", "--disable-dev-shm-usage"]
     });
 
     const page = await browser.newPage();
 
-    await page.setContent(html, {
-      waitUntil: "load",
-      timeout: 0
-    });
+    await page.setContent(html, { waitUntil: "load" });
 
     const pdf = await page.pdf({
       format: "A4",
