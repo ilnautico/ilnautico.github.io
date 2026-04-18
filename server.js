@@ -30,31 +30,18 @@ function calculateScores(input) {
 
   const mat = (input.material || "").toLowerCase();
   const bio = (input.bio_material || "").toLowerCase();
-  const app = (input.application || "").toLowerCase();
+  const appType = (input.application || "").toLowerCase();
 
-  if (mat.includes("pp") && bio.includes("pha")) {
-    thermal -= 15;
-    flow -= 10;
-  }
-
-  if (mat.includes("pe") && bio.includes("pla")) {
-    thermal -= 10;
-    mechanical -= 10;
-  }
-
+  if (mat.includes("pp")) thermal -= 10;
+  if (mat.includes("pe")) thermal -= 5;
   if (mat.includes("pet")) thermal -= 25;
 
-  if (app.includes("film")) {
-    flow -= 20;
-    mechanical -= 5;
-  }
+  if (bio.includes("pla")) thermal -= 10;
+  if (bio.includes("pha")) flow -= 10;
 
-  if (app.includes("injection")) {
-    mechanical -= 10;
-    thermal -= 5;
-  }
-
-  if (app.includes("blow")) flow -= 10;
+  if (appType.includes("film")) flow -= 15;
+  if (appType.includes("injection")) mechanical -= 10;
+  if (appType.includes("blow")) flow -= 10;
 
   thermal = Math.max(0, Math.min(100, thermal));
   flow = Math.max(0, Math.min(100, flow));
@@ -80,66 +67,19 @@ function calculateEconomic(score) {
 }
 
 /* =========================
-   リスク統一
+   TEXT
 ========================= */
-function deriveRisks(scores) {
-  const arr = [
-    { key: "thermal", label: "Thermal Instability", value: scores.thermal },
-    { key: "flow", label: "Flow Variability", value: scores.flow },
-    { key: "mechanical", label: "Mechanical Instability", value: scores.mechanical },
-  ];
-
-  arr.sort((a, b) => a.value - b.value);
-
-  return {
-    primary: arr[0],
-    secondary: arr[1],
-  };
-}
-
-/* =========================
-   解釈
-========================= */
-function interpretThermal(s) {
-  if (s >= 80) return "Thermally robust under standard processing conditions.";
-  if (s >= 65) return "Stable within controlled thermal exposure.";
-  if (s >= 50) return "Thermal sensitivity present; strict control required.";
-  return "High degradation risk under processing conditions.";
-}
-
-function interpretFlow(s) {
-  if (s >= 80) return "Consistent melt flow and stable processing.";
-  if (s >= 65) return "Moderate variability under controlled conditions.";
-  if (s >= 50) return "Flow instability affecting dimensional consistency.";
-  return "Severe flow inconsistency impacting process reliability.";
-}
-
-function interpretMechanical(s) {
-  if (s >= 80) return "Stable mechanical integrity.";
-  if (s >= 65) return "Conditionally stable depending on processing.";
-  if (s >= 50) return "Mechanical variability under load.";
-  return "Unstable structure under operational stress.";
-}
-
-/* =========================
-   EXECUTIVE
-========================= */
-function generateExecutive(scores, decisionData, economic, risks) {
+function generateExecutive(scores, decisionData, economic) {
   return `
 This assessment indicates ${decisionData.level} feasibility for transitioning to the evaluated material within the current processing framework.
 
-Thermal behavior (${scores.thermal}): ${interpretThermal(scores.thermal)}
-Flow behavior (${scores.flow}): ${interpretFlow(scores.flow)}
-Mechanical stability (${scores.mechanical}): ${interpretMechanical(scores.mechanical)}
+Thermal stability (${scores.thermal}) indicates controlled resistance to heat exposure.
+Flow stability (${scores.flow}) suggests moderate to stable melt behavior.
+Mechanical stability (${scores.mechanical}) reflects structurally acceptable performance.
 
 Deployment Decision: ${decisionData.decision}
 
-The primary limiting factor is ${risks.primary.label}, which directly influences process stability and product consistency.
-
-This condition may lead to:
-- Increased scrap rate
-- Inconsistent product quality
-- Reduced process efficiency
+The primary limiting factor is process variability under real-world conditions.
 
 Economic Impact: ${economic}
 
@@ -179,7 +119,6 @@ app.post("/generate-report", async (req, res) => {
     const scores = calculateScores(input);
     const decisionData = determineDecision(scores.total);
     const economic = calculateEconomic(scores.total);
-    const risks = deriveRisks(scores);
 
     const html = injectHtml(htmlTemplate, {
       assessment_type: "Technical Hypothesis",
@@ -188,37 +127,37 @@ app.post("/generate-report", async (req, res) => {
       report_date: new Date().toISOString().split("T")[0],
 
       compatibility_level: decisionData.level,
-      executive_summary: generateExecutive(scores, decisionData, economic, risks),
+      executive_summary: generateExecutive(scores, decisionData, economic),
 
-      key_risk: risks.primary.label + " under operational conditions.",
+      key_risk: "Flow variability under operational conditions.",
 
-      primary_risk_title: risks.primary.label,
-      primary_risk:
-        risks.primary.key === "thermal"
-          ? "Material degradation under elevated temperature conditions."
-          : risks.primary.key === "flow"
-          ? "Inconsistent melt behavior leading to quality fluctuation."
-          : "Mechanical instability under operational stress.",
+      primary_risk_title: "Thermal Instability",
+      primary_risk: "Material degradation under elevated temperature conditions.",
 
-      secondary_risk_title: risks.secondary.label,
-      secondary_risk:
-        risks.secondary.key === "thermal"
-          ? "Thermal sensitivity under processing conditions."
-          : risks.secondary.key === "flow"
-          ? "Flow instability affecting consistency."
-          : "Mechanical variability under load.",
+      secondary_risk_title: "Flow Variability",
+      secondary_risk: "Inconsistent melt behavior leading to quality fluctuation.",
 
-      mechanism: `${risks.primary.key} + ${risks.secondary.key} instability`,
+      mechanism: "Combined thermal and shear instability.",
 
-      // 🔥 完全復元（ここが重要）
       processing_window:
         scores.total > 70
           ? "Stable processing window expected."
           : "Controlled processing conditions required.",
 
-      thermal_behavior: interpretThermal(scores.thermal),
-      flow_characteristics: interpretFlow(scores.flow),
-      mechanical_behavior: interpretMechanical(scores.mechanical),
+      thermal_behavior:
+        scores.thermal > 70
+          ? "Thermally stable under controlled conditions."
+          : "Thermal sensitivity present.",
+
+      flow_characteristics:
+        scores.flow > 70
+          ? "Stable flow characteristics."
+          : "Variable flow behavior observed.",
+
+      mechanical_behavior:
+        scores.mechanical > 70
+          ? "Stable mechanical performance."
+          : "Conditionally stable mechanical behavior.",
 
       surface_quality:
         scores.flow > 70
@@ -233,9 +172,16 @@ app.post("/generate-report", async (req, res) => {
       application_implication: "Pilot testing required.",
 
       stability: "Moderate",
+      stability_note: "Depends on processing control.",
+
       consistency: "Moderate",
+      consistency_note: "Process dependent.",
 
       next_step: "Proceed to controlled pilot validation.",
+
+      decision: decisionData.decision,
+      economic_impact: economic,
+      pha_score: scores.total,
     });
 
     const browser = await puppeteer.launch({
