@@ -1,5 +1,6 @@
+
 import express from "express";
-import puppeteer from "puppeteer";
+import puppeteer from "puppeteer";　　
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -19,7 +20,7 @@ const htmlTemplate = fs.readFileSync(
 );
 
 // =========================
-// 安全値
+// 安全値（穴あき完全防止）
 // =========================
 const safe = (v, fallback = "-") => {
   if (v === undefined || v === null || v === "") return fallback;
@@ -60,7 +61,7 @@ function calculateScores(input) {
 function determineDecision(score) {
   if (score >= 75) return { decision: "GO", level: "HIGH" };
   if (score >= 55) return { decision: "CONDITIONAL GO", level: "MODERATE" };
-  return { decision: "HOLD", level: "LOW" };
+  return { decision: "HOLD", level: "LOW" };　
 }
 
 function calculateEconomic(score) {
@@ -70,63 +71,101 @@ function calculateEconomic(score) {
 }
 
 // =========================
-// VISUAL（完全固定版）
+// VISUAL（ズレない版）
 // =========================
 function generateOverlay(scores) {
   const { thermal, flow, total } = scores;
   const angle = -90 + total * 1.8;
 
   return `
-<div style="position:relative;width:100%;height:260px;">
+<div style="
+  position:relative;
+  width:100%;
+  height:260px;
+">
 
-<img src="https://ilnautico.github.io/visual-base.png"
-style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:contain;z-index:1;" />
+  <!-- 背景（確実表示） -->
+  <img src="https://ilnautico.github.io/visual-base.png"
+    style="
+      position:absolute;
+      top:0;
+      left:0;
+      width:100%;
+      height:100%;
+      object-fit:contain;
+      z-index:1;
+    "
+  />
 
-<!-- LEFT -->
-<div style="position:absolute;left:110px;top:55px;width:160px;text-align:center;z-index:3;">
-<div style="font-size:30px;">230°C</div>
-<div style="font-size:16px;">${thermal}</div>
-<svg width="140" height="60">
-<path d="M10 40 Q40 10 70 40 T130 40" stroke="#4f7c8a" fill="none" stroke-width="3"/>
-</svg>
-</div>
+  <!-- LEFT -->
+  <div style="
+    position:absolute;
+    left:110px;
+    top:55px;
+    width:160px;
+    text-align:center;
+    z-index:3;
+  ">
+    <div style="font-size:30px;">230°C</div>
+    <div style="font-size:16px;">${thermal}</div>
 
-<!-- RIGHT -->
-<div style="position:absolute;right:110px;top:55px;width:160px;text-align:center;z-index:3;">
-<div style="font-size:30px;color:#d62c2c;">180°C</div>
-<div style="font-size:16px;color:#d62c2c;">${flow}</div>
-<svg width="140" height="60">
-<path d="M10 40 Q40 10 70 40 T130 40" stroke="#d62c2c" fill="none" stroke-width="3"/>
-</svg>
-</div>
+    <svg width="140" height="60">
+      <path d="M10 40 Q40 10 70 40 T130 40"
+        stroke="#4f7c8a" fill="none" stroke-width="3"/>
+    </svg>
+  </div>
 
-<!-- CENTER -->
-<div style="position:absolute;left:50%;top:140px;transform:translateX(-50%);z-index:3;">
-<svg width="220" height="120" viewBox="0 0 200 120">
+  <!-- RIGHT -->
+  <div style="
+    position:absolute;
+    right:110px;
+    top:55px;
+    width:160px;
+    text-align:center;
+    z-index:3;
+  ">
+    <div style="font-size:30px; color:#d62c2c;">180°C</div>
+    <div style="font-size:16px; color:#d62c2c;">${flow}</div>
 
-<defs>
-<linearGradient id="grad">
-<stop offset="0%" stop-color="#22c55e"/>
-<stop offset="50%" stop-color="#fde047"/>
-<stop offset="100%" stop-color="#ef4444"/>
-</linearGradient>
-</defs>
+    <svg width="140" height="60">
+      <path d="M10 40 Q40 10 70 40 T130 40"
+        stroke="#d62c2c" fill="none" stroke-width="3"/>
+    </svg>
+  </div>
 
-<path d="M20 100 A80 80 0 0 1 180 100 L100 100 Z" fill="url(#grad)"/>
+  <!-- CENTER METER -->
+  <div style="
+    position:absolute;
+    left:50%;
+    top:140px;
+    transform:translateX(-50%);
+    z-index:3;
+  ">
+    <svg width="220" height="120" viewBox="0 0 200 120">
 
-<g transform="rotate(${angle} 100 100)">
-<line x1="100" y1="100" x2="100" y2="25" stroke="#111" stroke-width="3"/>
-</g>
+      <defs>
+        <linearGradient id="grad">
+          <stop offset="0%" stop-color="#22c55e"/>
+          <stop offset="50%" stop-color="#fde047"/>
+          <stop offset="100%" stop-color="#ef4444"/>
+        </linearGradient>
+      </defs>
 
-<circle cx="100" cy="100" r="4" fill="#111"/>
+      <path d="M20 100 A80 80 0 0 1 180 100 L100 100 Z"
+        fill="url(#grad)"/>
 
-</svg>
-</div>
+      <g transform="rotate(${angle} 100 100)">
+        <line x1="100" y1="100" x2="100" y2="25"
+          stroke="#111" stroke-width="3"/>
+      </g>
+
+      <circle cx="100" cy="100" r="4" fill="#111"/>
+    </svg>
+  </div>
 
 </div>
 `;
 }
-
 // =========================
 // EXECUTIVE
 // =========================
@@ -140,11 +179,14 @@ Mechanical stability (${scores.mechanical}): Structurally stable.
 
 Deployment Decision: ${decision.decision}
 
-Primary risk is process variability under real-world conditions.
+Primary risk is process variability under real-world conditions, which may lead to:
+- Product inconsistency
+- Scrap increase
+- Efficiency loss
 
 Economic Impact: ${economic}
 
-A controlled pilot validation phase is strongly recommended.
+A controlled pilot validation phase is strongly recommended prior to commercial deployment.
 `;
 }
 
@@ -156,20 +198,47 @@ function injectHtml(template, data) {
     return safe(data[key]);
   });
 }
-
 // =========================
 // MAIN
 // =========================
 app.post("/generate-report", async (req, res) => {
   try {
+   let input = req.body;
 
-    let input = req.body;
+    if (input?.data?.fields) {
+      const parsed = {};
+
+      input.data.fields.forEach((f) => {
+        const label = (f.label || "").toLowerCase();
+
+        if (label.includes("application")) {
+          parsed.application = f.value;
+        }
+
+        if (label.includes("material") && !label.includes("bio")) {
+          parsed.material = f.value;
+        }
+
+        if (label.includes("bio") || label.includes("target")) {
+          parsed.bio_material = f.value;
+        }
+      });
+
+      input = parsed;
+    }
+
 
     const scores = calculateScores(input);
     const decision = determineDecision(scores.total);
     const economic = calculateEconomic(scores.total);
 
+    const keyRisk =
+      scores.total > 70
+        ? "Minor process fluctuation impacting stability."
+        : "Thermal instability and inconsistency risk.";
+
     const html = injectHtml(htmlTemplate, {
+      assessment_type: "Technical Hypothesis",
       application: safe(input.application),
       material_transition: safe(input.bio_material),
       report_date: new Date().toISOString().split("T")[0],
@@ -177,7 +246,7 @@ app.post("/generate-report", async (req, res) => {
       compatibility_level: decision.level,
       executive_summary: generateExecutive(scores, decision, economic),
 
-      key_risk: "Minor process fluctuation impacting stability.",
+      key_risk: keyRisk,
 
       processing_window: "Stable processing window expected.",
       thermal_behavior: "Thermally stable under controlled conditions.",
@@ -187,8 +256,27 @@ app.post("/generate-report", async (req, res) => {
       surface_quality: "Uniform surface finish achievable.",
       structural_consistency: "Stable structural integrity.",
 
+      primary_risk_title: "Process Variability",
+      primary_risk: "Minor fluctuation impacting stability.",
+
+      secondary_risk_title: "Operational Sensitivity",
+      secondary_risk: "Dependent on process control.",
+
+      mechanism: "Thermal + flow instability",
+
+      stability: "Moderate",
+      stability_note: "Depends on processing control.",
+
+      consistency: "Moderate",
+      consistency_note: "Process dependent.",
+
       application_implication: "Pilot testing required.",
       next_step: "Proceed to controlled pilot validation.",
+
+      decision: decision.decision,
+      economic_impact: economic,
+
+      pha_score: scores.total,
 
       dynamic_overlay: generateOverlay(scores),
     });
@@ -198,15 +286,7 @@ app.post("/generate-report", async (req, res) => {
     });
 
     const page = await browser.newPage();
-
-    await page.setViewport({
-      width: 1200,
-      height: 1600
-    });
-
-    await page.setContent(html, {
-      waitUntil: "networkidle0"
-    });
+    await page.setContent(html, { waitUntil: "networkidle0" });
 
     const pdf = await page.pdf({
       format: "A4",
@@ -225,6 +305,7 @@ app.post("/generate-report", async (req, res) => {
   }
 });
 
+// =========================
 app.get("/latest-pdf", (req, res) => {
   if (!fs.existsSync(PDF_PATH)) {
     return res.status(404).send("No PDF yet");
