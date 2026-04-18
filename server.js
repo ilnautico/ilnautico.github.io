@@ -316,7 +316,7 @@ app.get("/latest-pdf", (req, res) => {
 app.listen(process.env.PORT || 8080, () => {
   console.log("Server running");
 });
-const html = 
+
 const html_3man =`;
 <!DOCTYPE html>
 <html>
