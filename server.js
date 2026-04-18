@@ -13,9 +13,6 @@ app.use(express.urlencoded({ extended: true }));
 
 const PDF_PATH = "/tmp/latest.pdf";
 
-// =========================
-// TEMPLATE
-// =========================
 const htmlTemplate = fs.readFileSync(
   path.join(__dirname, "template.html"),
   "utf8"
@@ -23,9 +20,9 @@ const htmlTemplate = fs.readFileSync(
 
 const safe = (v) => (v === undefined || v === null ? "" : String(v));
 
-// =========================
-// SCORE（精度MAX版）
-// =========================
+/* =========================
+   SCORE
+========================= */
 function calculateScores(input) {
   let thermal = 85;
   let flow = 85;
@@ -35,7 +32,6 @@ function calculateScores(input) {
   const bio = (input.bio_material || "").toLowerCase();
   const app = (input.application || "").toLowerCase();
 
-  // 材料相性
   if (mat.includes("pp") && bio.includes("pha")) {
     thermal -= 15;
     flow -= 10;
@@ -46,11 +42,8 @@ function calculateScores(input) {
     mechanical -= 10;
   }
 
-  if (mat.includes("pet")) {
-    thermal -= 25;
-  }
+  if (mat.includes("pet")) thermal -= 25;
 
-  // 用途依存
   if (app.includes("film")) {
     flow -= 20;
     mechanical -= 5;
@@ -61,9 +54,7 @@ function calculateScores(input) {
     thermal -= 5;
   }
 
-  if (app.includes("blow")) {
-    flow -= 10;
-  }
+  if (app.includes("blow")) flow -= 10;
 
   thermal = Math.max(0, Math.min(100, thermal));
   flow = Math.max(0, Math.min(100, flow));
@@ -74,9 +65,6 @@ function calculateScores(input) {
   return { thermal, flow, mechanical, total };
 }
 
-// =========================
-// 判定
-// =========================
 function determineDecision(score) {
   if (score >= 75) return { decision: "GO", level: "HIGH" };
   if (score >= 55) return { decision: "CONDITIONAL GO", level: "MODERATE" };
@@ -91,9 +79,9 @@ function calculateEconomic(score) {
   return "+60%+";
 }
 
-// =========================
-// リスク完全統一（最重要）
-// =========================
+/* =========================
+   リスク統一
+========================= */
 function deriveRisks(scores) {
   const arr = [
     { key: "thermal", label: "Thermal Instability", value: scores.thermal },
@@ -109,9 +97,9 @@ function deriveRisks(scores) {
   };
 }
 
-// =========================
-// 解釈（技術者レベル）
-// =========================
+/* =========================
+   解釈
+========================= */
 function interpretThermal(s) {
   if (s >= 80) return "Thermally robust under standard processing conditions.";
   if (s >= 65) return "Stable within controlled thermal exposure.";
@@ -133,9 +121,9 @@ function interpretMechanical(s) {
   return "Unstable structure under operational stress.";
 }
 
-// =========================
-// EXECUTIVE（完成版）
-// =========================
+/* =========================
+   EXECUTIVE
+========================= */
 function generateExecutive(scores, decisionData, economic, risks) {
   return `
 This assessment indicates ${decisionData.level} feasibility for transitioning to the evaluated material within the current processing framework.
@@ -159,9 +147,9 @@ A controlled pilot validation phase is strongly recommended prior to commercial 
 `;
 }
 
-// =========================
-// INJECT
-// =========================
+/* =========================
+   INJECT
+========================= */
 function injectHtml(template, data) {
   let html = template;
   for (const key in data) {
@@ -170,9 +158,9 @@ function injectHtml(template, data) {
   return html;
 }
 
-// =========================
-// MAIN
-// =========================
+/* =========================
+   MAIN
+========================= */
 app.post("/generate-report", async (req, res) => {
   try {
     let input = req.body;
@@ -222,6 +210,28 @@ app.post("/generate-report", async (req, res) => {
 
       mechanism: `${risks.primary.key} + ${risks.secondary.key} instability`,
 
+      // 🔥 完全復元（ここが重要）
+      processing_window:
+        scores.total > 70
+          ? "Stable processing window expected."
+          : "Controlled processing conditions required.",
+
+      thermal_behavior: interpretThermal(scores.thermal),
+      flow_characteristics: interpretFlow(scores.flow),
+      mechanical_behavior: interpretMechanical(scores.mechanical),
+
+      surface_quality:
+        scores.flow > 70
+          ? "Uniform surface finish achievable."
+          : "Surface variability possible.",
+
+      structural_consistency:
+        scores.mechanical > 70
+          ? "Stable structural integrity."
+          : "Requires validation under load.",
+
+      application_implication: "Pilot testing required.",
+
       stability: "Moderate",
       consistency: "Moderate",
 
@@ -256,7 +266,6 @@ app.post("/generate-report", async (req, res) => {
   }
 });
 
-// =========================
 app.get("/latest-pdf", (req, res) => {
   if (!fs.existsSync(PDF_PATH)) {
     return res.status(404).send("No PDF yet");
@@ -264,7 +273,6 @@ app.get("/latest-pdf", (req, res) => {
   res.sendFile(PDF_PATH);
 });
 
-// =========================
 app.listen(process.env.PORT || 8080, () => {
   console.log("🚀 Server running");
 });
