@@ -1,17 +1,17 @@
 import express from "express";
-import puppeteer from "puppeteer";　
+import puppeteer from "puppeteer";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import OpenAI from "openai";
 
-const __filename = fileURLToPath(import.meta.url);　
+const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
 
 // =========================
-// 🔥 ここが今回の核心（全部受け取る）
+// 全形式受信
 // =========================
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -20,34 +20,32 @@ app.use(express.text({ type: "*/*" }));
 const PDF_PATH = "/tmp/latest.pdf";
 
 // =========================
-// OpenAI
+// OpenAI（未使用でもOK）
 // =========================
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY || ""
 });
 
 // =========================
-// TEMPLATE（安全）
+// TEMPLATE
 // =========================
 let htmlTemplate = "";
 
 try {
   const filePath = path.join(__dirname, "template.html");
-  console.log("📁 Trying to load:", filePath);
+  console.log("📁 load:", filePath);
   htmlTemplate = fs.readFileSync(filePath, "utf8");
-  console.log("✅ template.html loaded");
-} catch (e) {
-  console.error("❌ template fallback");
+  console.log("✅ template loaded");
+} catch {
+  console.log("⚠️ template fallback");
   htmlTemplate = `
-  <html>
-    <body>
-      <h1>Fallback</h1>
-      {{application}}
-      {{material_transition}}
-      {{executive_summary}}
-      {{dynamic_overlay}}
-    </body>
-  </html>`;
+  <html><body>
+    <h1>Fallback</h1>
+    {{application}}
+    {{material_transition}}
+    {{executive_summary}}
+    {{dynamic_overlay}}
+  </body></html>`;
 }
 
 // =========================
@@ -59,19 +57,12 @@ function safe(v) {
 // overlay
 // =========================
 function generateOverlay(scoreLeft, scoreRight) {
-  const safeRight = Math.max(0, Math.min(100, Number(scoreRight) || 0));
-  const angle = -90 + safeRight * 1.8;
-
-  return `
-<div style="position:absolute;width:100%;height:100%;">
-  <div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);">
-    SCORE: ${safeRight}
-  </div>
-</div>`;
+  const s = Math.max(0, Math.min(100, Number(scoreRight) || 0));
+  return `<div style="text-align:center;">SCORE: ${s}</div>`;
 }
 
 // =========================
-// ロジック
+// logic
 // =========================
 function calculateScore(text) {
   let score = 100;
@@ -101,32 +92,50 @@ function injectHtml(template, data) {
 }
 
 // =========================
-// ヘルスチェック
+// Puppeteer再利用（超重要）
+// =========================
+let browser;
+
+async function getBrowser() {
+  if (!browser) {
+    console.log("🚀 launching browser...");
+    browser = await puppeteer.launch({
+      headless: "new",
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-gpu"
+      ]
+    });
+  }
+  return browser;
+}
+
+// =========================
+// health
 // =========================
 app.get("/", (req, res) => {
   res.send("SERVER OK");
 });
 
 // =========================
-// MAIN
+// main
 // =========================
 app.post("/generate-report", async (req, res) => {
 
   try {
 
-    console.log("🔥 HIT:", req.method, req.url);
-    console.log("🔥 RAW BODY:", req.body);
+    console.log("🔥 HIT");
 
-    // =========================
-    // 🔥 BODY解析（完全対応）
-    // =========================
     let raw = req.body;
 
+    // JSON fallback
     if (typeof raw === "string") {
       try {
         raw = JSON.parse(raw);
       } catch {
-        console.log("⚠️ 非JSON形式");
+        console.log("⚠️ non-json body");
       }
     }
 
@@ -145,7 +154,7 @@ app.post("/generate-report", async (req, res) => {
       input = raw;
     }
 
-    console.log("🔥 PARSED:", input);
+    console.log("🔥 INPUT:", input);
 
     const text = [
       input.application || "",
@@ -164,23 +173,14 @@ app.post("/generate-report", async (req, res) => {
     });
 
     // =========================
-    // 🔥 安定版PDF生成
+    // PDF生成（軽量化）
     // =========================
-    const browser = await puppeteer.launch({
-      headless: "new",
-      args: [
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--disable-dev-shm-usage",
-        "--disable-gpu"
-      ]
-    });
-
+    const browser = await getBrowser();
     const page = await browser.newPage();
 
     await page.setContent(html, {
       waitUntil: "load",
-      timeout: 15000
+      timeout: 10000
     });
 
     const pdf = await page.pdf({
@@ -188,7 +188,7 @@ app.post("/generate-report", async (req, res) => {
       printBackground: true
     });
 
-    await browser.close();
+    await page.close();
 
     fs.writeFileSync(PDF_PATH, pdf);
 
@@ -202,7 +202,7 @@ app.post("/generate-report", async (req, res) => {
 });
 
 // =========================
-// PDF取得
+// pdf fetch
 // =========================
 app.get("/latest-pdf", (req, res) => {
   if (!fs.existsSync(PDF_PATH)) {
