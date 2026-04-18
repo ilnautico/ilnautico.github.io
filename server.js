@@ -13,6 +13,9 @@ app.use(express.urlencoded({ extended: true }));
 
 const PDF_PATH = "/tmp/latest.pdf";
 
+// =========================
+// TEMPLATE
+// =========================
 const htmlTemplate = fs.readFileSync(
   path.join(__dirname, "template.html"),
   "utf8"
@@ -20,6 +23,9 @@ const htmlTemplate = fs.readFileSync(
 
 const safe = (v) => (v === undefined || v === null ? "" : String(v));
 
+// =========================
+// SCORE（分解）
+// =========================
 function calculateScores(input) {
   let thermal = 85;
   let flow = 85;
@@ -63,7 +69,9 @@ function calculateEconomic(score) {
   return "+60%+";
 }
 
-// 🔥 完全安定 overlay
+// =========================
+// OVERLAY（完全復旧）
+// =========================
 function generateOverlay(scores) {
   const { thermal, flow, total } = scores;
 
@@ -71,12 +79,13 @@ function generateOverlay(scores) {
   const ampL = 6 + (100 - thermal) * 0.25;
   const ampR = 6 + (100 - flow) * 0.25;
 
-  const imagePath = `file://${__dirname}/visual-base.png`;
-
   return `
 <div style="position:relative; width:100%;">
-  <img src="${imagePath}" style="width:100%; height:auto; display:block;" />
+  <!-- 画像：元サイズ維持 -->
+  <img src="https://ilnautico.github.io/visual-base.png"
+       style="width:100%; height:auto; display:block;" />
 
+  <!-- 温度表示 -->
   <div style="position:absolute; top:40px; left:50%; transform:translateX(-180px); text-align:center;">
     <div style="font-size:28px;">230°C</div>
     <div style="font-size:16px;">${thermal}</div>
@@ -87,16 +96,19 @@ function generateOverlay(scores) {
     <div style="font-size:16px; color:#d62c2c;">${flow}</div>
   </div>
 
+  <!-- 波（thermal） -->
   <svg style="position:absolute; left:50%; top:58%; transform:translateX(-120px);" width="120" height="40">
     <path d="M0 20 C20 ${20-ampL}, 40 ${20+ampL}, 60 20 C80 ${20-ampL}, 100 ${20+ampL}, 120 20"
       stroke="#4f7c8a" fill="none" stroke-width="3"/>
   </svg>
 
+  <!-- 波（flow） -->
   <svg style="position:absolute; left:50%; top:58%; transform:translateX(60px);" width="120" height="40">
     <path d="M0 20 C20 ${20-ampR}, 40 ${20+ampR}, 60 20 C80 ${20-ampR}, 100 ${20+ampR}, 120 20"
       stroke="#d62c2c" fill="none" stroke-width="3"/>
   </svg>
 
+  <!-- メータ -->
   <svg style="position:absolute; right:60px; bottom:20px;" viewBox="0 0 200 120" width="140" height="90">
     <defs>
       <linearGradient id="g">
@@ -118,30 +130,61 @@ function generateOverlay(scores) {
 `;
 }
 
+// =========================
+// TEXT（プロ仕様）
+// =========================
 function generateExecutive(scores, decisionData, economic) {
+  const { thermal, flow, mechanical } = scores;
+
   return `
-This assessment indicates ${decisionData.level} feasibility.
+This assessment indicates ${decisionData.level} feasibility for transitioning to the evaluated material under current processing conditions.
 
-Thermal: ${scores.thermal}
-Flow: ${scores.flow}
-Mechanical: ${scores.mechanical}
+While baseline compatibility is achievable, operational stability is not inherently guaranteed and is dependent on thermal exposure, flow behavior, and mechanical consistency.
 
-Decision: ${decisionData.decision}
+Thermal stability score: ${thermal}
+Flow stability score: ${flow}
+Mechanical stability score: ${mechanical}
+
+Deployment Decision: ${decisionData.decision}
+
+Operational consistency remains the primary limiting factor. Variability in melt behavior and process conditions may lead to inconsistency in product quality and increased scrap rates.
+
 Economic Impact: ${economic}
+
+A structured pilot validation phase is strongly recommended prior to any scale-up decision.
 `;
 }
 
+// =========================
+// INJECT
+// =========================
 function injectHtml(template, data) {
   let html = template;
   for (const key in data) {
-    html = html.replace(new RegExp(`{{\\s*${key}\\s*}}`, "g"), safe(data[key]));
+    html = html.replace(new RegExp({{\\s*${key}\\s*}}, "g"), safe(data[key]));
   }
   return html;
 }
 
+// =========================
+// MAIN
+// =========================
 app.post("/generate-report", async (req, res) => {
   try {
-    const input = req.body;
+    let input = req.body;
+
+    // Tally対応
+    if (input?.data?.fields) {
+      const parsed = {};
+      input.data.fields.forEach((f) => {
+        const label = (f.label || "").toLowerCase();
+        if (label.includes("application")) parsed.application = f.value;
+        if (label.includes("material")) parsed.material = f.value;
+        if (label.includes("bio") || label.includes("target"))
+          parsed.bio_material = f.value;
+      });
+      input = parsed;
+    }
 
     const scores = calculateScores(input);
     const decisionData = determineDecision(scores.total);
@@ -149,11 +192,71 @@ app.post("/generate-report", async (req, res) => {
 
     const html = injectHtml(htmlTemplate, {
       assessment_type: "Technical Hypothesis",
-      application: input.application,
-      material_transition: input.bio_material,
+      application: safe(input.application),
+      material_transition: safe(input.bio_material),
       report_date: new Date().toISOString().split("T")[0],
+
       compatibility_level: decisionData.level,
       executive_summary: generateExecutive(scores, decisionData, economic),
+
+      key_risk:
+        scores.thermal < 60
+          ? "Thermal instability and degradation risk."
+          : "Flow variability under operational conditions.",
+
+      processing_window:
+        scores.total > 70
+          ? "Stable processing window expected."
+          : "Controlled processing conditions required.",
+
+      thermal_behavior:
+        scores.thermal > 70
+          ? "Thermally stable under controlled conditions."
+          : "Thermal sensitivity present.",
+
+      flow_characteristics:
+        scores.flow > 70
+          ? "Stable flow characteristics."
+          : "Variable flow behavior observed.",
+
+      mechanical_behavior:
+        scores.mechanical > 70
+          ? "Stable mechanical performance."
+          : "Conditionally stable mechanical behavior.",
+
+      surface_quality:
+        scores.flow > 70
+          ? "Uniform surface finish achievable."
+          : "Surface variability possible.",
+
+      structural_consistency:
+        scores.mechanical > 70
+          ? "Stable structural integrity."
+          : "Requires validation under load.",
+
+      primary_risk_title: "Thermal Instability",
+      primary_risk:
+        "Material degradation under elevated temperature conditions.",
+
+      secondary_risk_title: "Flow Variability",
+      secondary_risk:
+        "Inconsistent melt behavior leading to quality fluctuation.",
+
+      mechanism: "Combined thermal and shear instability.",
+
+      stability: "Moderate",
+      stability_note: "Depends on processing control.",
+      consistency: "Moderate",
+      consistency_note: "Process dependent.",
+
+      application_implication: "Pilot testing required.",
+      next_step: "Proceed to controlled pilot validation.",
+
+      decision: decisionData.decision,
+      economic_impact: economic,
+
+      pha_score: scores.total,
+
       dynamic_overlay: generateOverlay(scores),
     });
 
@@ -165,7 +268,7 @@ app.post("/generate-report", async (req, res) => {
     const page = await browser.newPage();
 
     await page.setContent(html, {
-      waitUntil: "networkidle0",
+      waitUntil: "domcontentloaded",
       timeout: 0,
     });
 
@@ -182,6 +285,18 @@ app.post("/generate-report", async (req, res) => {
     console.error(err);
     res.status(500).send("error");
   }
+});
+
+// =========================
+app.get("/latest-pdf", (req, res) => {
+  if (!fs.existsSync(PDF_PATH)) {
+    return res.status(404).send("No PDF yet");
+  }
+  res.sendFile(PDF_PATH);
+});
+
+app.listen(process.env.PORT || 8080, () => {
+  console.log("🚀 Server running");
 });
 
 app.listen(process.env.PORT || 8080);
