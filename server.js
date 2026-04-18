@@ -24,7 +24,7 @@ const htmlTemplate = fs.readFileSync(
 const safe = (v) => (v === undefined || v === null ? "" : String(v));
 
 // =========================
-// SCORE（そのまま）
+// SCORE
 // =========================
 function calculateScores(input) {
   let thermal = 85;
@@ -70,7 +70,7 @@ function calculateEconomic(score) {
 }
 
 // =========================
-// OVERLAY（そのまま）
+// OVERLAY（完全復旧）
 // =========================
 function generateOverlay(scores) {
   const { thermal, flow, total } = scores;
@@ -82,7 +82,7 @@ function generateOverlay(scores) {
   return `
 <div style="position:relative; width:100%;">
   <img src="https://ilnautico.github.io/visual-base.png"
-       style="width:100%; height:auto; display:block;" />
+       style="width:800px; display:block;" />
 
   <div style="position:absolute; top:40px; left:50%; transform:translateX(-180px); text-align:center;">
     <div style="font-size:28px;">230°C</div>
@@ -126,7 +126,7 @@ function generateOverlay(scores) {
 }
 
 // =========================
-// TEXT（そのまま）
+// TEXT（完全復旧）
 // =========================
 function generateExecutive(scores, decisionData, economic) {
   const { thermal, flow, mechanical } = scores;
@@ -134,17 +134,24 @@ function generateExecutive(scores, decisionData, economic) {
   return `
 This assessment indicates ${decisionData.level} feasibility for transitioning to the evaluated material under current processing conditions.
 
+While baseline compatibility is achievable, operational stability is not inherently guaranteed and is dependent on thermal exposure, flow behavior, and mechanical consistency.
+
 Thermal stability score: ${thermal}
 Flow stability score: ${flow}
 Mechanical stability score: ${mechanical}
 
 Deployment Decision: ${decisionData.decision}
+
+Operational consistency remains the primary limiting factor. Variability in melt behavior and process conditions may lead to inconsistency in product quality and increased scrap rates.
+
 Economic Impact: ${economic}
+
+A structured pilot validation phase is strongly recommended prior to any scale-up decision.
 `;
 }
 
 // =========================
-// INJECT（そのまま）
+// INJECT（完全復旧）
 // =========================
 function injectHtml(template, data) {
   let html = template;
@@ -182,12 +189,70 @@ app.post("/generate-report", async (req, res) => {
       application: safe(input.application),
       material_transition: safe(input.bio_material),
       report_date: new Date().toISOString().split("T")[0],
+
       compatibility_level: decisionData.level,
       executive_summary: generateExecutive(scores, decisionData, economic),
+
+      key_risk:
+        scores.thermal < 60
+          ? "Thermal instability and degradation risk."
+          : "Flow variability under operational conditions.",
+
+      processing_window:
+        scores.total > 70
+          ? "Stable processing window expected."
+          : "Controlled processing conditions required.",
+
+      thermal_behavior:
+        scores.thermal > 70
+          ? "Thermally stable under controlled conditions."
+          : "Thermal sensitivity present.",
+
+      flow_characteristics:
+        scores.flow > 70
+          ? "Stable flow characteristics."
+          : "Variable flow behavior observed.",
+
+      mechanical_behavior:
+        scores.mechanical > 70
+          ? "Stable mechanical performance."
+          : "Conditionally stable mechanical behavior.",
+
+      surface_quality:
+        scores.flow > 70
+          ? "Uniform surface finish achievable."
+          : "Surface variability possible.",
+
+      structural_consistency:
+        scores.mechanical > 70
+          ? "Stable structural integrity."
+          : "Requires validation under load.",
+
+      primary_risk_title: "Thermal Instability",
+      primary_risk:
+        "Material degradation under elevated temperature conditions.",
+
+      secondary_risk_title: "Flow Variability",
+      secondary_risk:
+        "Inconsistent melt behavior leading to quality fluctuation.",
+
+      mechanism: "Combined thermal and shear instability.",
+
+      stability: "Moderate",
+      stability_note: "Depends on processing control.",
+      consistency: "Moderate",
+      consistency_note: "Process dependent.",
+
+      application_implication: "Pilot testing required.",
+      next_step: "Proceed to controlled pilot validation.",
+
+      decision: decisionData.decision,
+      economic_impact: economic,
+      pha_score: scores.total,
+
       dynamic_overlay: generateOverlay(scores),
     });
 
-    // 🔥 ここだけ強化
     const browser = await puppeteer.launch({
       headless: "new",
       args: [
@@ -201,7 +266,7 @@ app.post("/generate-report", async (req, res) => {
     const page = await browser.newPage();
 
     await page.setContent(html, {
-      waitUntil: "networkidle0",
+      waitUntil: "domcontentloaded",
       timeout: 0,
     });
 
@@ -210,9 +275,6 @@ app.post("/generate-report", async (req, res) => {
       printBackground: true,
     });
 
-    // 🔥 確認ログ
-    console.log("PDF size:", pdf.length);
-
     await browser.close();
 
     fs.writeFileSync(PDF_PATH, pdf);
@@ -220,7 +282,7 @@ app.post("/generate-report", async (req, res) => {
     res.send(pdf);
 
   } catch (err) {
-    console.error("ERROR:", err); // 🔥 強化
+    console.error(err);
     res.status(500).send("error");
   }
 });
