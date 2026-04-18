@@ -22,10 +22,10 @@ const htmlTemplate = fs.readFileSync(
 );
 
 // =========================
-// SAFE
+// SAFE（絶対穴埋め）
 // =========================
-const safe = (v, fallback = "-") => {
-  if (v === undefined || v === null || v === "") return fallback;
+const safe = (v) => {
+  if (v === undefined || v === null || v === "") return "-";
   return String(v);
 };
 
@@ -39,7 +39,7 @@ function calculateScores(input) {
 
   const mat = (input.material || "").toLowerCase();
   const bio = (input.bio_material || "").toLowerCase();
-  const appType = (input.application || "").toLowerCase();
+  const app = (input.application || "").toLowerCase();
 
   if (mat.includes("pp")) thermal -= 10;
   if (mat.includes("pe")) thermal -= 5;
@@ -48,9 +48,9 @@ function calculateScores(input) {
   if (bio.includes("pla")) thermal -= 10;
   if (bio.includes("pha")) flow -= 10;
 
-  if (appType.includes("film")) flow -= 15;
-  if (appType.includes("injection")) mechanical -= 10;
-  if (appType.includes("blow")) flow -= 10;
+  if (app.includes("film")) flow -= 15;
+  if (app.includes("injection")) mechanical -= 10;
+  if (app.includes("blow")) flow -= 10;
 
   thermal = Math.max(0, Math.min(100, thermal));
   flow = Math.max(0, Math.min(100, flow));
@@ -76,66 +76,54 @@ function calculateEconomic(score) {
 }
 
 // =========================
-// FAILURE（絶対生成）
+// FAILURE（必ず生成）
 // =========================
-function generateFailureAnalysis(scores) {
+function generateFailure(scores) {
   const primary =
     scores.thermal < 70
-      ? {
-          title: "Thermal Instability",
-          desc: "Material instability under elevated temperature conditions."
-        }
-      : {
-          title: "Process Variability",
-          desc: "Minor process fluctuation impacting stability."
-        };
+      ? ["Thermal Instability", "Material instability under elevated temperature."]
+      : ["Process Variability", "Minor process fluctuation impacting stability."];
 
   const secondary =
     scores.flow < 70
-      ? {
-          title: "Flow Variability",
-          desc: "Inconsistent melt behavior affecting consistency."
-        }
-      : {
-          title: "Operational Sensitivity",
-          desc: "Dependent on processing control conditions."
-        };
+      ? ["Flow Variability", "Inconsistent melt behavior affecting consistency."]
+      : ["Operational Sensitivity", "Dependent on processing control conditions."];
 
   return {
-    primary_risk_title: primary.title,
-    primary_risk: primary.desc,
-    secondary_risk_title: secondary.title,
-    secondary_risk: secondary.desc,
+    primary_risk_title: primary[0],
+    primary_risk: primary[1],
+    secondary_risk_title: secondary[0],
+    secondary_risk: secondary[1],
     mechanism: "Combined thermal and flow instability"
   };
 }
 
 // =========================
-// EXECUTIVE（強化版）
+// EXECUTIVE（完成版）
 // =========================
-function generateExecutive(scores, decisionData, economic) {
+function generateExecutive(scores, decision, economic) {
   return `
-This assessment indicates ${decisionData.level} feasibility for transitioning to the evaluated material within the current processing framework.
+This assessment indicates ${decision.level} feasibility for transitioning to the evaluated material within the current processing framework.
 
 Thermal behavior (${scores.thermal}): ${
     scores.thermal > 75
       ? "Thermally robust under standard processing conditions."
-      : "Thermal sensitivity requiring controlled exposure."
+      : "Thermal sensitivity requiring control."
   }
 
 Flow behavior (${scores.flow}): ${
     scores.flow > 75
       ? "Consistent melt flow and stable processing."
-      : "Variable flow behavior requiring tuning."
+      : "Variable flow behavior."
   }
 
 Mechanical stability (${scores.mechanical}): ${
     scores.mechanical > 75
       ? "Stable structural integrity."
-      : "Conditionally stable depending on process."
+      : "Conditionally stable."
   }
 
-Deployment Decision: ${decisionData.decision}
+Deployment Decision: ${decision.decision}
 
 Primary risk is process variability under real-world conditions, which may lead to:
 - Product inconsistency
@@ -149,31 +137,9 @@ A controlled pilot validation phase is strongly recommended prior to commercial 
 }
 
 // =========================
-// VALIDATION（最重要）
+// INJECT（完全一致型）
 // =========================
-function validateDataKeys(data) {
-  const required = [
-    "primary_risk_title",
-    "primary_risk",
-    "secondary_risk",
-    "secondary_risk_title",
-    "mechanism",
-    "next_step",
-    "executive_summary"
-  ];
-
-  required.forEach((k) => {
-    if (!data[k]) {
-      console.error("❌ Missing:", k);
-      data[k] = "-";
-    }
-  });
-}
-
-// =========================
-// INJECT（安全版）
-// =========================
-function injectHtml(template, data) {
+function inject(template, data) {
   return template.replace(/{{\s*([\w]+)\s*}}/g, (_, key) =>
     safe(data[key])
   );
@@ -186,7 +152,6 @@ app.post("/generate-report", async (req, res) => {
   try {
     let input = req.body;
 
-    // Tally対応
     if (input?.data?.fields) {
       const parsed = {};
       input.data.fields.forEach((f) => {
@@ -199,20 +164,24 @@ app.post("/generate-report", async (req, res) => {
     }
 
     const scores = calculateScores(input);
-    const decisionData = determineDecision(scores.total);
+    const decision = determineDecision(scores.total);
     const economic = calculateEconomic(scores.total);
-    const failure = generateFailureAnalysis(scores);
+    const failure = generateFailure(scores);
 
+    // 🔥 完全データ（テンプレ100%対応）
     const data = {
       application: safe(input.application),
       material_transition: safe(input.bio_material),
+      assessment_type: "Technical Hypothesis",
       report_date: new Date().toISOString().split("T")[0],
-      compatibility_level: decisionData.level,
-      executive_summary: generateExecutive(scores, decisionData, economic),
 
-      ...failure,
+      compatibility_level: decision.level,
+      executive_summary: generateExecutive(scores, decision, economic),
 
-      next_step: "Proceed to controlled pilot validation.",
+      key_risk:
+        scores.thermal < 70
+          ? "Thermal instability under operational conditions."
+          : "Process variability under real-world conditions.",
 
       processing_window:
         scores.total > 70
@@ -244,16 +213,18 @@ app.post("/generate-report", async (req, res) => {
           ? "Stable structural integrity."
           : "Requires validation.",
 
+      ...failure,
+
       stability: "Moderate",
       stability_note: "Depends on processing control.",
       consistency: "Moderate",
-      consistency_note: "Process dependent."
+      consistency_note: "Process dependent.",
+
+      application_implication: "Pilot testing required.",
+      next_step: "Proceed to controlled pilot validation."
     };
 
-    // 🔥 ここで絶対埋める
-    validateDataKeys(data);
-
-    const html = injectHtml(htmlTemplate, data);
+    const html = inject(htmlTemplate, data);
 
     const browser = await puppeteer.launch({
       headless: "new",
@@ -262,9 +233,7 @@ app.post("/generate-report", async (req, res) => {
 
     const page = await browser.newPage();
 
-    await page.setContent(html, {
-      waitUntil: "domcontentloaded"
-    });
+    await page.setContent(html, { waitUntil: "domcontentloaded" });
 
     const pdf = await page.pdf({
       format: "A4",
