@@ -96,79 +96,80 @@ function calculateEconomic(score) {
 }
 
 // =========================
-// EXECUTIVE（差し替え）
+// EXECUTIVE（完全版：経営＋技術統合）
 // =========================
+function getConstraint(scores) {
+  const min = Math.min(scores.thermal, scores.flow, scores.mechanical);
+
+  if (min === scores.flow) {
+    return {
+      factor: "flow consistency during extended production runs",
+      impact: "production consistency, yield rate, and operational efficiency",
+      control: "pressure stability, melt uniformity, and extrusion flow balance"
+    };
+  }
+
+  if (min === scores.thermal) {
+    return {
+      factor: "thermal stability under processing conditions",
+      impact: "material degradation risk and process reliability",
+      control: "temperature control precision and thermal distribution"
+    };
+  }
+
+  return {
+    factor: "mechanical integrity under load conditions",
+    impact: "product strength and structural performance",
+    control: "material strength consistency and structural reliability"
+  };
+}
+
 function generateExecutive(scores, decision, economic) {
 
-  const state = analyzeState(scores);
+  const c = getConstraint(scores);
 
-  let explanation = "";
-
-  if (state.limitingFactor === "flow") {
-    explanation = "Flow behavior is comparatively weaker and is expected to act as the primary limiting factor.";
-  } else if (state.limitingFactor === "thermal") {
-    explanation = "Thermal stability is the primary limiting factor affecting system reliability.";
+  let baseStatement = "";
+  if (decision.level === "HIGH") {
+    baseStatement = "This assessment indicates HIGH feasibility for transitioning to the evaluated material within the current processing framework.";
+  } else if (decision.level === "MODERATE") {
+    baseStatement = "This assessment indicates MODERATE feasibility for transitioning to the evaluated material within the current processing framework.";
   } else {
-    explanation = "Mechanical performance is the primary limiting factor affecting structural integrity.";
+    baseStatement = "This assessment indicates LOW feasibility for transitioning to the evaluated material within the current processing framework.";
   }
 
   return `
-This assessment indicates ${decision.level} feasibility for transitioning to the evaluated material within the current processing framework.
+${baseStatement}
 
 Thermal (${scores.thermal}) / Flow (${scores.flow}) / Mechanical (${scores.mechanical})
 
-${explanation}
+The system is structurally viable; however, overall stability is governed by ${c.factor}.
 
-Deployment Decision: ${decision.decision}
+This constraint directly influences ${c.impact}.
+
+Deployment Decision: ${decision.decision} (subject to stabilization of the limiting parameter)
 
 Economic Impact: ${economic}
 
-A controlled pilot validation phase is strongly recommended prior to commercial deployment.
+This constraint must be stabilized before any commercial-scale deployment.
+
+A controlled pilot validation phase is strongly recommended, with focus on ${c.control}.
 `;
 }
 
 // =========================
-// RISK（差し替え）
+// RISK（ボトルネック連動）
 // =========================
 function generateRisk(scores) {
-
-  const state = analyzeState(scores);
-
-  if (state.limitingFactor === "flow") {
-    if (state.severity === "low") return "Minor flow variability with limited production impact.";
-    if (state.severity === "moderate") return "Flow variability may limit process stability, directly impacting output consistency, yield rate, and operational efficiency during continuous production.";
-    return "Severe flow instability likely to cause production inefficiency, scrap increase, and unstable throughput.";
-  }
-
-  if (state.limitingFactor === "thermal") {
-    if (state.severity === "low") return "Minor thermal sensitivity with manageable control requirements.";
-    if (state.severity === "moderate") return "Thermal fluctuation may affect stability and processing reliability.";
-    return "High thermal instability likely to disrupt processing conditions and material integrity.";
-  }
-
-  if (state.limitingFactor === "mechanical") {
-    if (state.severity === "low") return "Minor mechanical variation under standard conditions.";
-    if (state.severity === "moderate") return "Mechanical performance variability may impact product integrity.";
-    return "Significant mechanical instability expected under load conditions.";
-  }
+  const c = getConstraint(scores);
+  return `${c.factor} variability may impact ${c.impact}.`;
 }
 
 // =========================
-// PROCESSING WINDOW（差し替え）
+// PROCESSING WINDOW（ボトルネック連動）
 // =========================
 function generateProcessingWindow(scores) {
-
-  const state = analyzeState(scores);
-
-  if (state.severity === "high") {
-    return "Processing window is unstable and requires strict parameter control and process redesign.";
-  }
-
-  if (state.severity === "moderate") {
-    return "Processing window stability depends on precise control of the limiting parameter, particularly under continuous operation conditions.";
-  }
-
-  return "Stable processing window expected.";
+  const c = getConstraint(scores);
+  return `Processing window stability depends on precise control of ${c.factor}.`;
 }
 
 // =========================
