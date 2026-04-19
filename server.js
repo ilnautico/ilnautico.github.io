@@ -114,35 +114,43 @@ function generateOverlay(scoreLeft, scoreRight) {
     <div style="color:#d62c2c;">${scoreRight}</div>
   </div>
 
-  <!-- 🔵 波（左：振幅変化） -->
-  <svg style="position:absolute; left:240px; bottom:90px; z-index:2;"
-    width="90" height="35" viewBox="0 0 90 35">
-    <path d="
-      M0 18
-      C15 ${18 - ampLeft}, 30 ${18 + ampLeft}, 45 18
-      C60 ${18 - ampLeft}, 75 ${18 + ampLeft}, 90 18
-    "
-    fill="none"
-    stroke="#4f7c8a"
-    stroke-width="3"
-    stroke-linecap="round"
-    />
-  </svg>
+ // 🔵 左波（完全復元＋振幅維持）
+<svg style="
+  position:absolute;
+  left:240px;
+  bottom:105px;
+  z-index:2;
+" width="90" height="35" viewBox="0 0 90 35">
+  <path d="
+    M0 18
+    C15 ${18 - ampLeft}, 30 ${18 + ampLeft}, 45 18
+    C60 ${18 - ampLeft}, 75 ${18 + ampLeft}, 90 18
+  "
+  fill="none"
+  stroke="#4f7c8a"
+  stroke-width="3"
+  stroke-linecap="round"
+/>
+</svg>
 
-  <!-- 🔴 波（右：振幅変化） -->
-  <svg style="position:absolute; left:430px; bottom:90px; z-index:2;"
-    width="90" height="35" viewBox="0 0 90 35">
-    <path d="
-      M0 18
-      C15 ${18 - ampRight}, 30 ${18 + ampRight}, 45 18
-      C60 ${18 - ampRight}, 75 ${18 + ampRight}, 90 18
-    "
-    fill="none"
-    stroke="#d62c2c"
-    stroke-width="3"
-    stroke-linecap="round"
-    />
-  </svg>
+// 🔴 右波（完全復元＋振幅維持）
+<svg style="
+  position:absolute;
+  left:430px;
+  bottom:100px;
+  z-index:2;
+" width="90" height="35" viewBox="0 0 90 35">
+  <path d="
+    M0 18
+    C15 ${18 - ampRight}, 30 ${18 + ampRight}, 45 18
+    C60 ${18 - ampRight}, 75 ${18 + ampRight}, 90 18
+  "
+  fill="none"
+  stroke="#d62c2c"
+  stroke-width="3"
+  stroke-linecap="round"
+/>
+</svg>
 
   <!-- 🎯 メーター -->
   <svg style="position:absolute; left:500px; bottom:10px; z-index:2;"
