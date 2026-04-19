@@ -293,7 +293,7 @@ app.post("/generate-report", async (req, res) => {
 
       pha_score: scores.total,
 
-     dynamic_overlay: generateOverlay(scores.thermal, scores.flow),
+     dynamic_overlay: generateOverlay(scores.thermal, scores.flow),});
 
     const browser = await puppeteer.launch({
       args: ["--no-sandbox", "--disable-setuid-sandbox"]
