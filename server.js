@@ -86,7 +86,7 @@ function generateOverlay(scoreLeft, scoreRight) {
   margin:0 auto;
 ">
 
-  <!-- 背景（元サイズ固定・絶対に伸びない） -->
+  <!-- 背景 -->
   <img src="https://ilnautico.github.io/visual-base.png"
     style="
       position:absolute;
@@ -123,10 +123,10 @@ function generateOverlay(scoreLeft, scoreRight) {
     <div style="font-size:16px; color:#d62c2c;">${scoreRight}</div>
   </div>
 
-  <!-- 🔵 左波（ノズル完全一致） -->
+  <!-- 🔵 左波（完全修正） -->
   <svg style="
     position:absolute;
-    left:240px;
+    left:270px;   /* ← ここだけ修正 */
     bottom:90px;
     z-index:2;
   " width="90" height="35" viewBox="0 0 90 35">
@@ -143,7 +143,7 @@ function generateOverlay(scoreLeft, scoreRight) {
     />
   </svg>
 
-  <!-- 🔴 右波（素材中央完全一致） -->
+  <!-- 🔴 右波（OKなのでそのまま） -->
   <svg style="
     position:absolute;
     left:430px;
@@ -163,7 +163,7 @@ function generateOverlay(scoreLeft, scoreRight) {
     />
   </svg>
 
-  <!-- 🎯 メーター（右下完全固定） -->
+  <!-- 🎯 メーター -->
   <svg style="
     position:absolute;
     left:500px;
