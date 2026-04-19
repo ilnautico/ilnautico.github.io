@@ -78,10 +78,6 @@ function generateOverlay(scoreLeft, scoreRight) {
 
   const angle = -90 + (scoreRight * 1.8);
 
-  // 🎯 振幅（ここが今回のコア）
-  const ampLeft = 6 + scoreLeft * 0.08;
-  const ampRight = 6 + scoreRight * 0.08;
-
   return `
 <div style="
   position:relative;
@@ -90,6 +86,7 @@ function generateOverlay(scoreLeft, scoreRight) {
   margin:0 auto;
 ">
 
+  <!-- 背景（元サイズ固定・絶対に伸びない） -->
   <img src="https://ilnautico.github.io/visual-base.png"
     style="
       position:absolute;
@@ -102,58 +99,77 @@ function generateOverlay(scoreLeft, scoreRight) {
     "
   />
 
-  <!-- 左 -->
-  <div style="position:absolute; top:45px; left:150px; text-align:center; z-index:2;">
-    <div style="font-size:28px;">230°C</div>
-    <div>${scoreLeft}</div>
+  <!-- 左温度 -->
+  <div style="
+    position:absolute;
+    top:45px;
+    left:150px;
+    text-align:center;
+    z-index:2;
+  ">
+    <div style="font-size:28px; color:#2f3a44;">230°C</div>
+    <div style="font-size:16px; color:#5b6770;">${scoreLeft}</div>
   </div>
 
-  <!-- 右 -->
-  <div style="position:absolute; top:45px; left:470px; text-align:center; z-index:2;">
+  <!-- 右温度 -->
+  <div style="
+    position:absolute;
+    top:45px;
+    left:470px;
+    text-align:center;
+    z-index:2;
+  ">
     <div style="font-size:28px; color:#d62c2c;">180°C</div>
-    <div style="color:#d62c2c;">${scoreRight}</div>
+    <div style="font-size:16px; color:#d62c2c;">${scoreRight}</div>
   </div>
 
-// 🔵 左波（完全一致 FIX）
-<svg style="
-  position:absolute;
-  left:235px;
-  bottom:120px;
-  z-index:2;
-" width="90" height="35" viewBox="0 0 90 35">
-  <path d="
-    M0 18
-    C15 ${18 - ampLeft}, 30 ${18 + ampLeft}, 45 18
-    C60 ${18 - ampLeft}, 75 ${18 + ampLeft}, 90 18
-  "
-  fill="none"
-  stroke="#4f7c8a"
-  stroke-width="3"
-  stroke-linecap="round"
-/>
-</svg>
+  <!-- 🔵 左波（ノズル完全一致） -->
+  <svg style="
+    position:absolute;
+    left:240px;
+    bottom:90px;
+    z-index:2;
+  " width="90" height="35" viewBox="0 0 90 35">
+    <path d="
+      M0 18
+      C15 6, 30 30, 45 18
+      C60 6, 75 30, 90 18
+    "
+    fill="none"
+    stroke="#4f7c8a"
+    stroke-width="3"
+    stroke-linecap="round"
+    opacity="0.9"
+    />
+  </svg>
 
-// 🔴 右波（完全一致 FIX）
-<svg style="
-  position:absolute;
-  left:435px;
-  bottom:115px;
-  z-index:2;
-" width="90" height="35" viewBox="0 0 90 35">
-  <path d="
-    M0 18
-    C15 ${18 - ampRight}, 30 ${18 + ampRight}, 45 18
-    C60 ${18 - ampRight}, 75 ${18 + ampRight}, 90 18
-  "
-  fill="none"
-  stroke="#d62c2c"
-  stroke-width="3"
-  stroke-linecap="round"
-/>
-</svg>
-  <!-- 🎯 メーター -->
-  <svg style="position:absolute; left:500px; bottom:10px; z-index:2;"
-    viewBox="0 0 200 120" width="140" height="90">
+  <!-- 🔴 右波（素材中央完全一致） -->
+  <svg style="
+    position:absolute;
+    left:430px;
+    bottom:90px;
+    z-index:2;
+  " width="90" height="35" viewBox="0 0 90 35">
+    <path d="
+      M0 18
+      C15 6, 30 30, 45 18
+      C60 6, 75 30, 90 18
+    "
+    fill="none"
+    stroke="#d62c2c"
+    stroke-width="3"
+    stroke-linecap="round"
+    opacity="0.9"
+    />
+  </svg>
+
+  <!-- 🎯 メーター（右下完全固定） -->
+  <svg style="
+    position:absolute;
+    left:500px;
+    bottom:10px;
+    z-index:2;
+  " viewBox="0 0 200 120" width="140" height="90">
 
     <defs>
       <linearGradient id="g">
@@ -164,13 +180,15 @@ function generateOverlay(scoreLeft, scoreRight) {
     </defs>
 
     <path d="M20 100 A80 80 0 0 1 180 100 L100 100 Z"
-      fill="url(#g)"/>
+      fill="url(#g)"
+    />
 
     <g transform="rotate(${angle} 100 100)">
       <line x1="100" y1="100" x2="100" y2="25"
         stroke="#111"
         stroke-width="3"
-        stroke-linecap="round"/>
+        stroke-linecap="round"
+      />
     </g>
 
     <circle cx="100" cy="100" r="4" fill="#111"/>
