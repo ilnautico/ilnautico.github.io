@@ -324,7 +324,6 @@ app.listen(process.env.PORT || 8080, () => {
   console.log("Server running");
 });
 
-const html_3man =`;
 
 const html_3man =`;
 <!DOCTYPE html>
