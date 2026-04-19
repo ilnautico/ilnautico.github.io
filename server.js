@@ -314,7 +314,7 @@ app.post("/generate-report", async (req, res) => {
 
       mechanism: "Thermal + flow instability",
 
-    stability_note:
+stability_note:
 decision.level === "HIGH"
   ? "Stable under controlled production conditions."
   : decision.level === "MODERATE"
@@ -327,7 +327,7 @@ decision.level === "HIGH"
   : decision.level === "MODERATE"
   ? "Process dependent with moderate variability."
   : "High variability expected during production.",
-
+      
       application_implication: "Pilot testing required.",
       next_step: "Proceed to controlled pilot validation.",
 
