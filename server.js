@@ -208,37 +208,6 @@ function generateOverlay(scoreLeft, scoreRight) {
 `;
 }
 
-  <!-- スマホ版（追加・テンプレ不要） -->
-  <div class="sp" style="display:none; width:100%; text-align:center;">
-
-    <img src="https://ilnautico.github.io/visual-base.png"
-      style="width:100%; height:auto;" />
-
-    <div style="display:flex; justify-content:space-around; margin-top:-70px;">
-      <div>
-        <div>230°C</div>
-        <div>${scoreLeft}</div>
-      </div>
-      <div>
-        <div style="color:#d62c2c;">180°C</div>
-        <div style="color:#d62c2c;">${scoreRight}</div>
-      </div>
-    </div>
-
-  </div>
-
-
-  <!-- 切替CSS（テンプレ触らない） -->
-  <style>
-    @media (max-width: 768px) {
-      .pc { display:none !important; }
-      .sp { display:block !important; }
-    }
-  </style>
-
-</div>
-`;
-}
 // =========================
 // EXECUTIVE
 // =========================
