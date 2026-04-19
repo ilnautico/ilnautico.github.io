@@ -313,7 +313,14 @@ app.post("/generate-report", async (req, res) => {
       secondary_risk: "Dependent on process control.",
 
       mechanism: "Thermal + flow instability",
+stability:
+decision.level === "HIGH" ? "High" :
+decision.level === "MODERATE" ? "Moderate" : "Low",
 
+consistency:
+decision.level === "HIGH" ? "High" :
+decision.level === "MODERATE" ? "Moderate" : "Low",
+      
 stability_note:
 decision.level === "HIGH"
   ? "Stable under controlled production conditions."
