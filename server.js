@@ -80,21 +80,20 @@ function generateOverlay(scoreLeft, scoreRight) {
   return `
 <div style="
   position:relative;
-  width:700px;
+  width:100%;
   height:260px;
-  margin:0 auto;
   overflow:hidden;
 ">
 
+  <!-- 背景（基準） -->
   <img src="https://ilnautico.github.io/visual-base.png"
     style="
       position:absolute;
       top:0;
-      left:50%;
-      transform:translateX(-50%);
-      width:680px;
-      height:auto;
-      object-fit:contain;
+      left:0;
+      width:100%;
+      height:100%;
+      object-fit:cover;
       z-index:1;
     "
   />
@@ -103,8 +102,7 @@ function generateOverlay(scoreLeft, scoreRight) {
   <div style="
     position:absolute;
     top:60px;
-    left:50%;
-    transform:translateX(-220px);
+    left:140px;
     text-align:center;
     z-index:2;
   ">
@@ -116,8 +114,7 @@ function generateOverlay(scoreLeft, scoreRight) {
   <div style="
     position:absolute;
     top:60px;
-    left:50%;
-    transform:translateX(220px);
+    right:140px;
     text-align:center;
     z-index:2;
   ">
@@ -125,38 +122,34 @@ function generateOverlay(scoreLeft, scoreRight) {
     <div style="color:#d62c2c;">${scoreRight}</div>
   </div>
 
-  <!-- 🔵 波 -->
+  <!-- 波 -->
   <svg style="
     position:absolute;
-    left:50%;
+    left:180px;
     bottom:100px;
-    transform:translateX(-160px);
     z-index:2;
   " width="100" height="40">
     <path d="M0 20 C20 5, 40 35, 60 20 C80 5, 100 35, 120 20"
       stroke="#4f7c8a" fill="none" stroke-width="3"/>
   </svg>
 
-  <!-- 🔴 波 -->
   <svg style="
     position:absolute;
-    left:50%;
+    right:180px;
     bottom:100px;
-    transform:translateX(160px);
     z-index:2;
   " width="100" height="40">
     <path d="M0 20 C20 5, 40 35, 60 20 C80 5, 100 35, 120 20"
       stroke="#d62c2c" fill="none" stroke-width="3"/>
   </svg>
 
-  <!-- 🎯 メーター（右下固定） -->
+  <!-- メーター -->
   <svg style="
     position:absolute;
-    left:50%;
-    bottom:20px;
-    transform:translateX(140px);
+    right:100px;
+    bottom:30px;
     z-index:2;
-  " viewBox="0 0 200 120" width="150" height="90">
+  " viewBox="0 0 200 120" width="150">
 
     <defs>
       <linearGradient id="g">
