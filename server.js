@@ -114,12 +114,11 @@ function generateRisk(scores) {
 function generateOverlay(scoreLeft, scoreRight) {
 
   // 🎯 メーター（少し厳しめ補正）
-  const adjusted = scoreRight * 0.92; // ← 少し左に寄せる
-  const angle = -90 + (adjusted * 1.8);
+  const adjusted = scoreRight * 0.90;
+const angle = -90 + (adjusted * 1.8);
 
-  // 🌊 波の強さ（振幅）
-  const ampLeft = 4 + (scoreLeft / 100) * 6;
-  const ampRight = 4 + ((100 - scoreRight) / 100) * 10;
+const ampLeft = 3 + (scoreLeft / 100) * 4;
+const ampRight = 6 + ((100 - scoreRight) / 100) * 12;
 
   return `
 <div style="
