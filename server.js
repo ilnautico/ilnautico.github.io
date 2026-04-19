@@ -124,7 +124,22 @@ function generateRisk(scores) {
   if (min >= 55) return "Moderate instability risk under variable conditions.";
   return "High instability risk due to material-process mismatch.";
 }
+// =========================
+// PROCESSING WINDOW（追加）
+// =========================
+function generateProcessingWindow(scores) {
+  const min = Math.min(scores.thermal, scores.flow, scores.mechanical);
 
+  if (min < 55) {
+    return "Processing window is unstable and requires significant parameter control.";
+  }
+
+  if (min < 75) {
+    return "Processing window stability depends on control of the limiting parameter.";
+  }
+
+  return "Stable processing window expected.";
+}
 // =========================
 // 🔥 UI（絶対固定：一切変更なし）
 // =========================
@@ -309,7 +324,7 @@ app.post("/generate-report", async (req, res) => {
 
       key_risk: keyRisk,
 
-      processing_window: "Stable processing window expected.",
+　　　　processing_window: generateProcessingWindow(scores)",
       thermal_behavior: "Thermally stable under controlled conditions.",
       flow_characteristics: "Stable flow characteristics.",
 
