@@ -76,41 +76,77 @@ function calculateEconomic(score) {
 // =========================
 function generateOverlay(scoreLeft, scoreRight) {
 
-  const angle = -90 + scoreRight * 1.8;
+  const angle = -90 + (scoreRight * 1.8);
 
   return `
-<svg width="700" height="260" viewBox="0 0 700 260">
+<div style="
+  position:relative;
+  width:700px;
+  height:260px;
+  margin:0 auto;
+">
 
   <!-- 背景 -->
-  <image href="https://ilnautico.github.io/visual-base.png"
-    x="0" y="0" width="700" height="260" />
+  <img src="https://ilnautico.github.io/visual-base.png"
+    style="
+      width:700px;
+      height:260px;
+      display:block;
+    "
+  />
 
-  <!-- 左テキスト -->
-  <text x="150" y="80" font-size="28" text-anchor="middle" fill="#2f3a44">
-    230°C
-  </text>
-  <text x="150" y="105" font-size="16" text-anchor="middle">
-    ${scoreLeft}
-  </text>
+  <!-- 左 -->
+  <div style="
+    position:absolute;
+    top:60px;
+    left:50%;
+    transform:translateX(-180px);
+    text-align:center;
+  ">
+    <div style="font-size:28px;">230°C</div>
+    <div>${scoreLeft}</div>
+  </div>
 
-  <!-- 右テキスト -->
-  <text x="550" y="80" font-size="28" text-anchor="middle" fill="#d62c2c">
-    180°C
-  </text>
-  <text x="550" y="105" font-size="16" text-anchor="middle" fill="#d62c2c">
-    ${scoreRight}
-  </text>
+  <!-- 右 -->
+  <div style="
+    position:absolute;
+    top:60px;
+    left:50%;
+    transform:translateX(180px);
+    text-align:center;
+  ">
+    <div style="font-size:28px; color:#d62c2c;">180°C</div>
+    <div style="color:#d62c2c;">${scoreRight}</div>
+  </div>
 
-  <!-- 青波 -->
-  <path d="M220 170 C240 150, 260 190, 280 170"
-    stroke="#4f7c8a" fill="none" stroke-width="3"/>
+  <!-- 🔵 波（完全一致） -->
+  <svg style="
+    position:absolute;
+    left:50%;
+    bottom:95px;
+    transform:translateX(-120px);
+  " width="90" height="35">
+    <path d="M0 18 C15 6, 30 30, 45 18 C60 6, 75 30, 90 18"
+      stroke="#4f7c8a" fill="none" stroke-width="3"/>
+  </svg>
 
-  <!-- 赤波 -->
-  <path d="M420 170 C440 150, 460 190, 480 170"
-    stroke="#d62c2c" fill="none" stroke-width="3"/>
+  <!-- 🔴 波（完全一致） -->
+  <svg style="
+    position:absolute;
+    left:50%;
+    bottom:95px;
+    transform:translateX(120px);
+  " width="90" height="35">
+    <path d="M0 18 C15 6, 30 30, 45 18 C60 6, 75 30, 90 18"
+      stroke="#d62c2c" fill="none" stroke-width="3"/>
+  </svg>
 
-  <!-- メーター -->
-  <g transform="translate(450,180)">
+  <!-- 🎯 メーター（そのままでOK） -->
+  <svg style="
+    position:absolute;
+    right:60px;
+    bottom:20px;
+  " viewBox="0 0 200 120" width="140" height="90">
 
     <defs>
       <linearGradient id="g">
@@ -120,18 +156,18 @@ function generateOverlay(scoreLeft, scoreRight) {
       </linearGradient>
     </defs>
 
-    <path d="M0 40 A40 40 0 0 1 80 40 L40 40 Z"
+    <path d="M20 100 A80 80 0 0 1 180 100 L100 100 Z"
       fill="url(#g)"/>
 
-    <g transform="rotate(${angle} 40 40)">
-      <line x1="40" y1="40" x2="40" y2="10"
+    <g transform="rotate(${angle} 100 100)">
+      <line x1="100" y1="100" x2="100" y2="25"
         stroke="#111" stroke-width="3"/>
     </g>
 
-    <circle cx="40" cy="40" r="3" fill="#111"/>
-  </g>
+    <circle cx="100" cy="100" r="4" fill="#111"/>
+  </svg>
 
-</svg>
+</div>
 `;
 }
 // =========================
