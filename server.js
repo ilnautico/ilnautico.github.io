@@ -73,28 +73,28 @@ function calculateEconomic(score) {
 // =========================
 // VISUAL（ズレない版）
 // =========================
+// =========================
 function generateOverlay(scoreLeft, scoreRight) {
-
-  const angle = -90 + (scoreRight * 1.8);
+  const angle = -90 + scoreRight * 1.8;
 
   return `
 <div style="
   position:relative;
-  width:760px;   /* ← 少し拡張 */
-  height:280px;
+  width:700px;
+  height:260px;
   margin:0 auto;
 ">
 
-  <!-- 背景（拡大＆中央寄せ） -->
+  <!-- 背景（暴走完全防止） -->
   <img src="https://ilnautico.github.io/visual-base.png"
     style="
       position:absolute;
       top:0;
       left:50%;
       transform:translateX(-50%);
-      width:760px;
-      height:280px;
-      object-fit:cover;
+      width:680px;
+      max-width:100%;
+      height:auto;
       z-index:1;
     "
   />
@@ -102,9 +102,9 @@ function generateOverlay(scoreLeft, scoreRight) {
   <!-- 左数値 -->
   <div style="
     position:absolute;
-    top:70px;
+    top:60px;
     left:50%;
-    transform:translateX(-230px);
+    transform:translateX(-220px);
     text-align:center;
     z-index:2;
   ">
@@ -115,9 +115,9 @@ function generateOverlay(scoreLeft, scoreRight) {
   <!-- 右数値 -->
   <div style="
     position:absolute;
-    top:70px;
+    top:60px;
     left:50%;
-    transform:translateX(230px);
+    transform:translateX(220px);
     text-align:center;
     z-index:2;
   ">
@@ -125,38 +125,38 @@ function generateOverlay(scoreLeft, scoreRight) {
     <div style="color:#d62c2c;">${scoreRight}</div>
   </div>
 
-  <!-- 🔵 波（ノズル位置に合わせる） -->
+  <!-- 🔵 波 -->
   <svg style="
     position:absolute;
     left:50%;
-    bottom:105px;
-    transform:translateX(-180px);
+    bottom:100px;
+    transform:translateX(-160px);
     z-index:2;
   " width="100" height="40">
     <path d="M0 20 C20 5, 40 35, 60 20 C80 5, 100 35, 120 20"
       stroke="#4f7c8a" fill="none" stroke-width="3"/>
   </svg>
 
-  <!-- 🔴 波（素材中央に乗せる） -->
+  <!-- 🔴 波 -->
   <svg style="
     position:absolute;
     left:50%;
-    bottom:105px;
-    transform:translateX(180px);
+    bottom:100px;
+    transform:translateX(160px);
     z-index:2;
   " width="100" height="40">
     <path d="M0 20 C20 5, 40 35, 60 20 C80 5, 100 35, 120 20"
       stroke="#d62c2c" fill="none" stroke-width="3"/>
   </svg>
 
-  <!-- 🎯 メーター（完全右下寄せ） -->
+  <!-- 🎯 メーター（右下固定） -->
   <svg style="
     position:absolute;
     left:50%;
-    bottom:25px;
-    transform:translateX(150px);
+    bottom:20px;
+    transform:translateX(140px);
     z-index:2;
-  " viewBox="0 0 200 120" width="160" height="100">
+  " viewBox="0 0 200 120" width="150" height="90">
 
     <defs>
       <linearGradient id="g">
@@ -175,12 +175,12 @@ function generateOverlay(scoreLeft, scoreRight) {
     </g>
 
     <circle cx="100" cy="100" r="4" fill="#111"/>
-
   </svg>
 
 </div>
 `;
 }
+
 // =========================
 // EXECUTIVE
 // =========================
