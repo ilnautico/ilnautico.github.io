@@ -82,70 +82,74 @@ function generateOverlay(scoreLeft, scoreRight) {
 <div style="
   position:relative;
   width:700px;
-  height:260px;
   margin:0 auto;
 ">
 
-  <!-- 背景 -->
+  <!-- 背景（比率維持・絶対崩れない） -->
   <img src="https://ilnautico.github.io/visual-base.png"
     style="
-      width:700px;
-      height:260px;
+      width:100%;
+      height:auto;
       display:block;
     "
   />
 
-  <!-- 左 -->
+  <!-- 左数値 -->
   <div style="
     position:absolute;
     top:60px;
     left:50%;
     transform:translateX(-180px);
     text-align:center;
+    z-index:2;
   ">
-    <div style="font-size:28px;">230°C</div>
-    <div>${scoreLeft}</div>
+    <div style="font-size:28px; color:#2f3a44;">230°C</div>
+    <div style="font-size:16px; color:#5b6770;">${scoreLeft}</div>
   </div>
 
-  <!-- 右 -->
+  <!-- 右数値 -->
   <div style="
     position:absolute;
     top:60px;
     left:50%;
     transform:translateX(180px);
     text-align:center;
+    z-index:2;
   ">
     <div style="font-size:28px; color:#d62c2c;">180°C</div>
-    <div style="color:#d62c2c;">${scoreRight}</div>
+    <div style="font-size:16px; color:#d62c2c;">${scoreRight}</div>
   </div>
 
-  <!-- 🔵 波（完全一致） -->
+  <!-- 🔵 波 -->
   <svg style="
     position:absolute;
     left:50%;
     bottom:95px;
     transform:translateX(-120px);
+    z-index:2;
   " width="90" height="35">
     <path d="M0 18 C15 6, 30 30, 45 18 C60 6, 75 30, 90 18"
       stroke="#4f7c8a" fill="none" stroke-width="3"/>
   </svg>
 
-  <!-- 🔴 波（完全一致） -->
+  <!-- 🔴 波 -->
   <svg style="
     position:absolute;
     left:50%;
     bottom:95px;
     transform:translateX(120px);
+    z-index:2;
   " width="90" height="35">
     <path d="M0 18 C15 6, 30 30, 45 18 C60 6, 75 30, 90 18"
       stroke="#d62c2c" fill="none" stroke-width="3"/>
   </svg>
 
-  <!-- 🎯 メーター（そのままでOK） -->
+  <!-- 🎯 メーター -->
   <svg style="
     position:absolute;
     right:60px;
     bottom:20px;
+    z-index:2;
   " viewBox="0 0 200 120" width="140" height="90">
 
     <defs>
