@@ -116,12 +116,14 @@ function generateOverlay(scoreLeft, scoreRight) {
   const angle = -90 + (scoreRight * 1.8);
 
   // 🌊 波の振幅（段階制御：デザイン非変更）
-  function getAmplitude(score) {
-    if (score >= 80) return 1.5;   // ほぼ直線
-    if (score >= 70) return 4;     // 少し波
-    if (score >= 60) return 8;     // 中程度
-    return 12;                     // 荒い
-  }
+  // 🌊 波の振幅（最終チューニング版）
+function getAmplitude(score) {
+  if (score >= 85) return 1.2;   // ← ほぼ完全直線
+  if (score >= 80) return 1.5;   // ← 直線寄り
+  if (score >= 70) return 5;     // ← ★ここ調整（75を少しだけ揺らす）
+  if (score >= 60) return 9;     // ← 中程度（60を少し強め）
+  return 13;                     // ← 低スコアはしっかり荒い
+}
 
   const ampLeft = getAmplitude(scoreLeft);
   const ampRight = getAmplitude(scoreRight);
