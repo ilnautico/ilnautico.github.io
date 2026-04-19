@@ -80,82 +80,83 @@ function generateOverlay(scoreLeft, scoreRight) {
   return `
 <div style="
   position:relative;
-  width:700px;
-  height:260px;
+  width:760px;   /* ← 少し拡張 */
+  height:280px;
   margin:0 auto;
 ">
 
-  <!-- 背景画像（復活） -->
+  <!-- 背景（拡大＆中央寄せ） -->
   <img src="https://ilnautico.github.io/visual-base.png"
     style="
       position:absolute;
       top:0;
-      left:0;
-      width:100%;
-      height:100%;
-      object-fit:contain;
+      left:50%;
+      transform:translateX(-50%);
+      width:760px;
+      height:280px;
+      object-fit:cover;
       z-index:1;
     "
   />
 
-  <!-- 左 -->
+  <!-- 左数値 -->
   <div style="
     position:absolute;
-    top:60px;
+    top:70px;
     left:50%;
-    transform:translateX(-200px);
+    transform:translateX(-230px);
     text-align:center;
     z-index:2;
   ">
-    <div style="font-size:28px;">230°C</div>
+    <div style="font-size:30px;">230°C</div>
     <div>${scoreLeft}</div>
   </div>
 
-  <!-- 右 -->
+  <!-- 右数値 -->
   <div style="
     position:absolute;
-    top:60px;
+    top:70px;
     left:50%;
-    transform:translateX(200px);
+    transform:translateX(230px);
     text-align:center;
     z-index:2;
   ">
-    <div style="font-size:28px; color:#d62c2c;">180°C</div>
+    <div style="font-size:30px; color:#d62c2c;">180°C</div>
     <div style="color:#d62c2c;">${scoreRight}</div>
   </div>
 
-  <!-- 波 左 -->
+  <!-- 🔵 波（ノズル位置に合わせる） -->
   <svg style="
     position:absolute;
     left:50%;
-    bottom:90px;
-    transform:translateX(-130px);
+    bottom:105px;
+    transform:translateX(-180px);
     z-index:2;
-  " width="90" height="35">
-    <path d="M0 18 C15 6, 30 30, 45 18 C60 6, 75 30, 90 18"
+  " width="100" height="40">
+    <path d="M0 20 C20 5, 40 35, 60 20 C80 5, 100 35, 120 20"
       stroke="#4f7c8a" fill="none" stroke-width="3"/>
   </svg>
 
-  <!-- 波 右 -->
+  <!-- 🔴 波（素材中央に乗せる） -->
   <svg style="
     position:absolute;
     left:50%;
-    bottom:90px;
-    transform:translateX(130px);
+    bottom:105px;
+    transform:translateX(180px);
     z-index:2;
-  " width="90" height="35">
-    <path d="M0 18 C15 6, 30 30, 45 18 C60 6, 75 30, 90 18"
+  " width="100" height="40">
+    <path d="M0 20 C20 5, 40 35, 60 20 C80 5, 100 35, 120 20"
       stroke="#d62c2c" fill="none" stroke-width="3"/>
   </svg>
 
-  <!-- メーター -->
+  <!-- 🎯 メーター（完全右下寄せ） -->
   <svg style="
     position:absolute;
     left:50%;
-    bottom:20px;
-    transform:translateX(60px);
+    bottom:25px;
+    transform:translateX(150px);
     z-index:2;
-  " viewBox="0 0 200 120" width="140" height="90">
+  " viewBox="0 0 200 120" width="160" height="100">
 
     <defs>
       <linearGradient id="g">
@@ -292,8 +293,7 @@ app.post("/generate-report", async (req, res) => {
 
       pha_score: scores.total,
 
-      dynamic_overlay: generateOverlay(scores),
-    });
+     dynamic_overlay: generateOverlay(scores.thermal, scores.flow),
 
     const browser = await puppeteer.launch({
       args: ["--no-sandbox", "--disable-setuid-sandbox"]
