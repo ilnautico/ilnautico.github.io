@@ -75,7 +75,7 @@ function calculateEconomic(score) {
 // =========================
 // =========================
 function generateOverlay(scoreLeft, scoreRight) {
-  const angle = -90 + (scoreRight * 1.8);
+  const angle = -90 + scoreRight * 1.8;
 
   return `
 <div style="
@@ -85,7 +85,7 @@ function generateOverlay(scoreLeft, scoreRight) {
   margin:0 auto;
 ">
 
-  <!-- 背景（これが元サイズ） -->
+  <!-- 背景（元サイズ固定） -->
   <img src="https://ilnautico.github.io/visual-base.png"
     style="
       position:absolute;
@@ -97,49 +97,49 @@ function generateOverlay(scoreLeft, scoreRight) {
     "
   />
 
-  <!-- 左 -->
+  <!-- 左数値 -->
   <div style="
     position:absolute;
-    top:60px;
-    left:140px;
+    top:55px;
+    left:150px;
     text-align:center;
     z-index:2;
   ">
-    <div style="font-size:28px;">230°C</div>
+    <div style="font-size:30px;">230°C</div>
     <div>${scoreLeft}</div>
   </div>
 
-  <!-- 右 -->
+  <!-- 右数値 -->
   <div style="
     position:absolute;
-    top:60px;
-    left:520px;
+    top:55px;
+    left:500px;
     text-align:center;
     z-index:2;
   ">
-    <div style="font-size:28px; color:#d62c2c;">180°C</div>
+    <div style="font-size:30px; color:#d62c2c;">180°C</div>
     <div style="color:#d62c2c;">${scoreRight}</div>
   </div>
 
   <!-- 青波 -->
   <svg style="
     position:absolute;
-    left:210px;
-    bottom:90px;
+    left:220px;
+    bottom:95px;
     z-index:2;
-  " width="90" height="35">
-    <path d="M0 18 C15 6, 30 30, 45 18 C60 6, 75 30, 90 18"
+  " width="100" height="40">
+    <path d="M0 20 C20 5, 40 35, 60 20 C80 5, 100 35, 120 20"
       stroke="#4f7c8a" fill="none" stroke-width="3"/>
   </svg>
 
   <!-- 赤波 -->
   <svg style="
     position:absolute;
-    left:420px;
-    bottom:90px;
+    left:430px;
+    bottom:95px;
     z-index:2;
-  " width="90" height="35">
-    <path d="M0 18 C15 6, 30 30, 45 18 C60 6, 75 30, 90 18"
+  " width="100" height="40">
+    <path d="M0 20 C20 5, 40 35, 60 20 C80 5, 100 35, 120 20"
       stroke="#d62c2c" fill="none" stroke-width="3"/>
   </svg>
 
@@ -149,7 +149,7 @@ function generateOverlay(scoreLeft, scoreRight) {
     left:460px;
     bottom:20px;
     z-index:2;
-  " viewBox="0 0 200 120" width="140" height="90">
+  " viewBox="0 0 200 120" width="150">
 
     <defs>
       <linearGradient id="g">
@@ -171,6 +171,30 @@ function generateOverlay(scoreLeft, scoreRight) {
   </svg>
 
 </div>
+`;
+}
+
+// =========================
+// EXECUTIVE
+// =========================
+function generateExecutive(scores, decision, economic) {
+  return `
+This assessment indicates ${decision.level} feasibility for transitioning to the evaluated material within the current processing framework.
+
+Thermal behavior (${scores.thermal}): Thermally stable under controlled conditions.
+Flow behavior (${scores.flow}): Stable melt flow and processing.
+Mechanical stability (${scores.mechanical}): Structurally stable.
+
+Deployment Decision: ${decision.decision}
+
+Primary risk is process variability under real-world conditions, which may lead to:
+- Product inconsistency
+- Scrap increase
+- Efficiency loss
+
+Economic Impact: ${economic}
+
+A controlled pilot validation phase is strongly recommended prior to commercial deployment.
 `;
 }
 
@@ -299,6 +323,8 @@ app.get("/latest-pdf", (req, res) => {
 app.listen(process.env.PORT || 8080, () => {
   console.log("Server running");
 });
+
+const html_3man =`;
 
 const html_3man =`;
 <!DOCTYPE html>
