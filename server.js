@@ -80,64 +80,66 @@ function generateOverlay(scores) {
   return `
 <div style="
   position:relative;
-  width:800px;
-  height:300px;
-  margin:0 auto;
+  width:100%;
+  height:260px;
 ">
 
-  <!-- 背景 -->
-  <img src="https://ilnautico.github.io/visual-base.png"
-    style="
-      width:800px;
-      height:300px;
-      position:absolute;
-      top:0;
-      left:0;
-      z-index:1;
-    "
-  />
+  <!-- 背景（基準） -->
+ <img src="https://ilnautico.github.io/visual-base.png"
+  style="
+    width:100%;
+    height:260px;
+    position:absolute;
+    top:0;
+    left:0;
+    object-fit:contain;
+    background:#f8fafc;
+    z-index:1;
+  "
+/>
 
-  <!-- LEFT（完全位置補正済） -->
+  <!-- LEFT -->
   <div style="
     position:absolute;
-    left:120px;
-    top:80px;
-    width:180px;
+    left:15%;
+    top:30%;
+    width:160px;
     text-align:center;
     z-index:3;
   ">
-    <div style="font-size:34px;">230°C</div>
-    <div style="margin-top:4px;">${thermal}</div>
+    <div style="font-size:32px;">230°C</div>
+    <div>${thermal}</div>
 
-    <svg width="140" height="60" style="margin-top:10px;">
+    <svg width="140" height="60">
       <path d="M10 40 Q40 10 70 40 T130 40"
         stroke="#4f7c8a" fill="none" stroke-width="3"/>
     </svg>
   </div>
 
-  <!-- RIGHT（完全位置補正済） -->
+  <!-- RIGHT -->
   <div style="
     position:absolute;
-    left:540px;
-    top:80px;
-    width:180px;
+    right:15%;
+    top:30%;
+    width:160px;
     text-align:center;
     z-index:3;
   ">
-    <div style="font-size:34px; color:#d62c2c;">180°C</div>
-    <div style="margin-top:4px; color:#d62c2c;">${flow}</div>
+    <div style="font-size:32px; color:#d62c2c;">180°C</div>
+    <div style="color:#d62c2c;">${flow}</div>
 
-    <svg width="140" height="60" style="margin-top:10px;">
+    <svg width="140" height="60">
       <path d="M10 40 Q40 10 70 40 T130 40"
         stroke="#d62c2c" fill="none" stroke-width="3"/>
     </svg>
   </div>
 
-  <!-- メーター（完全中央合わせ） -->
+  <!-- METER（中央補正） -->
   <div style="
     position:absolute;
-    left:300px;
-    top:140px;
+    left:50%;
+    top:65%;
+    transform:translate(-50%, -50%);
     z-index:3;
   ">
     <svg width="200" height="120" viewBox="0 0 200 120">
