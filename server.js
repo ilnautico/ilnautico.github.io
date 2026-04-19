@@ -123,25 +123,25 @@ function generateOverlay(scoreLeft, scoreRight) {
     <div style="font-size:16px; color:#d62c2c;">${scoreRight}</div>
   </div>
 
-  <!-- 🔵 左波（完全修正） -->
-  <svg style="
-    position:absolute;
-    left:270px;   /* ← ここだけ修正 */
-    bottom:90px;
-    z-index:2;
-  " width="90" height="35" viewBox="0 0 90 35">
-    <path d="
-      M0 18
-      C15 6, 30 30, 45 18
-      C60 6, 75 30, 90 18
-    "
-    fill="none"
-    stroke="#4f7c8a"
-    stroke-width="3"
-    stroke-linecap="round"
-    opacity="0.9"
-    />
-  </svg>
+<!-- 🔵 左波（最終確定） -->
+<svg style="
+  position:absolute;
+  left:280px;   /* ← 最終位置 */
+  bottom:90px;
+  z-index:2;
+" width="90" height="35" viewBox="0 0 90 35">
+  <path d="
+    M0 18
+    C15 6, 30 30, 45 18
+    C60 6, 75 30, 90 18
+  "
+  fill="none"
+  stroke="#4f7c8a"
+  stroke-width="3"
+  stroke-linecap="round"
+  opacity="0.9"
+/>
+</svg>
 
   <!-- 🔴 右波（OKなのでそのまま） -->
   <svg style="
