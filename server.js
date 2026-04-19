@@ -79,122 +79,130 @@ function generateOverlay(scoreLeft, scoreRight) {
   const angle = -90 + (scoreRight * 1.8);
 
   return `
-<div style="
-  position:relative;
-  width:700px;
-  height:260px;
-  margin:0 auto;
-">
+<div style="width:100%; display:flex; justify-content:center;">
 
-  <!-- 背景（元サイズ完全維持） -->
-  <img src="https://ilnautico.github.io/visual-base.png"
-    style="
-      position:absolute;
-      top:0;
-      left:0;
-      width:700px;
-      height:260px;
-      object-fit:contain;
-      z-index:1;
-    "
-  />
+  <!-- PC版（完全維持） -->
+  <div class="pc" style="position:relative; width:700px; height:260px;">
 
-  <!-- 左数値 -->
-  <div style="
-    position:absolute;
-    top:40px;
-    left:50%;
-    transform:translateX(-180px);
-    text-align:center;
-    z-index:2;
-  ">
-    <div style="font-size:28px; color:#2f3a44;">230°C</div>
-    <div style="font-size:16px; color:#5b6770;">${scoreLeft}</div>
-  </div>
-
-  <!-- 右数値 -->
-  <div style="
-    position:absolute;
-    top:40px;
-    left:50%;
-    transform:translateX(180px);
-    text-align:center;
-    z-index:2;
-  ">
-    <div style="font-size:28px; color:#d62c2c;">180°C</div>
-    <div style="font-size:16px; color:#d62c2c;">${scoreRight}</div>
-  </div>
-
-  <!-- 🔵 青波（完全一致） -->
-  <svg style="
-    position:absolute;
-    left:50%;
-    bottom:110px;
-    transform:translateX(-60px);
-    z-index:2;
-  " width="90" height="35">
-    <path d="
-      M0 18
-      C15 6, 30 30, 45 18
-      C60 6, 75 30, 90 18
-    "
-    fill="none"
-    stroke="#4f7c8a"
-    stroke-width="3"
-    stroke-linecap="round"
-  />
-  </svg>
-
-  <!-- 🔴 赤波（完全一致） -->
-  <svg style="
-    position:absolute;
-    left:50%;
-    bottom:100px;
-    transform:translateX(90px);
-    z-index:2;
-  " width="90" height="35">
-    <path d="
-      M0 18
-      C15 6, 30 30, 45 18
-      C60 6, 75 30, 90 18
-    "
-    fill="none"
-    stroke="#d62c2c"
-    stroke-width="3"
-    stroke-linecap="round"
-  />
-  </svg>
-
-  <!-- 🎯 メーター（完全固定＋連動） -->
-  <svg style="
-    position:absolute;
-    right:60px;
-    bottom:20px;
-    z-index:2;
-  " viewBox="0 0 200 120" width="140" height="90">
-
-    <defs>
-      <linearGradient id="g">
-        <stop offset="0%" stop-color="#22c55e"/>
-        <stop offset="50%" stop-color="#fde047"/>
-        <stop offset="100%" stop-color="#ef4444"/>
-      </linearGradient>
-    </defs>
-
-    <path d="M20 100 A80 80 0 0 1 180 100 L100 100 Z"
-      fill="url(#g)"
+    <img src="https://ilnautico.github.io/visual-base.png"
+      style="
+        position:absolute;
+        top:0;
+        left:0;
+        width:700px;
+        height:260px;
+        object-fit:contain;
+        z-index:1;
+      "
     />
 
-    <g transform="rotate(${angle} 100 100)">
-      <line x1="100" y1="100" x2="100" y2="25"
-        stroke="#111"
-        stroke-width="3"
-        stroke-linecap="round"
-      />
-    </g>
+    <!-- 左 -->
+    <div style="
+      position:absolute;
+      top:40px;
+      left:50%;
+      transform:translateX(-180px);
+      text-align:center;
+      z-index:2;
+    ">
+      <div style="font-size:28px;">230°C</div>
+      <div>${scoreLeft}</div>
+    </div>
 
-    <circle cx="100" cy="100" r="4" fill="#111"/>
-  </svg>
+    <!-- 右 -->
+    <div style="
+      position:absolute;
+      top:40px;
+      left:50%;
+      transform:translateX(180px);
+      text-align:center;
+      z-index:2;
+    ">
+      <div style="font-size:28px; color:#d62c2c;">180°C</div>
+      <div style="color:#d62c2c;">${scoreRight}</div>
+    </div>
+
+    <!-- 🔵 波 -->
+    <svg style="
+      position:absolute;
+      left:50%;
+      bottom:110px;
+      transform:translateX(-60px);
+      z-index:2;
+    " width="90" height="35">
+      <path d="M0 18 C15 6, 30 30, 45 18 C60 6, 75 30, 90 18"
+        stroke="#4f7c8a" fill="none" stroke-width="3"/>
+    </svg>
+
+    <!-- 🔴 波 -->
+    <svg style="
+      position:absolute;
+      left:50%;
+      bottom:100px;
+      transform:translateX(90px);
+      z-index:2;
+    " width="90" height="35">
+      <path d="M0 18 C15 6, 30 30, 45 18 C60 6, 75 30, 90 18"
+        stroke="#d62c2c" fill="none" stroke-width="3"/>
+    </svg>
+
+    <!-- メーター -->
+    <svg style="
+      position:absolute;
+      right:60px;
+      bottom:20px;
+      z-index:2;
+    " viewBox="0 0 200 120" width="140" height="90">
+
+      <defs>
+        <linearGradient id="g">
+          <stop offset="0%" stop-color="#22c55e"/>
+          <stop offset="50%" stop-color="#fde047"/>
+          <stop offset="100%" stop-color="#ef4444"/>
+        </linearGradient>
+      </defs>
+
+      <path d="M20 100 A80 80 0 0 1 180 100 L100 100 Z"
+        fill="url(#g)"/>
+
+      <g transform="rotate(${angle} 100 100)">
+        <line x1="100" y1="100" x2="100" y2="25"
+          stroke="#111" stroke-width="3"/>
+      </g>
+
+      <circle cx="100" cy="100" r="4" fill="#111"/>
+    </svg>
+
+  </div>
+
+
+  <!-- スマホ版（追加・テンプレ不要） -->
+  <div class="sp" style="display:none; width:100%; text-align:center;">
+
+    <img src="https://ilnautico.github.io/visual-base.png"
+      style="width:100%; height:auto;" />
+
+    <div style="display:flex; justify-content:space-around; margin-top:-70px;">
+      <div>
+        <div>230°C</div>
+        <div>${scoreLeft}</div>
+      </div>
+      <div>
+        <div style="color:#d62c2c;">180°C</div>
+        <div style="color:#d62c2c;">${scoreRight}</div>
+      </div>
+    </div>
+
+  </div>
+
+
+  <!-- 切替CSS（テンプレ触らない） -->
+  <style>
+    @media (max-width: 768px) {
+      .pc { display:none !important; }
+      .sp { display:block !important; }
+    }
+  </style>
 
 </div>
 `;
