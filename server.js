@@ -80,16 +80,16 @@ function generateOverlay(scores) {
   return `
 <div style="
   position:relative;
-  width:700px;
-  height:260px;
+  width:800px;
+  height:300px;
   margin:0 auto;
 ">
 
   <!-- 背景 -->
   <img src="https://ilnautico.github.io/visual-base.png"
     style="
-      width:700px;
-      height:260px;
+      width:800px;
+      height:300px;
       position:absolute;
       top:0;
       left:0;
@@ -97,50 +97,51 @@ function generateOverlay(scores) {
     "
   />
 
-  <!-- LEFT -->
+  <!-- LEFT（完全位置補正済） -->
   <div style="
     position:absolute;
-    left:110px;
-    top:60px;
-    width:160px;
+    left:120px;
+    top:80px;
+    width:180px;
     text-align:center;
     z-index:3;
   ">
-    <div style="font-size:30px;">230°C</div>
-    <div>${thermal}</div>
+    <div style="font-size:34px;">230°C</div>
+    <div style="margin-top:4px;">${thermal}</div>
 
-    <svg width="140" height="60">
+    <svg width="140" height="60" style="margin-top:10px;">
       <path d="M10 40 Q40 10 70 40 T130 40"
         stroke="#4f7c8a" fill="none" stroke-width="3"/>
     </svg>
   </div>
 
-  <!-- RIGHT -->
+  <!-- RIGHT（完全位置補正済） -->
   <div style="
     position:absolute;
-    left:430px;
-    top:60px;
-    width:160px;
+    left:540px;
+    top:80px;
+    width:180px;
     text-align:center;
     z-index:3;
   ">
-    <div style="font-size:30px; color:#d62c2c;">180°C</div>
-    <div style="color:#d62c2c;">${flow}</div>
+    <div style="font-size:34px; color:#d62c2c;">180°C</div>
+    <div style="margin-top:4px; color:#d62c2c;">${flow}</div>
 
-    <svg width="140" height="60">
+    <svg width="140" height="60" style="margin-top:10px;">
       <path d="M10 40 Q40 10 70 40 T130 40"
         stroke="#d62c2c" fill="none" stroke-width="3"/>
     </svg>
   </div>
 
-  <!-- METER -->
+  <!-- メーター（完全中央合わせ） -->
   <div style="
     position:absolute;
-    left:260px;
-    top:120px;
+    left:300px;
+    top:140px;
     z-index:3;
   ">
     <svg width="200" height="120" viewBox="0 0 200 120">
+
       <defs>
         <linearGradient id="grad">
           <stop offset="0%" stop-color="#22c55e"/>
