@@ -80,20 +80,19 @@ function generateOverlay(scoreLeft, scoreRight) {
   return `
 <div style="
   position:relative;
-  width:100%;
+  width:700px;
   height:260px;
-  overflow:hidden;
+  margin:0 auto;
 ">
 
-  <!-- 背景（基準） -->
+  <!-- 背景（元サイズ固定） -->
   <img src="https://ilnautico.github.io/visual-base.png"
     style="
       position:absolute;
       top:0;
       left:0;
-      width:100%;
-      height:100%;
-      object-fit:cover;
+      width:700px;
+      height:260px;
       z-index:1;
     "
   />
@@ -101,8 +100,8 @@ function generateOverlay(scoreLeft, scoreRight) {
   <!-- 左数値 -->
   <div style="
     position:absolute;
-    top:60px;
-    left:140px;
+    top:55px;
+    left:150px;
     text-align:center;
     z-index:2;
   ">
@@ -113,8 +112,8 @@ function generateOverlay(scoreLeft, scoreRight) {
   <!-- 右数値 -->
   <div style="
     position:absolute;
-    top:60px;
-    right:140px;
+    top:55px;
+    left:500px;
     text-align:center;
     z-index:2;
   ">
@@ -122,21 +121,22 @@ function generateOverlay(scoreLeft, scoreRight) {
     <div style="color:#d62c2c;">${scoreRight}</div>
   </div>
 
-  <!-- 波 -->
+  <!-- 青波 -->
   <svg style="
     position:absolute;
-    left:180px;
-    bottom:100px;
+    left:220px;
+    bottom:95px;
     z-index:2;
   " width="100" height="40">
     <path d="M0 20 C20 5, 40 35, 60 20 C80 5, 100 35, 120 20"
       stroke="#4f7c8a" fill="none" stroke-width="3"/>
   </svg>
 
+  <!-- 赤波 -->
   <svg style="
     position:absolute;
-    right:180px;
-    bottom:100px;
+    left:430px;
+    bottom:95px;
     z-index:2;
   " width="100" height="40">
     <path d="M0 20 C20 5, 40 35, 60 20 C80 5, 100 35, 120 20"
@@ -146,8 +146,8 @@ function generateOverlay(scoreLeft, scoreRight) {
   <!-- メーター -->
   <svg style="
     position:absolute;
-    right:100px;
-    bottom:30px;
+    left:460px;
+    bottom:20px;
     z-index:2;
   " viewBox="0 0 200 120" width="150">
 
