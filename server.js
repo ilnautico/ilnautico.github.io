@@ -83,9 +83,9 @@ function generateOverlay(scoreLeft, scoreRight) {
   width:700px;
   height:260px;
   margin:0 auto;
+  overflow:hidden;
 ">
 
-  <!-- 背景（暴走完全防止） -->
   <img src="https://ilnautico.github.io/visual-base.png"
     style="
       position:absolute;
@@ -93,8 +93,8 @@ function generateOverlay(scoreLeft, scoreRight) {
       left:50%;
       transform:translateX(-50%);
       width:680px;
-      max-width:100%;
       height:auto;
+      object-fit:contain;
       z-index:1;
     "
   />
