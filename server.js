@@ -78,136 +78,101 @@ function generateOverlay(scoreLeft, scoreRight) {
 
   const angle = -90 + (scoreRight * 1.8);
 
+  // 🎯 振幅（ここが今回のコア）
+  const ampLeft = 6 + scoreLeft * 0.08;
+  const ampRight = 6 + scoreRight * 0.08;
+
   return `
-<div style="width:100%; display:flex; justify-content:center;">
+<div style="
+  position:relative;
+  width:700px;
+  height:240px;
+  margin:0 auto;
+">
 
-  <!-- PC版（完全維持） -->
-  <div class="pc" style="position:relative; width:700px; height:260px;">
+  <img src="https://ilnautico.github.io/visual-base.png"
+    style="
+      position:absolute;
+      top:0;
+      left:0;
+      width:700px;
+      height:240px;
+      object-fit:contain;
+      z-index:1;
+    "
+  />
 
-    <img src="https://ilnautico.github.io/visual-base.png"
-      style="
-        position:absolute;
-        top:0;
-        left:0;
-        width:700px;
-        height:260px;
-        object-fit:contain;
-        z-index:1;
-      "
+  <!-- 左 -->
+  <div style="position:absolute; top:45px; left:150px; text-align:center; z-index:2;">
+    <div style="font-size:28px;">230°C</div>
+    <div>${scoreLeft}</div>
+  </div>
+
+  <!-- 右 -->
+  <div style="position:absolute; top:45px; left:470px; text-align:center; z-index:2;">
+    <div style="font-size:28px; color:#d62c2c;">180°C</div>
+    <div style="color:#d62c2c;">${scoreRight}</div>
+  </div>
+
+  <!-- 🔵 波（左：振幅変化） -->
+  <svg style="position:absolute; left:240px; bottom:90px; z-index:2;"
+    width="90" height="35" viewBox="0 0 90 35">
+    <path d="
+      M0 18
+      C15 ${18 - ampLeft}, 30 ${18 + ampLeft}, 45 18
+      C60 ${18 - ampLeft}, 75 ${18 + ampLeft}, 90 18
+    "
+    fill="none"
+    stroke="#4f7c8a"
+    stroke-width="3"
+    stroke-linecap="round"
     />
+  </svg>
 
-    <!-- 左 -->
-    <div style="
-      position:absolute;
-      top:40px;
-      left:50%;
-      transform:translateX(-180px);
-      text-align:center;
-      z-index:2;
-    ">
-      <div style="font-size:28px;">230°C</div>
-      <div>${scoreLeft}</div>
-    </div>
+  <!-- 🔴 波（右：振幅変化） -->
+  <svg style="position:absolute; left:430px; bottom:90px; z-index:2;"
+    width="90" height="35" viewBox="0 0 90 35">
+    <path d="
+      M0 18
+      C15 ${18 - ampRight}, 30 ${18 + ampRight}, 45 18
+      C60 ${18 - ampRight}, 75 ${18 + ampRight}, 90 18
+    "
+    fill="none"
+    stroke="#d62c2c"
+    stroke-width="3"
+    stroke-linecap="round"
+    />
+  </svg>
 
-    <!-- 右 -->
-    <div style="
-      position:absolute;
-      top:40px;
-      left:50%;
-      transform:translateX(180px);
-      text-align:center;
-      z-index:2;
-    ">
-      <div style="font-size:28px; color:#d62c2c;">180°C</div>
-      <div style="color:#d62c2c;">${scoreRight}</div>
-    </div>
+  <!-- 🎯 メーター -->
+  <svg style="position:absolute; left:500px; bottom:10px; z-index:2;"
+    viewBox="0 0 200 120" width="140" height="90">
 
-    <!-- 🔵 波 -->
-    <svg style="
-      position:absolute;
-      left:50%;
-      bottom:110px;
-      transform:translateX(-60px);
-      z-index:2;
-    " width="90" height="35">
-      <path d="M0 18 C15 6, 30 30, 45 18 C60 6, 75 30, 90 18"
-        stroke="#4f7c8a" fill="none" stroke-width="3"/>
-    </svg>
+    <defs>
+      <linearGradient id="g">
+        <stop offset="0%" stop-color="#22c55e"/>
+        <stop offset="50%" stop-color="#fde047"/>
+        <stop offset="100%" stop-color="#ef4444"/>
+      </linearGradient>
+    </defs>
 
-    <!-- 🔴 波 -->
-    <svg style="
-      position:absolute;
-      left:50%;
-      bottom:100px;
-      transform:translateX(90px);
-      z-index:2;
-    " width="90" height="35">
-      <path d="M0 18 C15 6, 30 30, 45 18 C60 6, 75 30, 90 18"
-        stroke="#d62c2c" fill="none" stroke-width="3"/>
-    </svg>
+    <path d="M20 100 A80 80 0 0 1 180 100 L100 100 Z"
+      fill="url(#g)"/>
 
-    <!-- メーター -->
-    <svg style="
-      position:absolute;
-      right:60px;
-      bottom:20px;
-      z-index:2;
-    " viewBox="0 0 200 120" width="140" height="90">
+    <g transform="rotate(${angle} 100 100)">
+      <line x1="100" y1="100" x2="100" y2="25"
+        stroke="#111"
+        stroke-width="3"
+        stroke-linecap="round"/>
+    </g>
 
-      <defs>
-        <linearGradient id="g">
-          <stop offset="0%" stop-color="#22c55e"/>
-          <stop offset="50%" stop-color="#fde047"/>
-          <stop offset="100%" stop-color="#ef4444"/>
-        </linearGradient>
-      </defs>
+    <circle cx="100" cy="100" r="4" fill="#111"/>
 
-      <path d="M20 100 A80 80 0 0 1 180 100 L100 100 Z"
-        fill="url(#g)"/>
-
-      <g transform="rotate(${angle} 100 100)">
-        <line x1="100" y1="100" x2="100" y2="25"
-          stroke="#111" stroke-width="3"/>
-      </g>
-
-      <circle cx="100" cy="100" r="4" fill="#111"/>
-    </svg>
-
-  </div>
-
-
-  <!-- スマホ版（追加・テンプレ不要） -->
-  <div class="sp" style="display:none; width:100%; text-align:center;">
-
-    <img src="https://ilnautico.github.io/visual-base.png"
-      style="width:100%; height:auto;" />
-
-    <div style="display:flex; justify-content:space-around; margin-top:-70px;">
-      <div>
-        <div>230°C</div>
-        <div>${scoreLeft}</div>
-      </div>
-      <div>
-        <div style="color:#d62c2c;">180°C</div>
-        <div style="color:#d62c2c;">${scoreRight}</div>
-      </div>
-    </div>
-
-  </div>
-
-
-  <!-- 切替CSS（テンプレ触らない） -->
-  <style>
-    @media (max-width: 768px) {
-      .pc { display:none !important; }
-      .sp { display:block !important; }
-    }
-  </style>
+  </svg>
 
 </div>
 `;
 }
-
 // =========================
 // EXECUTIVE
 // =========================
