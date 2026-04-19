@@ -113,12 +113,18 @@ function generateRisk(scores) {
 // =========================
 function generateOverlay(scoreLeft, scoreRight) {
 
-  // 🎯 メーター（少し厳しめ補正）
-  const adjusted = scoreRight * 0.90;
-const angle = -90 + (adjusted * 1.8);
+  const angle = -90 + (scoreRight * 1.8);
 
-const ampLeft = 3 + (scoreLeft / 100) * 4;
-const ampRight = 6 + ((100 - scoreRight) / 100) * 12;
+  // 🌊 波の振幅（段階制御：デザイン非変更）
+  function getAmplitude(score) {
+    if (score >= 80) return 1.5;   // ほぼ直線
+    if (score >= 70) return 4;     // 少し波
+    if (score >= 60) return 8;     // 中程度
+    return 12;                     // 荒い
+  }
+
+  const ampLeft = getAmplitude(scoreLeft);
+  const ampRight = getAmplitude(scoreRight);
 
   return `
 <div style="
@@ -128,7 +134,7 @@ const ampRight = 6 + ((100 - scoreRight) / 100) * 12;
   margin:0 auto;
 ">
 
-  <!-- 背景 -->
+  <!-- 背景（変更なし） -->
   <img src="https://ilnautico.github.io/visual-base.png"
     style="
       position:absolute;
@@ -141,21 +147,37 @@ const ampRight = 6 + ((100 - scoreRight) / 100) * 12;
     "
   />
 
-  <!-- 左温度 -->
-  <div style="position:absolute; top:45px; left:150px; text-align:center; z-index:2;">
+  <!-- 左温度（変更なし） -->
+  <div style="
+    position:absolute;
+    top:45px;
+    left:150px;
+    text-align:center;
+    z-index:2;
+  ">
     <div style="font-size:28px; color:#2f3a44;">230°C</div>
     <div style="font-size:16px; color:#5b6770;">${scoreLeft}</div>
   </div>
 
-  <!-- 右温度 -->
-  <div style="position:absolute; top:45px; left:470px; text-align:center; z-index:2;">
+  <!-- 右温度（変更なし） -->
+  <div style="
+    position:absolute;
+    top:45px;
+    left:470px;
+    text-align:center;
+    z-index:2;
+  ">
     <div style="font-size:28px; color:#d62c2c;">180°C</div>
     <div style="font-size:16px; color:#d62c2c;">${scoreRight}</div>
   </div>
 
-  <!-- 🔵 左波（安定ほど滑らか） -->
-  <svg style="position:absolute; left:280px; bottom:90px; z-index:2;"
-    width="90" height="35" viewBox="0 0 90 35">
+  <!-- 🔵 左波（位置完全固定・振幅のみ変化） -->
+  <svg style="
+    position:absolute;
+    left:280px;
+    bottom:90px;
+    z-index:2;
+  " width="90" height="35" viewBox="0 0 90 35">
     <path d="
       M0 18
       C15 ${18 - ampLeft}, 30 ${18 + ampLeft}, 45 18
@@ -166,12 +188,16 @@ const ampRight = 6 + ((100 - scoreRight) / 100) * 12;
     stroke-width="3"
     stroke-linecap="round"
     opacity="0.9"
-  />
+    />
   </svg>
 
-  <!-- 🔴 右波（低スコアほど荒れる） -->
-  <svg style="position:absolute; left:430px; bottom:90px; z-index:2;"
-    width="90" height="35" viewBox="0 0 90 35">
+  <!-- 🔴 右波（位置完全固定・振幅のみ変化） -->
+  <svg style="
+    position:absolute;
+    left:430px;
+    bottom:90px;
+    z-index:2;
+  " width="90" height="35" viewBox="0 0 90 35">
     <path d="
       M0 18
       C15 ${18 - ampRight}, 30 ${18 + ampRight}, 45 18
@@ -182,12 +208,16 @@ const ampRight = 6 + ((100 - scoreRight) / 100) * 12;
     stroke-width="3"
     stroke-linecap="round"
     opacity="0.9"
-  />
+    />
   </svg>
 
-  <!-- 🎯 メーター -->
-  <svg style="position:absolute; left:500px; bottom:10px; z-index:2;"
-    viewBox="0 0 200 120" width="140" height="90">
+  <!-- 🎯 メーター（完全固定・既存維持） -->
+  <svg style="
+    position:absolute;
+    left:500px;
+    bottom:10px;
+    z-index:2;
+  " viewBox="0 0 200 120" width="140" height="90">
 
     <defs>
       <linearGradient id="g">
@@ -198,13 +228,15 @@ const ampRight = 6 + ((100 - scoreRight) / 100) * 12;
     </defs>
 
     <path d="M20 100 A80 80 0 0 1 180 100 L100 100 Z"
-      fill="url(#g)" />
+      fill="url(#g)"
+    />
 
     <g transform="rotate(${angle} 100 100)">
       <line x1="100" y1="100" x2="100" y2="25"
         stroke="#111"
         stroke-width="3"
-        stroke-linecap="round"/>
+        stroke-linecap="round"
+      />
     </g>
 
     <circle cx="100" cy="100" r="4" fill="#111"/>
