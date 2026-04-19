@@ -117,7 +117,7 @@ function generateOverlay(scoreLeft, scoreRight) {
 
   // 🌊 波の振幅（最終チューニング）
   function getAmplitude(score) {
-   if (score >= 85) return 2;
+   if (score >= 85) return 1.6;
     if (score >= 80) return 3;
     if (score >= 70) return 5;
     if (score >= 60) return 9;
