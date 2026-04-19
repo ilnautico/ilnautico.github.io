@@ -82,35 +82,48 @@ function calculateEconomic(score) {
 // EXECUTIVE（数値連動）
 // =========================
 function generateExecutive(scores, decision, economic) {
-  const { thermal, flow, mechanical } = scores;
 
-  let bottleneckText = "";
-  let impactText = "";
+  const minScore = Math.min(scores.thermal, scores.flow, scores.mechanical);
 
-  if (flow <= thermal && flow <= mechanical) {
-    bottleneckText = `flow behavior is comparatively weaker (${flow})`;
-    impactText = "flow consistency will be the primary constraint on process stability";
-  } else if (thermal <= flow && thermal <= mechanical) {
-    bottleneckText = `thermal stability is comparatively weaker (${thermal})`;
-    impactText = "thermal control will be the primary constraint on process stability";
+  let bottleneck = "";
+  let controlFocus = "";
+
+  if (minScore === scores.flow) {
+    bottleneck = "flow consistency during extended production runs";
+    controlFocus = "pressure stability, melt uniformity, and extrusion flow balance";
+  } else if (minScore === scores.thermal) {
+    bottleneck = "thermal stability under processing conditions";
+    controlFocus = "temperature control precision and thermal distribution";
   } else {
-    bottleneckText = `mechanical integrity is comparatively weaker (${mechanical})`;
-    impactText = "mechanical performance will be the primary constraint on deployment reliability";
+    bottleneck = "mechanical integrity under load conditions";
+    controlFocus = "material strength consistency and structural performance";
+  }
+
+  let baseStatement = "";
+  if (decision.level === "HIGH") {
+    baseStatement = "This assessment indicates HIGH feasibility for transitioning to the evaluated material within the current processing framework.";
+  } else if (decision.level === "MODERATE") {
+    baseStatement = "This assessment indicates MODERATE feasibility for transitioning to the evaluated material within the current processing framework.";
+  } else {
+    baseStatement = "This assessment indicates LOW feasibility for transitioning to the evaluated material within the current processing framework.";
   }
 
   return `
-This assessment indicates ${decision.level} feasibility for transitioning to the evaluated material within the current processing framework.
+${baseStatement}
 
-Thermal stability is ${thermal >= 80 ? "strong" : "moderate"} (${thermal}), and mechanical integrity remains ${mechanical >= 80 ? "reliable" : "sensitive"} (${mechanical}).
-However, ${bottleneckText}, and is expected to act as the primary limiting factor.
+Thermal (${scores.thermal}) / Flow (${scores.flow}) / Mechanical (${scores.mechanical})
 
-As a result, ${impactText}, rather than thermal or structural constraints.
+The system is structurally viable; however, overall stability is governed by ${bottleneck}.
 
-Deployment Decision: ${decision.decision}
+This indicates that performance consistency will depend primarily on ${controlFocus}, rather than general system capability.
+
+Deployment Decision: ${decision.decision} (subject to stabilization of the limiting parameter)
 
 Economic Impact: ${economic}
 
-A controlled pilot validation phase is strongly recommended prior to commercial deployment.
+This may translate into increased scrap rates, reduced throughput efficiency, and higher process control costs under real production conditions.
+
+A controlled pilot validation phase is strongly recommended, with specific focus on stabilizing the identified limiting parameter.
 `;
 }
 
@@ -120,9 +133,23 @@ A controlled pilot validation phase is strongly recommended prior to commercial 
 function generateRisk(scores) {
   const min = Math.min(scores.thermal, scores.flow, scores.mechanical);
 
-  if (min >= 75) return "Minor process fluctuation impacting stability.";
-  if (min >= 55) return "Moderate instability risk under variable conditions.";
-  return "High instability risk due to material-process mismatch.";
+  if (min === scores.flow) {
+    if (min >= 75) return "Minor flow variability with limited production impact.";
+    if (min >= 55) return "Flow variability may impact output consistency and yield stability.";
+    return "Severe flow instability likely to cause production inefficiency and scrap increase.";
+  }
+
+  if (min === scores.thermal) {
+    if (min >= 75) return "Minor thermal sensitivity with manageable control requirements.";
+    if (min >= 55) return "Thermal fluctuation may affect stability and processing reliability.";
+    return "High thermal instability likely to disrupt processing conditions.";
+  }
+
+  if (min === scores.mechanical) {
+    if (min >= 75) return "Minor mechanical variation under standard conditions.";
+    if (min >= 55) return "Mechanical performance variability may impact product integrity.";
+    return "Significant mechanical instability expected under load conditions.";
+  }
 }
 // =========================
 // PROCESSING WINDOW（追加）
