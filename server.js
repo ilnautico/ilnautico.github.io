@@ -324,7 +324,7 @@ app.post("/generate-report", async (req, res) => {
 
       key_risk: keyRisk,
 
-　　　　processing_window: generateProcessingWindow(scores)",
+　　　　processing_window: generateProcessingWindow(scores),
       thermal_behavior: "Thermally stable under controlled conditions.",
       flow_characteristics: "Stable flow characteristics.",
 
