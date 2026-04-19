@@ -114,11 +114,11 @@ function generateOverlay(scoreLeft, scoreRight) {
     <div style="color:#d62c2c;">${scoreRight}</div>
   </div>
 
- // 🔵 左波（完全復元＋振幅維持）
+// 🔵 左波（完全一致 FIX）
 <svg style="
   position:absolute;
-  left:240px;
-  bottom:105px;
+  left:235px;
+  bottom:120px;
   z-index:2;
 " width="90" height="35" viewBox="0 0 90 35">
   <path d="
@@ -133,11 +133,11 @@ function generateOverlay(scoreLeft, scoreRight) {
 />
 </svg>
 
-// 🔴 右波（完全復元＋振幅維持）
+// 🔴 右波（完全一致 FIX）
 <svg style="
   position:absolute;
-  left:430px;
-  bottom:100px;
+  left:435px;
+  bottom:115px;
   z-index:2;
 " width="90" height="35" viewBox="0 0 90 35">
   <path d="
@@ -151,7 +151,6 @@ function generateOverlay(scoreLeft, scoreRight) {
   stroke-linecap="round"
 />
 </svg>
-
   <!-- 🎯 メーター -->
   <svg style="position:absolute; left:500px; bottom:10px; z-index:2;"
     viewBox="0 0 200 120" width="140" height="90">
