@@ -115,15 +115,14 @@ function generateOverlay(scoreLeft, scoreRight) {
 
   const angle = -90 + (scoreRight * 1.8);
 
-  // 🌊 波の振幅（段階制御：デザイン非変更）
-  // 🌊 波の振幅（最終チューニング版）
-function getAmplitude(score) {
-  if (score >= 85) return 1.2;   // ← ほぼ完全直線
-  if (score >= 80) return 1.5;   // ← 直線寄り
-  if (score >= 70) return 5;     // ← ★ここ調整（75を少しだけ揺らす）
-  if (score >= 60) return 9;     // ← 中程度（60を少し強め）
-  return 13;                     // ← 低スコアはしっかり荒い
-}
+  // 🌊 波の振幅（最終チューニング）
+  function getAmplitude(score) {
+    if (score >= 85) return 2.5;
+    if (score >= 80) return 3;
+    if (score >= 70) return 5;
+    if (score >= 60) return 9;
+    return 13;
+  }
 
   const ampLeft = getAmplitude(scoreLeft);
   const ampRight = getAmplitude(scoreRight);
@@ -136,7 +135,7 @@ function getAmplitude(score) {
   margin:0 auto;
 ">
 
-  <!-- 背景（変更なし） -->
+  <!-- 背景 -->
   <img src="https://ilnautico.github.io/visual-base.png"
     style="
       position:absolute;
@@ -149,7 +148,7 @@ function getAmplitude(score) {
     "
   />
 
-  <!-- 左温度（変更なし） -->
+  <!-- 左温度 -->
   <div style="
     position:absolute;
     top:45px;
@@ -161,7 +160,7 @@ function getAmplitude(score) {
     <div style="font-size:16px; color:#5b6770;">${scoreLeft}</div>
   </div>
 
-  <!-- 右温度（変更なし） -->
+  <!-- 右温度 -->
   <div style="
     position:absolute;
     top:45px;
@@ -173,7 +172,7 @@ function getAmplitude(score) {
     <div style="font-size:16px; color:#d62c2c;">${scoreRight}</div>
   </div>
 
-  <!-- 🔵 左波（位置完全固定・振幅のみ変化） -->
+  <!-- 🔵 左波（位置固定・振幅のみ変化） -->
   <svg style="
     position:absolute;
     left:280px;
@@ -187,13 +186,13 @@ function getAmplitude(score) {
     "
     fill="none"
     stroke="#4f7c8a"
-    stroke-width="3"
+    stroke-width="1.8"
     stroke-linecap="round"
-    opacity="0.9"
+    opacity="0.85"
     />
   </svg>
 
-  <!-- 🔴 右波（位置完全固定・振幅のみ変化） -->
+  <!-- 🔴 右波（位置固定・振幅のみ変化） -->
   <svg style="
     position:absolute;
     left:430px;
@@ -207,13 +206,13 @@ function getAmplitude(score) {
     "
     fill="none"
     stroke="#d62c2c"
-    stroke-width="3"
+    stroke-width="1.8"
     stroke-linecap="round"
-    opacity="0.9"
+    opacity="0.85"
     />
   </svg>
 
-  <!-- 🎯 メーター（完全固定・既存維持） -->
+  <!-- 🎯 メーター -->
   <svg style="
     position:absolute;
     left:500px;
