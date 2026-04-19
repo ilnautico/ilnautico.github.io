@@ -27,7 +27,7 @@ const safe = (v, fallback = "-") => {
 };
 
 // =========================
-// SCORE（修正済：ボトルネック型）
+// SCORE（既存そのまま）
 // =========================
 function calculateScores(input) {
   let thermal = 85;
@@ -52,7 +52,6 @@ function calculateScores(input) {
   flow = Math.max(0, Math.min(100, flow));
   mechanical = Math.max(0, Math.min(100, mechanical));
 
-  // 🔥 プロ仕様
   const bottleneck = Math.min(thermal, flow, mechanical);
   const avg = (thermal + flow + mechanical) / 3;
   const total = Math.round(bottleneck * 0.7 + avg * 0.3);
@@ -61,7 +60,25 @@ function calculateScores(input) {
 }
 
 // =========================
-// DECISION
+// 🔥 STATE（追加）
+// =========================
+function analyzeState(scores) {
+  const min = Math.min(scores.thermal, scores.flow, scores.mechanical);
+
+  let limitingFactor = "thermal";
+  if (scores.flow === min) limitingFactor = "flow";
+  if (scores.mechanical === min) limitingFactor = "mechanical";
+
+  let severity;
+  if (min >= 75) severity = "low";
+  else if (min >= 55) severity = "moderate";
+  else severity = "high";
+
+  return { limitingFactor, severity };
+}
+
+// =========================
+// DECISION（そのまま）
 // =========================
 function determineDecision(score) {
   if (score >= 75) return { decision: "GO", level: "HIGH" };
@@ -70,7 +87,7 @@ function determineDecision(score) {
 }
 
 // =========================
-// ECONOMIC
+// ECONOMIC（そのまま）
 // =========================
 function calculateEconomic(score) {
   if (score >= 75) return "+5–15%";
@@ -79,104 +96,90 @@ function calculateEconomic(score) {
 }
 
 // =========================
-// EXECUTIVE（数値連動）
+// EXECUTIVE（差し替え）
 // =========================
 function generateExecutive(scores, decision, economic) {
 
-  const minScore = Math.min(scores.thermal, scores.flow, scores.mechanical);
+  const state = analyzeState(scores);
 
-  let bottleneck = "";
-  let controlFocus = "";
+  let explanation = "";
 
-  if (minScore === scores.flow) {
-    bottleneck = "flow consistency during extended production runs";
-    controlFocus = "pressure stability, melt uniformity, and extrusion flow balance";
-  } else if (minScore === scores.thermal) {
-    bottleneck = "thermal stability under processing conditions";
-    controlFocus = "temperature control precision and thermal distribution";
+  if (state.limitingFactor === "flow") {
+    explanation = "Flow behavior is comparatively weaker and is expected to act as the primary limiting factor.";
+  } else if (state.limitingFactor === "thermal") {
+    explanation = "Thermal stability is the primary limiting factor affecting system reliability.";
   } else {
-    bottleneck = "mechanical integrity under load conditions";
-    controlFocus = "material strength consistency and structural performance";
-  }
-
-  let baseStatement = "";
-  if (decision.level === "HIGH") {
-    baseStatement = "This assessment indicates HIGH feasibility for transitioning to the evaluated material within the current processing framework.";
-  } else if (decision.level === "MODERATE") {
-    baseStatement = "This assessment indicates MODERATE feasibility for transitioning to the evaluated material within the current processing framework.";
-  } else {
-    baseStatement = "This assessment indicates LOW feasibility for transitioning to the evaluated material within the current processing framework.";
+    explanation = "Mechanical performance is the primary limiting factor affecting structural integrity.";
   }
 
   return `
-${baseStatement}
+This assessment indicates ${decision.level} feasibility for transitioning to the evaluated material within the current processing framework.
 
 Thermal (${scores.thermal}) / Flow (${scores.flow}) / Mechanical (${scores.mechanical})
 
-The system is structurally viable; however, overall stability is governed by ${bottleneck}.
+${explanation}
 
-This indicates that performance consistency will depend primarily on ${controlFocus}, rather than general system capability.
-
-Deployment Decision: ${decision.decision} (subject to stabilization of the limiting parameter)
+Deployment Decision: ${decision.decision}
 
 Economic Impact: ${economic}
 
-This may translate into increased scrap rates, reduced throughput efficiency, and higher process control costs under real production conditions.
-
-A controlled pilot validation phase is strongly recommended, with specific focus on stabilizing the identified limiting parameter.
+A controlled pilot validation phase is strongly recommended prior to commercial deployment.
 `;
 }
 
 // =========================
-// RISK
+// RISK（差し替え）
 // =========================
 function generateRisk(scores) {
-  const min = Math.min(scores.thermal, scores.flow, scores.mechanical);
 
-  if (min === scores.flow) {
-    if (min >= 75) return "Minor flow variability with limited production impact.";
-    if (min >= 55) return "Flow variability may impact output consistency and yield stability.";
-    return "Severe flow instability likely to cause production inefficiency and scrap increase.";
+  const state = analyzeState(scores);
+
+  if (state.limitingFactor === "flow") {
+    if (state.severity === "low") return "Minor flow variability with limited production impact.";
+    if (state.severity === "moderate") return "Flow variability may limit process stability, directly impacting output consistency, yield rate, and operational efficiency during continuous production.";
+    return "Severe flow instability likely to cause production inefficiency, scrap increase, and unstable throughput.";
   }
 
-  if (min === scores.thermal) {
-    if (min >= 75) return "Minor thermal sensitivity with manageable control requirements.";
-    if (min >= 55) return "Thermal fluctuation may affect stability and processing reliability.";
-    return "High thermal instability likely to disrupt processing conditions.";
+  if (state.limitingFactor === "thermal") {
+    if (state.severity === "low") return "Minor thermal sensitivity with manageable control requirements.";
+    if (state.severity === "moderate") return "Thermal fluctuation may affect stability and processing reliability.";
+    return "High thermal instability likely to disrupt processing conditions and material integrity.";
   }
 
-  if (min === scores.mechanical) {
-    if (min >= 75) return "Minor mechanical variation under standard conditions.";
-    if (min >= 55) return "Mechanical performance variability may impact product integrity.";
+  if (state.limitingFactor === "mechanical") {
+    if (state.severity === "low") return "Minor mechanical variation under standard conditions.";
+    if (state.severity === "moderate") return "Mechanical performance variability may impact product integrity.";
     return "Significant mechanical instability expected under load conditions.";
   }
 }
+
 // =========================
-// PROCESSING WINDOW（追加）
+// PROCESSING WINDOW（差し替え）
 // =========================
 function generateProcessingWindow(scores) {
-  const min = Math.min(scores.thermal, scores.flow, scores.mechanical);
 
-  if (min < 55) {
-    return "Processing window is unstable and requires significant parameter control.";
+  const state = analyzeState(scores);
+
+  if (state.severity === "high") {
+    return "Processing window is unstable and requires strict parameter control and process redesign.";
   }
 
-  if (min < 75) {
-    return "Processing window stability depends on control of the limiting parameter.";
+  if (state.severity === "moderate") {
+    return "Processing window stability depends on precise control of the limiting parameter, particularly under continuous operation conditions.";
   }
 
   return "Stable processing window expected.";
 }
+
 // =========================
-// 🔥 UI（絶対固定：一切変更なし）
+// UI（絶対触ってない）
 // =========================
 function generateOverlay(scoreLeft, scoreRight) {
 
   const angle = -90 + (scoreRight * 1.8);
 
-  // 🌊 波の振幅（最終チューニング）
   function getAmplitude(score) {
-   if (score >= 85) return 1.6;
+    if (score >= 85) return 1.6;
     if (score >= 80) return 3;
     if (score >= 70) return 5;
     if (score >= 60) return 9;
@@ -187,133 +190,46 @@ function generateOverlay(scoreLeft, scoreRight) {
   const ampRight = getAmplitude(scoreRight);
 
   return `
-<div style="
-  position:relative;
-  width:700px;
-  height:240px;
-  margin:0 auto;
-">
+<div style="position:relative;width:700px;height:240px;margin:0 auto;">
+<img src="https://ilnautico.github.io/visual-base.png"
+style="position:absolute;top:0;left:0;width:700px;height:240px;object-fit:contain;z-index:1;"/>
 
-  <!-- 背景 -->
-  <img src="https://ilnautico.github.io/visual-base.png"
-    style="
-      position:absolute;
-      top:0;
-      left:0;
-      width:700px;
-      height:240px;
-      object-fit:contain;
-      z-index:1;
-    "
-  />
-
-  <!-- 左温度 -->
-  <div style="
-    position:absolute;
-    top:45px;
-    left:150px;
-    text-align:center;
-    z-index:2;
-  ">
-    <div style="font-size:28px; color:#2f3a44;">230°C</div>
-    <div style="font-size:16px; color:#5b6770;">${scoreLeft}</div>
-  </div>
-
-  <!-- 右温度 -->
-  <div style="
-    position:absolute;
-    top:45px;
-    left:470px;
-    text-align:center;
-    z-index:2;
-  ">
-    <div style="font-size:28px; color:#d62c2c;">180°C</div>
-    <div style="font-size:16px; color:#d62c2c;">${scoreRight}</div>
-  </div>
-
-  <!-- 🔵 左波（位置固定・振幅のみ変化） -->
-  <svg style="
-    position:absolute;
-    left:280px;
-    bottom:90px;
-    z-index:2;
-  " width="90" height="35" viewBox="0 0 90 35">
-    <path d="
-      M0 18
-      C15 ${18 - ampLeft}, 30 ${18 + ampLeft}, 45 18
-      C60 ${18 - ampLeft}, 75 ${18 + ampLeft}, 90 18
-    "
-    fill="none"
-    stroke="#4f7c8a"
-    stroke-width="1.8"
-    stroke-linecap="round"
-    opacity="0.85"
-    />
-  </svg>
-
-  <!-- 🔴 右波（位置固定・振幅のみ変化） -->
-  <svg style="
-    position:absolute;
-    left:430px;
-    bottom:90px;
-    z-index:2;
-  " width="90" height="35" viewBox="0 0 90 35">
-    <path d="
-      M0 18
-      C15 ${18 - ampRight}, 30 ${18 + ampRight}, 45 18
-      C60 ${18 - ampRight}, 75 ${18 + ampRight}, 90 18
-    "
-    fill="none"
-    stroke="#d62c2c"
-    stroke-width="1.8"
-    stroke-linecap="round"
-    opacity="0.85"
-    />
-  </svg>
-
-  <!-- 🎯 メーター -->
-  <svg style="
-    position:absolute;
-    left:500px;
-    bottom:10px;
-    z-index:2;
-  " viewBox="0 0 200 120" width="140" height="90">
-
-    <defs>
-      <linearGradient id="g">
-        <stop offset="0%" stop-color="#22c55e"/>
-        <stop offset="50%" stop-color="#fde047"/>
-        <stop offset="100%" stop-color="#ef4444"/>
-      </linearGradient>
-    </defs>
-
-    <path d="M20 100 A80 80 0 0 1 180 100 L100 100 Z"
-      fill="url(#g)"
-    />
-
-    <g transform="rotate(${angle} 100 100)">
-      <line x1="100" y1="100" x2="100" y2="25"
-        stroke="#111"
-        stroke-width="3"
-        stroke-linecap="round"
-      />
-    </g>
-
-    <circle cx="100" cy="100" r="4" fill="#111"/>
-
-  </svg>
-
+<div style="position:absolute;top:45px;left:150px;text-align:center;z-index:2;">
+<div style="font-size:28px;color:#2f3a44;">230°C</div>
+<div style="font-size:16px;color:#5b6770;">${scoreLeft}</div>
 </div>
-`;
+
+<div style="position:absolute;top:45px;left:470px;text-align:center;z-index:2;">
+<div style="font-size:28px;color:#d62c2c;">180°C</div>
+<div style="font-size:16px;color:#d62c2c;">${scoreRight}</div>
+</div>
+
+<svg style="position:absolute;left:280px;bottom:90px;z-index:2;" width="90" height="35">
+<path d="M0 18 C15 ${18 - ampLeft}, 30 ${18 + ampLeft}, 45 18 C60 ${18 - ampLeft}, 75 ${18 + ampLeft}, 90 18"
+fill="none" stroke="#4f7c8a" stroke-width="1.8" opacity="0.85"/>
+</svg>
+
+<svg style="position:absolute;left:430px;bottom:90px;z-index:2;" width="90" height="35">
+<path d="M0 18 C15 ${18 - ampRight}, 30 ${18 + ampRight}, 45 18 C60 ${18 - ampRight}, 75 ${18 + ampRight}, 90 18"
+fill="none" stroke="#d62c2c" stroke-width="1.8" opacity="0.85"/>
+</svg>
+
+<svg style="position:absolute;left:500px;bottom:10px;z-index:2;" viewBox="0 0 200 120" width="140" height="90">
+<defs><linearGradient id="g"><stop offset="0%" stop-color="#22c55e"/><stop offset="50%" stop-color="#fde047"/><stop offset="100%" stop-color="#ef4444"/></linearGradient></defs>
+<path d="M20 100 A80 80 0 0 1 180 100 L100 100 Z" fill="url(#g)"/>
+<g transform="rotate(${angle} 100 100)">
+<line x1="100" y1="100" x2="100" y2="25" stroke="#111" stroke-width="3"/>
+</g>
+<circle cx="100" cy="100" r="4" fill="#111"/>
+</svg>
+</div>`;
 }
 
 // =========================
-// HTML INJECT
+// HTML
 // =========================
 function injectHtml(template, data) {
-  return template.replace(/{{\s*(\w+)\s*}}/g, (_, key) => {
-    return safe(data[key]);
-  });
+  return template.replace(/{{\s*(\w+)\s*}}/g, (_, key) => safe(data[key]));
 }
 
 // =========================
@@ -327,7 +243,6 @@ app.post("/generate-report", async (req, res) => {
       const parsed = {};
       input.data.fields.forEach((f) => {
         const label = (f.label || "").toLowerCase();
-
         if (label.includes("application")) parsed.application = f.value;
         if (label.includes("material") && !label.includes("bio")) parsed.material = f.value;
         if (label.includes("bio") || label.includes("target")) parsed.bio_material = f.value;
@@ -351,7 +266,8 @@ app.post("/generate-report", async (req, res) => {
 
       key_risk: keyRisk,
 
-　　　　processing_window: generateProcessingWindow(scores),
+      processing_window: generateProcessingWindow(scores),
+
       thermal_behavior: "Thermally stable under controlled conditions.",
       flow_characteristics: "Stable flow characteristics.",
 
@@ -409,9 +325,7 @@ app.post("/generate-report", async (req, res) => {
 });
 
 app.get("/latest-pdf", (req, res) => {
-  if (!fs.existsSync(PDF_PATH)) {
-    return res.status(404).send("No PDF yet");
-  }
+  if (!fs.existsSync(PDF_PATH)) return res.status(404).send("No PDF yet");
   res.sendFile(PDF_PATH);
 });
 
