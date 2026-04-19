@@ -128,13 +128,31 @@ function generateExecutive(scores, decision, economic) {
 
   const c = getConstraint(scores);
 
+  // 🔥 LOW専用
+  if (decision.level === "LOW") {
+    return `
+This assessment indicates LOW feasibility for transitioning to the evaluated material within the current processing framework.
+
+Thermal (${scores.thermal}) / Flow (${scores.flow}) / Mechanical (${scores.mechanical})
+
+The system is structurally constrained by severe instability in ${c.factor}.
+
+This is expected to significantly impact ${c.impact}, making stable production difficult to sustain.
+
+Deployment Decision: HOLD
+
+Commercial-scale deployment is not recommended under current conditions.
+
+A fundamental process redesign or material reconsideration is required before further validation.
+`;
+  }
+
+  // 既存（そのまま）
   let baseStatement = "";
   if (decision.level === "HIGH") {
     baseStatement = "This assessment indicates HIGH feasibility for transitioning to the evaluated material within the current processing framework.";
-  } else if (decision.level === "MODERATE") {
-    baseStatement = "This assessment indicates MODERATE feasibility for transitioning to the evaluated material within the current processing framework.";
   } else {
-    baseStatement = "This assessment indicates LOW feasibility for transitioning to the evaluated material within the current processing framework.";
+    baseStatement = "This assessment indicates MODERATE feasibility for transitioning to the evaluated material within the current processing framework.";
   }
 
   return `
@@ -161,6 +179,12 @@ A controlled pilot validation phase is strongly recommended, with focus on ${c.c
 // =========================
 function generateRisk(scores) {
   const c = getConstraint(scores);
+  const min = Math.min(scores.thermal, scores.flow, scores.mechanical);
+
+  if (min < 55) {
+    return `Severe instability in ${c.factor} is likely to cause production inefficiency, high scrap rates, and operational failure under continuous production conditions.`;
+  }
+
   return `${c.factor} variability may impact ${c.impact}.`;
 }
 
@@ -169,6 +193,12 @@ function generateRisk(scores) {
 // =========================
 function generateProcessingWindow(scores) {
   const c = getConstraint(scores);
+  const min = Math.min(scores.thermal, scores.flow, scores.mechanical);
+
+  if (min < 55) {
+    return `Processing window is narrow and unstable, requiring significant control intervention and limiting production reliability.`;
+  }
+
   return `Processing window stability depends on precise control of ${c.factor}.`;
 }
 
@@ -284,11 +314,13 @@ app.post("/generate-report", async (req, res) => {
 
       mechanism: "Thermal + flow instability",
 
-      stability: decision.level === "HIGH" ? "High" : "Moderate",
-      stability_note: "Depends on weakest parameter.",
+     stability:
+  decision.level === "HIGH" ? "High" :
+  decision.level === "MODERATE" ? "Moderate" : "Low",
 
-      consistency: decision.level === "HIGH" ? "High" : "Moderate",
-      consistency_note: "Process dependent.",
+consistency:
+  decision.level === "HIGH" ? "High" :
+  decision.level === "MODERATE" ? "Moderate" : "Low",
 
       application_implication: "Pilot testing required.",
       next_step: "Proceed to controlled pilot validation.",
