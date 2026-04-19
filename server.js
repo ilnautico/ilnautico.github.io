@@ -82,12 +82,29 @@ function calculateEconomic(score) {
 // EXECUTIVE（数値連動）
 // =========================
 function generateExecutive(scores, decision, economic) {
+  const { thermal, flow, mechanical } = scores;
+
+  let bottleneckText = "";
+  let impactText = "";
+
+  if (flow <= thermal && flow <= mechanical) {
+    bottleneckText = `flow behavior is comparatively weaker (${flow})`;
+    impactText = "flow consistency will be the primary constraint on process stability";
+  } else if (thermal <= flow && thermal <= mechanical) {
+    bottleneckText = `thermal stability is comparatively weaker (${thermal})`;
+    impactText = "thermal control will be the primary constraint on process stability";
+  } else {
+    bottleneckText = `mechanical integrity is comparatively weaker (${mechanical})`;
+    impactText = "mechanical performance will be the primary constraint on deployment reliability";
+  }
+
   return `
 This assessment indicates ${decision.level} feasibility for transitioning to the evaluated material within the current processing framework.
 
-Thermal (${scores.thermal}) / Flow (${scores.flow}) / Mechanical (${scores.mechanical})
+Thermal stability is ${thermal >= 80 ? "strong" : "moderate"} (${thermal}), and mechanical integrity remains ${mechanical >= 80 ? "reliable" : "sensitive"} (${mechanical}).
+However, ${bottleneckText}, and is expected to act as the primary limiting factor.
 
-The lowest-performing parameter determines overall system stability.
+As a result, ${impactText}, rather than thermal or structural constraints.
 
 Deployment Decision: ${decision.decision}
 
