@@ -73,96 +73,102 @@ function calculateEconomic(score) {
 // =========================
 // VISUAL（ズレない版）
 // =========================
-function generateOverlay(scores) {
-  const { thermal, flow, total } = scores;
-  const angle = -90 + total * 1.8;
+function generateOverlay(scoreLeft, scoreRight) {
+
+  const angle = -90 + (scoreRight * 1.8);
 
   return `
 <div style="
-  position:relative;
+  position:absolute;
+  left:0;
+  top:0;
   width:100%;
-  height:260px;
+  height:100%;
 ">
 
-  <!-- 背景（基準） -->
- <img src="https://ilnautico.github.io/visual-base.png"
-  style="
-    width:100%;
-    height:260px;
-    position:absolute;
-    top:0;
-    left:0;
-    object-fit:contain;
-    background:#f8fafc;
-    z-index:1;
-  "
-/>
-
-  <!-- LEFT -->
+  <!-- 左数値 -->
   <div style="
     position:absolute;
-    left:15%;
-    top:30%;
-    width:160px;
+    top:40px;
+    left:50%;
+    transform:translateX(-220px);
     text-align:center;
-    z-index:3;
   ">
-    <div style="font-size:32px;">230°C</div>
-    <div>${thermal}</div>
-
-    <svg width="140" height="60">
-      <path d="M10 40 Q40 10 70 40 T130 40"
-        stroke="#4f7c8a" fill="none" stroke-width="3"/>
-    </svg>
+    <div style="font-size:28px; color:#2f3a44;">230°C</div>
+    <div style="font-size:16px; color:#5b6770;">${scoreLeft}</div>
   </div>
 
-  <!-- RIGHT -->
+  <!-- 右数値 -->
   <div style="
     position:absolute;
-    right:15%;
-    top:30%;
-    width:160px;
+    top:40px;
+    left:50%;
+    transform:translateX(220px);
     text-align:center;
-    z-index:3;
   ">
-    <div style="font-size:32px; color:#d62c2c;">180°C</div>
-    <div style="color:#d62c2c;">${flow}</div>
-
-    <svg width="140" height="60">
-      <path d="M10 40 Q40 10 70 40 T130 40"
-        stroke="#d62c2c" fill="none" stroke-width="3"/>
-    </svg>
+    <div style="font-size:28px; color:#d62c2c;">180°C</div>
+    <div style="font-size:16px; color:#d62c2c;">${scoreRight}</div>
   </div>
 
-  <!-- METER（中央補正） -->
-  <div style="
+  <!-- 🔵 青波 -->
+  <svg style="
     position:absolute;
     left:50%;
-    top:65%;
-    transform:translate(-50%, -50%);
-    z-index:3;
-  ">
-    <svg width="200" height="120" viewBox="0 0 200 120">
+    bottom:105px;
+    transform:translateX(-120px);
+  " width="90" height="35" viewBox="0 0 90 35">
+    <path d="M0 18 C15 6, 30 30, 45 18 C60 6, 75 30, 90 18"
+      fill="none"
+      stroke="#4f7c8a"
+      stroke-width="3"
+      stroke-linecap="round"
+      opacity="0.9"/>
+  </svg>
 
-      <defs>
-        <linearGradient id="grad">
-          <stop offset="0%" stop-color="#22c55e"/>
-          <stop offset="50%" stop-color="#fde047"/>
-          <stop offset="100%" stop-color="#ef4444"/>
-        </linearGradient>
-      </defs>
+  <!-- 🔴 赤波 -->
+  <svg style="
+    position:absolute;
+    left:50%;
+    bottom:105px;
+    transform:translateX(120px);
+  " width="90" height="35" viewBox="0 0 90 35">
+    <path d="M0 18 C15 6, 30 30, 45 18 C60 6, 75 30, 90 18"
+      fill="none"
+      stroke="#d62c2c"
+      stroke-width="3"
+      stroke-linecap="round"
+      opacity="0.9"/>
+  </svg>
 
-      <path d="M20 100 A80 80 0 0 1 180 100 L100 100 Z"
-        fill="url(#grad)"/>
+  <!-- 🎯 メーター（中央基準に変更） -->
+  <svg style="
+    position:absolute;
+    left:50%;
+    bottom:20px;
+    transform:translateX(120px);
+  " viewBox="0 0 200 120" width="140" height="90">
 
-      <g transform="rotate(${angle} 100 100)">
-        <line x1="100" y1="100" x2="100" y2="25"
-          stroke="#111" stroke-width="3"/>
-      </g>
+    <defs>
+      <linearGradient id="g">
+        <stop offset="0%" stop-color="#22c55e"/>
+        <stop offset="50%" stop-color="#fde047"/>
+        <stop offset="100%" stop-color="#ef4444"/>
+      </linearGradient>
+    </defs>
 
-      <circle cx="100" cy="100" r="4" fill="#111"/>
-    </svg>
-  </div>
+    <path d="M20 100 A80 80 0 0 1 180 100 L100 100 Z"
+      fill="url(#g)"/>
+
+    <g transform="rotate(${angle} 100 100)">
+      <line x1="100" y1="100" x2="100" y2="25"
+        stroke="#111"
+        stroke-width="3"
+        stroke-linecap="round"/>
+    </g>
+
+    <circle cx="100" cy="100" r="4" fill="#111"/>
+
+  </svg>
 
 </div>
 `;
