@@ -124,30 +124,45 @@ function generateOverlay(scoreLeft, scoreRight) {
     <div style="font-size:28px; color:#d62c2c;">180°C</div>
     <div style="color:#d62c2c;">${scoreRight}</div>
   </div>
+// 🔵 青波（完全一致）
+<svg style="
+  position:absolute;
+  left:50%;
+  bottom:110px;
+  transform:translateX(-60px);
+  z-index:2;
+" width="90" height="35">
+  <path d="
+    M0 18
+    C15 6, 30 30, 45 18
+    C60 6, 75 30, 90 18
+  "
+  fill="none"
+  stroke="#4f7c8a"
+  stroke-width="3"
+  stroke-linecap="round"
+/>
+</svg>
 
-  <!-- 🔵 波 -->
-  <svg style="
-    position:absolute;
-    left:50%;
-    bottom:95px;
-    transform:translateX(-120px);
-    z-index:2;
-  " width="90" height="35">
-    <path d="M0 18 C15 6, 30 30, 45 18 C60 6, 75 30, 90 18"
-      stroke="#4f7c8a" fill="none" stroke-width="3"/>
-  </svg>
-
-  <!-- 🔴 波 -->
-  <svg style="
-    position:absolute;
-    left:50%;
-    bottom:95px;
-    transform:translateX(120px);
-    z-index:2;
-  " width="90" height="35">
-    <path d="M0 18 C15 6, 30 30, 45 18 C60 6, 75 30, 90 18"
-      stroke="#d62c2c" fill="none" stroke-width="3"/>
-  </svg>
+// 🔴 赤波（完全一致）
+<svg style="
+  position:absolute;
+  left:50%;
+  bottom:100px;
+  transform:translateX(90px);
+  z-index:2;
+" width="90" height="35">
+  <path d="
+    M0 18
+    C15 6, 30 30, 45 18
+    C60 6, 75 30, 90 18
+  "
+  fill="none"
+  stroke="#d62c2c"
+  stroke-width="3"
+  stroke-linecap="round"
+/>
+</svg>
 
   <!-- 🎯 メーター -->
   <svg style="
