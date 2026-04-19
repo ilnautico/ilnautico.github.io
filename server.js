@@ -1,6 +1,5 @@
-
 import express from "express";
-import puppeteer from "puppeteer";　　
+import puppeteer from "puppeteer";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -20,7 +19,7 @@ const htmlTemplate = fs.readFileSync(
 );
 
 // =========================
-// 安全値（穴あき完全防止）
+// SAFE
 // =========================
 const safe = (v, fallback = "-") => {
   if (v === undefined || v === null || v === "") return fallback;
@@ -28,7 +27,7 @@ const safe = (v, fallback = "-") => {
 };
 
 // =========================
-// SCORE
+// SCORE（最終版・1つだけ）
 // =========================
 function calculateScores(input) {
   let thermal = 85;
@@ -44,59 +43,10 @@ function calculateScores(input) {
   if (mat.includes("pet")) thermal -= 25;
 
   if (bio.includes("pla")) thermal -= 10;
-  if (bio.includes("pha")) flow -= 10;
+  if (bio.includes("pha")) flow -= 25;
 
-  if (appType.includes("film")) flow -= 15;
-  if (appType.includes("injection")) mechanical -= 10;
-
-  thermal = Math.max(0, Math.min(100, thermal));
-  flow = Math.max(0, Math.min(100, flow));
-  mechanical = Math.max(0, Math.min(100, mechanical));
-
-  const total = Math.round((thermal + flow + mechanical) / 3);
-
-  return { thermal, flow, mechanical, total };
-}
-
-function determineDecision(score) {
-  if (score >= 75) return { decision: "GO", level: "HIGH" };
-  if (score >= 55) return { decision: "CONDITIONAL GO", level: "MODERATE" };
-  return { decision: "HOLD", level: "LOW" };　
-}
-
-function calculateEconomic(score) {
-  if (score >= 75) return "+5–15%";
-  if (score >= 55) return "+15–30%";
-  return "+30%+";
-}
-
-// =========================
-// VISUAL（ズレない版）
-// =========================
-// =========================
-// =========================
-// SCORE（プロ仕様）
-// =========================
-function calculateScores(input) {
-  let thermal = 85;
-  let flow = 85;
-  let mechanical = 85;
-
-  const mat = (input.material || "").toLowerCase();
-  const bio = (input.bio_material || "").toLowerCase();
-  const appType = (input.application || "").toLowerCase();
-
-  // ===== 材料補正 =====
-  if (mat.includes("pp")) thermal -= 10;
-  if (mat.includes("pe")) thermal -= 5;
-  if (mat.includes("pet")) thermal -= 25;
-
-  if (bio.includes("pla")) thermal -= 10;
-  if (bio.includes("pha")) flow -= 25; // ←強化（実務寄り）
-
-  // ===== プロセス補正 =====
   if (appType.includes("film")) {
-    flow -= 20;       // フィルムは流動支配
+    flow -= 20;
     mechanical -= 5;
   }
 
@@ -104,22 +54,20 @@ function calculateScores(input) {
     mechanical -= 15;
   }
 
-  // clamp
   thermal = Math.max(0, Math.min(100, thermal));
   flow = Math.max(0, Math.min(100, flow));
   mechanical = Math.max(0, Math.min(100, mechanical));
 
-  // 🔥 ボトルネック主導スコア
   const total = Math.round(
-    (Math.min(thermal, flow, mechanical) * 0.6) +
-    ((thermal + flow + mechanical) / 3 * 0.4)
+    Math.min(thermal, flow, mechanical) * 0.6 +
+    ((thermal + flow + mechanical) / 3) * 0.4
   );
 
   return { thermal, flow, mechanical, total };
 }
 
 // =========================
-// 判定（そのままOK）
+// DECISION
 // =========================
 function determineDecision(score) {
   if (score >= 75) return { decision: "GO", level: "HIGH" };
@@ -128,7 +76,7 @@ function determineDecision(score) {
 }
 
 // =========================
-// 経済性
+// ECONOMIC
 // =========================
 function calculateEconomic(score) {
   if (score >= 75) return "+5–15%";
@@ -137,7 +85,7 @@ function calculateEconomic(score) {
 }
 
 // =========================
-// EXECUTIVE（完全連動）
+// EXECUTIVE
 // =========================
 function generateExecutive(scores, decision, economic) {
 
@@ -146,28 +94,23 @@ function generateExecutive(scores, decision, economic) {
   let riskText = "Process variability under real-world conditions.";
 
   if (worst === scores.flow) {
-    riskText = "Flow instability impacting film uniformity and extrusion stability.";
+    riskText = "Flow instability impacting film uniformity.";
   } else if (worst === scores.thermal) {
-    riskText = "Thermal sensitivity affecting processing window stability.";
+    riskText = "Thermal sensitivity affecting processing stability.";
   } else if (worst === scores.mechanical) {
-    riskText = "Mechanical performance variability under operational stress.";
+    riskText = "Mechanical instability under operational stress.";
   }
 
   return `
 This assessment indicates ${decision.level} feasibility for transitioning to the evaluated material within the current processing framework.
 
-Thermal behavior (${scores.thermal}): Stable within defined thermal window.
-Flow behavior (${scores.flow}): Flow consistency is a key controlling factor.
-Mechanical stability (${scores.mechanical}): Structurally stable under expected conditions.
+Thermal behavior (${scores.thermal}): Stable under controlled conditions.
+Flow behavior (${scores.flow}): Flow consistency is a key factor.
+Mechanical stability (${scores.mechanical}): Structurally stable.
 
 Deployment Decision: ${decision.decision}
 
 Primary risk is ${riskText}
-
-Potential impact:
-- Product inconsistency
-- Scrap increase
-- Efficiency fluctuation
 
 Economic Impact: ${economic}
 
@@ -176,19 +119,97 @@ A controlled pilot validation phase is strongly recommended prior to commercial 
 }
 
 // =========================
+// VISUAL（絶対触らない）
+// =========================
+function generateOverlay(scoreLeft, scoreRight) {
+
+  const angle = -90 + (scoreRight * 1.8);
+
+  return `
+<div style="
+  position:relative;
+  width:700px;
+  height:240px;
+  margin:0 auto;
+">
+
+  <img src="https://ilnautico.github.io/visual-base.png"
+    style="
+      position:absolute;
+      top:0;
+      left:0;
+      width:700px;
+      height:240px;
+      object-fit:contain;
+      z-index:1;
+    "
+  />
+
+  <div style="
+    position:absolute;
+    top:45px;
+    left:150px;
+    text-align:center;
+    z-index:2;
+  ">
+    <div style="font-size:28px; color:#2f3a44;">230°C</div>
+    <div style="font-size:16px; color:#5b6770;">${scoreLeft}</div>
+  </div>
+
+  <div style="
+    position:absolute;
+    top:45px;
+    left:470px;
+    text-align:center;
+    z-index:2;
+  ">
+    <div style="font-size:28px; color:#d62c2c;">180°C</div>
+    <div style="font-size:16px; color:#d62c2c;">${scoreRight}</div>
+  </div>
+
+  <svg style="position:absolute; left:280px; bottom:90px; z-index:2;" width="90" height="35">
+    <path d="M0 18 C15 6, 30 30, 45 18 C60 6, 75 30, 90 18"
+      fill="none" stroke="#4f7c8a" stroke-width="3"/>
+  </svg>
+
+  <svg style="position:absolute; left:430px; bottom:90px; z-index:2;" width="90" height="35">
+    <path d="M0 18 C15 6, 30 30, 45 18 C60 6, 75 30, 90 18"
+      fill="none" stroke="#d62c2c" stroke-width="3"/>
+  </svg>
+
+  <svg style="position:absolute; left:500px; bottom:10px; z-index:2;" viewBox="0 0 200 120" width="140" height="90">
+    <defs>
+      <linearGradient id="g">
+        <stop offset="0%" stop-color="#22c55e"/>
+        <stop offset="50%" stop-color="#fde047"/>
+        <stop offset="100%" stop-color="#ef4444"/>
+      </linearGradient>
+    </defs>
+    <path d="M20 100 A80 80 0 0 1 180 100 L100 100 Z" fill="url(#g)"/>
+    <g transform="rotate(${angle} 100 100)">
+      <line x1="100" y1="100" x2="100" y2="25" stroke="#111" stroke-width="3"/>
+    </g>
+    <circle cx="100" cy="100" r="4" fill="#111"/>
+  </svg>
+
+</div>
+`;
+}
+
+// =========================
 // INJECT
 // =========================
 function injectHtml(template, data) {
-  return template.replace(/{{\s*(\w+)\s*}}/g, (_, key) => {
-    return safe(data[key]);
-  });
+  return template.replace(/{{\s*(\w+)\s*}}/g, (_, key) => safe(data[key]));
 }
+
 // =========================
 // MAIN
 // =========================
 app.post("/generate-report", async (req, res) => {
   try {
-   let input = req.body;
+
+    let input = req.body;
 
     if (input?.data?.fields) {
       const parsed = {};
@@ -196,31 +217,17 @@ app.post("/generate-report", async (req, res) => {
       input.data.fields.forEach((f) => {
         const label = (f.label || "").toLowerCase();
 
-        if (label.includes("application")) {
-          parsed.application = f.value;
-        }
-
-        if (label.includes("material") && !label.includes("bio")) {
-          parsed.material = f.value;
-        }
-
-        if (label.includes("bio") || label.includes("target")) {
-          parsed.bio_material = f.value;
-        }
+        if (label.includes("application")) parsed.application = f.value;
+        if (label.includes("material") && !label.includes("bio")) parsed.material = f.value;
+        if (label.includes("bio") || label.includes("target")) parsed.bio_material = f.value;
       });
 
       input = parsed;
     }
 
-
     const scores = calculateScores(input);
     const decision = determineDecision(scores.total);
     const economic = calculateEconomic(scores.total);
-
-    const keyRisk =
-      scores.total > 70
-        ? "Minor process fluctuation impacting stability."
-        : "Thermal instability and inconsistency risk.";
 
     const html = injectHtml(htmlTemplate, {
       assessment_type: "Technical Hypothesis",
@@ -231,39 +238,8 @@ app.post("/generate-report", async (req, res) => {
       compatibility_level: decision.level,
       executive_summary: generateExecutive(scores, decision, economic),
 
-      key_risk: keyRisk,
-
-      processing_window: "Stable processing window expected.",
-      thermal_behavior: "Thermally stable under controlled conditions.",
-      flow_characteristics: "Stable flow characteristics.",
-
-      mechanical_behavior: "Stable mechanical performance.",
-      surface_quality: "Uniform surface finish achievable.",
-      structural_consistency: "Stable structural integrity.",
-
-      primary_risk_title: "Process Variability",
-      primary_risk: "Minor fluctuation impacting stability.",
-
-      secondary_risk_title: "Operational Sensitivity",
-      secondary_risk: "Dependent on process control.",
-
-      mechanism: "Thermal + flow instability",
-
-      stability: "Moderate",
-      stability_note: "Depends on processing control.",
-
-      consistency: "Moderate",
-      consistency_note: "Process dependent.",
-
-      application_implication: "Pilot testing required.",
-      next_step: "Proceed to controlled pilot validation.",
-
-      decision: decision.decision,
-      economic_impact: economic,
-
-      pha_score: scores.total,
-
-     dynamic_overlay: generateOverlay(scores.thermal, scores.flow),});
+      dynamic_overlay: generateOverlay(scores.thermal, scores.flow)
+    });
 
     const browser = await puppeteer.launch({
       args: ["--no-sandbox", "--disable-setuid-sandbox"]
@@ -280,21 +256,12 @@ app.post("/generate-report", async (req, res) => {
     await browser.close();
 
     fs.writeFileSync(PDF_PATH, pdf);
-
     res.send(pdf);
 
   } catch (err) {
     console.error(err);
     res.status(500).send("error");
   }
-});
-
-// =========================
-app.get("/latest-pdf", (req, res) => {
-  if (!fs.existsSync(PDF_PATH)) {
-    return res.status(404).send("No PDF yet");
-  }
-  res.sendFile(PDF_PATH);
 });
 
 app.listen(process.env.PORT || 8080, () => {
