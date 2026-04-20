@@ -107,7 +107,7 @@ function getConstraint(scores) {
 }
 
 // =========================
-// 🔥 EXECUTIVE（修正済み）
+// EXECUTIVE（修正済み）
 // =========================
 function generateExecutive(scores, decision, economic) {
 
@@ -169,7 +169,7 @@ function generateRisk(scores) {
 }
 
 // =========================
-// 🔥 PROCESSING WINDOW（修正済み）
+// PROCESSING WINDOW（修正済み）
 // =========================
 function generateProcessingWindow(scores) {
   const c = getConstraint(scores);
@@ -187,7 +187,7 @@ function generateProcessingWindow(scores) {
 }
 
 // =========================
-// 🔥 RISK TITLE（追加）
+// RISK TITLE（追加）
 // =========================
 function getPrimaryRiskTitle(scores) {
   const c = getConstraint(scores);
@@ -198,28 +198,12 @@ function getPrimaryRiskTitle(scores) {
 }
 
 // =========================
-// UI
-// =========================
-function generateOverlay(scoreLeft, scoreRight) {
-  const angle = -90 + (scoreRight * 1.8);
-
-  return `<div>...</div>`; // ←ここは既存そのまま（省略してOK）
-}
-
-// =========================
-// HTML
-// =========================
-function injectHtml(template, data) {
-  return template.replace(/{{\s*(\w+)\s*}}/g, (_, key) => safe(data[key]));
-}
-
-// =========================
-// DEVIATIONS
+// DEVIATIONS（最終）
 // =========================
 function generateExpectedDeviations(input, scores) {
   const app = (input.application || "").toLowerCase();
 
-  if (app.includes("film")) {
+  if (app.includes("film") || app.includes("packaging")) {
     return [
       "Increased thickness variation under high-speed extrusion",
       "Instability in film gauge control across width",
@@ -227,11 +211,19 @@ function generateExpectedDeviations(input, scores) {
     ];
   }
 
-  if (app.includes("injection")) {
+  if (app.includes("injection") || app.includes("container")) {
     return [
       "Dimensional variation under thermal load",
       "Potential warpage depending on cooling conditions",
       "Surface inconsistency due to flow imbalance"
+    ];
+  }
+
+  if (scores.total < 60) {
+    return [
+      "Significant instability in processing conditions",
+      "High variability in output consistency",
+      "Material degradation risk under standard operation"
     ];
   }
 
@@ -240,6 +232,13 @@ function generateExpectedDeviations(input, scores) {
     "Potential inconsistency depending on operating conditions",
     "Further validation required under real production environment"
   ];
+}
+
+// =========================
+// HTML
+// =========================
+function injectHtml(template, data) {
+  return template.replace(/{{\s*(\w+)\s*}}/g, (_, key) => safe(data[key]));
 }
 
 // =========================
@@ -253,10 +252,11 @@ app.post("/generate-report", async (req, res) => {
     const decision = determineDecision(scores.total);
     const economic = calculateEconomic(scores.total);
     const keyRisk = generateRisk(scores);
+
     const minScore = Math.min(scores.thermal, scores.flow, scores.mechanical);
 
     const deviationsHtml = generateExpectedDeviations(input, scores)
-      .map(d => `<li>${d}</li>`)
+      .map(d => `<li>${safe(d)}</li>`)
       .join("");
 
     const html = injectHtml(htmlTemplate, {
@@ -272,20 +272,45 @@ app.post("/generate-report", async (req, res) => {
 
       processing_window: generateProcessingWindow(scores),
 
-      primary_risk_title: getPrimaryRiskTitle(scores), // 🔥ここ
+      primary_risk_title: getPrimaryRiskTitle(scores),
       primary_risk: keyRisk,
+
+      secondary_risk_title: "Operational Sensitivity",
+      secondary_risk: "Dependent on process control.",
+
+      mechanism: "Thermal + flow instability",
 
       stability:
         minScore >= 80 ? "High" :
         minScore >= 60 ? "Moderate" :
         "Low",
 
+      stability_note:
+        minScore >= 80
+          ? "Stable under controlled production conditions."
+          : minScore >= 60
+          ? "Depends on control of the limiting parameter."
+          : "Unstable under current processing conditions.",
+
       consistency:
         scores.flow >= 80 ? "High" :
         scores.flow >= 60 ? "Moderate" :
         "Low",
 
+      consistency_note:
+        scores.flow >= 80
+          ? "Consistent under standard operating conditions."
+          : scores.flow >= 60
+          ? "Process dependent with moderate variability."
+          : "High variability expected during production.",
+
       expected_deviations: deviationsHtml,
+
+      application_implication: "Pilot testing required.",
+      next_step: "Proceed to controlled pilot validation.",
+
+      decision: decision.decision,
+      economic_impact: economic,
 
       pha_score: scores.total,
 
@@ -293,6 +318,7 @@ app.post("/generate-report", async (req, res) => {
     });
 
     const browser = await puppeteer.launch({
+      headless: "new",
       args: ["--no-sandbox", "--disable-setuid-sandbox"]
     });
 
@@ -314,6 +340,13 @@ app.post("/generate-report", async (req, res) => {
     console.error(err);
     res.status(500).send("error");
   }
+});
+
+app.get("/latest-pdf", (req, res) => {
+  if (!fs.existsSync(PDF_PATH)) {
+    return res.status(404).send("No PDF yet");
+  }
+  res.sendFile(PDF_PATH);
 });
 
 app.listen(process.env.PORT || 8080, () => {
