@@ -302,6 +302,9 @@ function generateExpectedDeviations(input, scores) {
 // =========================
 // MAIN
 // =========================
+// =========================
+// MAIN
+// =========================
 app.post("/generate-report", async (req, res) => {
   try {
     let input = req.body;
@@ -323,6 +326,11 @@ app.post("/generate-report", async (req, res) => {
     const keyRisk = generateRisk(scores);
 
     const minScore = Math.min(scores.thermal, scores.flow, scores.mechanical);
+
+    // 🔥 ここが今回の“完全解決ポイント”
+    const deviationsHtml = generateExpectedDeviations(input, scores)
+      .map(d => `<li>${d}</li>`)
+      .join("");
 
     const html = injectHtml(htmlTemplate, {
       assessment_type: "Technical Hypothesis",
@@ -352,7 +360,6 @@ app.post("/generate-report", async (req, res) => {
 
       mechanism: "Thermal + flow instability",
 
-      // 🔥 Stability（ボトルネック基準）
       stability:
         minScore >= 80 ? "High" :
         minScore >= 60 ? "Moderate" :
@@ -365,7 +372,6 @@ app.post("/generate-report", async (req, res) => {
           ? "Depends on control of the limiting parameter."
           : "Unstable under current processing conditions.",
 
-      // 🔥 Consistency（Flow支配）
       consistency:
         scores.flow >= 80 ? "High" :
         scores.flow >= 60 ? "Moderate" :
@@ -378,8 +384,8 @@ app.post("/generate-report", async (req, res) => {
           ? "Process dependent with moderate variability."
           : "High variability expected during production.",
 
-      // 🔥 NEW（案件別Deviation）
-      expected_deviations: generateExpectedDeviations(input, scores),
+      // 🔥 修正済み（HTML化して渡す）
+      expected_deviations: deviationsHtml,
 
       application_implication: "Pilot testing required.",
       next_step: "Proceed to controlled pilot validation.",
