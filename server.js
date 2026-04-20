@@ -60,6 +60,24 @@ function calculateScores(input) {
 }
 
 // =========================
+// DECISION
+// =========================
+function determineDecision(score) {
+  if (score >= 75) return { decision: "GO", level: "HIGH" };
+  if (score >= 55) return { decision: "CONDITIONAL GO", level: "MODERATE" };
+  return { decision: "HOLD", level: "LOW" };
+}
+
+// =========================
+// ECONOMIC
+// =========================
+function calculateEconomic(score) {
+  if (score >= 75) return "+5–15%";
+  if (score >= 55) return "+15–30%";
+  return "+30%+";
+}
+
+// =========================
 // CONSTRAINT
 // =========================
 function getConstraint(scores) {
@@ -95,7 +113,6 @@ function getConstraint(scores) {
 // EXECUTIVE
 // =========================
 function generateExecutive(scores, decision, economic) {
-
   const c = getConstraint(scores);
 
   if (decision.level === "LOW") {
@@ -173,7 +190,7 @@ function generateProcessingWindow(scores) {
 }
 
 // =========================
-// FAILURE TITLE（自動一致）
+// PRIMARY RISK TITLE
 // =========================
 function getPrimaryRiskTitle(scores) {
   const c = getConstraint(scores);
@@ -220,7 +237,46 @@ function generateExpectedDeviations(input, scores) {
 }
 
 // =========================
-// HTML INJECT
+// UI（完全復元）
+// =========================
+function generateOverlay(scoreLeft, scoreRight) {
+
+  const angle = -90 + (scoreRight * 1.8);
+
+  return `
+<div style="position:relative;width:700px;height:240px;margin:0 auto;">
+<img src="https://ilnautico.github.io/visual-base.png"
+style="position:absolute;top:0;left:0;width:700px;height:240px;object-fit:contain;z-index:1;"/>
+
+<div style="position:absolute;top:45px;left:150px;text-align:center;z-index:2;">
+<div style="font-size:28px;color:#2f3a44;">230°C</div>
+<div style="font-size:16px;color:#5b6770;">${scoreLeft}</div>
+</div>
+
+<div style="position:absolute;top:45px;left:470px;text-align:center;z-index:2;">
+<div style="font-size:28px;color:#d62c2c;">180°C</div>
+<div style="font-size:16px;color:#d62c2c;">${scoreRight}</div>
+</div>
+
+<svg style="position:absolute;left:500px;bottom:10px;z-index:2;" viewBox="0 0 200 120" width="140" height="90">
+<defs>
+<linearGradient id="g">
+<stop offset="0%" stop-color="#22c55e"/>
+<stop offset="50%" stop-color="#fde047"/>
+<stop offset="100%" stop-color="#ef4444"/>
+</linearGradient>
+</defs>
+<path d="M20 100 A80 80 0 0 1 180 100 L100 100 Z" fill="url(#g)"/>
+<g transform="rotate(${angle} 100 100)">
+<line x1="100" y1="100" x2="100" y2="25" stroke="#111" stroke-width="3"/>
+</g>
+<circle cx="100" cy="100" r="4" fill="#111"/>
+</svg>
+</div>`;
+}
+
+// =========================
+// HTML
 // =========================
 function injectHtml(template, data) {
   return template.replace(/{{\s*(\w+)\s*}}/g, (_, key) => safe(data[key]));
@@ -248,6 +304,7 @@ app.post("/generate-report", async (req, res) => {
     const decision = determineDecision(scores.total);
     const economic = calculateEconomic(scores.total);
     const keyRisk = generateRisk(scores);
+
     const minScore = Math.min(scores.thermal, scores.flow, scores.mechanical);
 
     const deviationsHtml = generateExpectedDeviations(input, scores)
@@ -281,9 +338,7 @@ app.post("/generate-report", async (req, res) => {
 
       mechanism: "Thermal + flow instability",
 
-      stability:
-        minScore >= 80 ? "High" :
-        minScore >= 60 ? "Moderate" : "Low",
+      stability: minScore >= 80 ? "High" : minScore >= 60 ? "Moderate" : "Low",
 
       stability_note:
         minScore >= 80
@@ -310,7 +365,6 @@ app.post("/generate-report", async (req, res) => {
 
       decision: decision.decision,
       economic_impact: economic,
-
       pha_score: scores.total,
 
       dynamic_overlay: generateOverlay(scores.thermal, scores.flow),
@@ -339,7 +393,10 @@ app.post("/generate-report", async (req, res) => {
     res.status(500).send("error");
   }
 });
-
+app.get("/latest-pdf", (req, res) => {
+  if (!fs.existsSync(PDF_PATH)) return res.status(404).send("No PDF yet");
+  res.sendFile(PDF_PATH);
+});
 app.listen(process.env.PORT || 8080, () => {
   console.log("Server running");
 });
