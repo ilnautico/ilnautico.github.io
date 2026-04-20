@@ -228,7 +228,10 @@ app.post("/generate-report", async (req, res) => {
     res.status(500).send("error");
   }
 });
-
+app.get("/latest-pdf", (req, res) => {
+  if (!fs.existsSync(PDF_PATH)) return res.status(404).send("No PDF yet");
+  res.sendFile(PDF_PATH);
+});
 app.listen(process.env.PORT || 8080, () => {
   console.log("Server running");
 });
