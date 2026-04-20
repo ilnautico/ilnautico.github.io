@@ -99,6 +99,9 @@ function calculateEconomic(score) {
 // =========================
 // EXECUTIVE（完全版：経営＋技術統合）
 // =========================
+// =========================
+// EXECUTIVE（完全版：経営＋技術統合）
+// =========================
 function getConstraint(scores) {
   const min = Math.min(scores.thermal, scores.flow, scores.mechanical);
 
@@ -146,6 +149,33 @@ Commercial-scale deployment is not recommended under current conditions.
 A fundamental process redesign or material reconsideration is required before further validation.
 `;
   }
+
+  let baseStatement = "";
+
+  if (decision.level === "HIGH") {
+    baseStatement = "This assessment indicates HIGH feasibility for transitioning to the evaluated material within the current processing framework.";
+  } else {
+    baseStatement = "This assessment indicates MODERATE feasibility for transitioning to the evaluated material within the current processing framework.";
+  }
+
+  return `
+${baseStatement}
+
+Thermal (${scores.thermal}) / Flow (${scores.flow}) / Mechanical (${scores.mechanical})
+
+The system is structurally viable, with overall stability primarily influenced by ${c.factor}.
+
+This factor directly influences ${c.impact}.
+
+Deployment Decision: ${decision.decision} (subject to stabilization of the limiting parameter)
+
+Economic Impact: ${economic}
+
+This parameter should be stabilized before full commercial-scale deployment.
+
+A controlled pilot validation phase is recommended, with focus on ${c.control}.
+`;
+}
 
   let baseStatement = "";
 
@@ -270,6 +300,7 @@ function generateRisk(scores) {
 // =========================
 // PROCESSING WINDOW（ボトルネック連動）
 // =========================
+
 function generateProcessingWindow(scores) {
   const c = getConstraint(scores);
   const min = Math.min(scores.thermal, scores.flow, scores.mechanical);
@@ -291,6 +322,9 @@ function getPrimaryRiskTitle(scores) {
 }
 // =========================
 // 🔥 PRIMARY RISK TITLE（追加）
+// =========================
+// =========================
+// 🔥 PRIMARY RISK TITLE（1つだけ残す）
 // =========================
 function getPrimaryRiskTitle(scores) {
   const c = getConstraint(scores);
