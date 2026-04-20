@@ -1,5 +1,5 @@
 import express from "express";
-import puppeteer from "puppeteer";　
+import puppeteer from "puppeteer";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -27,7 +27,7 @@ const safe = (v, fallback = "-") => {
 };
 
 // =========================
-// SCORE（既存そのまま）
+// SCORE
 // =========================
 function calculateScores(input) {
   let thermal = 85;
@@ -60,43 +60,7 @@ function calculateScores(input) {
 }
 
 // =========================
-// 🔥 STATE（追加）
-// =========================
-function analyzeState(scores) {
-  const min = Math.min(scores.thermal, scores.flow, scores.mechanical);
-
-  let limitingFactor = "thermal";
-  if (scores.flow === min) limitingFactor = "flow";
-  if (scores.mechanical === min) limitingFactor = "mechanical";
-
-  let severity;
-  if (min >= 75) severity = "low";
-  else if (min >= 55) severity = "moderate";
-  else severity = "high";
-
-  return { limitingFactor, severity };
-}
-
-// =========================
-// DECISION（そのまま）
-// =========================
-function determineDecision(score) {
-  if (score >= 75) return { decision: "GO", level: "HIGH" };
-  if (score >= 55) return { decision: "CONDITIONAL GO", level: "MODERATE" };
-  return { decision: "HOLD", level: "LOW" };
-}
-
-// =========================
-// ECONOMIC（そのまま）
-// =========================
-function calculateEconomic(score) {
-  if (score >= 75) return "+5–15%";
-  if (score >= 55) return "+15–30%";
-  return "+30%+";
-}
-
-// =========================
-// EXECUTIVE（完全版：経営＋技術統合）
+// CONSTRAINT
 // =========================
 function getConstraint(scores) {
   const min = Math.min(scores.thermal, scores.flow, scores.mechanical);
@@ -111,7 +75,7 @@ function getConstraint(scores) {
 
   if (min === scores.thermal) {
     return {
-      factor: "thermal stability under processing conditions",
+      factor: "thermal behaviour under processing conditions",
       impact: "material degradation risk and process reliability",
       control: "temperature control precision and thermal distribution"
     };
@@ -124,11 +88,30 @@ function getConstraint(scores) {
   };
 }
 
-function generateExecutive(scores, decision, economic) {
+// =========================
+// DECISION
+// =========================
+function determineDecision(score) {
+  if (score >= 75) return { decision: "GO", level: "HIGH" };
+  if (score >= 55) return { decision: "CONDITIONAL GO", level: "MODERATE" };
+  return { decision: "HOLD", level: "LOW" };
+}
 
+// =========================
+// ECONOMIC
+// =========================
+function calculateEconomic(score) {
+  if (score >= 75) return "+5–15%";
+  if (score >= 55) return "+15–30%";
+  return "+30%+";
+}
+
+// =========================
+// EXECUTIVE（完全版）
+// =========================
+function generateExecutive(scores, decision, economic) {
   const c = getConstraint(scores);
 
-  // 🔥 LOW専用
   if (decision.level === "LOW") {
     return `
 This assessment indicates LOW feasibility for transitioning to the evaluated material within the current processing framework.
@@ -147,126 +130,80 @@ A fundamental process redesign or material reconsideration is required before fu
 `;
   }
 
-  // 既存（そのまま）
-  let baseStatement = "";
-  if (decision.level === "HIGH") {
-    baseStatement = "This assessment indicates HIGH feasibility for transitioning to the evaluated material within the current processing framework.";
-  } else {
-    baseStatement = "This assessment indicates MODERATE feasibility for transitioning to the evaluated material within the current processing framework.";
-  }
+  let baseStatement =
+    decision.level === "HIGH"
+      ? "This assessment indicates HIGH feasibility for transitioning to the evaluated material within the current processing framework."
+      : "This assessment indicates MODERATE feasibility for transitioning to the evaluated material within the current processing framework.";
 
   return `
 ${baseStatement}
 
 Thermal (${scores.thermal}) / Flow (${scores.flow}) / Mechanical (${scores.mechanical})
 
-The system is structurally viable; however, overall stability is governed by ${c.factor}.
+The system is structurally viable, with overall stability primarily influenced by ${c.factor}.
 
-This constraint directly influences ${c.impact}.
+This factor directly influences ${c.impact}.
 
 Deployment Decision: ${decision.decision} (subject to stabilization of the limiting parameter)
 
 Economic Impact: ${economic}
 
-This constraint must be stabilized before any commercial-scale deployment.
+This parameter should be stabilized before full commercial-scale deployment.
 
-A controlled pilot validation phase is strongly recommended, with focus on ${c.control}.
+A controlled pilot validation phase is recommended, with focus on ${c.control}.
 `;
 }
 
 // =========================
-// RISK（ボトルネック連動）
+// RISK
 // =========================
 function generateRisk(scores) {
   const c = getConstraint(scores);
   const min = Math.min(scores.thermal, scores.flow, scores.mechanical);
 
   if (min < 55) {
-    return `Severe instability in ${c.factor} is likely to cause production inefficiency, high scrap rates, and operational failure under continuous production conditions.`;
+    return `Severe instability in ${c.factor} is likely to cause production inefficiency, high scrap rates, and operational failure.`;
   }
 
   return `${c.factor} variability may impact ${c.impact}.`;
 }
 
 // =========================
-// PROCESSING WINDOW（ボトルネック連動）
+// RISK TITLE
+// =========================
+function getPrimaryRiskTitle(scores) {
+  const c = getConstraint(scores);
+
+  if (c.factor.includes("thermal")) return "Thermal Instability";
+  if (c.factor.includes("flow")) return "Process Variability";
+  return "Mechanical Limitation";
+}
+
+// =========================
+// PROCESSING WINDOW
 // =========================
 function generateProcessingWindow(scores) {
   const c = getConstraint(scores);
   const min = Math.min(scores.thermal, scores.flow, scores.mechanical);
 
   if (min < 55) {
-    return `Processing window is narrow and unstable, requiring significant control intervention and limiting production reliability.`;
+    return `Processing window is narrow and unstable, requiring significant control intervention.`;
+  }
+
+  if (c.factor.includes("thermal")) {
+    return `Processing window stability depends on precise thermal control during processing.`;
   }
 
   return `Processing window stability depends on precise control of ${c.factor}.`;
 }
 
 // =========================
-// UI（絶対触ってない）
+// DEVIATION
 // =========================
-function generateOverlay(scoreLeft, scoreRight) {
-
-  const angle = -90 + (scoreRight * 1.8);
-
-  function getAmplitude(score) {
-    if (score >= 85) return 1.6;
-    if (score >= 80) return 3;
-    if (score >= 70) return 5;
-    if (score >= 60) return 9;
-    return 13;
-  }
-
-  const ampLeft = getAmplitude(scoreLeft);
-  const ampRight = getAmplitude(scoreRight);
-
-  return `
-<div style="position:relative;width:700px;height:240px;margin:0 auto;">
-<img src="https://ilnautico.github.io/visual-base.png"
-style="position:absolute;top:0;left:0;width:700px;height:240px;object-fit:contain;z-index:1;"/>
-
-<div style="position:absolute;top:45px;left:150px;text-align:center;z-index:2;">
-<div style="font-size:28px;color:#2f3a44;">230°C</div>
-<div style="font-size:16px;color:#5b6770;">${scoreLeft}</div>
-</div>
-
-<div style="position:absolute;top:45px;left:470px;text-align:center;z-index:2;">
-<div style="font-size:28px;color:#d62c2c;">180°C</div>
-<div style="font-size:16px;color:#d62c2c;">${scoreRight}</div>
-</div>
-
-<svg style="position:absolute;left:280px;bottom:90px;z-index:2;" width="90" height="35">
-<path d="M0 18 C15 ${18 - ampLeft}, 30 ${18 + ampLeft}, 45 18 C60 ${18 - ampLeft}, 75 ${18 + ampLeft}, 90 18"
-fill="none" stroke="#4f7c8a" stroke-width="1.8" opacity="0.85"/>
-</svg>
-
-<svg style="position:absolute;left:430px;bottom:90px;z-index:2;" width="90" height="35">
-<path d="M0 18 C15 ${18 - ampRight}, 30 ${18 + ampRight}, 45 18 C60 ${18 - ampRight}, 75 ${18 + ampRight}, 90 18"
-fill="none" stroke="#d62c2c" stroke-width="1.8" opacity="0.85"/>
-</svg>
-
-<svg style="position:absolute;left:500px;bottom:10px;z-index:2;" viewBox="0 0 200 120" width="140" height="90">
-<defs><linearGradient id="g"><stop offset="0%" stop-color="#22c55e"/><stop offset="50%" stop-color="#fde047"/><stop offset="100%" stop-color="#ef4444"/></linearGradient></defs>
-<path d="M20 100 A80 80 0 0 1 180 100 L100 100 Z" fill="url(#g)"/>
-<g transform="rotate(${angle} 100 100)">
-<line x1="100" y1="100" x2="100" y2="25" stroke="#111" stroke-width="3"/>
-</g>
-<circle cx="100" cy="100" r="4" fill="#111"/>
-</svg>
-</div>`;
-}
-
-// =========================
-// HTML
-// =========================
-function injectHtml(template, data) {
-  return template.replace(/{{\s*(\w+)\s*}}/g, (_, key) => safe(data[key]));
-}
 function generateExpectedDeviations(input, scores) {
   const app = (input.application || "").toLowerCase();
 
-  // フィルム系
-  if (app.includes("film") || app.includes("packaging")) {
+  if (app.includes("film")) {
     return [
       "Increased thickness variation under high-speed extrusion",
       "Instability in film gauge control across width",
@@ -274,8 +211,7 @@ function generateExpectedDeviations(input, scores) {
     ];
   }
 
-  // 射出系
-  if (app.includes("injection") || app.includes("container")) {
+  if (app.includes("injection")) {
     return [
       "Dimensional variation under thermal load",
       "Potential warpage depending on cooling conditions",
@@ -283,7 +219,6 @@ function generateExpectedDeviations(input, scores) {
     ];
   }
 
-  // LOWケース
   if (scores.total < 60) {
     return [
       "Significant instability in processing conditions",
@@ -292,16 +227,20 @@ function generateExpectedDeviations(input, scores) {
     ];
   }
 
-  // デフォルト
   return [
     "Moderate variability in process stability",
     "Potential inconsistency depending on operating conditions",
-    "Further validation required under real production environment"
+    "Further validation required"
   ];
 }
+
 // =========================
-// MAIN
+// HTML INJECT
 // =========================
+function injectHtml(template, data) {
+  return template.replace(/{{\s*(\w+)\s*}}/g, (_, key) => safe(data[key]));
+}
+
 // =========================
 // MAIN
 // =========================
@@ -324,10 +263,8 @@ app.post("/generate-report", async (req, res) => {
     const decision = determineDecision(scores.total);
     const economic = calculateEconomic(scores.total);
     const keyRisk = generateRisk(scores);
-
     const minScore = Math.min(scores.thermal, scores.flow, scores.mechanical);
 
-    // 🔥 ここが今回の“完全解決ポイント”
     const deviationsHtml = generateExpectedDeviations(input, scores)
       .map(d => `<li>${d}</li>`)
       .join("");
@@ -352,7 +289,7 @@ app.post("/generate-report", async (req, res) => {
       surface_quality: "Uniform surface finish achievable.",
       structural_consistency: "Stable structural integrity.",
 
-      primary_risk_title: "Process Variability",
+      primary_risk_title: getPrimaryRiskTitle(scores),
       primary_risk: keyRisk,
 
       secondary_risk_title: "Operational Sensitivity",
@@ -384,17 +321,12 @@ app.post("/generate-report", async (req, res) => {
           ? "Process dependent with moderate variability."
           : "High variability expected during production.",
 
-      // 🔥 修正済み（HTML化して渡す）
       expected_deviations: deviationsHtml,
 
       application_implication: "Pilot testing required.",
       next_step: "Proceed to controlled pilot validation.",
 
-      decision: decision.decision,
-      economic_impact: economic,
-
       pha_score: scores.total,
-
       dynamic_overlay: generateOverlay(scores.thermal, scores.flow),
     });
 
@@ -413,7 +345,6 @@ app.post("/generate-report", async (req, res) => {
     await browser.close();
 
     fs.writeFileSync(PDF_PATH, pdf);
-
     res.send(pdf);
 
   } catch (err) {
@@ -422,15 +353,9 @@ app.post("/generate-report", async (req, res) => {
   }
 });
 
-app.get("/latest-pdf", (req, res) => {
-  if (!fs.existsSync(PDF_PATH)) return res.status(404).send("No PDF yet");
-  res.sendFile(PDF_PATH);
-});
-
 app.listen(process.env.PORT || 8080, () => {
   console.log("Server running");
 });
-
 const html_3man =`;
 <!DOCTYPE html>
 <html>
