@@ -286,6 +286,9 @@ app.post("/generate-report", async (req, res) => {
     const economic = calculateEconomic(scores.total);
     const keyRisk = generateRisk(scores);
 
+    // ✅ ボトルネック定義（超重要）
+    const minScore = Math.min(scores.thermal, scores.flow, scores.mechanical);
+
     const html = injectHtml(htmlTemplate, {
       assessment_type: "Technical Hypothesis",
       application: safe(input.application),
@@ -313,28 +316,37 @@ app.post("/generate-report", async (req, res) => {
       secondary_risk: "Dependent on process control.",
 
       mechanism: "Thermal + flow instability",
-stability:
-  decision.level === "HIGH" ? "High" :
-  decision.level === "MODERATE" ? "Moderate" : "Low",
 
-stability_note:
-  decision.level === "HIGH"
-    ? "Stable under controlled production conditions."
-    : decision.level === "MODERATE"
-    ? "Depends on control of the limiting parameter."
-    : "Unstable under current processing conditions.",
+      // =========================
+      // 🔥 修正済ロジック（ここが本質）
+      // =========================
 
-consistency:
-  decision.level === "HIGH" ? "High" :
-  decision.level === "MODERATE" ? "Moderate" : "Low",
+      stability:
+        minScore >= 80 ? "High" :
+        minScore >= 60 ? "Moderate" :
+        "Low",
 
-consistency_note:
-  decision.level === "HIGH"
-    ? "Consistent under standard operating conditions."
-    : decision.level === "MODERATE"
-    ? "Process dependent with moderate variability."
-    : "High variability expected during production.",
-      
+      stability_note:
+        minScore >= 80
+          ? "Stable under controlled production conditions."
+          : minScore >= 60
+          ? "Depends on control of the limiting parameter."
+          : "Unstable under current processing conditions.",
+
+      consistency:
+        scores.flow >= 80 ? "High" :
+        scores.flow >= 60 ? "Moderate" :
+        "Low",
+
+      consistency_note:
+        scores.flow >= 80
+          ? "Consistent under standard operating conditions."
+          : scores.flow >= 60
+          ? "Process dependent with moderate variability."
+          : "High variability expected during production.",
+
+      // =========================
+
       application_implication: "Pilot testing required.",
       next_step: "Proceed to controlled pilot validation.",
 
