@@ -1,5 +1,3 @@
-// ★★★ 省略なし・完成版 ★★★
-
 import express from "express";
 import puppeteer from "puppeteer";
 import fs from "fs";
@@ -24,12 +22,12 @@ const htmlTemplate = fs.readFileSync(
 // SAFE
 // =========================
 const safe = (v, fallback = "-") => {
-  if (!v) return fallback;
+  if (!v || v === "") return fallback;
   return String(v);
 };
 
 // =========================
-// SCORE（既存 그대로）
+// SCORE
 // =========================
 function calculateScores(input) {
   let thermal = 85;
@@ -40,47 +38,20 @@ function calculateScores(input) {
   const bio = (input.bio_material || "").toLowerCase();
   const app = (input.application || "").toLowerCase();
 
+  if (mat.includes("pp")) thermal -= 10;
   if (mat.includes("pet")) thermal -= 25;
+
+  if (bio.includes("pla")) thermal -= 10;
   if (bio.includes("pha")) flow -= 10;
+
   if (app.includes("film")) flow -= 15;
-
-  thermal = Math.max(0, Math.min(100, thermal));
-  flow = Math.max(0, Math.min(100, flow));
-  mechanical = Math.max(0, Math.min(100, mechanical));
-
-  const bottleneck = Math.min(thermal, flow, mechanical);
-  const avg = (thermal + flow + mechanical) / 3;
-  const total = Math.round(bottleneck * 0.7 + avg * 0.3);
-
-  return { thermal, flow, mechanical, total };
-}
-
-// =========================
-// CONSTRAINT（既存 그대로）
-// =========================
-function getConstraint(scores) {
-  const min = Math.min(scores.thermal, scores.flow, scores.mechanical);
-
-  if (min === scores.flow) {
-    return {
-      factor: "flow consistency",
-      impact: "production stability",
-      control: "extrusion balance"
-    };
-  }
-
-  if (min === scores.thermal) {
-    return {
-      factor: "thermal stability",
-      impact: "material degradation",
-      control: "temperature control"
-    };
-  }
+  if (app.includes("injection")) mechanical -= 10;
 
   return {
-    factor: "mechanical integrity",
-    impact: "product strength",
-    control: "material consistency"
+    thermal,
+    flow,
+    mechanical,
+    total: Math.round((thermal + flow + mechanical) / 3)
   };
 }
 
@@ -88,92 +59,115 @@ function getConstraint(scores) {
 // DECISION
 // =========================
 function determineDecision(score) {
-  if (score >= 75) return { decision: "GO", level: "HIGH" };
-  if (score >= 55) return { decision: "CONDITIONAL GO", level: "MODERATE" };
-  return { decision: "HOLD", level: "LOW" };
+  if (score >= 75) return { level: "HIGH", decision: "GO" };
+  if (score >= 55) return { level: "MODERATE", decision: "CONDITIONAL GO" };
+  return { level: "LOW", decision: "HOLD" };
 }
 
 // =========================
-// ECONOMIC
+// EXECUTIVE
 // =========================
-function calculateEconomic(score) {
-  if (score >= 75) return "+5–15%";
-  if (score >= 55) return "+15–30%";
-  return "+30%+";
-}
+function generateExecutive(scores, decision, input) {
 
-// =========================
-// 🔥 EXECUTIVE（9パターン）
-// =========================
-function generateExecutive(scores, decision, economic) {
-  const c = getConstraint(scores);
-  const base = `Thermal (${scores.thermal}) / Flow (${scores.flow}) / Mechanical (${scores.mechanical})`;
+  const issues = input.issues || "";
+  const concern = input.concern || "";
+  const notes = input.notes || "";
 
   if (decision.level === "LOW") {
-    return `LOW feasibility.\n${base}\nFailure risk in ${c.factor}.`;
+    return `
+LOW feasibility.
+
+Thermal (${scores.thermal}) / Flow (${scores.flow}) / Mechanical (${scores.mechanical})
+
+Critical instability detected.
+
+Issues: ${issues}
+
+Primary concern: ${concern}
+
+Notes: ${notes}
+
+Production not recommended.
+`;
   }
 
   if (decision.level === "MODERATE") {
-    return `Moderate feasibility.\n${base}\nSensitive to ${c.factor}.`;
+    return `
+MODERATE feasibility.
+
+Thermal (${scores.thermal}) / Flow (${scores.flow}) / Mechanical (${scores.mechanical})
+
+Requires control and validation.
+
+Issues: ${issues}
+
+Primary concern: ${concern}
+
+Notes: ${notes}
+`;
   }
 
-  return `High feasibility.\n${base}\nStable with minor sensitivity to ${c.factor}. Economic: ${economic}`;
+  return `
+HIGH feasibility.
+
+Thermal (${scores.thermal}) / Flow (${scores.flow}) / Mechanical (${scores.mechanical})
+
+Stable for transition.
+
+Issues: ${issues}
+
+Primary concern: ${concern}
+
+Notes: ${notes}
+`;
 }
 
 // =========================
-// RISK
-// =========================
-function generateRisk(scores) {
-  const c = getConstraint(scores);
-  return `Risk related to ${c.factor}`;
-}
-
-// =========================
-// PROCESS
-// =========================
-function generateProcessingWindow(scores) {
-  const c = getConstraint(scores);
-  return `Depends on ${c.factor}`;
-}
-
-// =========================
-// STABILITY / CONSISTENCY
-// =========================
-function getStability(scores) {
-  return scores.total >= 70 ? "Stable" : "Unstable";
-}
-
-function getConsistency(scores) {
-  return scores.flow >= 70 ? "Consistent" : "Variable";
-}
-
-// =========================
-// DEVIATIONS
-// =========================
-function generateExpectedDeviations() {
-  return [
-    "Thickness variation",
-    "Flow instability",
-    "Surface inconsistency"
-  ];
-}
-
-// =========================
-// PRIMARY RISK TITLE
-// =========================
-function getPrimaryRiskTitle(scores) {
-  const c = getConstraint(scores);
-
-  if (c.factor.includes("thermal")) return "Thermal Instability";
-  if (c.factor.includes("flow")) return "Flow Variability";
-  return "Mechanical Limitation";
-}
-
-// =========================
-// HTML
+// HTML inject
 // =========================
 function injectHtml(template, data) {
   return template.replace(/{{\s*(\w+)\s*}}/g, (_, key) => safe(data[key]));
+}
+
+// =========================
+// 🔥 フォーム完全マッピング
+// =========================
+function parseForm(input) {
+
+  if (!input?.data?.fields) return input;
+
+  const parsed = {};
+
+  input.data.fields.forEach((f) => {
+    const label = (f.label || "").toLowerCase();
+    const value = f.value;
+
+    if (label.includes("project name")) parsed.project_name = value;
+    if (label.includes("application")) parsed.application = value;
+    if (label.includes("product type")) parsed.product_type = value;
+
+    if (label.includes("current material")) parsed.material = value;
+    if (label.includes("target material")) parsed.bio_material = value;
+
+    if (label.includes("known issues")) parsed.issues = value;
+    if (label.includes("mechanical requirement")) parsed.mechanical_req = value;
+
+    if (label.includes("processing method")) parsed.process = value;
+    if (label.includes("equipment")) parsed.equipment = value;
+
+    if (label.includes("screw")) parsed.screw = value;
+    if (label.includes("l/d")) parsed.ld = value;
+    if (label.includes("die")) parsed.mold = value;
+
+    if (label.includes("production scale")) parsed.scale = value;
+
+    if (label.includes("primary concern")) parsed.concern = value;
+    if (label.includes("additional notes")) parsed.notes = value;
+
+    if (label.includes("project stage")) parsed.stage = value;
+  });
+
+  return parsed;
 }
 
 // =========================
@@ -181,29 +175,34 @@ function injectHtml(template, data) {
 // =========================
 app.post("/generate-report", async (req, res) => {
   try {
-    const input = req.body;
+
+    const input = parseForm(req.body);
 
     const scores = calculateScores(input);
     const decision = determineDecision(scores.total);
-    const economic = calculateEconomic(scores.total);
-
-    const deviationsHtml = generateExpectedDeviations()
-      .map(d => `<li>${d}</li>`)
-      .join("");
 
     const html = injectHtml(htmlTemplate, {
-      application: safe(input.application),
-      material_transition: safe(input.bio_material),
+
+      application: input.application,
+      material_transition: input.bio_material,
+      report_date: new Date().toISOString().split("T")[0],
+
       compatibility_level: decision.level,
-      executive_summary: generateExecutive(scores, decision, economic),
-      key_risk: generateRisk(scores),
-      processing_window: generateProcessingWindow(scores),
-      primary_risk_title: getPrimaryRiskTitle(scores),
-      primary_risk: generateRisk(scores),
-      stability: getStability(scores),
-      consistency: getConsistency(scores),
-      expected_deviations: deviationsHtml,
-      pha_score: scores.total
+      executive_summary: generateExecutive(scores, decision, input),
+
+      key_risk: input.concern,
+      processing_window: input.process,
+
+      primary_risk_title: input.concern,
+
+      decision: decision.decision,
+      economic_impact: "Auto-calculated",
+
+      project_name: input.project_name,
+      product_type: input.product_type,
+      issues: input.issues,
+      notes: input.notes
+
     });
 
     const browser = await puppeteer.launch({
@@ -211,7 +210,7 @@ app.post("/generate-report", async (req, res) => {
     });
 
     const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: "networkidle0" });
+    await page.setContent(html);
 
     const pdf = await page.pdf({
       format: "A4",
@@ -228,10 +227,16 @@ app.post("/generate-report", async (req, res) => {
     res.status(500).send("error");
   }
 });
+
+// =========================
+// PDF GET
+// =========================
 app.get("/latest-pdf", (req, res) => {
   if (!fs.existsSync(PDF_PATH)) return res.status(404).send("No PDF yet");
   res.sendFile(PDF_PATH);
 });
+
+// =========================
 app.listen(process.env.PORT || 8080, () => {
   console.log("Server running");
 });
