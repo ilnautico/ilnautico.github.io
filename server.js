@@ -22,12 +22,12 @@ const htmlTemplate = fs.readFileSync(
 // SAFE
 // =========================
 const safe = (v, fallback = "-") => {
-  if (v === undefined || v === null || v === "") return fallback;
+  if (!v || v === "") return fallback;
   return String(v);
 };
 
 // =========================
-// SCORE（既存そのまま）
+// SCORE
 // =========================
 function calculateScores(input) {
   let thermal = 85;
@@ -38,7 +38,7 @@ function calculateScores(input) {
   const bio = (input.bio_material || "").toLowerCase();
   const appType = (input.application || "").toLowerCase();
 
-  if (mat.includes("pp")) thermal -= 10;
+  if (mat.includes("pp")) thermal -= 20;
   if (mat.includes("pe")) thermal -= 5;
   if (mat.includes("pet")) thermal -= 25;
 
@@ -60,6 +60,35 @@ function calculateScores(input) {
 }
 
 // =========================
+// CONSTRAINT
+// =========================
+function getConstraint(scores) {
+  const min = Math.min(scores.thermal, scores.flow, scores.mechanical);
+
+  if (min === scores.flow) {
+    return {
+      factor: "flow consistency",
+      impact: "production stability and yield",
+      control: "melt uniformity and pressure stability"
+    };
+  }
+
+  if (min === scores.thermal) {
+    return {
+      factor: "thermal stability",
+      impact: "material degradation and process reliability",
+      control: "temperature precision"
+    };
+  }
+
+  return {
+    factor: "mechanical integrity",
+    impact: "product performance",
+    control: "structural consistency"
+  };
+}
+
+// =========================
 // DECISION
 // =========================
 function determineDecision(score) {
@@ -78,70 +107,35 @@ function calculateEconomic(score) {
 }
 
 // =========================
-// CONSTRAINT
+// EXECUTIVE（完成版）
 // =========================
-function getConstraint(scores) {
-  const min = Math.min(scores.thermal, scores.flow, scores.mechanical);
-
-  if (min === scores.flow) {
-    return {
-      factor: "flow consistency",
-      impact: "production stability and yield",
-      control: "pressure stability and melt uniformity"
-    };
-  }
-
-  if (min === scores.thermal) {
-    return {
-      factor: "thermal stability",
-      impact: "material degradation and process reliability",
-      control: "temperature precision"
-    };
-  }
-
-  return {
-    factor: "mechanical stability",
-    impact: "structural performance",
-    control: "material integrity"
-  };
-}
-
-// =========================
-// 🔥 EXECUTIVE（完全復元＋強化）
-// =========================
-function generateExecutive(scores, decision, economic, input) {
+function generateExecutive(input, scores, decision, economic) {
 
   const c = getConstraint(scores);
 
-  const issues = input.known_issues || "No critical issues reported";
-  const concern = input.primary_concern || "No primary concern specified";
-  const notes = input.additional_notes || "No additional notes provided";
-
-  let baseStatement = decision.level;
-
   return `
-${baseStatement} feasibility.
+This assessment evaluates the feasibility of transitioning from conventional material to a biodegradable alternative under current production conditions.
 
 Thermal (${scores.thermal}) / Flow (${scores.flow}) / Mechanical (${scores.mechanical})
 
-Application context:
-${safe(input.application)} / ${safe(input.product_type)} / ${safe(input.processing_method)}
+Application:
+${safe(input.application)}
 
 Current material:
 ${safe(input.material)}
 
 Observed issues:
-${issues}
+${safe(input.issues)}
 
 Primary concern:
-${concern}
+${safe(input.concern)}
 
 Additional notes:
-${notes}
+${safe(input.notes)}
 
 The system is structurally ${decision.level === "LOW" ? "constrained" : "viable"}, with sensitivity to ${c.factor}.
 
-This directly impacts ${c.impact} under production conditions.
+This impacts ${c.impact} under production conditions.
 
 Control focus:
 ${c.control}
@@ -159,49 +153,80 @@ Deployment Decision: ${decision.decision}
 }
 
 // =========================
-// RISK（空防止）
+// RISK
 // =========================
-function generateSecondaryRisk(scores) {
-  return "Secondary instability may arise due to interaction between thermal and flow dynamics.";
-}
-
-function generateMechanism(scores) {
-  return "Instability originates from imbalance between thermal response and material flow behavior.";
+function generateRisk(scores) {
+  const c = getConstraint(scores);
+  return `${c.factor} may impact ${c.impact}`;
 }
 
 // =========================
-// EXPECTED
+// PRIMARY RISK TITLE
 // =========================
-function generateExpectedDeviations() {
-  return `
-<li>Thickness variation</li>
-<li>Flow instability</li>
-<li>Surface inconsistency</li>
-`;
+function getPrimaryRiskTitle(scores) {
+  const c = getConstraint(scores);
+  if (c.factor.includes("thermal")) return "Thermal Instability";
+  if (c.factor.includes("flow")) return "Flow Variability";
+  return "Mechanical Limitation";
 }
-
-// =========================
-// UI（そのまま）
-// =========================
 function generateOverlay(scoreLeft, scoreRight) {
 
   const angle = -90 + (scoreRight * 1.8);
 
+  function getAmplitude(score) {
+    if (score >= 85) return 1.6;
+    if (score >= 80) return 3;
+    if (score >= 70) return 5;
+    if (score >= 60) return 9;
+    return 13;
+  }
+
+  const ampLeft = getAmplitude(scoreLeft);
+  const ampRight = getAmplitude(scoreRight);
+
   return `
 <div style="position:relative;width:700px;height:240px;margin:0 auto;">
 <img src="https://ilnautico.github.io/visual-base.png"
-style="position:absolute;width:700px;height:240px;"/>
+style="position:absolute;top:0;left:0;width:700px;height:240px;object-fit:contain;z-index:1;"/>
 
-<svg style="position:absolute;left:500px;bottom:10px;" viewBox="0 0 200 120" width="140">
+<div style="position:absolute;top:45px;left:150px;text-align:center;z-index:2;">
+<div style="font-size:28px;color:#2f3a44;">230°C</div>
+<div style="font-size:16px;color:#5b6770;">${scoreLeft}</div>
+</div>
+
+<div style="position:absolute;top:45px;left:470px;text-align:center;z-index:2;">
+<div style="font-size:28px;color:#d62c2c;">180°C</div>
+<div style="font-size:16px;color:#d62c2c;">${scoreRight}</div>
+</div>
+
+<svg style="position:absolute;left:280px;bottom:90px;z-index:2;" width="90" height="35">
+<path d="M0 18 C15 ${18 - ampLeft}, 30 ${18 + ampLeft}, 45 18 C60 ${18 - ampLeft}, 75 ${18 + ampLeft}, 90 18"
+fill="none" stroke="#4f7c8a" stroke-width="1.8" opacity="0.85"/>
+</svg>
+
+<svg style="position:absolute;left:430px;bottom:90px;z-index:2;" width="90" height="35">
+<path d="M0 18 C15 ${18 - ampRight}, 30 ${18 + ampRight}, 45 18 C60 ${18 - ampRight}, 75 ${18 + ampRight}, 90 18"
+fill="none" stroke="#d62c2c" stroke-width="1.8" opacity="0.85"/>
+</svg>
+
+<svg style="position:absolute;left:500px;bottom:10px;z-index:2;" viewBox="0 0 200 120" width="140" height="90">
+<defs>
+<linearGradient id="g">
+<stop offset="0%" stop-color="#22c55e"/>
+<stop offset="50%" stop-color="#fde047"/>
+<stop offset="100%" stop-color="#ef4444"/>
+</linearGradient>
+</defs>
+<path d="M20 100 A80 80 0 0 1 180 100 L100 100 Z" fill="url(#g)"/>
 <g transform="rotate(${angle} 100 100)">
 <line x1="100" y1="100" x2="100" y2="25" stroke="#111" stroke-width="3"/>
 </g>
+<circle cx="100" cy="100" r="4" fill="#111"/>
 </svg>
 </div>`;
 }
-
 // =========================
-// HTML
+// HTML inject
 // =========================
 function injectHtml(template, data) {
   return template.replace(/{{\s*(\w+)\s*}}/g, (_, key) => safe(data[key]));
@@ -213,16 +238,7 @@ function injectHtml(template, data) {
 app.post("/generate-report", async (req, res) => {
   try {
 
-    const input = {
-      application: req.body.application,
-      product_type: req.body.product_type,
-      processing_method: req.body.processing_method,
-      material: req.body.material,
-      bio_material: req.body.bio_material,
-      known_issues: req.body.known_issues,
-      primary_concern: req.body.primary_concern,
-      additional_notes: req.body.additional_notes
-    };
+    const input = req.body;
 
     const scores = calculateScores(input);
     const decision = determineDecision(scores.total);
@@ -231,31 +247,50 @@ app.post("/generate-report", async (req, res) => {
 
     const html = injectHtml(htmlTemplate, {
 
-      application: input.application,
-      material_transition: input.bio_material,
+      application: safe(input.application),
+      material_transition: safe(input.bio_material),
       report_date: new Date().toISOString().split("T")[0],
 
       compatibility_level: decision.level,
-      executive_summary: generateExecutive(scores, decision, economic, input),
+      executive_summary: generateExecutive(input, scores, decision, economic),
 
-      key_risk: `${c.factor} may impact ${c.impact}`,
+      key_risk: generateRisk(scores),
 
       processing_window: `Depends on ${c.factor}`,
+      thermal_behavior: scores.thermal >= 70 ? "Stable under controlled conditions" : "Thermal instability observed",
+      flow_characteristics: scores.flow >= 70 ? "Consistent flow" : "Flow variability detected",
 
       mechanical_behavior: "Stable rigidity",
       surface_quality: "Uniform finish",
       structural_consistency: "Maintains structure",
 
-      primary_risk_title: c.factor,
-      primary_risk: `${c.factor} under production`,
-      secondary_risk: generateSecondaryRisk(scores),
-      mechanism: generateMechanism(scores),
+      application_implication:
+        decision.level === "HIGH"
+          ? "Suitable for controlled production"
+          : decision.level === "MODERATE"
+          ? "Requires optimization"
+          : "Not recommended",
 
-      expected_deviations: generateExpectedDeviations(),
+      primary_risk_title: getPrimaryRiskTitle(scores),
+      primary_risk: generateRisk(scores),
+
+      secondary_risk_title: "Process Interaction",
+      secondary_risk: "Thermal and flow interaction may affect consistency",
+
+      mechanism: "Thermal-flow interaction imbalance",
+
+      stability: scores.thermal >= 70 ? "Stable" : "Unstable",
+      consistency: scores.flow >= 70 ? "Consistent" : "Variable",
+
+      expected_deviations:
+        `<li>Thickness variation</li>
+         <li>Flow instability</li>
+         <li>Surface inconsistency</li>`,
+
+      next_step: "Proceed to pilot validation",
 
       decision: decision.decision,
       economic_impact: economic,
-      pha_score: scores.total,
 
       dynamic_overlay: generateOverlay(scores.thermal, scores.flow)
     });
@@ -265,7 +300,7 @@ app.post("/generate-report", async (req, res) => {
     });
 
     const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: "networkidle0" });
+    await page.setContent(html);
 
     const pdf = await page.pdf({
       format: "A4",
@@ -289,9 +324,7 @@ app.get("/latest-pdf", (req, res) => {
   res.sendFile(PDF_PATH);
 });
 
-app.listen(process.env.PORT || 8080, () => {
-  console.log("Server running");
-});
+app.listen(process.env.PORT || 8080);
 
 const html_3man =`;
 <!DOCTYPE html>
