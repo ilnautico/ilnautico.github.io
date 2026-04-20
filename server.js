@@ -22,7 +22,7 @@ const htmlTemplate = fs.readFileSync(
 // SAFE
 // =========================
 const safe = (v, fallback = "-") => {
-  if (!v || v === "") return fallback;
+  if (v === undefined || v === null || v === "") return fallback;
   return String(v);
 };
 
@@ -65,7 +65,18 @@ function determineDecision(score) {
 }
 
 // =========================
-// EXECUTIVE
+// CONSTRAINT
+// =========================
+function getConstraint(scores) {
+  const min = Math.min(scores.thermal, scores.flow, scores.mechanical);
+
+  if (min === scores.flow) return "flow consistency";
+  if (min === scores.thermal) return "thermal stability";
+  return "mechanical integrity";
+}
+
+// =========================
+// EXECUTIVE（完全版）
 // =========================
 function generateExecutive(scores, decision, input) {
 
@@ -79,12 +90,10 @@ LOW feasibility.
 
 Thermal (${scores.thermal}) / Flow (${scores.flow}) / Mechanical (${scores.mechanical})
 
-Critical instability detected.
+Critical instability.
 
 Issues: ${issues}
-
 Primary concern: ${concern}
-
 Notes: ${notes}
 
 Production not recommended.
@@ -97,12 +106,10 @@ MODERATE feasibility.
 
 Thermal (${scores.thermal}) / Flow (${scores.flow}) / Mechanical (${scores.mechanical})
 
-Requires control and validation.
+Requires stabilization.
 
 Issues: ${issues}
-
 Primary concern: ${concern}
-
 Notes: ${notes}
 `;
   }
@@ -115,25 +122,115 @@ Thermal (${scores.thermal}) / Flow (${scores.flow}) / Mechanical (${scores.mecha
 Stable for transition.
 
 Issues: ${issues}
-
 Primary concern: ${concern}
-
 Notes: ${notes}
 `;
 }
 
 // =========================
-// HTML inject
+// RISK
+// =========================
+function generateRisk(scores, input) {
+  const c = getConstraint(scores);
+  return `${c} may impact production stability.`;
+}
+
+// =========================
+// PROCESS WINDOW
+// =========================
+function generateProcessingWindow(scores) {
+  const c = getConstraint(scores);
+  return `Depends on ${c}`;
+}
+
+// =========================
+// PRIMARY RISK TITLE
+// =========================
+function getPrimaryRiskTitle(scores) {
+  const c = getConstraint(scores);
+
+  if (c.includes("thermal")) return "Thermal Instability";
+  if (c.includes("flow")) return "Flow Variability";
+  return "Mechanical Limitation";
+}
+
+// =========================
+// 🔥メーターUI（完全復元）
+// =========================
+function generateOverlay(scoreLeft, scoreRight) {
+
+  const angle = -90 + (scoreRight * 1.8);
+
+  function getAmplitude(score) {
+    if (score >= 85) return 1.6;
+    if (score >= 80) return 3;
+    if (score >= 70) return 5;
+    if (score >= 60) return 9;
+    return 13;
+  }
+
+  const ampLeft = getAmplitude(scoreLeft);
+  const ampRight = getAmplitude(scoreRight);
+
+  return `
+<div style="position:relative;width:700px;height:240px;margin:0 auto;">
+
+<img src="https://ilnautico.github.io/visual-base.png"
+style="position:absolute;top:0;left:0;width:700px;height:240px;object-fit:contain;z-index:1;"/>
+
+<div style="position:absolute;top:45px;left:150px;text-align:center;z-index:2;">
+<div style="font-size:28px;color:#2f3a44;">230°C</div>
+<div style="font-size:16px;color:#5b6770;">${scoreLeft}</div>
+</div>
+
+<div style="position:absolute;top:45px;left:470px;text-align:center;z-index:2;">
+<div style="font-size:28px;color:#d62c2c;">180°C</div>
+<div style="font-size:16px;color:#d62c2c;">${scoreRight}</div>
+</div>
+
+<svg style="position:absolute;left:280px;bottom:90px;z-index:2;" width="90" height="35">
+<path d="M0 18 C15 ${18 - ampLeft}, 30 ${18 + ampLeft}, 45 18 C60 ${18 - ampLeft}, 75 ${18 + ampLeft}, 90 18"
+fill="none" stroke="#4f7c8a" stroke-width="1.8" opacity="0.85"/>
+</svg>
+
+<svg style="position:absolute;left:430px;bottom:90px;z-index:2;" width="90" height="35">
+<path d="M0 18 C15 ${18 - ampRight}, 30 ${18 + ampRight}, 45 18 C60 ${18 - ampRight}, 75 ${18 + ampRight}, 90 18"
+fill="none" stroke="#d62c2c" stroke-width="1.8" opacity="0.85"/>
+</svg>
+
+<svg style="position:absolute;left:500px;bottom:10px;z-index:2;" viewBox="0 0 200 120" width="140" height="90">
+<defs>
+<linearGradient id="g">
+<stop offset="0%" stop-color="#22c55e"/>
+<stop offset="50%" stop-color="#fde047"/>
+<stop offset="100%" stop-color="#ef4444"/>
+</linearGradient>
+</defs>
+
+<path d="M20 100 A80 80 0 0 1 180 100 L100 100 Z" fill="url(#g)"/>
+
+<g transform="rotate(${angle} 100 100)">
+<line x1="100" y1="100" x2="100" y2="25" stroke="#111" stroke-width="3"/>
+</g>
+
+<circle cx="100" cy="100" r="4" fill="#111"/>
+
+</svg>
+
+</div>`;
+}
+
+// =========================
+// HTML
 // =========================
 function injectHtml(template, data) {
   return template.replace(/{{\s*(\w+)\s*}}/g, (_, key) => safe(data[key]));
 }
 
 // =========================
-// 🔥 フォーム完全マッピング
+// FORM PARSE（完全）
 // =========================
 function parseForm(input) {
-
   if (!input?.data?.fields) return input;
 
   const parsed = {};
@@ -142,29 +239,13 @@ function parseForm(input) {
     const label = (f.label || "").toLowerCase();
     const value = f.value;
 
-    if (label.includes("project name")) parsed.project_name = value;
     if (label.includes("application")) parsed.application = value;
-    if (label.includes("product type")) parsed.product_type = value;
-
     if (label.includes("current material")) parsed.material = value;
     if (label.includes("target material")) parsed.bio_material = value;
-
     if (label.includes("known issues")) parsed.issues = value;
-    if (label.includes("mechanical requirement")) parsed.mechanical_req = value;
-
-    if (label.includes("processing method")) parsed.process = value;
-    if (label.includes("equipment")) parsed.equipment = value;
-
-    if (label.includes("screw")) parsed.screw = value;
-    if (label.includes("l/d")) parsed.ld = value;
-    if (label.includes("die")) parsed.mold = value;
-
-    if (label.includes("production scale")) parsed.scale = value;
-
     if (label.includes("primary concern")) parsed.concern = value;
     if (label.includes("additional notes")) parsed.notes = value;
-
-    if (label.includes("project stage")) parsed.stage = value;
+    if (label.includes("processing")) parsed.process = value;
   });
 
   return parsed;
@@ -190,18 +271,33 @@ app.post("/generate-report", async (req, res) => {
       compatibility_level: decision.level,
       executive_summary: generateExecutive(scores, decision, input),
 
-      key_risk: input.concern,
-      processing_window: input.process,
+      key_risk: generateRisk(scores, input),
+      processing_window: generateProcessingWindow(scores),
 
-      primary_risk_title: input.concern,
+      primary_risk_title: getPrimaryRiskTitle(scores),
+
+      thermal_behavior: "Stable under controlled conditions",
+      flow_characteristics: "Consistent flow",
+      mechanical_behavior: "Stable rigidity",
+      surface_quality: "Uniform finish",
+      structural_consistency: "Maintains structure",
+
+      stability: "Stable",
+      consistency: "Consistent",
+
+      expected_deviations: `
+<li>Thickness variation</li>
+<li>Flow instability</li>
+<li>Surface inconsistency</li>
+`,
+
+      application_implication: "Suitable for controlled production",
+      next_step: "Proceed to pilot validation",
 
       decision: decision.decision,
-      economic_impact: "Auto-calculated",
+      economic_impact: "Auto",
 
-      project_name: input.project_name,
-      product_type: input.product_type,
-      issues: input.issues,
-      notes: input.notes
+      dynamic_overlay: generateOverlay(scores.thermal, scores.flow)
 
     });
 
@@ -236,7 +332,6 @@ app.get("/latest-pdf", (req, res) => {
   res.sendFile(PDF_PATH);
 });
 
-// =========================
 app.listen(process.env.PORT || 8080, () => {
   console.log("Server running");
 });
