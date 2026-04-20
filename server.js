@@ -148,6 +148,32 @@ A fundamental process redesign or material reconsideration is required before fu
   }
 
   let baseStatement = "";
+
+  if (decision.level === "HIGH") {
+    baseStatement = "This assessment indicates HIGH feasibility for transitioning to the evaluated material within the current processing framework.";
+  } else {
+    baseStatement = "This assessment indicates MODERATE feasibility for transitioning to the evaluated material within the current processing framework.";
+  }
+
+  return `
+${baseStatement}
+
+Thermal (${scores.thermal}) / Flow (${scores.flow}) / Mechanical (${scores.mechanical})
+
+The system is structurally viable, with overall stability primarily influenced by ${c.factor}.
+
+This factor directly influences ${c.impact}.
+
+Deployment Decision: ${decision.decision} (subject to stabilization of the limiting parameter)
+
+Economic Impact: ${economic}
+
+This parameter should be stabilized before full commercial-scale deployment.
+
+A controlled pilot validation phase is recommended, with focus on ${c.control}.
+`;
+}
+  let baseStatement = "";
   if (decision.level === "HIGH") {
     baseStatement = "This assessment indicates HIGH feasibility for transitioning to the evaluated material within the current processing framework.";
   } else {
