@@ -181,7 +181,7 @@ A controlled pilot validation phase is recommended, with focus on ${c.control}.
     baseStatement = "This assessment indicates MODERATE feasibility for transitioning to the evaluated material within the current processing framework.";
   }
 
-  return `
+return `
 ${baseStatement}
 
 Thermal (${scores.thermal}) / Flow (${scores.flow}) / Mechanical (${scores.mechanical})
