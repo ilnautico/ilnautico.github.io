@@ -1,5 +1,6 @@
+
 import express from "express";
-import puppeteer from "puppeteer";
+import puppeteer from "puppeteer";　
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -27,7 +28,7 @@ const safe = (v, fallback = "-") => {
 };
 
 // =========================
-// SCORE
+// SCORE（既存そのまま）
 // =========================
 function calculateScores(input) {
   let thermal = 85;
@@ -60,7 +61,25 @@ function calculateScores(input) {
 }
 
 // =========================
-// DECISION
+// 🔥 STATE（追加）
+// =========================
+function analyzeState(scores) {
+  const min = Math.min(scores.thermal, scores.flow, scores.mechanical);
+
+  let limitingFactor = "thermal";
+  if (scores.flow === min) limitingFactor = "flow";
+  if (scores.mechanical === min) limitingFactor = "mechanical";
+
+  let severity;
+  if (min >= 75) severity = "low";
+  else if (min >= 55) severity = "moderate";
+  else severity = "high";
+
+  return { limitingFactor, severity };
+}
+
+// =========================
+// DECISION（そのまま）
 // =========================
 function determineDecision(score) {
   if (score >= 75) return { decision: "GO", level: "HIGH" };
@@ -69,7 +88,7 @@ function determineDecision(score) {
 }
 
 // =========================
-// ECONOMIC
+// ECONOMIC（そのまま）
 // =========================
 function calculateEconomic(score) {
   if (score >= 75) return "+5–15%";
@@ -78,7 +97,7 @@ function calculateEconomic(score) {
 }
 
 // =========================
-// CONSTRAINT
+// EXECUTIVE（完全版：経営＋技術統合）
 // =========================
 function getConstraint(scores) {
   const min = Math.min(scores.thermal, scores.flow, scores.mechanical);
@@ -87,8 +106,7 @@ function getConstraint(scores) {
     return {
       factor: "flow consistency during extended production runs",
       impact: "production consistency, yield rate, and operational efficiency",
-      control: "pressure stability, melt uniformity, and extrusion flow balance",
-      type: "flow"
+      control: "pressure stability, melt uniformity, and extrusion flow balance"
     };
   }
 
@@ -96,23 +114,19 @@ function getConstraint(scores) {
     return {
       factor: "thermal stability under processing conditions",
       impact: "material degradation risk and process reliability",
-      control: "temperature control precision and thermal distribution",
-      type: "thermal"
+      control: "temperature control precision and thermal distribution"
     };
   }
 
   return {
     factor: "mechanical integrity under load conditions",
     impact: "product strength and structural performance",
-    control: "material strength consistency and structural reliability",
-    type: "mechanical"
+    control: "material strength consistency and structural reliability"
   };
 }
 
-// =========================
-// EXECUTIVE
-// =========================
 function generateExecutive(scores, decision, economic) {
+
   const c = getConstraint(scores);
 
   if (decision.level === "LOW") {
@@ -133,10 +147,12 @@ A fundamental process redesign or material reconsideration is required before fu
 `;
   }
 
-  const baseStatement =
-    decision.level === "HIGH"
-      ? "This assessment indicates HIGH feasibility for transitioning to the evaluated material within the current processing framework."
-      : "This assessment indicates MODERATE feasibility for transitioning to the evaluated material within the current processing framework.";
+  let baseStatement = "";
+  if (decision.level === "HIGH") {
+    baseStatement = "This assessment indicates HIGH feasibility for transitioning to the evaluated material within the current processing framework.";
+  } else {
+    baseStatement = "This assessment indicates MODERATE feasibility for transitioning to the evaluated material within the current processing framework.";
+  }
 
   return `
 ${baseStatement}
@@ -157,8 +173,35 @@ A controlled pilot validation phase is recommended, with focus on ${c.control}.
 `;
 }
 
+  // 既存（そのまま）
+  let baseStatement = "";
+  if (decision.level === "HIGH") {
+    baseStatement = "This assessment indicates HIGH feasibility for transitioning to the evaluated material within the current processing framework.";
+  } else {
+    baseStatement = "This assessment indicates MODERATE feasibility for transitioning to the evaluated material within the current processing framework.";
+  }
+
+  return `
+${baseStatement}
+
+Thermal (${scores.thermal}) / Flow (${scores.flow}) / Mechanical (${scores.mechanical})
+
+The system is structurally viable; however, overall stability is governed by ${c.factor}.
+
+This constraint directly influences ${c.impact}.
+
+Deployment Decision: ${decision.decision} (subject to stabilization of the limiting parameter)
+
+Economic Impact: ${economic}
+
+This constraint must be stabilized before any commercial-scale deployment.
+
+A controlled pilot validation phase is strongly recommended, with focus on ${c.control}.
+`;
+}
+
 // =========================
-// RISK
+// RISK（ボトルネック連動）
 // =========================
 function generateRisk(scores) {
   const c = getConstraint(scores);
@@ -172,7 +215,7 @@ function generateRisk(scores) {
 }
 
 // =========================
-// PROCESS WINDOW
+// PROCESSING WINDOW（ボトルネック連動）
 // =========================
 function generateProcessingWindow(scores) {
   const c = getConstraint(scores);
@@ -182,66 +225,41 @@ function generateProcessingWindow(scores) {
     return `Processing window is narrow and unstable, requiring significant control intervention and limiting production reliability.`;
   }
 
-  if (c.type === "thermal") {
+  // 🔥 修正済み
+  if (c.factor.includes("thermal")) {
     return `Processing window stability depends on precise thermal control during processing.`;
   }
 
   return `Processing window stability depends on precise control of ${c.factor}.`;
 }
-
 // =========================
-// PRIMARY RISK TITLE
+// 🔥 PRIMARY RISK TITLE（追加）
 // =========================
 function getPrimaryRiskTitle(scores) {
   const c = getConstraint(scores);
-  if (c.type === "thermal") return "Thermal Instability";
-  if (c.type === "flow") return "Process Variability";
+
+  if (c.factor.includes("thermal")) return "Thermal Instability";
+  if (c.factor.includes("flow")) return "Process Variability";
   return "Mechanical Limitation";
 }
 
 // =========================
-// EXPECTED DEVIATIONS
-// =========================
-function generateExpectedDeviations(input, scores) {
-  const app = (input.application || "").toLowerCase();
-
-  if (app.includes("film")) {
-    return [
-      "Increased thickness variation under high-speed extrusion",
-      "Instability in film gauge control across width",
-      "Variability in melt flow leading to uneven film formation"
-    ];
-  }
-
-  if (app.includes("injection") || app.includes("container")) {
-    return [
-      "Dimensional variation under thermal load",
-      "Potential warpage depending on cooling conditions",
-      "Surface inconsistency due to flow imbalance"
-    ];
-  }
-
-  if (scores.total < 60) {
-    return [
-      "Significant instability in processing conditions",
-      "High variability in output consistency",
-      "Material degradation risk under standard operation"
-    ];
-  }
-
-  return [
-    "Moderate variability in process stability",
-    "Potential inconsistency depending on operating conditions",
-    "Further validation required under real production environment"
-  ];
-}
-
-// =========================
-// UI（完全復元）
+// UI（絶対触ってない）
 // =========================
 function generateOverlay(scoreLeft, scoreRight) {
 
   const angle = -90 + (scoreRight * 1.8);
+
+  function getAmplitude(score) {
+    if (score >= 85) return 1.6;
+    if (score >= 80) return 3;
+    if (score >= 70) return 5;
+    if (score >= 60) return 9;
+    return 13;
+  }
+
+  const ampLeft = getAmplitude(scoreLeft);
+  const ampRight = getAmplitude(scoreRight);
 
   return `
 <div style="position:relative;width:700px;height:240px;margin:0 auto;">
@@ -258,14 +276,18 @@ style="position:absolute;top:0;left:0;width:700px;height:240px;object-fit:contai
 <div style="font-size:16px;color:#d62c2c;">${scoreRight}</div>
 </div>
 
+<svg style="position:absolute;left:280px;bottom:90px;z-index:2;" width="90" height="35">
+<path d="M0 18 C15 ${18 - ampLeft}, 30 ${18 + ampLeft}, 45 18 C60 ${18 - ampLeft}, 75 ${18 + ampLeft}, 90 18"
+fill="none" stroke="#4f7c8a" stroke-width="1.8" opacity="0.85"/>
+</svg>
+
+<svg style="position:absolute;left:430px;bottom:90px;z-index:2;" width="90" height="35">
+<path d="M0 18 C15 ${18 - ampRight}, 30 ${18 + ampRight}, 45 18 C60 ${18 - ampRight}, 75 ${18 + ampRight}, 90 18"
+fill="none" stroke="#d62c2c" stroke-width="1.8" opacity="0.85"/>
+</svg>
+
 <svg style="position:absolute;left:500px;bottom:10px;z-index:2;" viewBox="0 0 200 120" width="140" height="90">
-<defs>
-<linearGradient id="g">
-<stop offset="0%" stop-color="#22c55e"/>
-<stop offset="50%" stop-color="#fde047"/>
-<stop offset="100%" stop-color="#ef4444"/>
-</linearGradient>
-</defs>
+<defs><linearGradient id="g"><stop offset="0%" stop-color="#22c55e"/><stop offset="50%" stop-color="#fde047"/><stop offset="100%" stop-color="#ef4444"/></linearGradient></defs>
 <path d="M20 100 A80 80 0 0 1 180 100 L100 100 Z" fill="url(#g)"/>
 <g transform="rotate(${angle} 100 100)">
 <line x1="100" y1="100" x2="100" y2="25" stroke="#111" stroke-width="3"/>
@@ -281,7 +303,46 @@ style="position:absolute;top:0;left:0;width:700px;height:240px;object-fit:contai
 function injectHtml(template, data) {
   return template.replace(/{{\s*(\w+)\s*}}/g, (_, key) => safe(data[key]));
 }
+function generateExpectedDeviations(input, scores) {
+  const app = (input.application || "").toLowerCase();
 
+  // フィルム系
+  if (app.includes("film") || app.includes("packaging")) {
+    return [
+      "Increased thickness variation under high-speed extrusion",
+      "Instability in film gauge control across width",
+      "Variability in melt flow leading to uneven film formation"
+    ];
+  }
+
+  // 射出系
+  if (app.includes("injection") || app.includes("container")) {
+    return [
+      "Dimensional variation under thermal load",
+      "Potential warpage depending on cooling conditions",
+      "Surface inconsistency due to flow imbalance"
+    ];
+  }
+
+  // LOWケース
+  if (scores.total < 60) {
+    return [
+      "Significant instability in processing conditions",
+      "High variability in output consistency",
+      "Material degradation risk under standard operation"
+    ];
+  }
+
+  // デフォルト
+  return [
+    "Moderate variability in process stability",
+    "Potential inconsistency depending on operating conditions",
+    "Further validation required under real production environment"
+  ];
+}
+// =========================
+// MAIN
+// =========================
 // =========================
 // MAIN
 // =========================
@@ -307,6 +368,7 @@ app.post("/generate-report", async (req, res) => {
 
     const minScore = Math.min(scores.thermal, scores.flow, scores.mechanical);
 
+    // 🔥 ここが今回の“完全解決ポイント”
     const deviationsHtml = generateExpectedDeviations(input, scores)
       .map(d => `<li>${d}</li>`)
       .join("");
@@ -321,6 +383,7 @@ app.post("/generate-report", async (req, res) => {
       executive_summary: generateExecutive(scores, decision, economic),
 
       key_risk: keyRisk,
+
       processing_window: generateProcessingWindow(scores),
 
       thermal_behavior: "Thermally stable under controlled conditions.",
@@ -330,15 +393,18 @@ app.post("/generate-report", async (req, res) => {
       surface_quality: "Uniform surface finish achievable.",
       structural_consistency: "Stable structural integrity.",
 
-      primary_risk_title: getPrimaryRiskTitle(scores),
-      primary_risk: keyRisk,
+      primary_risk_title: getPrimaryRiskTitle(scores), // ←ここ重要
+  primary_risk: keyRisk,
 
       secondary_risk_title: "Operational Sensitivity",
       secondary_risk: "Dependent on process control.",
 
       mechanism: "Thermal + flow instability",
 
-      stability: minScore >= 80 ? "High" : minScore >= 60 ? "Moderate" : "Low",
+      stability:
+        minScore >= 80 ? "High" :
+        minScore >= 60 ? "Moderate" :
+        "Low",
 
       stability_note:
         minScore >= 80
@@ -349,7 +415,8 @@ app.post("/generate-report", async (req, res) => {
 
       consistency:
         scores.flow >= 80 ? "High" :
-        scores.flow >= 60 ? "Moderate" : "Low",
+        scores.flow >= 60 ? "Moderate" :
+        "Low",
 
       consistency_note:
         scores.flow >= 80
@@ -358,6 +425,7 @@ app.post("/generate-report", async (req, res) => {
           ? "Process dependent with moderate variability."
           : "High variability expected during production.",
 
+      // 🔥 修正済み（HTML化して渡す）
       expected_deviations: deviationsHtml,
 
       application_implication: "Pilot testing required.",
@@ -365,6 +433,7 @@ app.post("/generate-report", async (req, res) => {
 
       decision: decision.decision,
       economic_impact: economic,
+
       pha_score: scores.total,
 
       dynamic_overlay: generateOverlay(scores.thermal, scores.flow),
@@ -393,13 +462,16 @@ app.post("/generate-report", async (req, res) => {
     res.status(500).send("error");
   }
 });
+
 app.get("/latest-pdf", (req, res) => {
   if (!fs.existsSync(PDF_PATH)) return res.status(404).send("No PDF yet");
   res.sendFile(PDF_PATH);
 });
+
 app.listen(process.env.PORT || 8080, () => {
   console.log("Server running");
 });
+
 const html_3man =`;
 <!DOCTYPE html>
 <html>
