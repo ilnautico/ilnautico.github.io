@@ -286,7 +286,6 @@ app.post("/generate-report", async (req, res) => {
     const economic = calculateEconomic(scores.total);
     const keyRisk = generateRisk(scores);
 
-    // ✅ ボトルネック定義（超重要）
     const minScore = Math.min(scores.thermal, scores.flow, scores.mechanical);
 
     const html = injectHtml(htmlTemplate, {
@@ -317,10 +316,7 @@ app.post("/generate-report", async (req, res) => {
 
       mechanism: "Thermal + flow instability",
 
-      // =========================
-      // 🔥 修正済ロジック（ここが本質）
-      // =========================
-
+      // 🔥 Stability（ボトルネック基準）
       stability:
         minScore >= 80 ? "High" :
         minScore >= 60 ? "Moderate" :
@@ -333,6 +329,7 @@ app.post("/generate-report", async (req, res) => {
           ? "Depends on control of the limiting parameter."
           : "Unstable under current processing conditions.",
 
+      // 🔥 Consistency（Flow支配）
       consistency:
         scores.flow >= 80 ? "High" :
         scores.flow >= 60 ? "Moderate" :
@@ -345,7 +342,8 @@ app.post("/generate-report", async (req, res) => {
           ? "Process dependent with moderate variability."
           : "High variability expected during production.",
 
-      // =========================
+      // 🔥 NEW（案件別Deviation）
+      expected_deviations: generateExpectedDeviations(input, scores),
 
       application_implication: "Pilot testing required.",
       next_step: "Proceed to controlled pilot validation.",
