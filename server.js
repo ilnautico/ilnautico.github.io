@@ -222,15 +222,19 @@ function generateProcessingWindow(scores) {
   const min = Math.min(scores.thermal, scores.flow, scores.mechanical);
 
   if (min < 55) {
-    return `Processing window is narrow and unstable, requiring significant control intervention and limiting production reliability.`;
+    return `Processing window is narrow and unstable...`;
   }
 
-  // 🔥 修正済み
-  if (c.factor.includes("thermal")) {
-    return `Processing window stability depends on precise thermal control during processing.`;
-  }
+  return `Processing window stability depends on ...`;
+}
 
-  return `Processing window stability depends on precise control of ${c.factor}.`;
+// 👇ここから新しい関数
+function getPrimaryRiskTitle(scores) {
+  const c = getConstraint(scores);
+
+  if (c.factor.includes("thermal")) return "Thermal Instability";
+  if (c.factor.includes("flow")) return "Process Variability";
+  return "Mechanical Limitation";
 }
 // =========================
 // 🔥 PRIMARY RISK TITLE（追加）
