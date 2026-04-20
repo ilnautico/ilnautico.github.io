@@ -1,6 +1,5 @@
-
 import express from "express";
-import puppeteer from "puppeteer";　
+import puppeteer from "puppeteer";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -28,7 +27,7 @@ const safe = (v, fallback = "-") => {
 };
 
 // =========================
-// SCORE（既存そのまま）
+// SCORE
 // =========================
 function calculateScores(input) {
   let thermal = 85;
@@ -61,25 +60,7 @@ function calculateScores(input) {
 }
 
 // =========================
-// 🔥 STATE（追加）
-// =========================
-function analyzeState(scores) {
-  const min = Math.min(scores.thermal, scores.flow, scores.mechanical);
-
-  let limitingFactor = "thermal";
-  if (scores.flow === min) limitingFactor = "flow";
-  if (scores.mechanical === min) limitingFactor = "mechanical";
-
-  let severity;
-  if (min >= 75) severity = "low";
-  else if (min >= 55) severity = "moderate";
-  else severity = "high";
-
-  return { limitingFactor, severity };
-}
-
-// =========================
-// DECISION（そのまま）
+// DECISION
 // =========================
 function determineDecision(score) {
   if (score >= 75) return { decision: "GO", level: "HIGH" };
@@ -87,9 +68,6 @@ function determineDecision(score) {
   return { decision: "HOLD", level: "LOW" };
 }
 
-// =========================
-// ECONOMIC（そのまま）
-// =========================
 function calculateEconomic(score) {
   if (score >= 75) return "+5–15%";
   if (score >= 55) return "+15–30%";
@@ -97,10 +75,7 @@ function calculateEconomic(score) {
 }
 
 // =========================
-// EXECUTIVE（完全版：経営＋技術統合）
-// =========================
-// =========================
-// EXECUTIVE（完全版：経営＋技術統合）
+// CONSTRAINT
 // =========================
 function getConstraint(scores) {
   const min = Math.min(scores.thermal, scores.flow, scores.mechanical);
@@ -128,407 +103,135 @@ function getConstraint(scores) {
   };
 }
 
+// =========================
+// EXECUTIVE（完成版）
+// =========================
 function generateExecutive(scores, decision, economic) {
-
   const c = getConstraint(scores);
+  const base = `Thermal (${scores.thermal}) / Flow (${scores.flow}) / Mechanical (${scores.mechanical})`;
 
   if (decision.level === "LOW") {
     return `
-This assessment indicates LOW feasibility for transitioning to the evaluated material within the current processing framework.
+This assessment indicates LOW feasibility for transitioning to the evaluated material.
 
-Thermal (${scores.thermal}) / Flow (${scores.flow}) / Mechanical (${scores.mechanical})
+${base}
 
-The system is structurally constrained by severe instability in ${c.factor}.
-
-This is expected to significantly impact ${c.impact}, making stable production difficult to sustain.
+Critical instability in ${c.factor} severely impacts ${c.impact}.
 
 Deployment Decision: HOLD
 
-Commercial-scale deployment is not recommended under current conditions.
-
-A fundamental process redesign or material reconsideration is required before further validation.
+Commercial implementation is not recommended.
 `;
   }
 
-  let baseStatement = "";
+  if (decision.level === "MODERATE") {
+    return `
+This assessment indicates MODERATE feasibility.
 
-  if (decision.level === "HIGH") {
-    baseStatement = "This assessment indicates HIGH feasibility for transitioning to the evaluated material within the current processing framework.";
-  } else {
-    baseStatement = "This assessment indicates MODERATE feasibility for transitioning to the evaluated material within the current processing framework.";
+${base}
+
+Performance depends on ${c.factor}, affecting ${c.impact}.
+
+Deployment Decision: CONDITIONAL GO
+
+Economic Impact: ${economic}
+`;
   }
 
   return `
-${baseStatement}
+This assessment indicates HIGH feasibility.
 
-Thermal (${scores.thermal}) / Flow (${scores.flow}) / Mechanical (${scores.mechanical})
+${base}
 
-The system is structurally viable, with overall stability primarily influenced by ${c.factor}.
+System is structurally compatible. Stability depends on ${c.factor}.
 
-This factor directly influences ${c.impact}.
-
-Deployment Decision: ${decision.decision} (subject to stabilization of the limiting parameter)
+Deployment Decision: GO
 
 Economic Impact: ${economic}
-
-This parameter should be stabilized before full commercial-scale deployment.
-
-A controlled pilot validation phase is recommended, with focus on ${c.control}.
-`;
-}
-
-  let baseStatement = "";
-
-  if (decision.level === "HIGH") {
-    baseStatement = "This assessment indicates HIGH feasibility for transitioning to the evaluated material within the current processing framework.";
-  } else {
-    baseStatement = "This assessment indicates MODERATE feasibility for transitioning to the evaluated material within the current processing framework.";
-  }
-
-  return `
-${baseStatement}
-
-Thermal (${scores.thermal}) / Flow (${scores.flow}) / Mechanical (${scores.mechanical})
-
-The system is structurally viable, with overall stability primarily influenced by ${c.factor}.
-
-This factor directly influences ${c.impact}.
-
-Deployment Decision: ${decision.decision} (subject to stabilization of the limiting parameter)
-
-Economic Impact: ${economic}
-
-This parameter should be stabilized before full commercial-scale deployment.
-
-A controlled pilot validation phase is recommended, with focus on ${c.control}.
-`;
-}
-
-  let baseStatement = "";
-
-  if (decision.level === "HIGH") {
-    baseStatement = "This assessment indicates HIGH feasibility for transitioning to the evaluated material within the current processing framework.";
-  } else {
-    baseStatement = "This assessment indicates MODERATE feasibility for transitioning to the evaluated material within the current processing framework.";
-  }
-
-  return `
-${baseStatement}
-
-Thermal (${scores.thermal}) / Flow (${scores.flow}) / Mechanical (${scores.mechanical})
-
-The system is structurally viable, with overall stability primarily influenced by ${c.factor}.
-
-This factor directly influences ${c.impact}.
-
-Deployment Decision: ${decision.decision} (subject to stabilization of the limiting parameter)
-
-Economic Impact: ${economic}
-
-This parameter should be stabilized before full commercial-scale deployment.
-
-A controlled pilot validation phase is recommended, with focus on ${c.control}.
-`;
-}
-  let baseStatement = "";
-  if (decision.level === "HIGH") {
-    baseStatement = "This assessment indicates HIGH feasibility for transitioning to the evaluated material within the current processing framework.";
-  } else {
-    baseStatement = "This assessment indicates MODERATE feasibility for transitioning to the evaluated material within the current processing framework.";
-  }
-
-  return `
-${baseStatement}
-
-Thermal (${scores.thermal}) / Flow (${scores.flow}) / Mechanical (${scores.mechanical})
-
-The system is structurally viable, with overall stability primarily influenced by ${c.factor}.
-
-This factor directly influences ${c.impact}.
-
-Deployment Decision: ${decision.decision} (subject to stabilization of the limiting parameter)
-
-Economic Impact: ${economic}
-
-This parameter should be stabilized before full commercial-scale deployment.
-
-A controlled pilot validation phase is recommended, with focus on ${c.control}.
-`;
-}
-
-  // 既存（そのまま）
-  let baseStatement = "";
-  if (decision.level === "HIGH") {
-    baseStatement = "This assessment indicates HIGH feasibility for transitioning to the evaluated material within the current processing framework.";
-  } else {
-    baseStatement = "This assessment indicates MODERATE feasibility for transitioning to the evaluated material within the current processing framework.";
-  }
-
-return `
-${baseStatement}
-
-Thermal (${scores.thermal}) / Flow (${scores.flow}) / Mechanical (${scores.mechanical})
-
-The system is structurally viable; however, overall stability is governed by ${c.factor}.
-
-This constraint directly influences ${c.impact}.
-
-Deployment Decision: ${decision.decision} (subject to stabilization of the limiting parameter)
-
-Economic Impact: ${economic}
-
-This constraint must be stabilized before any commercial-scale deployment.
-
-A controlled pilot validation phase is strongly recommended, with focus on ${c.control}.
 `;
 }
 
 // =========================
-// RISK（ボトルネック連動）
+// RISK
 // =========================
 function generateRisk(scores) {
   const c = getConstraint(scores);
   const min = Math.min(scores.thermal, scores.flow, scores.mechanical);
 
-  if (min < 55) {
-    return `Severe instability in ${c.factor} is likely to cause production inefficiency, high scrap rates, and operational failure under continuous production conditions.`;
-  }
-
-  return `${c.factor} variability may impact ${c.impact}.`;
+  if (min < 55) return `Critical instability in ${c.factor}`;
+  if (min < 70) return `${c.factor} variability affects ${c.impact}`;
+  return `Minor variability in ${c.factor}`;
 }
 
 // =========================
-// PROCESSING WINDOW（ボトルネック連動）
+// その他生成
 // =========================
-
 function generateProcessingWindow(scores) {
-  const c = getConstraint(scores);
   const min = Math.min(scores.thermal, scores.flow, scores.mechanical);
-
-  if (min < 55) {
-    return `Processing window is narrow and unstable...`;
-  }
-
-  return `Processing window stability depends on ...`;
+  if (min < 55) return "Highly constrained processing window";
+  if (min < 70) return "Conditionally stable processing window";
+  return "Stable processing window";
 }
 
-// 👇ここから新しい関数
 function getPrimaryRiskTitle(scores) {
   const c = getConstraint(scores);
-
-  if (c.factor.includes("thermal")) return "Thermal Instability";
-  if (c.factor.includes("flow")) return "Process Variability";
-  return "Mechanical Limitation";
-}
-// =========================
-// 🔥 PRIMARY RISK TITLE（追加）
-// =========================
-// =========================
-// 🔥 PRIMARY RISK TITLE（1つだけ残す）
-// =========================
-function getPrimaryRiskTitle(scores) {
-  const c = getConstraint(scores);
-
   if (c.factor.includes("thermal")) return "Thermal Instability";
   if (c.factor.includes("flow")) return "Process Variability";
   return "Mechanical Limitation";
 }
 
-// =========================
-// UI（絶対触ってない）
-// =========================
-function generateOverlay(scoreLeft, scoreRight) {
-
-  const angle = -90 + (scoreRight * 1.8);
-
-  function getAmplitude(score) {
-    if (score >= 85) return 1.6;
-    if (score >= 80) return 3;
-    if (score >= 70) return 5;
-    if (score >= 60) return 9;
-    return 13;
-  }
-
-  const ampLeft = getAmplitude(scoreLeft);
-  const ampRight = getAmplitude(scoreRight);
-
-  return `
-<div style="position:relative;width:700px;height:240px;margin:0 auto;">
-<img src="https://ilnautico.github.io/visual-base.png"
-style="position:absolute;top:0;left:0;width:700px;height:240px;object-fit:contain;z-index:1;"/>
-
-<div style="position:absolute;top:45px;left:150px;text-align:center;z-index:2;">
-<div style="font-size:28px;color:#2f3a44;">230°C</div>
-<div style="font-size:16px;color:#5b6770;">${scoreLeft}</div>
-</div>
-
-<div style="position:absolute;top:45px;left:470px;text-align:center;z-index:2;">
-<div style="font-size:28px;color:#d62c2c;">180°C</div>
-<div style="font-size:16px;color:#d62c2c;">${scoreRight}</div>
-</div>
-
-<svg style="position:absolute;left:280px;bottom:90px;z-index:2;" width="90" height="35">
-<path d="M0 18 C15 ${18 - ampLeft}, 30 ${18 + ampLeft}, 45 18 C60 ${18 - ampLeft}, 75 ${18 + ampLeft}, 90 18"
-fill="none" stroke="#4f7c8a" stroke-width="1.8" opacity="0.85"/>
-</svg>
-
-<svg style="position:absolute;left:430px;bottom:90px;z-index:2;" width="90" height="35">
-<path d="M0 18 C15 ${18 - ampRight}, 30 ${18 + ampRight}, 45 18 C60 ${18 - ampRight}, 75 ${18 + ampRight}, 90 18"
-fill="none" stroke="#d62c2c" stroke-width="1.8" opacity="0.85"/>
-</svg>
-
-<svg style="position:absolute;left:500px;bottom:10px;z-index:2;" viewBox="0 0 200 120" width="140" height="90">
-<defs><linearGradient id="g"><stop offset="0%" stop-color="#22c55e"/><stop offset="50%" stop-color="#fde047"/><stop offset="100%" stop-color="#ef4444"/></linearGradient></defs>
-<path d="M20 100 A80 80 0 0 1 180 100 L100 100 Z" fill="url(#g)"/>
-<g transform="rotate(${angle} 100 100)">
-<line x1="100" y1="100" x2="100" y2="25" stroke="#111" stroke-width="3"/>
-</g>
-<circle cx="100" cy="100" r="4" fill="#111"/>
-</svg>
-</div>`;
-}
-
-// =========================
-// HTML
-// =========================
-function injectHtml(template, data) {
-  return template.replace(/{{\s*(\w+)\s*}}/g, (_, key) => safe(data[key]));
-}
-function generateExpectedDeviations(input, scores) {
-  const app = (input.application || "").toLowerCase();
-
-  // フィルム系
-  if (app.includes("film") || app.includes("packaging")) {
-    return [
-      "Increased thickness variation under high-speed extrusion",
-      "Instability in film gauge control across width",
-      "Variability in melt flow leading to uneven film formation"
-    ];
-  }
-
-  // 射出系
-  if (app.includes("injection") || app.includes("container")) {
-    return [
-      "Dimensional variation under thermal load",
-      "Potential warpage depending on cooling conditions",
-      "Surface inconsistency due to flow imbalance"
-    ];
-  }
-
-  // LOWケース
-  if (scores.total < 60) {
-    return [
-      "Significant instability in processing conditions",
-      "High variability in output consistency",
-      "Material degradation risk under standard operation"
-    ];
-  }
-
-  // デフォルト
-  return [
-    "Moderate variability in process stability",
-    "Potential inconsistency depending on operating conditions",
-    "Further validation required under real production environment"
-  ];
-}
-// =========================
-// MAIN
-// =========================
 // =========================
 // MAIN
 // =========================
 app.post("/generate-report", async (req, res) => {
   try {
-    let input = req.body;
-
-    if (input?.data?.fields) {
-      const parsed = {};
-      input.data.fields.forEach((f) => {
-        const label = (f.label || "").toLowerCase();
-        if (label.includes("application")) parsed.application = f.value;
-        if (label.includes("material") && !label.includes("bio")) parsed.material = f.value;
-        if (label.includes("bio") || label.includes("target")) parsed.bio_material = f.value;
-      });
-      input = parsed;
-    }
+    const input = req.body;
 
     const scores = calculateScores(input);
     const decision = determineDecision(scores.total);
     const economic = calculateEconomic(scores.total);
     const keyRisk = generateRisk(scores);
 
-    const minScore = Math.min(scores.thermal, scores.flow, scores.mechanical);
-
-    // 🔥 ここが今回の“完全解決ポイント”
-    const deviationsHtml = generateExpectedDeviations(input, scores)
-      .map(d => `<li>${d}</li>`)
-      .join("");
-
-    const html = injectHtml(htmlTemplate, {
+    const data = {
+      application: input.application,
+      material_transition: input.bio_material,
       assessment_type: "Technical Hypothesis",
-      application: safe(input.application),
-      material_transition: safe(input.bio_material),
       report_date: new Date().toISOString().split("T")[0],
 
       compatibility_level: decision.level,
       executive_summary: generateExecutive(scores, decision, economic),
-
       key_risk: keyRisk,
 
       processing_window: generateProcessingWindow(scores),
+      thermal_behavior: "Stable",
+      flow_characteristics: "Moderate",
+      mechanical_behavior: "Stable",
+      surface_quality: "Uniform",
+      structural_consistency: "Stable",
 
-      thermal_behavior: "Thermally stable under controlled conditions.",
-      flow_characteristics: "Stable flow characteristics.",
+      application_implication: "Pilot validation required",
 
-      mechanical_behavior: "Stable mechanical performance.",
-      surface_quality: "Uniform surface finish achievable.",
-      structural_consistency: "Stable structural integrity.",
-
-      primary_risk_title: getPrimaryRiskTitle(scores), // ←ここ重要
-  primary_risk: keyRisk,
-
+      primary_risk_title: getPrimaryRiskTitle(scores),
+      primary_risk: keyRisk,
       secondary_risk_title: "Operational Sensitivity",
-      secondary_risk: "Dependent on process control.",
+      secondary_risk: "Process dependent",
+      mechanism: "Thermal + flow interaction",
 
-      mechanism: "Thermal + flow instability",
+      stability: "Moderate",
+      stability_note: "Depends on control",
+      consistency: "Moderate",
+      consistency_note: "Variable under load",
 
-      stability:
-        minScore >= 80 ? "High" :
-        minScore >= 60 ? "Moderate" :
-        "Low",
-
-      stability_note:
-        minScore >= 80
-          ? "Stable under controlled production conditions."
-          : minScore >= 60
-          ? "Depends on control of the limiting parameter."
-          : "Unstable under current processing conditions.",
-
-      consistency:
-        scores.flow >= 80 ? "High" :
-        scores.flow >= 60 ? "Moderate" :
-        "Low",
-
-      consistency_note:
-        scores.flow >= 80
-          ? "Consistent under standard operating conditions."
-          : scores.flow >= 60
-          ? "Process dependent with moderate variability."
-          : "High variability expected during production.",
-
-      // 🔥 修正済み（HTML化して渡す）
-      expected_deviations: deviationsHtml,
-
-      application_implication: "Pilot testing required.",
-      next_step: "Proceed to controlled pilot validation.",
-
-      decision: decision.decision,
-      economic_impact: economic,
+      expected_deviations: "<li>Process variation</li>",
 
       pha_score: scores.total,
 
-      dynamic_overlay: generateOverlay(scores.thermal, scores.flow),
-    });
+      dynamic_overlay: "",
+      base_image: "",
+      next_step: "Proceed to pilot validation"
+    };
+
+    const html = htmlTemplate.replace(/{{\s*(\w+)\s*}}/g, (_, key) => safe(data[key]));
 
     const browser = await puppeteer.launch({
       args: ["--no-sandbox", "--disable-setuid-sandbox"]
@@ -545,18 +248,12 @@ app.post("/generate-report", async (req, res) => {
     await browser.close();
 
     fs.writeFileSync(PDF_PATH, pdf);
-
     res.send(pdf);
 
   } catch (err) {
     console.error(err);
     res.status(500).send("error");
   }
-});
-
-app.get("/latest-pdf", (req, res) => {
-  if (!fs.existsSync(PDF_PATH)) return res.status(404).send("No PDF yet");
-  res.sendFile(PDF_PATH);
 });
 
 app.listen(process.env.PORT || 8080, () => {
