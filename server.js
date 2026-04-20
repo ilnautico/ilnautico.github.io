@@ -234,28 +234,51 @@ app.post("/generate-report", async (req, res) => {
     const html = htmlTemplate.replace(/{{\s*(\w+)\s*}}/g, (_, key) => safe(data[key]));
 
     const browser = await puppeteer.launch({
-      args: ["--no-sandbox", "--disable-setuid-sandbox"]
-    });
+  headless: "new",
+  args: [
+    "--no-sandbox",
+    "--disable-setuid-sandbox",
+    "--disable-dev-shm-usage",
+    "--disable-gpu"
+  ]
+});
 
     const page = await browser.newPage();
     await page.setContent(html, { waitUntil: "networkidle0" });
 
     const pdf = await page.pdf({
-      format: "A4",
-      printBackground: true
-    });
+  format: "A4",
+  printBackground: true
+});
 
-    await browser.close();
+await browser.close();
 
-    fs.writeFileSync(PDF_PATH, pdf);
-    res.send(pdf);
+// 保存（ここ重要：必ず先に書く）
+fs.writeFileSync(PDF_PATH, pdf);
+
+// レスポンス（完全版）
+res.setHeader("Content-Type", "application/pdf");
+res.setHeader("Content-Disposition", "inline; filename=report.pdf");
+res.setHeader("Content-Length", pdf.length);
+
+res.end(pdf);
 
   } catch (err) {
     console.error(err);
     res.status(500).send("error");
   }
 });
+app.get("/latest-pdf", (req, res) => {
+  if (!fs.existsSync(PDF_PATH)) {
+    return res.status(404).send("No PDF yet");
+  }
 
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader("Content-Disposition", "inline; filename=report.pdf");
+
+  const stream = fs.createReadStream(PDF_PATH);
+  stream.pipe(res);
+});
 app.listen(process.env.PORT || 8080, () => {
   console.log("Server running");
 });
