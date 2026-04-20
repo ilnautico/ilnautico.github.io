@@ -262,7 +262,43 @@ fill="none" stroke="#d62c2c" stroke-width="1.8" opacity="0.85"/>
 function injectHtml(template, data) {
   return template.replace(/{{\s*(\w+)\s*}}/g, (_, key) => safe(data[key]));
 }
+function generateExpectedDeviations(input, scores) {
+  const app = (input.application || "").toLowerCase();
 
+  // フィルム系
+  if (app.includes("film") || app.includes("packaging")) {
+    return [
+      "Increased thickness variation under high-speed extrusion",
+      "Instability in film gauge control across width",
+      "Variability in melt flow leading to uneven film formation"
+    ];
+  }
+
+  // 射出系
+  if (app.includes("injection") || app.includes("container")) {
+    return [
+      "Dimensional variation under thermal load",
+      "Potential warpage depending on cooling conditions",
+      "Surface inconsistency due to flow imbalance"
+    ];
+  }
+
+  // LOWケース
+  if (scores.total < 60) {
+    return [
+      "Significant instability in processing conditions",
+      "High variability in output consistency",
+      "Material degradation risk under standard operation"
+    ];
+  }
+
+  // デフォルト
+  return [
+    "Moderate variability in process stability",
+    "Potential inconsistency depending on operating conditions",
+    "Further validation required under real production environment"
+  ];
+}
 // =========================
 // MAIN
 // =========================
