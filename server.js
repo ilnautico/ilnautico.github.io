@@ -1,12 +1,3 @@
-おそらく最後に確実に動いてたやつ
-
-ただ、これはさっきの文章生成９のやつが含まれてない、
-ので文章方式がこれは旧式なので↑置き換えて全文ください。
-
-
-＞今までの構造壊さないようにして全文出せ
-
-
 import express from "express";
 import puppeteer from "puppeteer";　
 import fs from "fs";
