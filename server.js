@@ -655,7 +655,7 @@ function generateOverlay(scores) {
   const ampLeft  = getAmplitude(scores.thermal);
   const ampRight = getAmplitude(scores.flow);
 
-  return `
+return `
 <div style="position:absolute;top:45px;left:120px;text-align:center;z-index:3;">
   <div style="font-size:28px;color:#2f3a44;">230°C</div>
   <div style="font-size:16px;color:#5b6770;">${scores.thermal}</div>
@@ -666,16 +666,19 @@ function generateOverlay(scores) {
   <div style="font-size:16px;color:#d62c2c;">${scores.flow}</div>
 </div>
 
-<svg style="position:absolute;left:260px;bottom:80px;z-index:3;" width="90" height="35">
+<!-- 左の波（中央基準） -->
+<svg style="position:absolute;left:50%;transform:translateX(-140px);bottom:80px;z-index:3;" width="90" height="35">
   <path d="M0 18 C15 ${18 - ampLeft}, 30 ${18 + ampLeft}, 45 18 C60 ${18 - ampLeft}, 75 ${18 + ampLeft}, 90 18"
     fill="none" stroke="#4f7c8a" stroke-width="1.8" opacity="0.85"/>
 </svg>
 
-<svg style="position:absolute;right:260px;bottom:80px;z-index:3;" width="90" height="35">
+<!-- 右の波（中央基準） -->
+<svg style="position:absolute;left:50%;transform:translateX(50px);bottom:80px;z-index:3;" width="90" height="35">
   <path d="M0 18 C15 ${18 - ampRight}, 30 ${18 + ampRight}, 45 18 C60 ${18 - ampRight}, 75 ${18 + ampRight}, 90 18"
     fill="none" stroke="#d62c2c" stroke-width="1.8" opacity="0.85"/>
 </svg>
 
+<!-- メーター -->
 <svg style="position:absolute;right:40px;bottom:20px;z-index:3;" viewBox="0 0 200 120" width="140" height="90">
   <defs>
     <linearGradient id="g">
@@ -685,12 +688,12 @@ function generateOverlay(scores) {
     </linearGradient>
   </defs>
   <path d="M20 100 A80 80 0 0 1 180 100 L100 100 Z" fill="url(#g)"/>
-  <g transform="rotate(${angle} 100 100)">
+  <g transform="rotate(${-90 + scores.total * 1.8} 100 100)">
     <line x1="100" y1="100" x2="100" y2="30" stroke="#111" stroke-width="3"/>
   </g>
   <circle cx="100" cy="100" r="4" fill="#111"/>
-</svg>`;
-}
+</svg>
+`;
 
 // ══════════════════════════════════════════════════════════════
 // § 16b  CLAUDE NARRATIVE API  — structured JSON text generation
