@@ -669,14 +669,22 @@ return `
 
 <!-- 青波（左） -->
 <svg style="position:absolute;left:230px;bottom:65px;z-index:3;" width="140" height="40">
-  <path d="M0 20 C40 ${20 - ampLeft}, 80 ${20 + ampLeft}, 120 20"
-    fill="none" stroke="#4f7c8a" stroke-width="2" opacity="0.95"/>
+  <path d="M0 20 
+           C40 ${20 - ampLeft}, 80 ${20 + ampLeft}, 120 20"
+    fill="none"
+    stroke="#4f7c8a"
+    stroke-width="2"
+    opacity="0.95"/>
 </svg>
 
-<!-- 赤波（右）※完全接続 -->
-<svg style="position:absolute;left:348px;bottom:65px;z-index:3;" width="160" height="40">
-  <path d="M0 20 C40 ${20 - ampRight}, 80 ${20 + ampRight}, 140 20"
-    fill="none" stroke="#d62c2c" stroke-width="2" opacity="0.95"/>
+<!-- 赤波（右） -->
+<svg style="position:absolute;left:350px;bottom:65px;z-index:3;" width="160" height="40">
+  <path d="M0 20 
+           C40 ${20 - ampRight}, 80 ${20 + ampRight}, 140 20"
+    fill="none"
+    stroke="#d62c2c"
+    stroke-width="2"
+    opacity="0.95"/>
 </svg>
 
 <!-- メーター -->
