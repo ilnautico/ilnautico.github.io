@@ -1,8 +1,16 @@
 import express from "express";
-import puppeteer from "puppeteer";　
+import puppeteer from "puppeteer";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import PQueue from "p-queue";
+
+const fetchFn = global.fetch
+  ? global.fetch.bind(global)
+  : async (...args) => {
+      const mod = await import("node-fetch");
+      return mod.default(...args);
+    };
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -11,261 +19,630 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-const PDF_PATH = "/tmp/latest.pdf";
+const htmlTemplate = fs.readFileSync(path.join(__dirname, "template.html"), "utf8");
 
-const htmlTemplate = fs.readFileSync(
-  path.join(__dirname, "template.html"),
-  "utf8"
-);
+// 起動時チェック — Claude API key
+if (!process.env.ANTHROPIC_API_KEY) {
+  console.warn("⚠️  ANTHROPIC_API_KEY not set — Claude narrative disabled, fallback mode active");
+}
 
-// =========================
-// SAFE
-// =========================
-const safe = (v, fallback = "-") => {
+// ══════════════════════════════════════════════════════════════
+// CONCURRENCY CONTROL  — max 2 simultaneous Puppeteer jobs
+// ══════════════════════════════════════════════════════════════
+
+const queue = new PQueue({ concurrency: 2 });
+
+// ══════════════════════════════════════════════════════════════
+// GLOBAL TIMEOUT HELPER
+// ══════════════════════════════════════════════════════════════
+
+const globalTimeout = (ms) =>
+  new Promise((_, reject) =>
+    setTimeout(() => reject(new Error(`Global PDF timeout after ${ms}ms`)), ms)
+  );
+
+// ══════════════════════════════════════════════════════════════
+// BROWSER SINGLETON  — reuse across requests; restart on crash
+// ══════════════════════════════════════════════════════════════
+
+let _browser = null;
+
+async function getBrowser() {
+  if (_browser && _browser.isConnected()) return _browser;
+  _browser = await puppeteer.launch({
+    args: [
+      "--no-sandbox",
+      "--disable-setuid-sandbox",
+      "--disable-dev-shm-usage",
+      "--disable-gpu",
+    ],
+  });
+  _browser.on("disconnected", () => { _browser = null; }); // クラッシュ時にリセット
+  return _browser;
+}
+
+// ══════════════════════════════════════════════════════════════
+// § 1  UTILITIES
+// ══════════════════════════════════════════════════════════════
+
+const safe = (v, fallback = "—") => {
   if (v === undefined || v === null || v === "") return fallback;
   return String(v);
 };
 
-// =========================
-// SCORE（既存そのまま）
-// =========================
+const clamp = (v) => Math.max(0, Math.min(100, v));
+
+function safeParseJSON(text) {
+  try {
+    const match = text.match(/\{[\s\S]*\}/);
+    if (!match) throw new Error("No JSON found");
+    return JSON.parse(match[0]);
+  } catch {
+    throw new Error("JSON parse failed");
+  }
+}
+
+function validateNarrative(obj) {
+  const keys = [
+    "executive_summary",
+    "risk_primary",
+    "risk_secondary",
+    "mechanism",
+    "processing_window_note",
+    "application_implication",
+    "next_step",
+  ];
+  for (const k of keys) {
+    if (!obj || typeof obj[k] !== "string") {
+      throw new Error(`Invalid narrative structure — missing key: ${k}`);
+    }
+  }
+  return obj;
+}
+
+// ══════════════════════════════════════════════════════════════
+// § 2  INPUT NORMALIZATION  (no recursion, no self-call)
+// ══════════════════════════════════════════════════════════════
+
+function normalizeInput(raw) {
+  if (!raw) return {};
+
+  // Label-based extraction for Make.com / webhook payloads
+  if (raw.data && Array.isArray(raw.data.fields)) {
+    const parsed = {};
+    raw.data.fields.forEach((f) => {
+      const label = (f.label || "").toLowerCase();
+      const value = Array.isArray(f.value) ? f.value.join(", ") : (f.value || "");
+      if (label.includes("application")) parsed.application = value;
+      if (label.includes("material") && !label.includes("bio") && !label.includes("target"))
+        parsed.material = value;
+      if (label.includes("bio") || label.includes("target"))
+        parsed.bio_material = value;
+      if (label.includes("processing")) parsed.processing = value;
+      if (label.includes("equipment"))  parsed.equipment   = value;
+      if (label.includes("scale"))      parsed.scale        = value;
+      if (label.includes("stage"))      parsed.project_stage = value;
+      if (label.includes("issue"))      parsed.issues       = value;
+      if (label.includes("concern"))    parsed.concern      = value;
+      if (label.includes("note"))       parsed.notes        = value;
+    });
+    return parsed;
+  }
+
+  // Direct JSON body (from Claude artifact / API test)
+  return raw;
+}
+
+// ══════════════════════════════════════════════════════════════
+// § 3  SCORING ENGINE
+// ══════════════════════════════════════════════════════════════
+
 function calculateScores(input) {
-  let thermal = 85;
-  let flow = 85;
+  let thermal   = 85;
+  let flow       = 85;
   let mechanical = 85;
 
-  const mat = (input.material || "").toLowerCase();
-  const bio = (input.bio_material || "").toLowerCase();
-  const appType = (input.application || "").toLowerCase();
+  const mat = (input.material    || "").toUpperCase();
+  const bio = (input.bio_material || "").toUpperCase();
+  const app = (input.application  || "").toUpperCase();
 
-  if (mat.includes("pp")) thermal -= 10;
-  if (mat.includes("pe")) thermal -= 5;
-  if (mat.includes("pet")) thermal -= 25;
+  // Material adjustments
+  if ((mat.includes("CPP") || mat.includes("PP")) && !mat.includes("PET")) thermal -= 10;
+  if (mat.includes("PE") && !mat.includes("PET")) thermal -= 5;
+  if (mat.includes("PET")) thermal -= 25;
 
-  if (bio.includes("pla")) thermal -= 10;
-  if (bio.includes("pha")) flow -= 10;
+  // Biomaterial adjustments
+  if (bio.includes("PLA")) thermal -= 10;
+  if (bio.includes("PHA") || bio.includes("PHB")) flow -= 10;
 
-  if (appType.includes("film")) flow -= 15;
-  if (appType.includes("injection")) mechanical -= 10;
+  // Application adjustments
+  const appTokens   = app.split(/\W+/);
+  const isFilm =
+    app.includes("FILM") ||
+    appTokens.includes("FILM");
 
-  thermal = Math.max(0, Math.min(100, thermal));
-  flow = Math.max(0, Math.min(100, flow));
-  mechanical = Math.max(0, Math.min(100, mechanical));
+  const isInjection =
+    app.includes("INJECT") ||
+    app.includes("MOLD")   ||
+    app.includes("MOULD")  ||
+    appTokens.includes("IM");
+
+  if (isFilm)      flow       -= 15;
+  if (isInjection) mechanical -= 10;
+
+  thermal   = clamp(thermal);
+  flow       = clamp(flow);
+  mechanical = clamp(mechanical);
 
   const bottleneck = Math.min(thermal, flow, mechanical);
-  const avg = (thermal + flow + mechanical) / 3;
-  const total = Math.round(bottleneck * 0.7 + avg * 0.3);
+  const avg        = (thermal + flow + mechanical) / 3;
+  const total      = Math.round(bottleneck * 0.7 + avg * 0.3);
 
-  return { thermal, flow, mechanical, total };
+  return { thermal, flow, mechanical, total, tokens: appTokens };
 }
 
-// =========================
-// 🔥 STATE（追加）
-// =========================
-function analyzeState(scores) {
-  const min = Math.min(scores.thermal, scores.flow, scores.mechanical);
+// ══════════════════════════════════════════════════════════════
+// § 4  CONSTRAINT LOGIC  — tie-breaking: Flow > Thermal > Mechanical
+// ══════════════════════════════════════════════════════════════
 
-  let limitingFactor = "thermal";
-  if (scores.flow === min) limitingFactor = "flow";
-  if (scores.mechanical === min) limitingFactor = "mechanical";
-
-  let severity;
-  if (min >= 75) severity = "low";
-  else if (min >= 55) severity = "moderate";
-  else severity = "high";
-
-  return { limitingFactor, severity };
-}
-
-// =========================
-// DECISION（そのまま）
-// =========================
-function determineDecision(score) {
-  if (score >= 75) return { decision: "GO", level: "HIGH" };
-  if (score >= 55) return { decision: "CONDITIONAL GO", level: "MODERATE" };
-  return { decision: "HOLD", level: "LOW" };
-}
-
-// =========================
-// ECONOMIC（そのまま）
-// =========================
-function calculateEconomic(score) {
-  if (score >= 75) return "+5–15%";
-  if (score >= 55) return "+15–30%";
-  return "+30%+";
-}
-
-// =========================
-// EXECUTIVE（完全版：経営＋技術統合）
-// =========================
 function getConstraint(scores) {
   const min = Math.min(scores.thermal, scores.flow, scores.mechanical);
 
-  if (min === scores.flow) {
+  if (scores.flow === min) {
     return {
-      factor: "flow consistency during extended production runs",
-      impact: "production consistency, yield rate, and operational efficiency",
-      control: "pressure stability, melt uniformity, and extrusion flow balance"
+      type:    "FLOW",
+      score:   scores.flow,
+      factor:  "flow consistency during extended production runs",
+      impact:  "production consistency, yield rate, and operational efficiency",
+      control: "pressure stability, melt uniformity, and extrusion flow balance",
     };
   }
 
-  if (min === scores.thermal) {
+  if (scores.thermal === min) {
     return {
-      factor: "thermal stability under processing conditions",
-      impact: "material degradation risk and process reliability",
-      control: "temperature control precision and thermal distribution"
+      type:    "THERMAL",
+      score:   scores.thermal,
+      factor:  "thermal stability under processing conditions",
+      impact:  "material degradation risk and process reliability",
+      control: "temperature control precision and thermal distribution",
     };
   }
 
   return {
-    factor: "mechanical integrity under load conditions",
-    impact: "product strength and structural performance",
-    control: "material strength consistency and structural reliability"
+    type:    "MECHANICAL",
+    score:   scores.mechanical,
+    factor:  "mechanical integrity under load conditions",
+    impact:  "product strength and structural performance",
+    control: "material strength consistency and structural reliability",
   };
 }
 
-function generateExecutive(input, scores, decision, economic) {
+// ══════════════════════════════════════════════════════════════
+// § 5  DECISION ENGINE
+// ══════════════════════════════════════════════════════════════
 
-  const c = getConstraint(scores);
-  const state = analyzeState(scores);
+function determineDecision(total) {
+  if (total >= 75) return { decision: "GO",            level: "HIGH"     };
+  if (total >= 55) return { decision: "CONDITIONAL GO", level: "MODERATE" };
+  return              { decision: "HOLD",           level: "LOW"      };
+}
 
-  // 🔥 LOW（重度制約）
+// ══════════════════════════════════════════════════════════════
+// § 6  ECONOMIC IMPACT
+// ══════════════════════════════════════════════════════════════
+
+function calculateEconomic(total) {
+  if (total >= 75) return "+5–15%";
+  if (total >= 55) return "+15–30%";
+  return "+30%+";
+}
+
+// ══════════════════════════════════════════════════════════════
+// § 7  EXECUTIVE SUMMARY  (9-branch: LOW / MODERATE×3 / HIGH×1)
+//       LOW ×1, MODERATE×FLOW, MODERATE×THERMAL, MODERATE×MECHANICAL,
+//       HIGH ×1  → 5 primary branches; nuance layered by scores inside each
+// ══════════════════════════════════════════════════════════════
+
+function generateExecutive(scores, decision, economic, constraint) {
+  const { thermal, flow, mechanical, total } = scores;
+  const scoreBlock = `Thermal (${thermal}) / Flow (${flow}) / Mechanical (${mechanical}) / Composite: ${total}`;
+
+  // ── LOW ────────────────────────────────────────────────────
   if (decision.level === "LOW") {
-    return `
-This assessment indicates LOW feasibility for transitioning to the evaluated material within the current processing framework.
-
-Thermal (${scores.thermal}) / Flow (${scores.flow}) / Mechanical (${scores.mechanical})
-
-The system is structurally constrained by critical instability in ${c.factor}.
-
-This constraint is expected to severely impact ${c.impact}, making stable production unsustainable under current conditions.
-
-Observed instability level suggests high risk of operational failure, excessive scrap generation, and inconsistent product output.
-
-Deployment Decision: HOLD
-
-Commercial-scale deployment is not recommended.
-
-A fundamental reassessment of material compatibility or processing architecture is required before further validation.
-`;
+    return (
+      `This assessment indicates LOW feasibility for the evaluated material transition within the current processing framework.\n\n` +
+      `${scoreBlock}\n\n` +
+      `The system is critically constrained by instability in ${constraint.factor} (score: ${constraint.score}/100). ` +
+      `This constraint is expected to severely impact ${constraint.impact}, making stable production unsustainable under existing conditions. ` +
+      `Observed instability levels indicate high risk of operational failure, excessive scrap generation, and unacceptable output variability.\n\n` +
+      `Material cost variance is projected at ${economic}, reflecting the re-engineering requirements implied by the current configuration.\n\n` +
+      `Deployment Decision: HOLD — Commercial-scale deployment is not recommended. ` +
+      `A fundamental reassessment of material compatibility or processing architecture is required before further validation proceeds.`
+    );
   }
 
-  // 🔥 MODERATE（条件付き）
+  // ── MODERATE / FLOW ────────────────────────────────────────
+  if (decision.level === "MODERATE" && constraint.type === "FLOW") {
+    return (
+      `This assessment indicates MODERATE feasibility for the evaluated material transition within the current processing framework.\n\n` +
+      `${scoreBlock}\n\n` +
+      `The system is operationally viable but constrained by flow-related instability. ` +
+      `Variability in ${constraint.factor} (score: ${constraint.score}/100) may impact ${constraint.impact}, ` +
+      `particularly under extended production cycles and high line-speed conditions. ` +
+      `Melt behaviour management represents the primary challenge for achieving stable commercial operation.\n\n` +
+      `Material cost variance is projected at ${economic}. ` +
+      `A controlled pilot validation phase is recommended with specific focus on ${constraint.control}.\n\n` +
+      `Deployment Decision: CONDITIONAL GO`
+    );
+  }
+
+  // ── MODERATE / THERMAL ─────────────────────────────────────
+  if (decision.level === "MODERATE" && constraint.type === "THERMAL") {
+    return (
+      `This assessment indicates MODERATE feasibility for the evaluated material transition within the current processing framework.\n\n` +
+      `${scoreBlock}\n\n` +
+      `The system is operationally viable but thermally sensitive. ` +
+      `Instability in ${constraint.factor} (score: ${constraint.score}/100) may influence ${constraint.impact}, ` +
+      `particularly under elevated or variable processing temperatures. ` +
+      `The target biodegradable material's narrow thermal window requires precision temperature control to prevent degradation onset during sustained production.\n\n` +
+      `Material cost variance is projected at ${economic}. ` +
+      `Pilot validation is recommended with emphasis on ${constraint.control}.\n\n` +
+      `Deployment Decision: CONDITIONAL GO`
+    );
+  }
+
+  // ── MODERATE / MECHANICAL ──────────────────────────────────
   if (decision.level === "MODERATE") {
-
-    if (state.limitingFactor === "flow") {
-      return `
-This assessment indicates MODERATE feasibility for transitioning to the evaluated material within the current processing framework.
-
-Thermal (${scores.thermal}) / Flow (${scores.flow}) / Mechanical (${scores.mechanical})
-
-The system remains viable, but performance is constrained by flow-related instability.
-
-Variability in ${c.factor} may impact ${c.impact}, particularly under extended production cycles.
-
-Production stability is achievable, but requires careful control of melt behavior and process conditions.
-
-Deployment Decision: CONDITIONAL GO
-
-Economic Impact: ${economic}
-
-A controlled pilot validation phase is recommended, with focus on ${c.control}.
-`;
-    }
-
-    if (state.limitingFactor === "thermal") {
-      return `
-This assessment indicates MODERATE feasibility for transitioning to the evaluated material within the current processing framework.
-
-Thermal (${scores.thermal}) / Flow (${scores.flow}) / Mechanical (${scores.mechanical})
-
-The system is operationally viable but sensitive to thermal conditions.
-
-Instability in ${c.factor} may influence ${c.impact}, particularly under elevated processing temperatures.
-
-Thermal control precision will be critical to maintaining process reliability.
-
-Deployment Decision: CONDITIONAL GO
-
-Economic Impact: ${economic}
-
-Pilot validation is recommended with emphasis on ${c.control}.
-`;
-    }
-
-    // mechanical
-    return `
-This assessment indicates MODERATE feasibility for transitioning to the evaluated material within the current processing framework.
-
-Thermal (${scores.thermal}) / Flow (${scores.flow}) / Mechanical (${scores.mechanical})
-
-The system is viable but exhibits structural sensitivity.
-
-Limitations in ${c.factor} may affect ${c.impact}, particularly in demanding application conditions.
-
-Product performance consistency should be validated through controlled testing.
-
-Deployment Decision: CONDITIONAL GO
-
-Economic Impact: ${economic}
-
-Pilot validation is recommended with focus on ${c.control}.
-`;
+    return (
+      `This assessment indicates MODERATE feasibility for the evaluated material transition within the current processing framework.\n\n` +
+      `${scoreBlock}\n\n` +
+      `The system is viable but exhibits structural sensitivity under load conditions. ` +
+      `Limitations in ${constraint.factor} (score: ${constraint.score}/100) may affect ${constraint.impact}, ` +
+      `particularly in demanding application environments. ` +
+      `Product performance consistency must be validated through controlled mechanical testing before commercial commitment.\n\n` +
+      `Material cost variance is projected at ${economic}. ` +
+      `Pilot validation is recommended with focus on ${constraint.control}.\n\n` +
+      `Deployment Decision: CONDITIONAL GO`
+    );
   }
 
-  // 🔥 HIGH（実行可能）
-  return `
-This assessment indicates HIGH feasibility for transitioning to the evaluated material within the current processing framework.
-
-Thermal (${scores.thermal}) / Flow (${scores.flow}) / Mechanical (${scores.mechanical})
-
-The system demonstrates strong compatibility across key processing parameters.
-
-Minor sensitivity to ${c.factor} may exist, but does not significantly impact ${c.impact} under standard operating conditions.
-
-Stable production is achievable with standard process controls.
-
-Deployment Decision: GO
-
-Economic Impact: ${economic}
-
-Proceed with pilot validation and gradual scale-up under controlled conditions.
-`;
+  // ── HIGH ───────────────────────────────────────────────────
+  return (
+    `This assessment indicates HIGH feasibility for the evaluated material transition within the current processing framework.\n\n` +
+    `${scoreBlock}\n\n` +
+    `The system demonstrates strong compatibility across all key processing parameters. ` +
+    `Minor sensitivity to ${constraint.factor} (score: ${constraint.score}/100) may exist, ` +
+    `but does not significantly impact ${constraint.impact} under standard operating conditions. ` +
+    `Stable production is achievable with standard process controls and no fundamental redesign requirement.\n\n` +
+    `Material cost variance is projected at ${economic}.\n\n` +
+    `Deployment Decision: GO — Proceed to controlled pilot validation and gradual scale-up.`
+  );
 }
-// =========================
-// RISK（ボトルネック連動）
-// =========================
-function generateRisk(scores) {
-  const c = getConstraint(scores);
-  const min = Math.min(scores.thermal, scores.flow, scores.mechanical);
 
-  if (min < 55) {
-    return `Severe instability in ${c.factor} is likely to cause production inefficiency, high scrap rates, and operational failure under continuous production conditions.`;
+// ══════════════════════════════════════════════════════════════
+// § 8  RISK STRUCTURE  (Primary / Secondary / Mechanism)
+// ══════════════════════════════════════════════════════════════
+
+function generateRisk(scores, constraint, input) {
+  const mat = safe(input.material,    "the source material");
+  const bio = safe(input.bio_material, "the target biodegradable material");
+  const app = safe(input.application,  "the current processing application");
+
+  // ── Primary — constraint dimension only ────────────────────
+  const primary = constraint.score < 55
+    ? `Critical instability in ${constraint.factor} (${constraint.score}/100) is expected to cause production failure, ` +
+      `excessive scrap generation, and uncontrolled output variability under continuous operating conditions. ` +
+      `This risk alone is sufficient to prevent commercial deployment without fundamental process redesign.`
+    : `Variability in ${constraint.factor} (${constraint.score}/100) is the primary operational risk for this transition. ` +
+      `This directly affects ${constraint.impact} and must be managed through rigorous control of ${constraint.control}. ` +
+      `Risk exposure increases proportionally under extended production cycles and elevated throughput conditions.`;
+
+  // ── Secondary — interaction between the TWO non-constraint dimensions ──
+  let dimA, scoreA, dimB, scoreB;
+  if (constraint.type === "FLOW") {
+    dimA = "thermal";    scoreA = scores.thermal;
+    dimB = "mechanical"; scoreB = scores.mechanical;
+  } else if (constraint.type === "THERMAL") {
+    dimA = "flow";       scoreA = scores.flow;
+    dimB = "mechanical"; scoreB = scores.mechanical;
+  } else {
+    dimA = "thermal";    scoreA = scores.thermal;
+    dimB = "flow";       scoreB = scores.flow;
   }
 
-  return `${c.factor} variability may impact ${c.impact}.`;
+  const secondary =
+    `${dimA.charAt(0).toUpperCase() + dimA.slice(1)} variability (${scoreA}/100) interacts with ` +
+    `${dimB} performance (${scoreB}/100), amplifying instability in process consistency under continuous ` +
+    `production conditions. If ${dimA} parameters drift outside the validated tolerance window, ` +
+    `${dimB} behaviour is expected to degrade in tandem — compounding output variability beyond ` +
+    `what the primary constraint alone predicts.`;
+
+  // ── Mechanism — physicochemical origin ─────────────────────
+  const mechanism =
+    `${mat} exhibits broader thermal and rheological tolerance under standard processing conditions, ` +
+    `while ${bio} introduces a narrower operating window driven by crystallisation kinetics and degradation ` +
+    `onset sensitivity. Under ${app} conditions, this property mismatch generates instability in ` +
+    `${constraint.factor}, causing ${constraint.impact} to fall outside commercially acceptable ranges.`;
+
+  return { primary, secondary, mechanism };
 }
 
-// =========================
-// PROCESSING WINDOW（ボトルネック連動）
-// =========================
-function generateProcessingWindow(scores) {
-  const c = getConstraint(scores);
-  const min = Math.min(scores.thermal, scores.flow, scores.mechanical);
+// ══════════════════════════════════════════════════════════════
+// § 9  PROCESSING SECTION  (correct score dependencies enforced)
+// ══════════════════════════════════════════════════════════════
 
-  if (min < 55) {
-    return `Processing window is narrow and unstable, requiring significant control intervention and limiting production reliability.`;
+function generateProcessing(scores, constraint) {
+  // Processing window — constraint score dependent
+  let processingWindow;
+  if (constraint.score < 55) {
+    processingWindow =
+      `Processing window is critically narrow and unstable. The ${constraint.type} constraint ` +
+      `(${constraint.score}/100) limits usable parameters to conditions incompatible with continuous ` +
+      `commercial production. Significant control intervention and likely equipment modification are required.`;
+  } else if (constraint.score < 75) {
+    processingWindow =
+      `Processing window is operable but restricted by ${constraint.factor} (${constraint.score}/100). ` +
+      `Sustained production requires tightly validated parameters; deviations outside the established range ` +
+      `will cause measurable output instability and increased scrap rates.`;
+  } else {
+    processingWindow =
+      `Processing window is broad and compatible with standard operating parameters. ` +
+      `${constraint.factor.charAt(0).toUpperCase() + constraint.factor.slice(1)} ` +
+      `(${constraint.score}/100) does not impose critical restrictions under normal production conditions.`;
   }
 
-  return `Processing window stability depends on precise control of ${c.factor}.`;
+  // Thermal behaviour — MUST use scores.thermal
+  let thermalBehavior;
+  if (scores.thermal >= 75) {
+    thermalBehavior =
+      `Stable — operating within safe thermal band with acceptable degradation margin (Thermal: ${scores.thermal}/100). ` +
+      `Temperature control requirements are consistent with standard biodegradable polymer processing protocol.`;
+  } else if (scores.thermal >= 55) {
+    thermalBehavior =
+      `Marginal — processing temperature is near the material's degradation threshold (Thermal: ${scores.thermal}/100). ` +
+      `Active zone-by-zone temperature monitoring is required to prevent thermal degradation onset ` +
+      `during extended production runs.`;
+  } else {
+    thermalBehavior =
+      `Unstable — thermal window is incompatible with stable biodegradable processing (Thermal: ${scores.thermal}/100). ` +
+      `Degradation risk under standard operating temperature is high; ` +
+      `thermal profile redesign is required before pilot validation.`;
+  }
+
+  // Flow characteristics — MUST use scores.flow
+  let flowCharacteristics;
+  if (scores.flow >= 75) {
+    flowCharacteristics =
+      `Consistent — melt rheology within acceptable processing range (Flow: ${scores.flow}/100). ` +
+      `Standard screw configuration and pressure settings are expected to maintain melt uniformity ` +
+      `across production runs without active intervention.`;
+  } else if (scores.flow >= 55) {
+    flowCharacteristics =
+      `Variable — melt flow requires active stabilisation (Flow: ${scores.flow}/100). ` +
+      `Pressure fluctuation risk during extended extrusion cycles necessitates real-time monitoring, ` +
+      `screw speed adjustment, and reduced throughput during the validation phase.`;
+  } else {
+    flowCharacteristics =
+      `Unstable — melt behaviour is incompatible with continuous production (Flow: ${scores.flow}/100). ` +
+      `Significant flow instability is expected, resulting in unacceptable gauge variation, ` +
+      `potential line shutdowns, and high off-specification output rates.`;
+  }
+
+  return { processingWindow, thermalBehavior, flowCharacteristics };
 }
 
-// =========================
-// UI（絶対触ってない）
-// =========================
-function generateOverlay(scoreLeft, scoreRight) {
+// ══════════════════════════════════════════════════════════════
+// § 10  PRODUCT SECTION
+// ══════════════════════════════════════════════════════════════
 
-  const angle = -90 + (scoreRight * 1.8);
+function generateProduct(scores) {
+  // Mechanical behaviour — scores.mechanical
+  const mechanical = scores.mechanical >= 75
+    ? `Structural integrity of the final product is achievable under standard processing conditions (${scores.mechanical}/100). ` +
+      `Mechanical performance meets commercial specification without formulation adjustment.`
+    : scores.mechanical >= 55
+    ? `Mechanical performance is adequate but sensitive to process consistency (${scores.mechanical}/100). ` +
+      `Property variation between production batches is expected without active control measures.`
+    : `Mechanical performance is below commercial threshold (${scores.mechanical}/100). ` +
+      `Structural integrity risk is high; product specification compliance cannot be guaranteed ` +
+      `without material reformulation or process redesign.`;
+
+  // Surface quality — scores.flow
+  const surface = scores.flow >= 75
+    ? `Surface finish is expected to meet specification. Consistent melt flow (${scores.flow}/100) ` +
+      `supports uniform surface formation under standard die and cooling conditions.`
+    : scores.flow >= 55
+    ? `Surface quality is conditionally acceptable. Flow variability (${scores.flow}/100) may introduce ` +
+      `surface inconsistencies, particularly during die start-up and extended high-speed runs.`
+    : `Surface quality is unreliable under current parameters (${scores.flow}/100). Melt instability ` +
+      `is expected to generate streaking, pitting, and uneven gloss at commercial production speeds.`;
+
+  // Structural consistency — scores.total
+  const structural = scores.total >= 75
+    ? `Structural consistency is achievable within the defined processing envelope. Dimensional stability ` +
+      `and wall thickness uniformity are expected to meet pilot validation targets.`
+    : scores.total >= 55
+    ? `Structural consistency is conditional on parameter control (Total: ${scores.total}/100). ` +
+      `Dimensional variation is expected at the margins of the processing window; ` +
+      `tooling and cooling adjustments may be required.`
+    : `Structural consistency is not achievable under current conditions (Total: ${scores.total}/100). ` +
+      `Dimensional variance and structural failure risk exceed commercial tolerance without process redesign.`;
+
+  return { mechanical, surface, structural };
+}
+
+// ══════════════════════════════════════════════════════════════
+// § 11  QUALITY SECTION
+// ══════════════════════════════════════════════════════════════
+
+function generateQuality(scores) {
+  const minScore = Math.min(scores.thermal, scores.flow, scores.mechanical);
+
+  // Stability — bottleneck (min) score
+  const stability     = minScore >= 75 ? "High" : minScore >= 55 ? "Moderate" : "Low";
+  const stabilityNote = minScore >= 75
+    ? `Process stability index: ${minScore}/100. Acceptable for commercial deployment under standard QC protocol.`
+    : minScore >= 55
+    ? `Process stability index: ${minScore}/100. Conditional acceptance — enhanced in-line monitoring and SPC required.`
+    : `Process stability index: ${minScore}/100. Below commercial threshold. Redesign required before deployment.`;
+
+  // Consistency — Flow score
+  const consistency     = scores.flow >= 75 ? "High" : scores.flow >= 55 ? "Moderate" : "Low";
+  const consistencyNote = scores.flow >= 75
+    ? `Flow consistency index: ${scores.flow}/100. Production consistency achievable within standard parameter tolerance.`
+    : scores.flow >= 55
+    ? `Flow consistency index: ${scores.flow}/100. Closed-loop pressure control recommended to limit batch-to-batch variability.`
+    : `Flow consistency index: ${scores.flow}/100. High variability expected. Output consistency cannot be assured without flow stabilisation.`;
+
+  return { stability, stabilityNote, consistency, consistencyNote };
+}
+
+// ══════════════════════════════════════════════════════════════
+// § 12  EXPECTED DEVIATIONS  (Film / Injection / Low / Default)
+//        Returns HTML <li> string for direct injection into <ul>
+// ══════════════════════════════════════════════════════════════
+
+function generateExpectedDeviations(input, scores) {
+  const app = (input.application || "").toUpperCase();
+  let items;
+
+  const tokens      = scores.tokens || app.split(/\W+/);
+
+  const isFilm =
+    app.includes("FILM") ||
+    tokens.includes("FILM");
+
+  const isInjection =
+    app.includes("INJECT") ||
+    app.includes("MOLD")   ||
+    app.includes("MOULD")  ||
+    tokens.includes("IM");
+
+  if (isFilm && isInjection) {
+    items = [
+      `Combined process instability affecting both film formation and injection precision simultaneously`,
+      `Cross-process variability leading to inconsistent material behaviour across dual-mode production runs`,
+      `Dual-mode processing risk requiring separate, independent validation protocols for each conversion method`,
+    ];
+  } else if (isFilm) {
+    const gaugeRange = scores.flow < 65 ? "15–25" : "8–12";
+    items = [
+      `Film gauge variation ±${gaugeRange}% across web width under steady-state production conditions`,
+      `Longitudinal thickness inconsistency correlated with melt pressure fluctuation during extended extrusion runs`,
+      `Flow instability events during die heating and cooling transitions producing off-specification material zones`,
+    ];
+  } else if (isInjection) {
+    const dimRange = scores.mechanical < 65 ? "0.3–0.8" : "0.1–0.3";
+    items = [
+      `Dimensional variation ±${dimRange}mm on critical part features under process parameter fluctuation`,
+      `Warpage and sink marks on thick-wall sections due to differential cooling rate distribution across the mould`,
+      `Surface gloss inconsistency and sink mark formation correlated with gate seal timing variation`,
+    ];
+  } else if (scores.total < 55) {
+    items = [
+      `Critical instability across all processing dimensions — output quality cannot be controlled under current parameters`,
+      `High variability in product dimensions, surface finish, and mechanical properties expected across production batches`,
+      `Material degradation events anticipated during standard operating conditions; off-specification output rate will be significant`,
+    ];
+  } else {
+    items = [
+      `Moderate process variability expected during initial production runs and parameter optimisation phase`,
+      `Potential output inconsistency at the boundary of the validated processing window under fluctuating ambient conditions`,
+      `Further deviation characterisation required under real-scale production environment before commercial acceptance`,
+    ];
+  }
+
+  return items.map((item) => `<li>${item}</li>`).join("\n");
+}
+
+// ══════════════════════════════════════════════════════════════
+// § 12b  PRIMARY RISK TITLE  (constraint-aware)
+// ══════════════════════════════════════════════════════════════
+
+function getPrimaryRiskTitle(constraint) {
+  if (constraint.type === "THERMAL")   return "Thermal Instability";
+  if (constraint.type === "FLOW")      return "Process Variability";
+  return "Mechanical Limitation";
+}
+
+// ══════════════════════════════════════════════════════════════
+// § 13  APPLICATION IMPLICATION
+// ══════════════════════════════════════════════════════════════
+
+function generateApplicationImplication(decision, input) {
+  const app = safe(input.application, "this application");
+  if (decision.level === "HIGH") {
+    return (
+      `${app} is viable for commercial deployment. The material transition is technically feasible ` +
+      `within the current processing framework. Standard monitoring protocols apply during initial production ramp-up.`
+    );
+  }
+  if (decision.level === "MODERATE") {
+    return (
+      `${app} is viable subject to process optimisation. Pilot-scale validation is required before ` +
+      `commercial commitment. Constraint control measures must be implemented and verified prior to full deployment.`
+    );
+  }
+  return (
+    `${app} is not recommended for commercial deployment at the current feasibility level. ` +
+    `Material reformulation or application redesign is required before re-evaluation.`
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
+// § 14  NEXT STEPS  (decision + constraint aware)
+// ══════════════════════════════════════════════════════════════
+
+function generateNextStep(decision, constraint, scores) {
+  if (decision.level === "HIGH") {
+    return (
+      `Based on the HIGH feasibility assessment (Total: ${scores.total}/100), the system is ready for controlled pilot deployment.\n\n` +
+      `Initiate pilot production with monitoring focused on ${constraint.factor}. ` +
+      `Validate yield stability and product consistency under continuous production conditions ` +
+      `before committing to full commercial scale-up. ` +
+      `Document validated process parameters as the baseline for ongoing quality control.`
+    );
+  }
+
+  if (decision.level === "MODERATE") {
+    return (
+      `Based on the MODERATE feasibility assessment (Total: ${scores.total}/100), ` +
+      `engineering validation targeting ${constraint.type.toLowerCase()} performance is required before pilot approval.\n\n` +
+      `Implement control measures for ${constraint.control}. ` +
+      `Execute structured parameter trials to characterise the usable processing window. ` +
+      `Re-evaluate system stability after stabilisation controls are confirmed, ` +
+      `then proceed to pilot validation with defined acceptance criteria.`
+    );
+  }
+
+  return (
+    `Based on the LOW feasibility assessment (Total: ${scores.total}/100), ` +
+    `commercial transition under the current configuration is not recommended.\n\n` +
+    `Suspend transition planning and evaluate alternative material grades or process architecture modifications. ` +
+    `Address the critical constraint in ${constraint.factor} specifically. ` +
+    `A revised evaluation should be submitted after design modifications are validated at laboratory scale.`
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
+// § 15  HTML INJECTION
+// ══════════════════════════════════════════════════════════════
+
+function injectHtml(template, data) {
+  return template.replace(/{{\s*(\w+)\s*}}/g, (_, key) => {
+    const val = data[key];
+    if (val === undefined || val === null) return "—";
+    return String(val);
+  });
+}
+
+// ══════════════════════════════════════════════════════════════
+// § 16  DYNAMIC OVERLAY  (UNCHANGED from original spec)
+//        Generates overlay elements only; base image handled by template
+// ══════════════════════════════════════════════════════════════
+
+function generateOverlay(scores) {
+  const angle = -90 + scores.total * 1.8;
 
   function getAmplitude(score) {
     if (score >= 85) return 1.6;
@@ -275,212 +652,333 @@ function generateOverlay(scoreLeft, scoreRight) {
     return 13;
   }
 
-  const ampLeft = getAmplitude(scoreLeft);
-  const ampRight = getAmplitude(scoreRight);
+  const ampLeft  = getAmplitude(scores.thermal);
+  const ampRight = getAmplitude(scores.flow);
 
   return `
-<div style="position:relative;width:700px;height:240px;margin:0 auto;">
-<img src="https://ilnautico.github.io/visual-base.png"
-style="position:absolute;top:0;left:0;width:700px;height:240px;object-fit:contain;z-index:1;"/>
-
 <div style="position:absolute;top:45px;left:150px;text-align:center;z-index:2;">
-<div style="font-size:28px;color:#2f3a44;">230°C</div>
-<div style="font-size:16px;color:#5b6770;">${scoreLeft}</div>
+  <div style="font-size:28px;color:#2f3a44;">230°C</div>
+  <div style="font-size:16px;color:#5b6770;">${scores.thermal}</div>
 </div>
 
 <div style="position:absolute;top:45px;left:470px;text-align:center;z-index:2;">
-<div style="font-size:28px;color:#d62c2c;">180°C</div>
-<div style="font-size:16px;color:#d62c2c;">${scoreRight}</div>
+  <div style="font-size:28px;color:#d62c2c;">180°C</div>
+  <div style="font-size:16px;color:#d62c2c;">${scores.flow}</div>
 </div>
 
 <svg style="position:absolute;left:280px;bottom:90px;z-index:2;" width="90" height="35">
-<path d="M0 18 C15 ${18 - ampLeft}, 30 ${18 + ampLeft}, 45 18 C60 ${18 - ampLeft}, 75 ${18 + ampLeft}, 90 18"
-fill="none" stroke="#4f7c8a" stroke-width="1.8" opacity="0.85"/>
+  <path d="M0 18 C15 ${18 - ampLeft}, 30 ${18 + ampLeft}, 45 18 C60 ${18 - ampLeft}, 75 ${18 + ampLeft}, 90 18"
+    fill="none" stroke="#4f7c8a" stroke-width="1.8" opacity="0.85"/>
 </svg>
 
 <svg style="position:absolute;left:430px;bottom:90px;z-index:2;" width="90" height="35">
-<path d="M0 18 C15 ${18 - ampRight}, 30 ${18 + ampRight}, 45 18 C60 ${18 - ampRight}, 75 ${18 + ampRight}, 90 18"
-fill="none" stroke="#d62c2c" stroke-width="1.8" opacity="0.85"/>
+  <path d="M0 18 C15 ${18 - ampRight}, 30 ${18 + ampRight}, 45 18 C60 ${18 - ampRight}, 75 ${18 + ampRight}, 90 18"
+    fill="none" stroke="#d62c2c" stroke-width="1.8" opacity="0.85"/>
 </svg>
 
-<svg style="position:absolute;left:500px;bottom:10px;z-index:2;" viewBox="0 0 200 120" width="140" height="90">
-<defs><linearGradient id="g"><stop offset="0%" stop-color="#22c55e"/><stop offset="50%" stop-color="#fde047"/><stop offset="100%" stop-color="#ef4444"/></linearGradient></defs>
-<path d="M20 100 A80 80 0 0 1 180 100 L100 100 Z" fill="url(#g)"/>
-<g transform="rotate(${angle} 100 100)">
-<line x1="100" y1="100" x2="100" y2="25" stroke="#111" stroke-width="3"/>
-</g>
-<circle cx="100" cy="100" r="4" fill="#111"/>
-</svg>
-</div>`;
+<svg style="position:absolute;right:20px;bottom:10px;z-index:2;" viewBox="0 0 200 120" width="140" height="90">
+  <defs>
+    <linearGradient id="g">
+      <stop offset="0%"   stop-color="#22c55e"/>
+      <stop offset="50%"  stop-color="#fde047"/>
+      <stop offset="100%" stop-color="#ef4444"/>
+    </linearGradient>
+  </defs>
+  <path d="M20 100 A80 80 0 0 1 180 100 L100 100 Z" fill="url(#g)"/>
+  <g transform="rotate(${angle} 100 100)">
+    <line x1="100" y1="100" x2="100" y2="25" stroke="#111" stroke-width="3"/>
+  </g>
+  <circle cx="100" cy="100" r="4" fill="#111"/>
+</svg>`;
 }
 
-// =========================
-// HTML
-// =========================
-function injectHtml(template, data) {
-  return template.replace(/{{\s*(\w+)\s*}}/g, (_, key) => safe(data[key]));
+// ══════════════════════════════════════════════════════════════
+// § 16b  CLAUDE NARRATIVE API  — structured JSON text generation
+//         Fills 7 narrative fields via Anthropic API.
+//         Falls back to deterministic generators on any failure.
+// ══════════════════════════════════════════════════════════════
+
+const NARRATIVE_USER_TEMPLATE = `You are a JSON generation module embedded inside a production system.
+You are NOT an assistant.
+You are NOT allowed to think freely.
+You are NOT allowed to explain anything.
+Your output will be directly parsed by a backend system.
+If you break the format, the system will fail.
+
+SYSTEM ROLE (FIXED)
+- You ONLY generate structured JSON
+- You DO NOT modify system logic
+- You DO NOT modify scores
+- You DO NOT generate HTML
+- You DO NOT generate markdown
+- You DO NOT generate explanation text
+
+CRITICAL OUTPUT RULES (MANDATORY)
+1. Output must be valid JSON
+2. No text before JSON
+3. No text after JSON
+4. No markdown (no backtick blocks)
+5. No comments
+6. No trailing commas
+7. No missing quotes
+8. No additional keys
+9. No line breaks outside JSON
+10. All keys must exist
+11. All values must be strings
+12. Do not include null or undefined
+13. Do not escape structure
+If ANY of these rules are violated, the system will break.
+
+STRICT PROHIBITIONS
+You MUST NOT:
+- Suggest processing parameters (temperature, speed, etc.)
+- Suggest suppliers or materials
+- Change technical conclusions beyond given scores
+- Introduce new variables or assumptions
+- Output anything outside JSON
+
+INPUT DATA (READ ONLY)
+Application: {{application}}
+Material: {{material}}
+Target Bio Material: {{bio_material}}
+Scores:
+Thermal: {{thermal}}
+Flow: {{flow}}
+Mechanical: {{mechanical}}
+Total: {{total}}
+Constraint: {{constraint}}
+
+INTERPRETATION RULES
+- LOW (<55): not viable → HOLD
+- MODERATE (55-74): conditional → requires validation
+- HIGH (75+): viable → proceed
+- Primary risk = lowest score dimension
+- Secondary risk = interaction of remaining two dimensions
+- Mechanism = explain mismatch between material and process
+- No speculation beyond input
+
+OUTPUT FORMAT (STRICT JSON ONLY)
+{
+  "executive_summary": "",
+  "risk_primary": "",
+  "risk_secondary": "",
+  "mechanism": "",
+  "processing_window_note": "",
+  "application_implication": "",
+  "next_step": ""
+}`;
+
+async function callClaudeForNarrative(input, scores, constraint) {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) throw new Error("ANTHROPIC_API_KEY not set");
+
+  const userContent = NARRATIVE_USER_TEMPLATE
+    .replace("{{application}}",  safe(input.application,    "Not specified"))
+    .replace("{{material}}",     safe(input.material,       "Not specified"))
+    .replace("{{bio_material}}", safe(input.bio_material,   "Not specified"))
+    .replace("{{thermal}}",      String(scores.thermal))
+    .replace("{{flow}}",         String(scores.flow))
+    .replace("{{mechanical}}",   String(scores.mechanical))
+    .replace("{{total}}",        String(scores.total))
+    .replace("{{constraint}}",   constraint.type);
+
+  const controller = new AbortController();
+  const timeoutId  = setTimeout(() => controller.abort(), 8000);
+
+  const res = await fetchFn("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type":      "application/json",
+      "x-api-key":         apiKey,
+      "anthropic-version": "2023-06-01",
+    },
+    body: JSON.stringify({
+      model:       "claude-opus-4-5",
+      max_tokens:  1024,
+      temperature: 0,
+      messages:    [{ role: "user", content: userContent }],
+    }),
+    signal: controller.signal,
+  }).finally(() => clearTimeout(timeoutId));
+
+  if (!res.ok) throw new Error(`Claude API error: ${res.status}`);
+
+  const data = await res.json();
+
+  const raw = Array.isArray(data.content)
+    ? data.content.map(b => b.type === "text" ? b.text : "").join("").trim()
+    : "";
+
+  if (!raw) throw new Error("Empty Claude response");
+
+  const parsed = safeParseJSON(raw);
+  const result = validateNarrative(parsed);
+
+  console.log("[Claude OK] narrative generated successfully");
+  return result;
 }
-function generateExpectedDeviations(input, scores) {
-  const app = (input.application || "").toLowerCase();
 
-  // フィルム系
-  if (app.includes("film") || app.includes("packaging")) {
-    return [
-      "Increased thickness variation under high-speed extrusion",
-      "Instability in film gauge control across width",
-      "Variability in melt flow leading to uneven film formation"
-    ];
-  }
+// ══════════════════════════════════════════════════════════════
+// § 17  MAIN ROUTE
+// ══════════════════════════════════════════════════════════════
 
-  // 射出系
-  if (app.includes("injection") || app.includes("container")) {
-    return [
-      "Dimensional variation under thermal load",
-      "Potential warpage depending on cooling conditions",
-      "Surface inconsistency due to flow imbalance"
-    ];
-  }
+app.post("/generate-report", (req, res) => {
+  queue.add(() => handleReport(req, res)).catch(err => {
+    console.error("[Queue error]", err.message);
+  });
+});
 
-  // LOWケース
-  if (scores.total < 60) {
-    return [
-      "Significant instability in processing conditions",
-      "High variability in output consistency",
-      "Material degradation risk under standard operation"
-    ];
-  }
-
-  // デフォルト
-  return [
-    "Moderate variability in process stability",
-    "Potential inconsistency depending on operating conditions",
-    "Further validation required under real production environment"
-  ];
-}
-// =========================
-// MAIN
-// =========================
-app.post("/generate-report", async (req, res) => {
+async function handleReport(req, res) {
   try {
-    let input = req.body;
+    const input = normalizeInput(req.body);
 
-    if (input?.data?.fields) {
-      const parsed = {};
-      input.data.fields.forEach((f) => {
-        const label = (f.label || "").toLowerCase();
-        if (label.includes("application")) parsed.application = f.value;
-        if (label.includes("material") && !label.includes("bio")) parsed.material = f.value;
-        if (label.includes("bio") || label.includes("target")) parsed.bio_material = f.value;
-      });
-      input = parsed;
+    // --- Deterministic engine ---
+    const scores     = calculateScores(input);
+    const constraint = getConstraint(scores);
+    const decision   = determineDecision(scores.total);
+    const economic   = calculateEconomic(scores.total);
+
+    // --- Text generators (deterministic baseline) ---
+    const risk       = generateRisk(scores, constraint, input);
+    const processing = generateProcessing(scores, constraint);
+    const product    = generateProduct(scores);
+    const quality    = generateQuality(scores);
+
+    // --- Claude narrative API (AI-enhanced; falls back to deterministic on failure) ---
+    let narrative = null;
+    try {
+      narrative = await callClaudeForNarrative(input, scores, constraint);
+    } catch (e) {
+      if (e.name === "AbortError") {
+        console.warn("[Claude TIMEOUT]");
+      } else {
+        console.warn("[Claude ERROR]", e.message);
+      }
     }
 
-    const scores = calculateScores(input);
-    const decision = determineDecision(scores.total);
-    const economic = calculateEconomic(scores.total);
-    const keyRisk = generateRisk(scores);
+    const exec_summary        = narrative?.executive_summary        || generateExecutive(scores, decision, economic, constraint);
+    const primary_risk_body   = narrative?.risk_primary             || risk.primary;
+    const secondary_risk_body = narrative?.risk_secondary           || risk.secondary;
+    const mechanism_body      = narrative?.mechanism                || risk.mechanism;
+    const proc_window_note    = narrative?.processing_window_note   || processing.processingWindow;
+    const app_implication     = narrative?.application_implication  || generateApplicationImplication(decision, input);
+    const next_step_body      = narrative?.next_step                || generateNextStep(decision, constraint, scores);
 
-    const minScore = Math.min(scores.thermal, scores.flow, scores.mechanical);
-
-    const html = injectHtml(htmlTemplate, {
-      assessment_type: "Technical Hypothesis",
-      application: safe(input.application),
+    // --- Template data map ---
+    const htmlData = {
+      assessment_type:    "Technical Hypothesis",
+      application:         safe(input.application),
       material_transition: safe(input.bio_material),
-      report_date: new Date().toISOString().split("T")[0],
+      report_date:         new Date().toISOString().split("T")[0],
 
       compatibility_level: decision.level,
-      executive_summary: generateExecutive(scores, decision, economic),
+      executive_summary:   exec_summary,
+      key_risk:            primary_risk_body,
 
-      key_risk: keyRisk,
+      processing_window:    proc_window_note,
+      thermal_behavior:     processing.thermalBehavior,
+      flow_characteristics: processing.flowCharacteristics,
 
-      processing_window: generateProcessingWindow(scores),
+      mechanical_behavior:     product.mechanical,
+      surface_quality:          product.surface,
+      structural_consistency:   product.structural,
+      application_implication:  app_implication,
 
-      thermal_behavior: "Thermally stable under controlled conditions.",
-      flow_characteristics: "Stable flow characteristics.",
+      primary_risk_title:   getPrimaryRiskTitle(constraint),
+      primary_risk:          primary_risk_body,
+      secondary_risk_title: "Dimensional Interaction Risk",
+      secondary_risk:        secondary_risk_body,
+      mechanism:             mechanism_body,
 
-      mechanical_behavior: "Stable mechanical performance.",
-      surface_quality: "Uniform surface finish achievable.",
-      structural_consistency: "Stable structural integrity.",
-
-      primary_risk_title: "Process Variability",
-      primary_risk: keyRisk,
-
-      secondary_risk_title: "Operational Sensitivity",
-      secondary_risk: "Dependent on process control.",
-
-      mechanism: "Thermal + flow instability",
-
-      // 🔥 Stability（ボトルネック基準）
-      stability:
-        minScore >= 80 ? "High" :
-        minScore >= 60 ? "Moderate" :
-        "Low",
-
-      stability_note:
-        minScore >= 80
-          ? "Stable under controlled production conditions."
-          : minScore >= 60
-          ? "Depends on control of the limiting parameter."
-          : "Unstable under current processing conditions.",
-
-      // 🔥 Consistency（Flow支配）
-      consistency:
-        scores.flow >= 80 ? "High" :
-        scores.flow >= 60 ? "Moderate" :
-        "Low",
-
-      consistency_note:
-        scores.flow >= 80
-          ? "Consistent under standard operating conditions."
-          : scores.flow >= 60
-          ? "Process dependent with moderate variability."
-          : "High variability expected during production.",
-
-      // 🔥 NEW（案件別Deviation）
+      stability:           quality.stability,
+      stability_note:      quality.stabilityNote,
+      consistency:         quality.consistency,
+      consistency_note:    quality.consistencyNote,
       expected_deviations: generateExpectedDeviations(input, scores),
-
-      application_implication: "Pilot testing required.",
-      next_step: "Proceed to controlled pilot validation.",
-
-      decision: decision.decision,
-      economic_impact: economic,
 
       pha_score: scores.total,
 
-      dynamic_overlay: generateOverlay(scores.thermal, scores.flow),
-    });
+      base_image: "https://ilnautico.github.io/visual-base.png",
+      dynamic_overlay: `<div style="position:relative;width:700px;height:240px;margin:0 auto;">
+  <img src="https://ilnautico.github.io/visual-base.png"
+       style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:contain;z-index:1;" />
+  ${generateOverlay(scores)}
+</div>`,
 
-    const browser = await puppeteer.launch({
-      args: ["--no-sandbox", "--disable-setuid-sandbox"]
-    });
+      next_step:       next_step_body,
+      decision:        decision.decision,
+      economic_impact: economic,
+    };
 
-    const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: "networkidle0" });
+    const html = injectHtml(htmlTemplate, htmlData);
 
-    const pdf = await page.pdf({
-      format: "A4",
-      printBackground: true
-    });
+    // --- PDF generation wrapped in global timeout ---
+    const pdf = await Promise.race([
+      renderPdf(html),
+      globalTimeout(45000),
+    ]);
 
-    await browser.close();
-
-    fs.writeFileSync(PDF_PATH, pdf);
-
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", "attachment; filename=fairvia-report.pdf");
+    res.setHeader("Content-Length", pdf.length);
     res.send(pdf);
 
   } catch (err) {
-    console.error(err);
-    res.status(500).send("error");
+    console.error("[PDF ERROR]", {
+      message: err.message,
+      stack:   err.stack,
+      input:   req.body,
+    });
+    res.status(500).json({ error: "PDF generation failed", detail: err.message });
   }
+}
+
+// --- PDF renderer — page lifecycle only (browser is reused) ---
+async function renderPdf(html) {
+  const browser = await getBrowser();
+  const page    = await browser.newPage();
+  if (!page) throw new Error("Puppeteer page creation failed");
+
+  let closed = false;
+
+  const safeClose = async () => {
+    if (!closed) {
+      closed = true;
+      await page.close().catch(() => {});
+    }
+  };
+
+  page.on("error",     safeClose);
+  page.on("pageerror", safeClose);
+
+  try {
+    await page.setContent(html, { waitUntil: "networkidle0", timeout: 30000 })
+      .catch(() => { throw new Error("HTML render timeout — networkidle0 not reached within 30s"); });
+
+    await page.evaluate(async () => await document.fonts.ready);
+
+    return await page.pdf({ format: "A4", printBackground: true });
+
+  } finally {
+    await safeClose();
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+// AUXILIARY ROUTES
+// ══════════════════════════════════════════════════════════════
+
+app.get("/health", (_req, res) => {
+  res.json({ status: "ok", timestamp: new Date().toISOString() });
 });
 
-app.get("/latest-pdf", (req, res) => {
-  if (!fs.existsSync(PDF_PATH)) return res.status(404).send("No PDF yet");
-  res.sendFile(PDF_PATH);
-});
+// ══════════════════════════════════════════════════════════════
+// START
+// ══════════════════════════════════════════════════════════════
 
-app.listen(process.env.PORT || 8080, () => {
-  console.log("Server running");
+const PORT = process.env.PORT || 8080;
+app.listen(PORT, () => {
+  console.log(`[FairVia] Server running on port ${PORT}`);
 });
 
 const html_3man =`;
