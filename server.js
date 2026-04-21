@@ -107,48 +107,28 @@ function calculateEconomic(score) {
 }
 
 // =========================
-// EXECUTIVE（完成版）
+// EXECUTIVE
 // =========================
 function generateExecutive(input, scores, decision, economic) {
-
   const c = getConstraint(scores);
 
   return `
-This assessment evaluates the feasibility of transitioning from conventional material to a biodegradable alternative under current production conditions.
+This assessment evaluates the feasibility of transitioning to a biodegradable material.
 
 Thermal (${scores.thermal}) / Flow (${scores.flow}) / Mechanical (${scores.mechanical})
 
-Application:
-${safe(input.application)}
+Application: ${safe(input.application)}
+Material: ${safe(input.material)}
+Issues: ${safe(input.issues)}
+Concern: ${safe(input.concern)}
+Notes: ${safe(input.notes)}
 
-Current material:
-${safe(input.material)}
+System is ${decision.level === "LOW" ? "constrained" : "viable"} with sensitivity to ${c.factor}.
+Impact: ${c.impact}
+Control: ${c.control}
 
-Observed issues:
-${safe(input.issues)}
-
-Primary concern:
-${safe(input.concern)}
-
-Additional notes:
-${safe(input.notes)}
-
-The system is structurally ${decision.level === "LOW" ? "constrained" : "viable"}, with sensitivity to ${c.factor}.
-
-This impacts ${c.impact} under production conditions.
-
-Control focus:
-${c.control}
-
-Economic impact:
-${economic}
-
-Recommended action:
-${decision.level === "LOW"
-  ? "Redesign required"
-  : "Proceed with controlled pilot validation"}
-
-Deployment Decision: ${decision.decision}
+Economic: ${economic}
+Decision: ${decision.decision}
 `;
 }
 
@@ -161,232 +141,67 @@ function generateRisk(scores) {
 }
 
 // =========================
-// PRIMARY RISK TITLE
+// LABEL MATCH
 // =========================
-function getPrimaryRiskTitle(scores) {
-  const c = getConstraint(scores);
-  if (c.factor.includes("thermal")) return "Thermal Instability";
-  if (c.factor.includes("flow")) return "Flow Variability";
-  return "Mechanical Limitation";
+function pickValue(fields, includes = []) {
+  const f = fields.find(x => {
+    const label = (x.label || "").toLowerCase();
+    return includes.every(k => label.includes(k));
+  });
+  return f?.value || "";
 }
-function generateOverlay(scoreLeft, scoreRight) {
 
-  const angle = -90 + (scoreRight * 1.8);
-
-  function getAmplitude(score) {
-    if (score >= 85) return 1.6;
-    if (score >= 80) return 3;
-    if (score >= 70) return 5;
-    if (score >= 60) return 9;
-    return 13;
-  }
-
-  const ampLeft = getAmplitude(scoreLeft);
-  const ampRight = getAmplitude(scoreRight);
-
-  return `
-<div style="position:relative;width:700px;height:240px;margin:0 auto;">
-<img src="https://ilnautico.github.io/visual-base.png"
-style="position:absolute;top:0;left:0;width:700px;height:240px;object-fit:contain;z-index:1;"/>
-
-<div style="position:absolute;top:45px;left:150px;text-align:center;z-index:2;">
-<div style="font-size:28px;color:#2f3a44;">230°C</div>
-<div style="font-size:16px;color:#5b6770;">${scoreLeft}</div>
-</div>
-
-<div style="position:absolute;top:45px;left:470px;text-align:center;z-index:2;">
-<div style="font-size:28px;color:#d62c2c;">180°C</div>
-<div style="font-size:16px;color:#d62c2c;">${scoreRight}</div>
-</div>
-
-<svg style="position:absolute;left:280px;bottom:90px;z-index:2;" width="90" height="35">
-<path d="M0 18 C15 ${18 - ampLeft}, 30 ${18 + ampLeft}, 45 18 C60 ${18 - ampLeft}, 75 ${18 + ampLeft}, 90 18"
-fill="none" stroke="#4f7c8a" stroke-width="1.8" opacity="0.85"/>
-</svg>
-
-<svg style="position:absolute;left:430px;bottom:90px;z-index:2;" width="90" height="35">
-<path d="M0 18 C15 ${18 - ampRight}, 30 ${18 + ampRight}, 45 18 C60 ${18 - ampRight}, 75 ${18 + ampRight}, 90 18"
-fill="none" stroke="#d62c2c" stroke-width="1.8" opacity="0.85"/>
-</svg>
-
-<svg style="position:absolute;left:500px;bottom:10px;z-index:2;" viewBox="0 0 200 120" width="140" height="90">
-<defs>
-<linearGradient id="g">
-<stop offset="0%" stop-color="#22c55e"/>
-<stop offset="50%" stop-color="#fde047"/>
-<stop offset="100%" stop-color="#ef4444"/>
-</linearGradient>
-</defs>
-<path d="M20 100 A80 80 0 0 1 180 100 L100 100 Z" fill="url(#g)"/>
-<g transform="rotate(${angle} 100 100)">
-<line x1="100" y1="100" x2="100" y2="25" stroke="#111" stroke-width="3"/>
-</g>
-<circle cx="100" cy="100" r="4" fill="#111"/>
-</svg>
-</div>`;
-}
 // =========================
-// HTML inject
+// NORMALIZE
+// =========================
+function normalizeInput(body) {
+  if (!body?.data?.fields) return body;
+
+  const fields = body.data.fields;
+
+  return {
+    application: pickValue(fields, ["application"]),
+    material: pickValue(fields, ["material"]),
+    bio_material: pickValue(fields, ["target"]) || pickValue(fields, ["bio"]),
+    issues: pickValue(fields, ["issue"]),
+    concern: pickValue(fields, ["concern"]),
+    notes: pickValue(fields, ["note"])
+  };
+}
+
+// =========================
+// HTML
 // =========================
 function injectHtml(template, data) {
   return template.replace(/{{\s*(\w+)\s*}}/g, (_, key) => safe(data[key]));
 }
 
 // =========================
-// MAIN
+// MAIN（完全修正版）
 // =========================
 app.post("/generate-report", async (req, res) => {
   try {
 
-    // 🔥 入力正規化（ここだけ新）
-    let input = normalizeInput(req.body);
+    const input = normalizeInput(req.body);
 
     const scores = calculateScores(input);
     const decision = determineDecision(scores.total);
     const economic = calculateEconomic(scores.total);
 
     const html = injectHtml(htmlTemplate, {
-      application: safe(input.application),
-      material_transition: safe(input.bio_material),
+      application: input.application,
+      material_transition: input.bio_material,
       report_date: new Date().toISOString().split("T")[0],
 
       compatibility_level: decision.level,
       executive_summary: generateExecutive(input, scores, decision, economic),
 
       key_risk: generateRisk(scores),
-      processing_window: generateProcessingWindow(scores),
-
-      primary_risk_title: getPrimaryRiskTitle(scores),
 
       decision: decision.decision,
       economic_impact: economic,
-
-      pha_score: scores.total,
 
       dynamic_overlay: generateOverlay(scores.thermal, scores.flow),
-    });
-
-    const browser = await puppeteer.launch({
-      args: ["--no-sandbox", "--disable-setuid-sandbox"]
-    });
-
-    const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: "networkidle0" });
-
-    const pdf = await page.pdf({
-      format: "A4",
-      printBackground: true
-    });
-
-    await browser.close();
-
-    fs.writeFileSync(PDF_PATH, pdf);
-
-    res.send(pdf);
-
-  } catch (err) {
-    console.error(err);
-    res.status(500).send("error");
-  }
-});
-// =========================
-// 🔥 LABEL MATCH（最終版・完全吸収）
-// =========================
-function pickValue(fields, includes = [], excludes = []) {
-  const f = fields.find((x) => {
-    const label = (x.label || "").toLowerCase();
-    const okInc = includes.every(k => label.includes(k));
-    const okExc = excludes.every(k => !label.includes(k));
-    return okInc && okExc;
-  });
-  return f?.value || "";
-}
-
-// =========================
-// 🔥 INPUT NORMALIZE（完全版）
-// =========================
-function normalizeInput(body) {
-  let input = normalizeInput(req.body);
-
-    const scores = calculateScores(input);
-    input = {
-      // 基本
-      application: pickValue(fields, ["application"]),
-      material: pickValue(fields, ["current", "material"]),
-      bio_material: pickValue(fields, ["target"]) || pickValue(fields, ["bio"]),
-
-      // 課題系
-      issues: pickValue(fields, ["issue"]),
-      concern: pickValue(fields, ["concern"]),
-      notes: pickValue(fields, ["note"]),
-
-      // 製品文脈
-      product_type: pickValue(fields, ["product", "type"]),
-      mechanical_req: pickValue(fields, ["mechanical"]),
-      processing: pickValue(fields, ["processing"]),
-      equipment: pickValue(fields, ["equipment"]),
-      scale: pickValue(fields, ["scale"]),
-      project_stage: pickValue(fields, ["stage"]),
-    };
-  }
-
-  return input;
-}
-    const input = req.body;
-
-    const scores = calculateScores(input);
-    const decision = determineDecision(scores.total);
-    const economic = calculateEconomic(scores.total);
-    const c = getConstraint(scores);
-
-    const html = injectHtml(htmlTemplate, {
-
-      application: safe(input.application),
-      material_transition: safe(input.bio_material),
-      report_date: new Date().toISOString().split("T")[0],
-
-      compatibility_level: decision.level,
-      executive_summary: generateExecutive(input, scores, decision, economic),
-
-      key_risk: generateRisk(scores),
-
-      processing_window: `Depends on ${c.factor}`,
-      thermal_behavior: scores.thermal >= 70 ? "Stable under controlled conditions" : "Thermal instability observed",
-      flow_characteristics: scores.flow >= 70 ? "Consistent flow" : "Flow variability detected",
-
-      mechanical_behavior: "Stable rigidity",
-      surface_quality: "Uniform finish",
-      structural_consistency: "Maintains structure",
-
-      application_implication:
-        decision.level === "HIGH"
-          ? "Suitable for controlled production"
-          : decision.level === "MODERATE"
-          ? "Requires optimization"
-          : "Not recommended",
-
-      primary_risk_title: getPrimaryRiskTitle(scores),
-      primary_risk: generateRisk(scores),
-
-      secondary_risk_title: "Process Interaction",
-      secondary_risk: "Thermal and flow interaction may affect consistency",
-
-      mechanism: "Thermal-flow interaction imbalance",
-
-      stability: scores.thermal >= 70 ? "Stable" : "Unstable",
-      consistency: scores.flow >= 70 ? "Consistent" : "Variable",
-
-      expected_deviations:
-        `<li>Thickness variation</li>
-         <li>Flow instability</li>
-         <li>Surface inconsistency</li>`,
-
-      next_step: "Proceed to pilot validation",
-
-      decision: decision.decision,
-      economic_impact: economic,
-
-      dynamic_overlay: generateOverlay(scores.thermal, scores.flow)
     });
 
     const browser = await puppeteer.launch({
@@ -404,7 +219,6 @@ function normalizeInput(body) {
     await browser.close();
 
     fs.writeFileSync(PDF_PATH, pdf);
-
     res.send(pdf);
 
   } catch (err) {
@@ -413,6 +227,9 @@ function normalizeInput(body) {
   }
 });
 
+// =========================
+// GET PDF
+// =========================
 app.get("/latest-pdf", (req, res) => {
   if (!fs.existsSync(PDF_PATH)) return res.status(404).send("No PDF yet");
   res.sendFile(PDF_PATH);
