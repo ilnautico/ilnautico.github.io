@@ -676,7 +676,7 @@ function generateOverlay(scores) {
     fill="none" stroke="#d62c2c" stroke-width="1.8" opacity="0.85"/>
 </svg>
 
-<svg style="position:absolute;right:10px;bottom:10px;z-index:3;" viewBox="0 0 200 120" width="120" height="80">
+<svg style="position:absolute;right:40px;bottom:20px;z-index:3;" viewBox="0 0 200 120" width="140" height="90">
   <defs>
     <linearGradient id="g">
       <stop offset="0%" stop-color="#22c55e"/>
