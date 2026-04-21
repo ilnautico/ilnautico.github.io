@@ -1,7 +1,3 @@
-わかった
-⇧で試す
-でもクロードが制限に達した
-修正したコード⇩
 import express from "express";
 import puppeteer from "puppeteer";
 import fs from "fs";
