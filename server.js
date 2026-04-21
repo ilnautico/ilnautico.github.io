@@ -693,7 +693,7 @@ return `
   </g>
   <circle cx="100" cy="100" r="4" fill="#111"/>
 </svg>
-`;
+`;}
 
 // ══════════════════════════════════════════════════════════════
 // § 16b  CLAUDE NARRATIVE API  — structured JSON text generation
