@@ -237,6 +237,58 @@ function injectHtml(template, data) {
 // =========================
 app.post("/generate-report", async (req, res) => {
   try {
+
+    // 🔥 入力正規化（ここだけ新）
+    let input = normalizeInput(req.body);
+
+    const scores = calculateScores(input);
+    const decision = determineDecision(scores.total);
+    const economic = calculateEconomic(scores.total);
+
+    const html = injectHtml(htmlTemplate, {
+      application: safe(input.application),
+      material_transition: safe(input.bio_material),
+      report_date: new Date().toISOString().split("T")[0],
+
+      compatibility_level: decision.level,
+      executive_summary: generateExecutive(input, scores, decision, economic),
+
+      key_risk: generateRisk(scores),
+      processing_window: generateProcessingWindow(scores),
+
+      primary_risk_title: getPrimaryRiskTitle(scores),
+
+      decision: decision.decision,
+      economic_impact: economic,
+
+      pha_score: scores.total,
+
+      dynamic_overlay: generateOverlay(scores.thermal, scores.flow),
+    });
+
+    const browser = await puppeteer.launch({
+      args: ["--no-sandbox", "--disable-setuid-sandbox"]
+    });
+
+    const page = await browser.newPage();
+    await page.setContent(html, { waitUntil: "networkidle0" });
+
+    const pdf = await page.pdf({
+      format: "A4",
+      printBackground: true
+    });
+
+    await browser.close();
+
+    fs.writeFileSync(PDF_PATH, pdf);
+
+    res.send(pdf);
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("error");
+  }
+});
 // =========================
 // 🔥 LABEL MATCH（最終版・完全吸収）
 // =========================
