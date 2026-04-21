@@ -678,7 +678,6 @@ return `
     opacity="0.85"/>
 </svg>
 
-
 <svg style="position:absolute;left:430px;bottom:90px;z-index:2;" width="90" height="35">
   <path d="M0 18 
            C15 ${18 - ampRight}, 30 ${18 + ampRight}, 45 18 
