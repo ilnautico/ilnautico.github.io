@@ -666,8 +666,8 @@ return `
   <div style="font-size:28px;color:#d62c2c;">180°C</div>
   <div style="font-size:16px;color:#d62c2c;">${scores.flow}</div>
 </div>
+
 return `
-<!-- 青波 -->
 <svg style="position:absolute;left:280px;bottom:90px;z-index:2;" width="90" height="35">
   <path d="M0 18 
            C15 ${18 - ampLeft}, 30 ${18 + ampLeft}, 45 18 
@@ -678,7 +678,7 @@ return `
     opacity="0.85"/>
 </svg>
 
-<!-- 赤波 -->
+
 <svg style="position:absolute;left:430px;bottom:90px;z-index:2;" width="90" height="35">
   <path d="M0 18 
            C15 ${18 - ampRight}, 30 ${18 + ampRight}, 45 18 
