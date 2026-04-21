@@ -687,7 +687,7 @@ return `
     opacity="0.85"/>
 </svg>
 `;
-<!-- メーター -->
+
 <svg style="position:absolute;right:40px;bottom:10px;z-index:3;" viewBox="0 0 200 120" width="140" height="90">
   <defs>
     <linearGradient id="g">
