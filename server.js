@@ -899,8 +899,7 @@ async function handleReport(req, res) {
       pha_score: scores.total,
 
       base_image: "https://ilnautico.github.io/visual-base.png",
-      dynamic_overlay:  ${generateOverlay(scores)}
-</div>`,
+      dynamic_overlay:generateOverlay(scores),
 
       next_step:       next_step_body,
       decision:        decision.decision,
