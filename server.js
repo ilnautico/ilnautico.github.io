@@ -667,7 +667,6 @@ return `
   <div style="font-size:16px;color:#d62c2c;">${scores.flow}</div>
 </div>
 
-return `
 <svg style="position:absolute;left:280px;bottom:90px;z-index:2;" width="90" height="35">
   <path d="M0 18 
            C15 ${18 - ampLeft}, 30 ${18 + ampLeft}, 45 18 
@@ -688,7 +687,6 @@ return `
     opacity="0.85"/>
 </svg>
 `;
-
 <!-- メーター -->
 <svg style="position:absolute;right:40px;bottom:10px;z-index:3;" viewBox="0 0 200 120" width="140" height="90">
   <defs>
