@@ -666,26 +666,29 @@ return `
   <div style="font-size:28px;color:#d62c2c;">180°C</div>
   <div style="font-size:16px;color:#d62c2c;">${scores.flow}</div>
 </div>
-
-<!-- 青波（左） -->
-<svg style="position:absolute;left:230px;bottom:65px;z-index:3;" width="140" height="40">
-  <path d="M0 20 
-           C40 ${20 - ampLeft}, 80 ${20 + ampLeft}, 120 20"
+return `
+<!-- 青波 -->
+<svg style="position:absolute;left:280px;bottom:90px;z-index:2;" width="90" height="35">
+  <path d="M0 18 
+           C15 ${18 - ampLeft}, 30 ${18 + ampLeft}, 45 18 
+           C60 ${18 - ampLeft}, 75 ${18 + ampLeft}, 90 18"
     fill="none"
     stroke="#4f7c8a"
-    stroke-width="2"
-    opacity="0.95"/>
+    stroke-width="1.8"
+    opacity="0.85"/>
 </svg>
 
-<!-- 赤波（右） -->
-<svg style="position:absolute;left:350px;bottom:65px;z-index:3;" width="160" height="40">
-  <path d="M0 20 
-           C40 ${20 - ampRight}, 80 ${20 + ampRight}, 140 20"
+<!-- 赤波 -->
+<svg style="position:absolute;left:430px;bottom:90px;z-index:2;" width="90" height="35">
+  <path d="M0 18 
+           C15 ${18 - ampRight}, 30 ${18 + ampRight}, 45 18 
+           C60 ${18 - ampRight}, 75 ${18 + ampRight}, 90 18"
     fill="none"
     stroke="#d62c2c"
-    stroke-width="2"
-    opacity="0.95"/>
+    stroke-width="1.8"
+    opacity="0.85"/>
 </svg>
+`;
 
 <!-- メーター -->
 <svg style="position:absolute;right:40px;bottom:10px;z-index:3;" viewBox="0 0 200 120" width="140" height="90">
