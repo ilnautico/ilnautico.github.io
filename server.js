@@ -237,7 +237,49 @@ function injectHtml(template, data) {
 // =========================
 app.post("/generate-report", async (req, res) => {
   try {
+// =========================
+// 🔥 LABEL MATCH（最終版・完全吸収）
+// =========================
+function pickValue(fields, includes = [], excludes = []) {
+  const f = fields.find((x) => {
+    const label = (x.label || "").toLowerCase();
+    const okInc = includes.every(k => label.includes(k));
+    const okExc = excludes.every(k => !label.includes(k));
+    return okInc && okExc;
+  });
+  return f?.value || "";
+}
 
+// =========================
+// 🔥 INPUT NORMALIZE（完全版）
+// =========================
+function normalizeInput(body) {
+  let input = normalizeInput(req.body);
+
+    const scores = calculateScores(input);
+    input = {
+      // 基本
+      application: pickValue(fields, ["application"]),
+      material: pickValue(fields, ["current", "material"]),
+      bio_material: pickValue(fields, ["target"]) || pickValue(fields, ["bio"]),
+
+      // 課題系
+      issues: pickValue(fields, ["issue"]),
+      concern: pickValue(fields, ["concern"]),
+      notes: pickValue(fields, ["note"]),
+
+      // 製品文脈
+      product_type: pickValue(fields, ["product", "type"]),
+      mechanical_req: pickValue(fields, ["mechanical"]),
+      processing: pickValue(fields, ["processing"]),
+      equipment: pickValue(fields, ["equipment"]),
+      scale: pickValue(fields, ["scale"]),
+      project_stage: pickValue(fields, ["stage"]),
+    };
+  }
+
+  return input;
+}
     const input = req.body;
 
     const scores = calculateScores(input);
