@@ -669,26 +669,26 @@ function generateOverlay(scores) {
   </div>
 
   <!-- 青波 -->
-  <svg style="position:absolute;left:300px;bottom:85px;z-index:2;" width="90" height="35">
-    <path d="M0 18 
-             C15 ${18 - ampLeft}, 30 ${18 + ampLeft}, 45 18 
-             C60 ${18 - ampLeft}, 75 ${18 + ampLeft}, 90 18"
-      fill="none"
-      stroke="#4f7c8a"
-      stroke-width="1.8"
-      opacity="0.85"/>
-  </svg>
+<svg style="position:absolute;left:280px;bottom:85px;z-index:2;" width="90" height="35">
+  <path d="M0 18 
+           C15 ${18 - ampLeft}, 30 ${18 + ampLeft}, 45 18 
+           C60 ${18 - ampLeft}, 75 ${18 + ampLeft}, 90 18"
+    fill="none"
+    stroke="#4f7c8a"
+    stroke-width="1.8"
+    opacity="0.85"/>
+</svg>
 
-  <!-- 赤波 -->
-  <svg style="position:absolute;left:440px;bottom:85px;z-index:2;" width="90" height="35">
-    <path d="M0 18 
-             C15 ${18 - ampRight}, 30 ${18 + ampRight}, 45 18 
-             C60 ${18 - ampRight}, 75 ${18 + ampRight}, 90 18"
-      fill="none"
-      stroke="#d62c2c"
-      stroke-width="1.8"
-      opacity="0.85"/>
-  </svg>
+<!-- 赤波 -->
+<svg style="position:absolute;left:420px;bottom:85px;z-index:2;" width="90" height="35">
+  <path d="M0 18 
+           C15 ${18 - ampRight}, 30 ${18 + ampRight}, 45 18 
+           C60 ${18 - ampRight}, 75 ${18 + ampRight}, 90 18"
+    fill="none"
+    stroke="#d62c2c"
+    stroke-width="1.8"
+    opacity="0.85"/>
+</svg>
 
   <!-- メーター -->
   <svg style="position:absolute;right:40px;bottom:10px;z-index:3;" viewBox="0 0 200 120" width="140" height="90">
