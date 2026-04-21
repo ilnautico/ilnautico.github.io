@@ -652,59 +652,61 @@ function generateOverlay(scores) {
     return 13;
   }
 
-  const ampLeft  = getAmplitude(scores.thermal);
+  const ampLeft = getAmplitude(scores.thermal);
   const ampRight = getAmplitude(scores.flow);
-return `
-<!-- 左温度 -->
-<div style="position:absolute;top:40px;left:140px;text-align:center;z-index:3;">
-  <div style="font-size:28px;color:#2f3a44;">230°C</div>
-  <div style="font-size:16px;color:#5b6770;">${scores.thermal}</div>
-</div>
 
-<!-- 右温度 -->
-<div style="position:absolute;top:40px;right:140px;text-align:center;z-index:3;">
-  <div style="font-size:28px;color:#d62c2c;">180°C</div>
-  <div style="font-size:16px;color:#d62c2c;">${scores.flow}</div>
-</div>
+  return `
+  <!-- 左温度 -->
+  <div style="position:absolute;top:40px;left:140px;text-align:center;z-index:3;">
+    <div style="font-size:28px;color:#2f3a44;">230°C</div>
+    <div style="font-size:16px;color:#5b6770;">${scores.thermal}</div>
+  </div>
 
-<!-- 青波 -->
-<svg style="position:absolute;left:300px;bottom:85px;z-index:2;" width="90" height="35">
-  <path d="M0 18 
-           C15 ${18 - ampLeft}, 30 ${18 + ampLeft}, 45 18 
-           C60 ${18 - ampLeft}, 75 ${18 + ampLeft}, 90 18"
-    fill="none"
-    stroke="#4f7c8a"
-    stroke-width="1.8"
-    opacity="0.85"/>
-</svg>
+  <!-- 右温度 -->
+  <div style="position:absolute;top:40px;right:140px;text-align:center;z-index:3;">
+    <div style="font-size:28px;color:#d62c2c;">180°C</div>
+    <div style="font-size:16px;color:#d62c2c;">${scores.flow}</div>
+  </div>
 
-<!-- 赤波 -->
-<svg style="position:absolute;left:440px;bottom:85px;z-index:2;" width="90" height="35">
-  <path d="M0 18 
-           C15 ${18 - ampRight}, 30 ${18 + ampRight}, 45 18 
-           C60 ${18 - ampRight}, 75 ${18 + ampRight}, 90 18"
-    fill="none"
-    stroke="#d62c2c"
-    stroke-width="1.8"
-    opacity="0.85"/>
-</svg>
+  <!-- 青波 -->
+  <svg style="position:absolute;left:300px;bottom:85px;z-index:2;" width="90" height="35">
+    <path d="M0 18 
+             C15 ${18 - ampLeft}, 30 ${18 + ampLeft}, 45 18 
+             C60 ${18 - ampLeft}, 75 ${18 + ampLeft}, 90 18"
+      fill="none"
+      stroke="#4f7c8a"
+      stroke-width="1.8"
+      opacity="0.85"/>
+  </svg>
 
-<!-- メーター -->
-<svg style="position:absolute;right:40px;bottom:10px;z-index:3;" viewBox="0 0 200 120" width="140" height="90">
-  <defs>
-    <linearGradient id="g">
-      <stop offset="0%" stop-color="#22c55e"/>
-      <stop offset="50%" stop-color="#fde047"/>
-      <stop offset="100%" stop-color="#ef4444"/>
-    </linearGradient>
-  </defs>
-  <path d="M20 100 A80 80 0 0 1 180 100 L100 100 Z" fill="url(#g)"/>
-  <g transform="rotate(${-90 + scores.total * 1.8} 100 100)">
-    <line x1="100" y1="100" x2="100" y2="30" stroke="#111" stroke-width="3"/>
-  </g>
-  <circle cx="100" cy="100" r="4" fill="#111"/>
-</svg>
-`;
+  <!-- 赤波 -->
+  <svg style="position:absolute;left:440px;bottom:85px;z-index:2;" width="90" height="35">
+    <path d="M0 18 
+             C15 ${18 - ampRight}, 30 ${18 + ampRight}, 45 18 
+             C60 ${18 - ampRight}, 75 ${18 + ampRight}, 90 18"
+      fill="none"
+      stroke="#d62c2c"
+      stroke-width="1.8"
+      opacity="0.85"/>
+  </svg>
+
+  <!-- メーター -->
+  <svg style="position:absolute;right:40px;bottom:10px;z-index:3;" viewBox="0 0 200 120" width="140" height="90">
+    <defs>
+      <linearGradient id="g">
+        <stop offset="0%" stop-color="#22c55e"/>
+        <stop offset="50%" stop-color="#fde047"/>
+        <stop offset="100%" stop-color="#ef4444"/>
+      </linearGradient>
+    </defs>
+    <path d="M20 100 A80 80 0 0 1 180 100 L100 100 Z" fill="url(#g)"/>
+    <g transform="rotate(${angle} 100 100)">
+      <line x1="100" y1="100" x2="100" y2="30" stroke="#111" stroke-width="3"/>
+    </g>
+    <circle cx="100" cy="100" r="4" fill="#111"/>
+  </svg>
+  `;
+}
 // ══════════════════════════════════════════════════════════════
 // § 16b  CLAUDE NARRATIVE API  — structured JSON text generation
 //         Fills 7 narrative fields via Anthropic API.
