@@ -667,16 +667,16 @@ return `
   <div style="font-size:16px;color:#d62c2c;">${scores.flow}</div>
 </div>
 
-<!-- 左波（ノズル直下） -->
-<svg style="position:absolute;left:260px;bottom:55px;z-index:3;" width="90" height="35">
-  <path d="M0 18 C15 ${18 - ampLeft}, 30 ${18 + ampLeft}, 45 18 C60 ${18 - ampLeft}, 75 ${18 + ampLeft}, 90 18"
-    fill="none" stroke="#4f7c8a" stroke-width="1.8" opacity="0.85"/>
+<!-- 青波（左） -->
+<svg style="position:absolute;left:230px;bottom:65px;z-index:3;" width="140" height="40">
+  <path d="M0 20 C40 ${20 - ampLeft}, 80 ${20 + ampLeft}, 120 20"
+    fill="none" stroke="#4f7c8a" stroke-width="2" opacity="0.95"/>
 </svg>
 
-<!-- 右波（接続ライン） -->
-<svg style="position:absolute;left:340px;bottom:55px;z-index:3;" width="90" height="35">
-  <path d="M0 18 C15 ${18 - ampRight}, 30 ${18 + ampRight}, 45 18 C60 ${18 - ampRight}, 75 ${18 + ampRight}, 90 18"
-    fill="none" stroke="#d62c2c" stroke-width="1.8" opacity="0.85"/>
+<!-- 赤波（右）※完全接続 -->
+<svg style="position:absolute;left:348px;bottom:65px;z-index:3;" width="160" height="40">
+  <path d="M0 20 C40 ${20 - ampRight}, 80 ${20 + ampRight}, 140 20"
+    fill="none" stroke="#d62c2c" stroke-width="2" opacity="0.95"/>
 </svg>
 
 <!-- メーター -->
