@@ -917,7 +917,8 @@ async function handleReport(req, res) {
       renderPdf(html),
       globalTimeout(45000),
     ]);
-
+   latestPdfBuffer = pdf;
+    
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", "attachment; filename=fairvia-report.pdf");
     res.setHeader("Content-Length", pdf.length);
@@ -970,6 +971,15 @@ async function renderPdf(html) {
 
 app.get("/health", (_req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });
+});
+let latestPdfBuffer = null;
+
+app.get("/latest-pdf", (req, res) => {
+  if (!latestPdfBuffer) {
+    return res.status(404).send("No PDF generated yet");
+  }
+  res.setHeader("Content-Type", "application/pdf");
+  res.send(latestPdfBuffer);
 });
 
 // ══════════════════════════════════════════════════════════════
