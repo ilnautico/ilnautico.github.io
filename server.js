@@ -116,7 +116,7 @@ function validateMechanism(obj) {
 }
 
 // ══════════════════════════════════════════════════════════════
-// § 2  INPUT NORMALIZATION  (label-based; no recursion)
+// § 2  INPUT NORMALIZATION  (label-based; expanded)
 // ══════════════════════════════════════════════════════════════
 
 function normalizeInput(raw) {
@@ -124,25 +124,48 @@ function normalizeInput(raw) {
 
   if (raw.data && Array.isArray(raw.data.fields)) {
     const parsed = {};
-    raw.data.fields.forEach((f) => {
+    const fields = raw.data.fields;
+
+    fields.forEach((f) => {
       const label = (f.label || "").toLowerCase();
       const value = Array.isArray(f.value) ? f.value.join(", ") : (f.value || "");
+      const type = (f.type || "").toLowerCase();
 
+      if (label.includes("project name")) parsed.project_name = value;
+      if (label.includes("project stage")) parsed.project_stage = value;
+      if (label.includes("product type")) parsed.product_type = value;
       if (label.includes("application")) parsed.application = value;
-      if (label.includes("material") && !label.includes("bio") && !label.includes("target")) {
-        parsed.material = value;
+      if (label.includes("mechanical requirement")) parsed.mechanical_requirement = value;
+      if (label.includes("current material")) parsed.material = value;
+      if (label.includes("known issues")) parsed.issues = value;
+      if (label.includes("target material")) parsed.bio_material = value;
+      if (label.includes("processing method")) parsed.processing = value;
+      if (label.includes("equipment type")) parsed.equipment = value;
+      if (label.includes("screw diameter")) parsed.screw_diameter = value;
+      if (label === "l/d" || label.includes("l/d")) parsed.ld_ratio = value;
+      if (label.includes("die / mold") || label.includes("die/mold")) parsed.die_mold = value;
+      if (label.includes("production scale")) parsed.scale = value;
+      if (label.includes("primary concern")) parsed.concern = value;
+      if (label.includes("additional notes")) parsed.notes = value;
+
+      if (label.includes("visual requirement")) parsed.requirement_focus = "VISUAL";
+      if (label.includes("environment condition")) parsed.requirement_focus = "ENVIRONMENT";
+      if (label.includes("product stability")) parsed.current_material_focus = "PRODUCT_STABILITY";
+      if (label.includes("transition purpose")) parsed.transition_focus = "PURPOSE";
+      if (label.includes("certification requirement")) parsed.transition_focus = "CERTIFICATION";
+      if (label.includes("critical area")) parsed.risk_focus = "CRITICAL_AREA";
+
+      if (type.includes("multiple") || type.includes("choice")) {
+        const lowerValue = value.toLowerCase();
+        if (lowerValue.includes("visual")) parsed.requirement_focus = "VISUAL";
+        if (lowerValue.includes("environment")) parsed.requirement_focus = "ENVIRONMENT";
+        if (lowerValue.includes("product stability")) parsed.current_material_focus = "PRODUCT_STABILITY";
+        if (lowerValue.includes("transition purpose")) parsed.transition_focus = "PURPOSE";
+        if (lowerValue.includes("certification")) parsed.transition_focus = "CERTIFICATION";
+        if (lowerValue.includes("critical area")) parsed.risk_focus = "CRITICAL_AREA";
       }
-      if (label.includes("bio") || label.includes("target")) {
-        parsed.bio_material = value;
-      }
-      if (label.includes("processing")) parsed.processing = value;
-      if (label.includes("equipment")) parsed.equipment = value;
-      if (label.includes("scale")) parsed.scale = value;
-      if (label.includes("stage")) parsed.project_stage = value;
-      if (label.includes("issue")) parsed.issues = value;
-      if (label.includes("concern")) parsed.concern = value;
-      if (label.includes("note")) parsed.notes = value;
     });
+
     return parsed;
   }
 
@@ -150,47 +173,167 @@ function normalizeInput(raw) {
 }
 
 // ══════════════════════════════════════════════════════════════
-// § 2b  MATERIAL / APPLICATION FAMILY HELPERS
+// § 2b  CONTEXT INTERPRETATION HELPERS
 // ══════════════════════════════════════════════════════════════
 
-function getMaterialFamily(material) {
-  const m = (material || "").toUpperCase();
+function classifyMaterial(material) {
+  const m = safe(material, "").toUpperCase();
 
-  if (m.includes("LLDPE")) return "LLDPE";
-  if (m.includes("LDPE")) return "LDPE";
-  if (m.includes("PE")) return "PE";
-  if (m.includes("PP")) return "PP";
   if (m.includes("PET")) return "PET";
+  if (m.includes("LLDPE")) return "POLYOLEFIN_PE";
+  if (m.includes("LDPE")) return "POLYOLEFIN_PE";
+  if (m.includes("HDPE")) return "POLYOLEFIN_PE";
+  if (m.includes("PE")) return "POLYOLEFIN_PE";
+  if (m.includes("CPP")) return "POLYOLEFIN_PP";
+  if (m.includes("PP")) return "POLYOLEFIN_PP";
+  if (m.includes("PLA")) return "PLA_BASED";
+  if (m.includes("PHA") || m.includes("PHB")) return "PHA_BASED";
 
   return "OTHER";
 }
 
-function getBioFamily(bio) {
-  const b = (bio || "").toUpperCase();
+function classifyApplication(application, processing) {
+  const a = safe(application, "").toUpperCase();
+  const p = safe(processing, "").toUpperCase();
+  const text = `${a} ${p}`;
 
-  if (b.includes("PLA")) return "PLA";
-  if (b.includes("PHA") || b.includes("PHB")) return "PHA";
+  if (
+    text.includes("HOT-FILL") ||
+    text.includes("HOT FILL") ||
+    text.includes("HEAT EXPOSURE")
+  ) return "HOT_FILL_RIGID";
 
-  return "OTHER_BIO";
-}
+  if (
+    text.includes("MICROWAVE") ||
+    text.includes("MICROWAVEABLE") ||
+    text.includes("MICROWAVABLE")
+  ) return "MICROWAVEABLE_RIGID";
 
-function getApplicationFamily(application) {
-  const a = (application || "").toUpperCase();
+  if (
+    text.includes("HIGH-TEMPERATURE") ||
+    text.includes("HIGH TEMPERATURE") ||
+    text.includes("HEAT LOAD") ||
+    text.includes("HEAT RESISTANCE")
+  ) return "HEAT_EXPOSED_RIGID";
 
-  if (a.includes("FROZEN") || a.includes("LOW-TEMPERATURE")) return "FROZEN_FILM";
-  if (a.includes("MICROWAVE")) return "MICROWAVE_PACKAGING";
-  if (a.includes("HOT-FILL")) return "HOT_FILL_RIGID";
-  if (a.includes("FILM") || a.includes("POUCH")) return "GENERAL_FILM";
-  if (a.includes("INJECT") || a.includes("MOLD") || a.includes("MOULD")) return "INJECTION_PART";
+  if (
+    text.includes("LOW-TEMPERATURE") ||
+    text.includes("LOW TEMPERATURE") ||
+    text.includes("FROZEN")
+  ) return "LOW_TEMP_FILM";
+
+  if (
+    text.includes("HIGH-SPEED FILM") ||
+    text.includes("HIGH SPEED FILM") ||
+    (text.includes("FILM") && text.includes("HIGH-SPEED"))
+  ) return "HIGH_SPEED_FILM";
+
+  if (text.includes("FILM")) return "GENERAL_FILM";
+  if (text.includes("INJECTION")) return "GENERAL_INJECTION";
 
   return "GENERAL";
+}
+
+function extractNoteFlags(notes) {
+  const n = safe(notes, "").toUpperCase();
+  const flags = new Set();
+
+  if (n.includes("NO EQUIPMENT MODIFICATION") || n.includes("NO EQUIPMENT CHANGE")) flags.add("NO_EQUIPMENT_CHANGE");
+  if (n.includes("REPEATED HEAT") || n.includes("REPEATED HEATING")) flags.add("REPEATED_HEAT");
+  if (n.includes("LONG RUN") || n.includes("EXTENDED RUN")) flags.add("LONG_RUN");
+  if (n.includes("LOW TEMP") || n.includes("LOW-TEMPERATURE") || n.includes("FROZEN")) flags.add("LOW_TEMP_USE");
+  if (n.includes("SEAL")) flags.add("SEAL_IMPORTANT");
+  if (n.includes("DIMENSION")) flags.add("DIMENSION_CRITICAL");
+  if (n.includes("HIGH SPEED") || n.includes("HIGH-SPEED")) flags.add("HIGH_SPEED");
+  if (n.includes("SURFACE")) flags.add("SURFACE_IMPORTANT");
+
+  return [...flags];
+}
+
+function interpretInputContext(input) {
+  const processText = `${safe(input.processing, "")} ${safe(input.mechanical_requirement, "")} ${safe(input.equipment, "")}`.toUpperCase();
+  const applicationFamily = classifyApplication(input.application, input.processing);
+  const materialClass = classifyMaterial(input.material);
+  const targetMaterialClass = classifyMaterial(input.bio_material);
+  const noteFlags = extractNoteFlags(input.notes);
+
+  let process_family = "GENERAL";
+  if (processText.includes("BLOWN FILM")) process_family = "BLOWN_FILM";
+  else if (processText.includes("FILM")) process_family = "FILM_EXTRUSION";
+  else if (processText.includes("INJECTION")) process_family = "INJECTION";
+
+  let use_condition_family = "GENERAL";
+  if (
+    applicationFamily === "HOT_FILL_RIGID" ||
+    applicationFamily === "MICROWAVEABLE_RIGID" ||
+    applicationFamily === "HEAT_EXPOSED_RIGID"
+  ) {
+    use_condition_family = "THERMAL_STRESS";
+  } else if (
+    applicationFamily === "HIGH_SPEED_FILM" ||
+    applicationFamily === "GENERAL_FILM"
+  ) {
+    use_condition_family = "FLOW_STRESS";
+  } else if (applicationFamily === "LOW_TEMP_FILM") {
+    use_condition_family = "LOW_TEMP_HANDLING";
+  }
+
+  const stageText = safe(input.project_stage, "").toUpperCase();
+  let stage_level = "EARLY";
+  if (stageText.includes("PILOT")) stage_level = "PILOT";
+  if (stageText.includes("PRE-COMMERCIAL") || stageText.includes("PRE COMMERCIAL")) stage_level = "PRE_COMMERCIAL";
+  if (stageText.includes("MASS")) stage_level = "MASS_TARGET";
+
+  const scaleText = safe(input.scale, "").toUpperCase();
+  let production_risk_level = "LOW";
+  if (scaleText.includes("PILOT") || scaleText.includes("MEDIUM")) production_risk_level = "MEDIUM";
+  if (scaleText.includes("MASS") || scaleText.includes("COMMERCIAL")) production_risk_level = "HIGH";
+
+  return {
+    process_family,
+    application_family: applicationFamily,
+    use_condition_family,
+    stage_level,
+    production_risk_level,
+    note_flags: noteFlags,
+    option_flags: {
+      requirement_focus: input.requirement_focus || null,
+      transition_focus: input.transition_focus || null,
+      current_material_focus: input.current_material_focus || null,
+      risk_focus: input.risk_focus || null,
+    },
+    material_class: materialClass,
+    target_material_class: targetMaterialClass,
+  };
+}
+
+function applyOptionModifiers(scores, context) {
+  const next = { ...scores };
+
+  if (context.option_flags.requirement_focus === "ENVIRONMENT") {
+    next.flow = clamp(next.flow - 2);
+  }
+
+  if (context.option_flags.requirement_focus === "VISUAL") {
+    next.flow = clamp(next.flow - 3);
+  }
+
+  if (context.option_flags.current_material_focus === "PRODUCT_STABILITY") {
+    next.mechanical = clamp(next.mechanical - 2);
+  }
+
+  if (context.option_flags.transition_focus === "CERTIFICATION") {
+    next.total = clamp(next.total - 1);
+  }
+
+  return next;
 }
 
 // ══════════════════════════════════════════════════════════════
 // § 3  SCORING ENGINE
 // ══════════════════════════════════════════════════════════════
 
-function calculateScores(input) {
+function calculateScores(input, context = null) {
   let thermal = 85;
   let flow = 85;
   let mechanical = 85;
@@ -198,6 +341,12 @@ function calculateScores(input) {
   const mat = (input.material || "").toUpperCase();
   const bio = (input.bio_material || "").toUpperCase();
   const app = (input.application || "").toUpperCase();
+  const processing = (input.processing || "").toUpperCase();
+  const appTokens = app.split(/\W+/);
+
+  if (!context) {
+    context = interpretInputContext(input);
+  }
 
   if ((mat.includes("CPP") || mat.includes("PP")) && !mat.includes("PET")) thermal -= 10;
   if (mat.includes("PE") && !mat.includes("PET")) thermal -= 5;
@@ -206,28 +355,71 @@ function calculateScores(input) {
   if (bio.includes("PLA")) thermal -= 10;
   if (bio.includes("PHA") || bio.includes("PHB")) flow -= 10;
 
-  const appTokens = app.split(/\W+/);
-
-  const isFilm = app.includes("FILM") || appTokens.includes("FILM");
-
+  const isFilm = app.includes("FILM") || appTokens.includes("FILM") || processing.includes("FILM");
   const isInjection =
     app.includes("INJECT") ||
     app.includes("MOLD") ||
     app.includes("MOULD") ||
-    appTokens.includes("IM");
+    appTokens.includes("IM") ||
+    processing.includes("INJECTION");
 
   if (isFilm) flow -= 15;
   if (isInjection) mechanical -= 10;
+
+  if (context.application_family === "MICROWAVEABLE_RIGID") thermal -= 10;
+  if (context.application_family === "HOT_FILL_RIGID") thermal -= 15;
+  if (context.application_family === "HEAT_EXPOSED_RIGID") thermal -= 10;
+  if (context.application_family === "HIGH_SPEED_FILM") flow -= 10;
+  if (context.application_family === "LOW_TEMP_FILM") {
+    flow -= 5;
+    mechanical -= 3;
+  }
+
+  if (context.note_flags.includes("NO_EQUIPMENT_CHANGE")) thermal -= 5;
+  if (context.note_flags.includes("REPEATED_HEAT")) thermal -= 5;
+  if (context.note_flags.includes("LONG_RUN")) flow -= 5;
+  if (context.note_flags.includes("LOW_TEMP_USE")) mechanical -= 3;
+  if (context.note_flags.includes("SEAL_IMPORTANT")) flow -= 3;
+  if (context.note_flags.includes("DIMENSION_CRITICAL")) mechanical -= 5;
+  if (context.note_flags.includes("HIGH_SPEED")) flow -= 5;
+  if (context.note_flags.includes("SURFACE_IMPORTANT")) flow -= 2;
+
+  if (
+    context.material_class === "POLYOLEFIN_PP" &&
+    context.target_material_class === "PLA_BASED" &&
+    context.use_condition_family === "THERMAL_STRESS"
+  ) {
+    thermal -= 10;
+  }
+
+  if (
+    context.material_class === "PET" &&
+    context.target_material_class === "PLA_BASED" &&
+    context.use_condition_family === "THERMAL_STRESS"
+  ) {
+    thermal -= 5;
+  }
+
+  if (
+    context.material_class === "POLYOLEFIN_PE" &&
+    context.target_material_class === "PHA_BASED" &&
+    context.process_family === "BLOWN_FILM"
+  ) {
+    flow -= 5;
+  }
 
   thermal = clamp(thermal);
   flow = clamp(flow);
   mechanical = clamp(mechanical);
 
-  const bottleneck = Math.min(thermal, flow, mechanical);
-  const avg = (thermal + flow + mechanical) / 3;
+  let scores = { thermal, flow, mechanical, total: 0, tokens: appTokens };
+  scores = applyOptionModifiers(scores, context);
+
+  const bottleneck = Math.min(scores.thermal, scores.flow, scores.mechanical);
+  const avg = (scores.thermal + scores.flow + scores.mechanical) / 3;
   const total = Math.round(bottleneck * 0.7 + avg * 0.3);
 
-  return { thermal, flow, mechanical, total, tokens: appTokens };
+  return { ...scores, total };
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -263,6 +455,105 @@ function getConstraint(scores) {
     factor: "mechanical integrity under load conditions",
     impact: "product strength and structural performance",
     control: "material strength consistency and structural reliability",
+  };
+}
+
+function determineDecisionBand(total, scores, context) {
+  if (total >= 75) {
+    return {
+      level: "HIGH",
+      sublevel: null,
+      blocker_type: "NONE",
+      commercial_readiness: "READY_FOR_PILOT_SCALEUP",
+      validation_priority: "PERFORMANCE_CONFIRMATION",
+    };
+  }
+
+  if (total >= 70) {
+    return {
+      level: "MODERATE",
+      sublevel: "A",
+      blocker_type: "MANAGEABLE_CONSTRAINT",
+      commercial_readiness: "CONTROLLED_PILOT_READY",
+      validation_priority: "STABILITY_CONFIRMATION",
+    };
+  }
+
+  if (total >= 62) {
+    return {
+      level: "MODERATE",
+      sublevel: "B",
+      blocker_type: "CONDITIONALLY_LIMITING",
+      commercial_readiness: "PILOT_WITH_TIGHT_CONTROLS",
+      validation_priority: "CONSTRAINT_REDUCTION",
+    };
+  }
+
+  if (total >= 55) {
+    return {
+      level: "MODERATE",
+      sublevel: "C",
+      blocker_type: "COMMERCIAL_LIMITING",
+      commercial_readiness: "RESTRICTED_PILOT_ONLY",
+      validation_priority: "LIMITATION_MAPPING",
+    };
+  }
+
+  const lowType =
+    context.use_condition_family === "THERMAL_STRESS"
+      ? "LOW_STRUCTURAL"
+      : "LOW_CONDITIONAL";
+
+  return {
+    level: "LOW",
+    sublevel: null,
+    blocker_type: lowType,
+    commercial_readiness: "NOT_READY",
+    validation_priority: "ALTERNATIVE_PATH_REVIEW",
+  };
+}
+
+function buildConstraintArchitecture(scores, context) {
+  const primary = getConstraint(scores);
+
+  let secondaryTitle = "Process Interaction Risk";
+  let secondaryType = "";
+  let enablingType = "";
+
+  if (primary.type === "FLOW") {
+    secondaryType = "THERMAL";
+    enablingType = "MECHANICAL";
+  } else if (primary.type === "THERMAL") {
+    secondaryType = "FLOW";
+    enablingType = "MECHANICAL";
+  } else {
+    secondaryType = "THERMAL";
+    enablingType = "FLOW";
+  }
+
+  const scoreMap = {
+    THERMAL: scores.thermal,
+    FLOW: scores.flow,
+    MECHANICAL: scores.mechanical,
+  };
+
+  return {
+    primary_constraint: primary,
+    secondary_interaction: {
+      title: secondaryTitle,
+      type: secondaryType,
+      score: scoreMap[secondaryType],
+    },
+    enabling_factor: {
+      type: enablingType,
+      score: scoreMap[enablingType],
+    },
+    blocker_type:
+      primary.type === "THERMAL" && context.use_condition_family === "THERMAL_STRESS"
+        ? "THERMAL_READINESS_BLOCKER"
+        : primary.type === "FLOW"
+          ? "PROCESS_STABILITY_BLOCKER"
+          : "STRUCTURAL_CONSISTENCY_BLOCKER",
   };
 }
 
@@ -377,161 +668,80 @@ function generateExecutive(scores, decision, economic, constraint) {
 }
 
 // ══════════════════════════════════════════════════════════════
-// § 8  RISK / MECHANISM HELPERS
+// § 8  RISK STRUCTURE
 // ══════════════════════════════════════════════════════════════
 
-function getSecondaryRiskTitle(constraint, input) {
-  const app = (input.application || "").toUpperCase();
+function generateRisk(scores, constraintArch, input, context) {
+  const primary = constraintArch.primary_constraint;
+  const mat = safe(input.material, "the source material");
+  const bio = safe(input.bio_material, "the target biodegradable material");
+  const app = safe(input.application, "the specified processing application");
 
-  const isInjection =
-    app.includes("INJECT") ||
-    app.includes("MOLD") ||
-    app.includes("MOULD");
-
-  const isPrecision =
-    app.includes("PRECISION") ||
-    app.includes("DIMENSION") ||
-    app.includes("TOLERANCE");
-
-  if (constraint.type === "FLOW" || constraint.type === "THERMAL") {
-    return "Process Interaction Risk";
-  }
-
-  if (constraint.type === "MECHANICAL" && (isInjection || isPrecision)) {
-    return "Dimensional Interaction Risk";
-  }
-
-  return "Process Interaction Risk";
-}
-
-function getTargetingPhrase(constraintType) {
-  if (constraintType === "THERMAL") return "thermal stability control";
-  if (constraintType === "FLOW") return "flow stability control";
-  return "mechanical performance stability";
-}
-
-function generateMechanism(input, constraint) {
-  const materialFamily = getMaterialFamily(input.material);
-  const bioFamily = getBioFamily(input.bio_material);
-  const applicationFamily = getApplicationFamily(input.application);
-
-  if (applicationFamily === "FROZEN_FILM" && constraint.type === "FLOW") {
-    return (
-      `${safe(input.material)} provides relatively broad film-forming tolerance and stable extrusion behaviour under continuous pouch production, ` +
-      `whereas ${safe(input.bio_material)} introduces greater sensitivity in melt stability and crystallisation-driven flow response. ` +
-      `Under frozen food pouch and low-temperature packaging conditions, this mismatch is more likely to appear as instability in film formation, ` +
-      `seal-area consistency, and extended-run output control rather than as a purely thermal limitation. ` +
-      `As a result, production consistency, yield rate, and operational efficiency may deteriorate when flow stability is not tightly maintained.`
-    );
-  }
-
-  if (applicationFamily === "MICROWAVE_PACKAGING" && constraint.type === "THERMAL") {
-    return (
-      `${safe(input.material)} maintains a broader tolerance to elevated processing and use-phase heat exposure, ` +
-      `whereas ${safe(input.bio_material)} operates within a narrower thermal stability range governed by earlier softening and degradation onset sensitivity. ` +
-      `Under microwaveable food packaging conditions, this material gap becomes critical because repeated thermal exposure directly affects shape retention, ` +
-      `seal stability, and structural reliability after heating. ` +
-      `This mismatch therefore manifests primarily as thermal instability under processing and downstream application conditions.`
-    );
-  }
-
-  if (applicationFamily === "HOT_FILL_RIGID" && constraint.type === "THERMAL") {
-    return (
-      `${safe(input.material)} retains broader thermal tolerance and structural stability during molding and post-fill heat exposure, ` +
-      `whereas ${safe(input.bio_material)} introduces a narrower operating window with greater sensitivity to heat-induced deformation and degradation onset. ` +
-      `In hot-fill container or heat-exposure applications, this difference becomes decisive because thermal load is directly linked to part retention, ` +
-      `seal performance, and dimensional stability after filling. ` +
-      `The result is a primary thermal limitation that constrains reliable deployment under the current material transition scenario.`
-    );
-  }
-
-  if (applicationFamily === "GENERAL_FILM" && constraint.type === "FLOW") {
-    return (
-      `${safe(input.material)} exhibits broader film-processing tolerance and more stable rheological behaviour under continuous extrusion, ` +
-      `whereas ${safe(input.bio_material)} introduces a narrower operational window shaped by flow sensitivity and structure-development effects during processing. ` +
-      `Under ${safe(input.application)} conditions, this mismatch is most likely to emerge as instability in melt uniformity, web control, and extended-run consistency. ` +
-      `This directly constrains production consistency, yield stability, and overall operational efficiency.`
-    );
-  }
-
-  if (applicationFamily === "INJECTION_PART" && constraint.type === "THERMAL") {
-    return (
-      `${safe(input.material)} provides broader thermal processing latitude and stronger dimensional retention under elevated service conditions, ` +
-      `whereas ${safe(input.bio_material)} is governed by a narrower thermal stability window and earlier onset of heat-related property decline. ` +
-      `In injection-molded structural applications exposed to thermal load, this gap increases the risk of deformation, rigidity loss, and post-molding instability. ` +
-      `Accordingly, the material transition is primarily constrained by thermal stability under processing and use-phase conditions.`
-    );
-  }
-
-  if (bioFamily === "PLA" && materialFamily === "PET" && constraint.type === "THERMAL") {
-    return (
-      `${safe(input.material)} retains stronger resistance to elevated processing and service temperatures, whereas ${safe(input.bio_material)} is governed by a lower thermal tolerance range and earlier heat-induced property decline. ` +
-      `Under ${safe(input.application)} conditions, this difference increases the risk of softening, deformation, and reduced dimensional retention during both conversion and downstream use. ` +
-      `The transition is therefore primarily constrained by thermal instability rather than by flow uniformity or baseline molding capability.`
-    );
-  }
-
-  return (
-    `${safe(input.material)} exhibits broader thermal and rheological tolerance under standard processing conditions, ` +
-    `whereas ${safe(input.bio_material)} introduces a narrower operational window governed by crystallisation kinetics and degradation onset sensitivity. ` +
-    `Under ${safe(input.application)} conditions, this property mismatch generates instability in ${constraint.factor}, ` +
-    `causing ${constraint.impact} to fall outside commercially acceptable limits.`
-  );
-}
-
-function generateSecondaryRiskText(scores, constraint) {
-  let dimA, scoreA, dimB, scoreB;
-
-  if (constraint.type === "FLOW") {
-    dimA = "thermal";
-    scoreA = scores.thermal;
-    dimB = "mechanical";
-    scoreB = scores.mechanical;
-  } else if (constraint.type === "THERMAL") {
-    dimA = "flow";
-    scoreA = scores.flow;
-    dimB = "mechanical";
-    scoreB = scores.mechanical;
+  let primaryText = "";
+  if (primary.score < 55) {
+    primaryText =
+      `Critical instability in ${primary.factor} (${primary.score}/100) is expected to prevent commercially stable production under the declared operating conditions. ` +
+      `This directly compromises ${primary.impact} and creates a high probability of failure, scrap escalation, and non-compliant output.`;
   } else {
-    dimA = "thermal";
-    scoreA = scores.thermal;
-    dimB = "flow";
-    scoreB = scores.flow;
+    primaryText =
+      `Variability in ${primary.factor} (${primary.score}/100) constitutes the primary operational risk for this material transition. ` +
+      `This directly impacts ${primary.impact} and must be managed through rigorous control of ${primary.control}. ` +
+      `Risk exposure increases as production duration, throughput, or thermal burden move toward the boundary of the qualified operating range.`;
   }
 
-  const highPair = scoreA >= 75 && scoreB >= 75;
-
-  if (highPair) {
-    return (
-      `${dimA.charAt(0).toUpperCase() + dimA.slice(1)} sensitivity (${scoreA}/100) interacts with ` +
-      `${dimB} consistency (${scoreB}/100), creating downstream process-level effects across the production system. ` +
-      `Where ${dimA} conditions move toward the boundary of the qualified operating range, ${dimB} performance may be conditionally affected, ` +
-      `resulting in compounded output variation beyond the influence of the primary constraint alone.`
-    );
+  let secondaryText = "";
+  if (primary.type === "FLOW") {
+    secondaryText =
+      `Thermal sensitivity (${scores.thermal}/100) interacts with mechanical consistency (${scores.mechanical}/100), creating downstream process-level effects once flow stability begins to drift. ` +
+      `Where melt behaviour moves toward the boundary of the qualified operating range, structural performance and output uniformity may deteriorate beyond the influence of the primary constraint alone.`;
+  } else if (primary.type === "THERMAL") {
+    secondaryText =
+      `Flow sensitivity (${scores.flow}/100) interacts with mechanical consistency (${scores.mechanical}/100), creating downstream process-level effects across the production system. ` +
+      `Where thermal conditions move toward the boundary of the qualified operating range, mechanical performance may be conditionally affected, resulting in compounded output variation beyond the influence of the primary constraint alone.`;
+  } else {
+    secondaryText =
+      `Thermal sensitivity (${scores.thermal}/100) interacts with flow stability (${scores.flow}/100), increasing the effect of the structural limitation at the edge of the qualified operating range. ` +
+      `As process conditions drift, both dimensional reliability and production consistency may deteriorate together.`;
   }
 
-  return (
-    `${dimA.charAt(0).toUpperCase() + dimA.slice(1)} instability (${scoreA}/100) interacts with ` +
-    `${dimB} variability (${scoreB}/100), propagating process-level instability across the production system. ` +
-    `Deviation in ${dimA} parameters beyond the qualified operating range directly constrains ${dimB} performance, ` +
-    `resulting in compounded output variability and production consistency degradation that exceeds the impact of the primary constraint alone.`
-  );
-}
+  let mechanismText = "";
+  if (
+    context.material_class === "POLYOLEFIN_PP" &&
+    context.target_material_class === "PLA_BASED" &&
+    context.use_condition_family === "THERMAL_STRESS"
+  ) {
+    mechanismText =
+      `${mat} maintains broader tolerance to elevated processing and use-phase heat exposure, whereas ${bio} operates within a narrower thermal stability range governed by earlier softening and degradation onset sensitivity. ` +
+      `Under ${app} conditions, this material gap becomes critical because repeated thermal exposure directly affects shape retention, seal stability, and structural reliability after heating. ` +
+      `This mismatch therefore manifests primarily as thermal instability under processing and downstream application conditions.`;
+  } else if (
+    context.material_class === "PET" &&
+    context.target_material_class === "PLA_BASED" &&
+    context.use_condition_family === "THERMAL_STRESS"
+  ) {
+    mechanismText =
+      `${mat} provides a wider thermal processing margin and stronger dimensional retention under heat-exposed rigid packaging conditions, whereas ${bio} enters a narrower stability range with earlier softening and degradation sensitivity. ` +
+      `Under ${app} conditions, this difference is likely to appear as reduced dimensional reliability and progressive loss of heat tolerance once production or use temperature approaches the upper boundary of the qualified range.`;
+  } else if (
+    context.material_class === "POLYOLEFIN_PE" &&
+    context.target_material_class === "PHA_BASED" &&
+    context.process_family === "BLOWN_FILM"
+  ) {
+    mechanismText =
+      `${mat} provides relatively broad film-forming tolerance and stable extrusion behaviour under continuous pouch production, whereas ${bio} introduces greater sensitivity in melt stability and crystallisation-driven flow response. ` +
+      `Under ${app} conditions, this mismatch is more likely to appear as instability in film formation, seal-area consistency, and extended-run output control rather than as a purely thermal limitation. ` +
+      `As a result, production consistency, yield rate, and operational efficiency may deteriorate when flow stability is not tightly maintained.`;
+  } else {
+    mechanismText =
+      `${mat} exhibits broader thermal and rheological tolerance under standard processing conditions, whereas ${bio} introduces a narrower operational window governed by crystallisation kinetics and degradation onset sensitivity. ` +
+      `Under ${app} conditions, this property mismatch generates instability in ${primary.factor}, causing ${primary.impact} to fall outside commercially acceptable limits.`;
+  }
 
-// ══════════════════════════════════════════════════════════════
-// § 8b  RISK STRUCTURE
-// ══════════════════════════════════════════════════════════════
-
-function generateRisk(scores, constraint, input) {
-  const primary =
-    constraint.score < 55
-      ? `Critical instability in ${constraint.factor} (${constraint.score}/100) directly results in production failure, excessive scrap generation, and uncontrolled output variability under continuous operating conditions. This constraint alone is sufficient to prevent commercial deployment without fundamental process redesign.`
-      : `Variability in ${constraint.factor} (${constraint.score}/100) constitutes the primary operational risk for this material transition. This directly impacts ${constraint.impact} and must be managed through rigorous control of ${constraint.control}. Risk exposure escalates proportionally under extended production cycles and elevated throughput conditions.`;
-
-  const secondary = generateSecondaryRiskText(scores, constraint);
-  const mechanism = generateMechanism(input, constraint);
-
-  return { primary, secondary, mechanism };
+  return {
+    primary: primaryText,
+    secondary: secondaryText,
+    mechanism: mechanismText,
+  };
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -685,61 +895,52 @@ function generateQuality(scores) {
 // § 12  EXPECTED DEVIATIONS
 // ══════════════════════════════════════════════════════════════
 
-function generateExpectedDeviations(input, scores) {
-  const appFamily = getApplicationFamily(input.application);
-  const constraintType = getConstraint(scores).type;
+function generateExpectedDeviations(input, scores, context, constraintArch) {
+  const items = [];
 
-  let items = [];
-
-  if (appFamily === "FROZEN_FILM" && constraintType === "FLOW") {
-    items = [
-      `Local film stiffness variation may reduce pouch-forming consistency under low-temperature handling conditions`,
-      `Seal-area thickness imbalance may emerge where melt stability shifts during extended extrusion runs`,
-      `Cold-chain flex performance may vary across production output when flow uniformity deteriorates over time`,
-    ];
-  } else if (appFamily === "MICROWAVE_PACKAGING" && constraintType === "THERMAL") {
-    items = [
-      `Local softening or shape distortion may appear during repeated microwave heating exposure`,
-      `Seal-area deformation risk may increase where thermal retention is insufficient across the formed structure`,
-      `Heat-induced stiffness variation may produce non-uniform packaging performance after heating cycles`,
-    ];
-  } else if (appFamily === "HOT_FILL_RIGID" && constraintType === "THERMAL") {
-    items = [
-      `Container wall deformation may occur under hot-fill temperature exposure`,
-      `Seal integrity loss may arise where thermal retention is insufficient during filling and cooling`,
-      `Post-fill dimensional relaxation may compromise shape stability under elevated product temperature`,
-    ];
-  } else if (appFamily === "INJECTION_PART" && constraintType === "THERMAL") {
-    items = [
-      `Thermal deformation may appear on loaded or unsupported sections during repeated heat exposure`,
-      `Local dimensional drift may increase where thermal retention falls below application requirements`,
-      `Heat-induced rigidity loss may reduce part stability under continuous service conditions`,
-    ];
-  } else if (appFamily === "GENERAL_FILM" && constraintType === "FLOW") {
-    const gaugeRange = scores.flow < 65 ? "15–25" : "8–12";
-    items = [
-      `Film gauge variation ±${gaugeRange}% across web width under steady-state production conditions`,
-      `Longitudinal thickness non-uniformity correlated with melt pressure fluctuation during extended extrusion runs`,
-      `Flow instability events during die thermal cycling producing off-specification material zones`,
-    ];
-  } else if (constraintType === "FLOW") {
-    items = [
-      `Output consistency variation may appear during extended production runs where melt uniformity drifts outside the qualified range`,
-      `Surface or profile non-uniformity may increase under pressure fluctuation during steady-state conversion`,
-      `Production stability may decline as line conditions move toward the edge of the validated flow envelope`,
-    ];
-  } else if (constraintType === "THERMAL") {
-    items = [
-      `Heat-induced deformation may emerge where thermal retention is insufficient for the intended application`,
-      `Local loss of stiffness or structural stability may appear under repeated thermal exposure`,
-      `Material response may become inconsistent when thermal load approaches the upper limit of the qualified operating window`,
-    ];
+  if (
+    context.material_class === "POLYOLEFIN_PP" &&
+    context.target_material_class === "PLA_BASED" &&
+    context.use_condition_family === "THERMAL_STRESS"
+  ) {
+    items.push("Heat-induced deformation may emerge where thermal retention is insufficient for the intended application");
+    items.push("Local loss of stiffness or structural stability may appear under repeated thermal exposure");
+    items.push("Material response may become inconsistent when thermal load approaches the upper limit of the qualified operating window");
+  } else if (
+    context.material_class === "PET" &&
+    context.target_material_class === "PLA_BASED" &&
+    context.use_condition_family === "THERMAL_STRESS"
+  ) {
+    items.push("Dimensional drift may increase at precision edges where thermal exposure approaches the qualified limit");
+    items.push("Local wall-section distortion may appear after repeated heat loading or high-temperature filling cycles");
+    items.push("Container geometry retention may vary between cycles where thermal stability is insufficient for the required use condition");
+  } else if (
+    context.material_class === "POLYOLEFIN_PE" &&
+    context.target_material_class === "PHA_BASED" &&
+    context.process_family === "BLOWN_FILM" &&
+    context.application_family === "LOW_TEMP_FILM"
+  ) {
+    items.push("Local film stiffness variation may reduce pouch-forming consistency under low-temperature handling conditions");
+    items.push("Seal-area thickness imbalance may emerge where melt stability shifts during extended extrusion runs");
+    items.push("Cold-chain flex performance may vary across production output when flow uniformity deteriorates over time");
+  } else if (
+    context.material_class === "POLYOLEFIN_PE" &&
+    context.target_material_class === "PHA_BASED" &&
+    context.process_family === "BLOWN_FILM"
+  ) {
+    const gaugeRange = scores.flow < 65 ? "±15–25%" : "±8–12%";
+    items.push(`Film gauge variation ${gaugeRange} across web width under steady-state production conditions`);
+    items.push("Longitudinal thickness non-uniformity correlated with melt pressure fluctuation during extended extrusion runs");
+    items.push("Flow instability events during die thermal cycling producing off-specification material zones");
+  } else if (context.process_family === "INJECTION") {
+    const dimRange = scores.mechanical < 65 ? "±0.3–0.8mm" : "±0.1–0.3mm";
+    items.push(`Dimensional deviation ${dimRange} on critical part features under process parameter fluctuation`);
+    items.push("Warpage or local sink behaviour may appear where cooling balance shifts across the molded section");
+    items.push("Surface or geometry retention may vary when material response approaches the boundary of the qualified processing window");
   } else {
-    items = [
-      `Dimensional deviation may appear on critical features under fluctuating process conditions`,
-      `Mechanical property variation may affect structural consistency across production output`,
-      `Further deviation characterisation is required under full-scale production conditions prior to commercial acceptance`,
-    ];
+    items.push("Moderate process variability is anticipated during initial production runs and parameter optimisation activities");
+    items.push("Potential output non-conformance at the boundary of the validated processing window under fluctuating ambient conditions");
+    items.push("Further deviation characterisation is required under full-scale production conditions prior to commercial acceptance");
   }
 
   return items.map((item) => `<li>${item}</li>`).join("\n");
@@ -782,6 +983,37 @@ function generateApplicationImplication(decision, input) {
   );
 }
 
+function generateApplicationImplicationV2(decisionBand, context, constraintArch, input) {
+  const app = safe(input.application, "this application");
+  const primary = constraintArch.primary_constraint;
+
+  if (decisionBand.level === "LOW") {
+    return (
+      `${app} is not suitable for commercial deployment under the declared configuration. ` +
+      `The primary blocker is ${primary.factor}, and the current material transition path does not provide sufficient margin for reliable implementation.`
+    );
+  }
+
+  if (decisionBand.level === "MODERATE" && context.use_condition_family === "THERMAL_STRESS") {
+    return (
+      `${app} is technically feasible subject to tightly controlled process optimisation. ` +
+      `Pilot-scale validation is required before commercial commitment, with particular emphasis on maintaining thermal margin and downstream dimensional reliability.`
+    );
+  }
+
+  if (decisionBand.level === "MODERATE" && context.process_family === "BLOWN_FILM") {
+    return (
+      `${app} is technically feasible subject to process optimisation. ` +
+      `Pilot-scale validation is required and must verify flow stability, output uniformity, and application-level consistency before full-scale deployment.`
+    );
+  }
+
+  return (
+    `${app} is technically feasible subject to process optimisation. ` +
+    `Pilot-scale validation is required and must be successfully completed prior to commercial commitment.`
+  );
+}
+
 // ══════════════════════════════════════════════════════════════
 // § 14  NEXT STEPS
 // ══════════════════════════════════════════════════════════════
@@ -799,7 +1031,12 @@ function generateNextStep(decision, constraint, scores) {
   }
 
   if (decision.level === "MODERATE") {
-    const targetingPhrase = getTargetingPhrase(constraint.type);
+    const targetingPhrase =
+      constraint.type === "THERMAL"
+        ? "thermal stability control"
+        : constraint.type === "FLOW"
+          ? "flow stability control"
+          : "mechanical performance stability";
 
     return (
       `Based on the MODERATE feasibility determination (Composite: ${scores.total}/100), ` +
@@ -820,6 +1057,37 @@ function generateNextStep(decision, constraint, scores) {
     `Address the critical constraint identified in ${constraint.factor}. ` +
     `A revised evaluation submission is required following validation ` +
     `of design modifications at laboratory scale.`
+  );
+}
+
+function generateNextStepV2(decisionBand, constraintArch, context, scores) {
+  const primary = constraintArch.primary_constraint;
+
+  if (decisionBand.level === "LOW") {
+    return (
+      `Based on the LOW feasibility determination (Composite: ${scores.total}/100), the current transition path is not recommended for pilot approval.\n\n` +
+      `Suspend deployment planning and review either an alternative grade or a modified process architecture that can address ${primary.factor}. ` +
+      `Re-submission should follow only after a revised material or processing path has been technically screened at laboratory level.`
+    );
+  }
+
+  if (primary.type === "FLOW") {
+    return (
+      `Based on the MODERATE feasibility determination (Composite: ${scores.total}/100), engineering validation targeting flow stability control is required prior to pilot approval and must be completed before any commercial commitment.\n\n` +
+      `Implement control measures for ${primary.control}. Execute structured parameter trials to define the qualified processing envelope. Re-assess system stability following confirmation of stabilisation controls, then proceed to pilot validation against defined acceptance criteria.`
+    );
+  }
+
+  if (primary.type === "THERMAL") {
+    return (
+      `Based on the MODERATE feasibility determination (Composite: ${scores.total}/100), engineering validation targeting thermal stability control is required prior to pilot approval and must be completed before any commercial commitment.\n\n` +
+      `Implement control measures for ${primary.control}. Execute structured parameter trials to define the qualified processing envelope. Re-assess system stability following confirmation of stabilisation controls, then proceed to pilot validation against defined acceptance criteria.`
+    );
+  }
+
+  return (
+    `Based on the MODERATE feasibility determination (Composite: ${scores.total}/100), engineering validation targeting structural performance stability is required prior to pilot approval and must be completed before any commercial commitment.\n\n` +
+    `Implement control measures for ${primary.control}. Execute structured validation trials, then proceed to pilot review against defined structural acceptance criteria.`
   );
 }
 
@@ -1134,12 +1402,15 @@ async function handleReport(req, res) {
   try {
     const input = normalizeInput(req.body);
 
-    const scores = calculateScores(input);
+    const context = interpretInputContext(input);
+    const scores = calculateScores(input, context);
     const constraint = getConstraint(scores);
     const decision = determineDecision(scores.total);
+    const decisionBand = determineDecisionBand(scores.total, scores, context);
     const economic = calculateEconomic(scores.total);
+    const constraintArch = buildConstraintArchitecture(scores, context);
 
-    const risk = generateRisk(scores, constraint, input);
+    const risk = generateRisk(scores, constraintArch, input, context);
     const processing = generateProcessing(scores, constraint);
     const product = generateProduct(scores);
     const quality = generateQuality(scores);
@@ -1178,13 +1449,14 @@ async function handleReport(req, res) {
     const expected_devs_html = Array.isArray(expected_devs_raw)
       ? expected_devs_raw
           .filter(Boolean)
-          .map((d) => `<li>${String(d).trim()}</li>`)
+          .map((d) => `<li>${String(d).trim().slice(0, 220)}</li>`)
           .join("\n")
-      : generateExpectedDeviations(input, scores);
+      : generateExpectedDeviations(input, scores, context, constraintArch);
     const proc_window_note = narrative?.processing_window_note || processing.processingWindow;
     const app_implication =
-      narrative?.application_implication || generateApplicationImplication(decision, input);
-    const next_step_body = narrative?.next_step || generateNextStep(decision, constraint, scores);
+      narrative?.application_implication || generateApplicationImplicationV2(decisionBand, context, constraintArch, input);
+    const next_step_body =
+      narrative?.next_step || generateNextStepV2(decisionBand, constraintArch, context, scores);
 
     const htmlData = {
       assessment_type: "Technical Hypothesis",
@@ -1211,7 +1483,7 @@ async function handleReport(req, res) {
 
       primary_risk_title: getPrimaryRiskTitle(constraint),
       primary_risk: primary_risk_body,
-      secondary_risk_title: getSecondaryRiskTitle(constraint, input),
+      secondary_risk_title: "Process Interaction Risk",
       secondary_risk: secondary_risk_body,
       mechanism: mechanism_body,
 
