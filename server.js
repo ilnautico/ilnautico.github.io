@@ -13,7 +13,7 @@ const fetchFn = global.fetch
     };
 
 const __filename = fileURLToPath(import.meta.url);
-const __dirname  = path.dirname(__filename);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 app.use(express.json());
@@ -56,7 +56,9 @@ async function getBrowser() {
       "--disable-gpu",
     ],
   });
-  _browser.on("disconnected", () => { _browser = null; });
+  _browser.on("disconnected", () => {
+    _browser = null;
+  });
   return _browser;
 }
 
@@ -111,18 +113,20 @@ function normalizeInput(raw) {
     raw.data.fields.forEach((f) => {
       const label = (f.label || "").toLowerCase();
       const value = Array.isArray(f.value) ? f.value.join(", ") : (f.value || "");
-      if (label.includes("application")) parsed.application  = value;
-      if (label.includes("material") && !label.includes("bio") && !label.includes("target"))
+      if (label.includes("application")) parsed.application = value;
+      if (label.includes("material") && !label.includes("bio") && !label.includes("target")) {
         parsed.material = value;
-      if (label.includes("bio") || label.includes("target"))
-        parsed.bio_material  = value;
-      if (label.includes("processing")) parsed.processing    = value;
-      if (label.includes("equipment"))  parsed.equipment     = value;
-      if (label.includes("scale"))      parsed.scale         = value;
-      if (label.includes("stage"))      parsed.project_stage = value;
-      if (label.includes("issue"))      parsed.issues        = value;
-      if (label.includes("concern"))    parsed.concern       = value;
-      if (label.includes("note"))       parsed.notes         = value;
+      }
+      if (label.includes("bio") || label.includes("target")) {
+        parsed.bio_material = value;
+      }
+      if (label.includes("processing")) parsed.processing = value;
+      if (label.includes("equipment")) parsed.equipment = value;
+      if (label.includes("scale")) parsed.scale = value;
+      if (label.includes("stage")) parsed.project_stage = value;
+      if (label.includes("issue")) parsed.issues = value;
+      if (label.includes("concern")) parsed.concern = value;
+      if (label.includes("note")) parsed.notes = value;
     });
     return parsed;
   }
@@ -135,43 +139,41 @@ function normalizeInput(raw) {
 // ══════════════════════════════════════════════════════════════
 
 function calculateScores(input) {
-  let thermal   = 85;
-  let flow       = 85;
+  let thermal = 85;
+  let flow = 85;
   let mechanical = 85;
 
-  const mat = (input.material    || "").toUpperCase();
+  const mat = (input.material || "").toUpperCase();
   const bio = (input.bio_material || "").toUpperCase();
-  const app = (input.application  || "").toUpperCase();
+  const app = (input.application || "").toUpperCase();
 
   if ((mat.includes("CPP") || mat.includes("PP")) && !mat.includes("PET")) thermal -= 10;
   if (mat.includes("PE") && !mat.includes("PET")) thermal -= 5;
   if (mat.includes("PET")) thermal -= 25;
 
-  if (bio.includes("PLA"))                        thermal -= 10;
-  if (bio.includes("PHA") || bio.includes("PHB")) flow   -= 10;
+  if (bio.includes("PLA")) thermal -= 10;
+  if (bio.includes("PHA") || bio.includes("PHB")) flow -= 10;
 
   const appTokens = app.split(/\W+/);
 
-  const isFilm =
-    app.includes("FILM") ||
-    appTokens.includes("FILM");
+  const isFilm = app.includes("FILM") || appTokens.includes("FILM");
 
   const isInjection =
     app.includes("INJECT") ||
-    app.includes("MOLD")   ||
-    app.includes("MOULD")  ||
+    app.includes("MOLD") ||
+    app.includes("MOULD") ||
     appTokens.includes("IM");
 
-  if (isFilm)      flow       -= 15;
+  if (isFilm) flow -= 15;
   if (isInjection) mechanical -= 10;
 
-  thermal   = clamp(thermal);
-  flow       = clamp(flow);
+  thermal = clamp(thermal);
+  flow = clamp(flow);
   mechanical = clamp(mechanical);
 
   const bottleneck = Math.min(thermal, flow, mechanical);
-  const avg        = (thermal + flow + mechanical) / 3;
-  const total      = Math.round(bottleneck * 0.7 + avg * 0.3);
+  const avg = (thermal + flow + mechanical) / 3;
+  const total = Math.round(bottleneck * 0.7 + avg * 0.3);
 
   return { thermal, flow, mechanical, total, tokens: appTokens };
 }
@@ -185,29 +187,29 @@ function getConstraint(scores) {
 
   if (scores.flow === min) {
     return {
-      type:    "FLOW",
-      score:   scores.flow,
-      factor:  "flow consistency during extended production runs",
-      impact:  "production consistency, yield rate, and operational efficiency",
+      type: "FLOW",
+      score: scores.flow,
+      factor: "flow consistency during extended production runs",
+      impact: "production consistency, yield rate, and operational efficiency",
       control: "pressure stability, melt uniformity, and extrusion flow balance",
     };
   }
 
   if (scores.thermal === min) {
     return {
-      type:    "THERMAL",
-      score:   scores.thermal,
-      factor:  "thermal stability under processing conditions",
-      impact:  "material degradation risk and process reliability",
+      type: "THERMAL",
+      score: scores.thermal,
+      factor: "thermal stability under processing conditions",
+      impact: "material degradation risk and process reliability",
       control: "temperature control precision and thermal distribution uniformity",
     };
   }
 
   return {
-    type:    "MECHANICAL",
-    score:   scores.mechanical,
-    factor:  "mechanical integrity under load conditions",
-    impact:  "product strength and structural performance",
+    type: "MECHANICAL",
+    score: scores.mechanical,
+    factor: "mechanical integrity under load conditions",
+    impact: "product strength and structural performance",
     control: "material strength consistency and structural reliability",
   };
 }
@@ -217,9 +219,9 @@ function getConstraint(scores) {
 // ══════════════════════════════════════════════════════════════
 
 function determineDecision(total) {
-  if (total >= 75) return { decision: "GO",             level: "HIGH"     };
+  if (total >= 75) return { decision: "GO", level: "HIGH" };
   if (total >= 55) return { decision: "CONDITIONAL GO", level: "MODERATE" };
-  return              { decision: "HOLD",            level: "LOW"      };
+  return { decision: "HOLD", level: "LOW" };
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -234,13 +236,11 @@ function calculateEconomic(total) {
 
 // ══════════════════════════════════════════════════════════════
 // § 7  EXECUTIVE SUMMARY
-//       LOW / MODERATE×FLOW / MODERATE×THERMAL / MODERATE×MECHANICAL / HIGH
 // ══════════════════════════════════════════════════════════════
 
 function generateExecutive(scores, decision, economic, constraint) {
   const { thermal, flow, mechanical, total } = scores;
-  const scoreBlock =
-    `Thermal (${thermal}) / Flow (${flow}) / Mechanical (${mechanical}) / Composite: ${total}`;
+  const scoreBlock = `Thermal (${thermal}) / Flow (${flow}) / Mechanical (${mechanical}) / Composite: ${total}`;
 
   if (decision.level === "LOW") {
     return (
@@ -328,33 +328,38 @@ function generateExecutive(scores, decision, economic, constraint) {
 // § 8  RISK STRUCTURE  (Primary / Secondary / Mechanism)
 // ══════════════════════════════════════════════════════════════
 
-// --- 修正済み generateRisk 関数のみ差し替え ---
-
 function generateRisk(scores, constraint, input) {
-  const mat = safe(input.material,     "the source material");
+  const mat = safe(input.material, "the source material");
   const bio = safe(input.bio_material, "the target biodegradable material");
-  const app = safe(input.application,  "the specified processing application");
+  const app = safe(input.application, "the specified processing application");
 
-  const primary = constraint.score < 55
-    ? `Critical instability in ${constraint.factor} (${constraint.score}/100) directly results in production failure, excessive scrap generation, and uncontrolled output variability ` +
-      `under continuous operating conditions. This constraint alone is sufficient to prevent ` +
-      `commercial deployment without fundamental process redesign.`
-    : `Variability in ${constraint.factor} (${constraint.score}/100) constitutes the primary ` +
-      `operational risk for this material transition. This directly impacts ${constraint.impact} ` +
-      `and must be managed through rigorous control of ${constraint.control}. ` +
-      `Risk exposure escalates proportionally under extended production cycles ` +
-      `and elevated throughput conditions.`;
+  const primary =
+    constraint.score < 55
+      ? `Critical instability in ${constraint.factor} (${constraint.score}/100) directly results in production failure, excessive scrap generation, and uncontrolled output variability ` +
+        `under continuous operating conditions. This constraint alone is sufficient to prevent ` +
+        `commercial deployment without fundamental process redesign.`
+      : `Variability in ${constraint.factor} (${constraint.score}/100) constitutes the primary ` +
+        `operational risk for this material transition. This directly impacts ${constraint.impact} ` +
+        `and must be managed through rigorous control of ${constraint.control}. ` +
+        `Risk exposure escalates proportionally under extended production cycles ` +
+        `and elevated throughput conditions.`;
 
   let dimA, scoreA, dimB, scoreB;
   if (constraint.type === "FLOW") {
-    dimA = "thermal";    scoreA = scores.thermal;
-    dimB = "mechanical"; scoreB = scores.mechanical;
+    dimA = "thermal";
+    scoreA = scores.thermal;
+    dimB = "mechanical";
+    scoreB = scores.mechanical;
   } else if (constraint.type === "THERMAL") {
-    dimA = "flow";       scoreA = scores.flow;
-    dimB = "mechanical"; scoreB = scores.mechanical;
+    dimA = "flow";
+    scoreA = scores.flow;
+    dimB = "mechanical";
+    scoreB = scores.mechanical;
   } else {
-    dimA = "thermal";    scoreA = scores.thermal;
-    dimB = "flow";       scoreB = scores.flow;
+    dimA = "thermal";
+    scoreA = scores.thermal;
+    dimB = "flow";
+    scoreB = scores.flow;
   }
 
   const secondary =
@@ -447,41 +452,44 @@ function generateProcessing(scores, constraint) {
 // ══════════════════════════════════════════════════════════════
 
 function generateProduct(scores) {
-  const mechanical = scores.mechanical >= 75
-    ? `Structural integrity of the finished product is attainable under standard processing conditions ` +
-      `(Mechanical: ${scores.mechanical}/100). Mechanical performance meets commercial specification ` +
-      `without formulation adjustment.`
-    : scores.mechanical >= 55
-    ? `Mechanical performance is conditionally adequate, subject to process consistency ` +
-      `(Mechanical: ${scores.mechanical}/100). Inter-batch property variation is anticipated ` +
-      `without active control measures.`
-    : `Mechanical performance falls below the commercial acceptance threshold ` +
-      `(Mechanical: ${scores.mechanical}/100). Structural integrity compliance cannot be assured ` +
-      `without material reformulation or process redesign.`;
+  const mechanical =
+    scores.mechanical >= 75
+      ? `Structural integrity of the finished product is attainable under standard processing conditions ` +
+        `(Mechanical: ${scores.mechanical}/100). Mechanical performance meets commercial specification ` +
+        `without formulation adjustment.`
+      : scores.mechanical >= 55
+        ? `Mechanical performance is conditionally adequate, subject to process consistency ` +
+          `(Mechanical: ${scores.mechanical}/100). Inter-batch property variation is anticipated ` +
+          `without active control measures.`
+        : `Mechanical performance falls below the commercial acceptance threshold ` +
+          `(Mechanical: ${scores.mechanical}/100). Structural integrity compliance cannot be assured ` +
+          `without material reformulation or process redesign.`;
 
-  const surface = scores.flow >= 75
-    ? `Surface finish conforms to specification. Operationally stable melt flow ` +
-      `(Flow: ${scores.flow}/100) supports uniform surface formation under standard die ` +
-      `and cooling conditions.`
-    : scores.flow >= 55
-    ? `Surface quality is conditionally acceptable. Flow variability (Flow: ${scores.flow}/100) ` +
-      `directly introduces surface non-uniformities, particularly during die start-up ` +
-      `and extended high-speed production runs.`
-    : `Surface quality is unreliable under current process parameters (Flow: ${scores.flow}/100). ` +
-      `Melt instability directly generates streaking, pitting, and non-uniform gloss ` +
-      `at commercial production speeds.`;
+  const surface =
+    scores.flow >= 75
+      ? `Surface finish conforms to specification. Operationally stable melt flow ` +
+        `(Flow: ${scores.flow}/100) supports uniform surface formation under standard die ` +
+        `and cooling conditions.`
+      : scores.flow >= 55
+        ? `Surface quality is conditionally acceptable. Flow variability (Flow: ${scores.flow}/100) ` +
+          `directly introduces surface non-uniformities, particularly during die start-up ` +
+          `and extended high-speed production runs.`
+        : `Surface quality is unreliable under current process parameters (Flow: ${scores.flow}/100). ` +
+          `Melt instability directly generates streaking, pitting, and non-uniform gloss ` +
+          `at commercial production speeds.`;
 
-  const structural = scores.total >= 75
-    ? `Structural consistency is attainable within the defined processing envelope. ` +
-      `Dimensional stability and wall thickness uniformity conform to ` +
-      `pilot validation acceptance criteria.`
-    : scores.total >= 55
-    ? `Structural consistency is conditional on process parameter control ` +
-      `(Composite: ${scores.total}/100). Dimensional variation is anticipated at the margins ` +
-      `of the processing window; tooling and cooling parameter adjustments are required.`
-    : `Structural consistency is unattainable under the current process conditions ` +
-      `(Composite: ${scores.total}/100). Dimensional variance and structural non-compliance ` +
-      `exceed commercial tolerance limits without process redesign.`;
+  const structural =
+    scores.total >= 75
+      ? `Structural consistency is attainable within the defined processing envelope. ` +
+        `Dimensional stability and wall thickness uniformity conform to ` +
+        `pilot validation acceptance criteria.`
+      : scores.total >= 55
+        ? `Structural consistency is conditional on process parameter control ` +
+          `(Composite: ${scores.total}/100). Dimensional variation is anticipated at the margins ` +
+          `of the processing window; tooling and cooling parameter adjustments are required.`
+        : `Structural consistency is unattainable under the current process conditions ` +
+          `(Composite: ${scores.total}/100). Dimensional variance and structural non-compliance ` +
+          `exceed commercial tolerance limits without process redesign.`;
 
   return { mechanical, surface, structural };
 }
@@ -493,47 +501,46 @@ function generateProduct(scores) {
 function generateQuality(scores) {
   const minScore = Math.min(scores.thermal, scores.flow, scores.mechanical);
 
-  const stability     = minScore >= 75 ? "High" : minScore >= 55 ? "Moderate" : "Low";
-  const stabilityNote = minScore >= 75
-    ? `Process stability index: ${minScore}/100. Compliant with commercial deployment ` +
-      `under standard quality control protocol.`
-    : minScore >= 55
-    ? `Process stability index: ${minScore}/100. Conditionally acceptable — enhanced ` +
-      `in-line monitoring and statistical process control (SPC) are required.`
-    : `Process stability index: ${minScore}/100. Below the commercial acceptance threshold. ` +
-      `Process redesign is required prior to deployment.`;
+  const stability = minScore >= 75 ? "High" : minScore >= 55 ? "Moderate" : "Low";
+  const stabilityNote =
+    minScore >= 75
+      ? `Process stability index: ${minScore}/100. Compliant with commercial deployment ` +
+        `under standard quality control protocol.`
+      : minScore >= 55
+        ? `Process stability index: ${minScore}/100. Conditionally acceptable — enhanced ` +
+          `in-line monitoring and statistical process control (SPC) are required.`
+        : `Process stability index: ${minScore}/100. Below the commercial acceptance threshold. ` +
+          `Process redesign is required prior to deployment.`;
 
-  const consistency     = scores.flow >= 75 ? "High" : scores.flow >= 55 ? "Moderate" : "Low";
-  const consistencyNote = scores.flow >= 75
-    ? `Flow consistency index: ${scores.flow}/100. Production consistency is attainable ` +
-      `within standard parameter tolerance limits.`
-    : scores.flow >= 55
-    ? `Flow consistency index: ${scores.flow}/100. Closed-loop pressure control is ` +
-      `recommended to restrict inter-batch variability to acceptable levels.`
-    : `Flow consistency index: ${scores.flow}/100. High inter-batch variability is anticipated. ` +
-      `Output consistency cannot be assured without active flow stabilisation measures.`;
+  const consistency = scores.flow >= 75 ? "High" : scores.flow >= 55 ? "Moderate" : "Low";
+  const consistencyNote =
+    scores.flow >= 75
+      ? `Flow consistency index: ${scores.flow}/100. Production consistency is attainable ` +
+        `within standard parameter tolerance limits.`
+      : scores.flow >= 55
+        ? `Flow consistency index: ${scores.flow}/100. Closed-loop pressure control is ` +
+          `recommended to restrict inter-batch variability to acceptable levels.`
+        : `Flow consistency index: ${scores.flow}/100. High inter-batch variability is anticipated. ` +
+          `Output consistency cannot be assured without active flow stabilisation measures.`;
 
   return { stability, stabilityNote, consistency, consistencyNote };
 }
 
 // ══════════════════════════════════════════════════════════════
 // § 12  EXPECTED DEVIATIONS
-//        Returns HTML <li> string for direct injection into <ul>
 // ══════════════════════════════════════════════════════════════
 
 function generateExpectedDeviations(input, scores) {
-  const app    = (input.application || "").toUpperCase();
+  const app = (input.application || "").toUpperCase();
   const tokens = scores.tokens || app.split(/\W+/);
   let items;
 
-  const isFilm =
-    app.includes("FILM") ||
-    tokens.includes("FILM");
+  const isFilm = app.includes("FILM") || tokens.includes("FILM");
 
   const isInjection =
     app.includes("INJECT") ||
-    app.includes("MOLD")   ||
-    app.includes("MOULD")  ||
+    app.includes("MOLD") ||
+    app.includes("MOULD") ||
     tokens.includes("IM");
 
   if (isFilm && isInjection) {
@@ -578,8 +585,8 @@ function generateExpectedDeviations(input, scores) {
 // ══════════════════════════════════════════════════════════════
 
 function getPrimaryRiskTitle(constraint) {
-  if (constraint.type === "THERMAL")   return "Thermal Instability";
-  if (constraint.type === "FLOW")      return "Process Flow Variability";
+  if (constraint.type === "THERMAL") return "Thermal Instability";
+  if (constraint.type === "FLOW") return "Process Flow Variability";
   return "Mechanical Performance Limitation";
 }
 
@@ -628,9 +635,11 @@ function generateNextStep(decision, constraint, scores) {
 
   if (decision.level === "MODERATE") {
     const targetingPhrase =
-      constraint.type === "THERMAL"   ? "thermal stability control" :
-      constraint.type === "FLOW"      ? "flow stability control"    :
-                                        "mechanical performance stability";
+      constraint.type === "THERMAL"
+        ? "thermal stability control"
+        : constraint.type === "FLOW"
+          ? "flow stability control"
+          : "mechanical performance stability";
 
     return (
       `Based on the MODERATE feasibility determination (Composite: ${scores.total}/100), ` +
@@ -681,7 +690,7 @@ function generateOverlay(scores) {
     return 13;
   }
 
-  const ampLeft  = getAmplitude(scores.thermal);
+  const ampLeft = getAmplitude(scores.thermal);
   const ampRight = getAmplitude(scores.flow);
 
   return `
@@ -708,8 +717,8 @@ function generateOverlay(scores) {
   <svg style="position:absolute;right:40px;bottom:10px;z-index:3;" viewBox="0 0 200 120" width="140" height="90">
     <defs>
       <linearGradient id="g">
-        <stop offset="0%"   stop-color="#22c55e"/>
-        <stop offset="50%"  stop-color="#fde047"/>
+        <stop offset="0%" stop-color="#22c55e"/>
+        <stop offset="50%" stop-color="#fde047"/>
         <stop offset="100%" stop-color="#ef4444"/>
       </linearGradient>
     </defs>
@@ -723,7 +732,6 @@ function generateOverlay(scores) {
 
 // ══════════════════════════════════════════════════════════════
 // § 16b  CLAUDE NARRATIVE API
-//         Falls back to deterministic generators on any failure.
 // ══════════════════════════════════════════════════════════════
 
 const NARRATIVE_USER_TEMPLATE = `You are a JSON generation module embedded inside a production system.
@@ -801,30 +809,30 @@ async function callClaudeForNarrative(input, scores, constraint) {
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY not set");
 
   const userContent = NARRATIVE_USER_TEMPLATE
-    .replace("{{application}}",  safe(input.application,    "Not specified"))
-    .replace("{{material}}",     safe(input.material,       "Not specified"))
-    .replace("{{bio_material}}", safe(input.bio_material,   "Not specified"))
-    .replace("{{thermal}}",      String(scores.thermal))
-    .replace("{{flow}}",         String(scores.flow))
-    .replace("{{mechanical}}",   String(scores.mechanical))
-    .replace("{{total}}",        String(scores.total))
-    .replace("{{constraint}}",   constraint.type);
+    .replace("{{application}}", safe(input.application, "Not specified"))
+    .replace("{{material}}", safe(input.material, "Not specified"))
+    .replace("{{bio_material}}", safe(input.bio_material, "Not specified"))
+    .replace("{{thermal}}", String(scores.thermal))
+    .replace("{{flow}}", String(scores.flow))
+    .replace("{{mechanical}}", String(scores.mechanical))
+    .replace("{{total}}", String(scores.total))
+    .replace("{{constraint}}", constraint.type);
 
   const controller = new AbortController();
-  const timeoutId  = setTimeout(() => controller.abort(), 8000);
+  const timeoutId = setTimeout(() => controller.abort(), 8000);
 
   const res = await fetchFn("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
-      "Content-Type":      "application/json",
-      "x-api-key":         apiKey,
+      "Content-Type": "application/json",
+      "x-api-key": apiKey,
       "anthropic-version": "2023-06-01",
     },
     body: JSON.stringify({
-      model:       "claude-opus-4-5",
-      max_tokens:  1024,
+      model: "claude-opus-4-5",
+      max_tokens: 1024,
       temperature: 0,
-      messages:    [{ role: "user", content: userContent }],
+      messages: [{ role: "user", content: userContent }],
     }),
     signal: controller.signal,
   }).finally(() => clearTimeout(timeoutId));
@@ -834,15 +842,139 @@ async function callClaudeForNarrative(input, scores, constraint) {
   const data = await res.json();
 
   const raw = Array.isArray(data.content)
-    ? data.content.map(b => b.type === "text" ? b.text : "").join("").trim()
+    ? data.content.map((b) => (b.type === "text" ? b.text : "")).join("").trim()
     : "";
 
   if (!raw) throw new Error("Empty Claude response");
 
-  const parsed = safeParseJSON(raw);
+  const parsed = safeParseJSON(
+    raw.replace(/^[^{]*/, "").replace(/[^}]*$/, "")
+  );
   const result = validateNarrative(parsed);
 
   console.log("[Claude OK] narrative generated successfully");
+  return result;
+}
+
+// ══════════════════════════════════════════════════════════════
+// § 16c  CLAUDE MECHANISM API
+// ══════════════════════════════════════════════════════════════
+
+const MECHANISM_USER_TEMPLATE = `You are a professional materials and processing consultant specializing in biodegradable polymers.
+Your role is to refine specific sections of a technical feasibility report to achieve a high-end, consulting-grade output.
+
+CRITICAL RULES
+- Do NOT change any scores or evaluation logic.
+- Do NOT introduce new assumptions beyond the provided data.
+- Do NOT provide processing parameters, formulations, or supplier recommendations.
+- Keep explanations technical, precise, and professional.
+- Output must be valid JSON only.
+- Each field must be concise (2-4 sentences max).
+
+TASK
+Refine ONLY the following two sections:
+1. Mechanism
+2. Expected Deviations
+
+INPUT DATA
+Current Material: {{material}}
+Target Material: {{bio_material}}
+Scores:
+- Thermal: {{thermal}}
+- Flow: {{flow}}
+- Mechanical: {{mechanical}}
+Primary Constraint: {{constraint}}
+Application: {{application}}
+Processing Method: {{equipment}}
+Known Issues: {{concern}}
+
+INSTRUCTIONS
+
+Mechanism
+- Clearly explain the fundamental material difference between current and target materials.
+- Focus on: thermal stability, rheology, degradation sensitivity.
+- Must directly connect to the PRIMARY CONSTRAINT.
+- Avoid generic phrasing.
+- Make it sound like expert-level material science reasoning.
+
+Expected Deviations
+- Generate 3 bullet points.
+- Each must reflect: real processing risks, material-specific behavior.
+- Must align with: the constraint, the application.
+- Avoid generic "process variability" phrases.
+- Be specific to material behavior (e.g. degradation, deformation, instability patterns).
+- If the target material is PLA-based: consider hydrolytic degradation sensitivity and lower thermal resistance compared to polyolefins.
+
+OUTPUT FORMAT (STRICT JSON ONLY — no text before or after)
+{
+  "mechanism": "...",
+  "expected_deviations": ["...", "...", "..."]
+}`;
+
+function validateMechanism(obj) {
+  if (!obj || typeof obj.mechanism !== "string") {
+    throw new Error("Invalid mechanism structure — missing or non-string key: mechanism");
+  }
+  if (
+    !Array.isArray(obj.expected_deviations) ||
+    obj.expected_deviations.length !== 3 ||
+    obj.expected_deviations.some((d) => typeof d !== "string")
+  ) {
+    throw new Error("Invalid mechanism structure — expected_deviations must be array of 3 strings");
+  }
+  return obj;
+}
+
+async function callClaudeForMechanism(input, scores, constraint) {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) throw new Error("ANTHROPIC_API_KEY not set");
+
+  const userContent = MECHANISM_USER_TEMPLATE
+    .replace("{{material}}", safe(input.material, "Not specified"))
+    .replace("{{bio_material}}", safe(input.bio_material, "Not specified"))
+    .replace("{{thermal}}", String(scores.thermal))
+    .replace("{{flow}}", String(scores.flow))
+    .replace("{{mechanical}}", String(scores.mechanical))
+    .replace("{{constraint}}", constraint.type)
+    .replace("{{application}}", safe(input.application, "Not specified"))
+    .replace("{{equipment}}", safe(input.equipment, "Not specified"))
+    .replace("{{concern}}", safe(input.concern, "None noted"));
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+  const res = await fetchFn("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+    },
+    body: JSON.stringify({
+      model: "claude-opus-4-5",
+      max_tokens: 1024,
+      temperature: 0,
+      messages: [{ role: "user", content: userContent }],
+    }),
+    signal: controller.signal,
+  }).finally(() => clearTimeout(timeoutId));
+
+  if (!res.ok) throw new Error(`Claude API error (mechanism): ${res.status}`);
+
+  const data = await res.json();
+
+  const raw = Array.isArray(data.content)
+    ? data.content.map((b) => (b.type === "text" ? b.text : "")).join("").trim()
+    : "";
+
+  if (!raw) throw new Error("Empty Claude response (mechanism)");
+
+  const parsed = safeParseJSON(
+    raw.replace(/^[^{]*/, "").replace(/[^}]*$/, "")
+  );
+  const result = validateMechanism(parsed);
+
+  console.log("[Claude OK] mechanism refined successfully");
   return result;
 }
 
@@ -851,7 +983,7 @@ async function callClaudeForNarrative(input, scores, constraint) {
 // ══════════════════════════════════════════════════════════════
 
 app.post("/generate-report", (req, res) => {
-  queue.add(() => handleReport(req, res)).catch(err => {
+  queue.add(() => handleReport(req, res)).catch((err) => {
     console.error("[Queue error]", err.message);
   });
 });
@@ -860,28 +992,35 @@ async function handleReport(req, res) {
   try {
     const input = normalizeInput(req.body);
 
-    const scores     = calculateScores(input);
+    const scores = calculateScores(input);
     const constraint = getConstraint(scores);
-    const decision   = determineDecision(scores.total);
-    const economic   = calculateEconomic(scores.total);
+    const decision = determineDecision(scores.total);
+    const economic = calculateEconomic(scores.total);
 
-    const risk       = generateRisk(scores, constraint, input);
+    const risk = generateRisk(scores, constraint, input);
     const processing = generateProcessing(scores, constraint);
-    const product    = generateProduct(scores);
-    const quality    = generateQuality(scores);
+    const product = generateProduct(scores);
+    const quality = generateQuality(scores);
 
     let narrative = null;
+    let mechanismData = null;
+
     try {
       narrative = await callClaudeForNarrative(input, scores, constraint);
     } catch (e) {
-      if (e.name === "AbortError") {
-        console.warn("[Claude TIMEOUT]");
-      } else {
-        console.warn("[Claude ERROR]", e.message);
-      }
+      if (e.name === "AbortError") console.warn("[Claude TIMEOUT] narrative");
+      else console.warn("[Claude ERROR] narrative:", e.message);
     }
 
-    let exec_summary = narrative?.executive_summary || generateExecutive(scores, decision, economic, constraint);
+    try {
+      mechanismData = await callClaudeForMechanism(input, scores, constraint);
+    } catch (e) {
+      if (e.name === "AbortError") console.warn("[Claude TIMEOUT] mechanism");
+      else console.warn("[Claude ERROR] mechanism:", e.message);
+    }
+
+    let exec_summary =
+      narrative?.executive_summary || generateExecutive(scores, decision, economic, constraint);
 
     if (decision.level === "MODERATE") {
       exec_summary = exec_summary.replace(
@@ -889,71 +1028,70 @@ async function handleReport(req, res) {
         "Deployment Decision: CONDITIONAL GO — Controlled pilot validation required prior to commercial commitment"
       );
     }
-    const primary_risk_body   = narrative?.risk_primary            || risk.primary;
-    const secondary_risk_body = narrative?.risk_secondary          || risk.secondary;
-    const mechanism_body      = narrative?.mechanism               || risk.mechanism;
-    const proc_window_note    = narrative?.processing_window_note  || processing.processingWindow;
-    const app_implication     = narrative?.application_implication || generateApplicationImplication(decision, input);
-    const next_step_body      = narrative?.next_step               || generateNextStep(decision, constraint, scores);
+
+    const primary_risk_body = narrative?.risk_primary || risk.primary;
+    const secondary_risk_body = narrative?.risk_secondary || risk.secondary;
+    const mechanism_body = mechanismData?.mechanism || risk.mechanism;
+    const expected_devs_raw = mechanismData?.expected_deviations;
+    const expected_devs_html = Array.isArray(expected_devs_raw)
+      ? expected_devs_raw
+          .filter(Boolean)
+          .map((d) => `<li>${String(d).trim().slice(0, 180)}</li>`)
+          .join("\n")
+      : generateExpectedDeviations(input, scores);
+    const proc_window_note = narrative?.processing_window_note || processing.processingWindow;
+    const app_implication =
+      narrative?.application_implication || generateApplicationImplication(decision, input);
+    const next_step_body = narrative?.next_step || generateNextStep(decision, constraint, scores);
 
     const htmlData = {
-      // Cover
-      assessment_type:    "Technical Hypothesis",
-      application:         safe(input.application),
+      assessment_type: "Technical Hypothesis",
+      application: safe(input.application),
       material_transition: safe(input.bio_material),
-      report_date:         new Date().toISOString().split("T")[0],
+      report_date: new Date().toISOString().split("T")[0],
 
-      // Subtitle lines — map to {{subtitle_note}} in template.html
       subtitle_note:
         "For manufacturers evaluating biodegradable material transition using existing processing equipment." +
         "<br>This report enables early-stage decision-making without requiring immediate engineering trials.",
 
-      // §01
       compatibility_level: decision.level,
-      executive_summary:   exec_summary,
-      key_risk:            primary_risk_body,
+      executive_summary: exec_summary,
+      key_risk: primary_risk_body,
 
-      // §02
-      processing_window:    proc_window_note,
-      thermal_behavior:     processing.thermalBehavior,
+      processing_window: proc_window_note,
+      thermal_behavior: processing.thermalBehavior,
       flow_characteristics: processing.flowCharacteristics,
 
-      // §03
-      mechanical_behavior:     product.mechanical,
-      surface_quality:          product.surface,
-      structural_consistency:   product.structural,
-      application_implication:  app_implication,
+      mechanical_behavior: product.mechanical,
+      surface_quality: product.surface,
+      structural_consistency: product.structural,
+      application_implication: app_implication,
 
-      // §04
-      primary_risk_title:   getPrimaryRiskTitle(constraint),
-      primary_risk:          primary_risk_body,
+      primary_risk_title: getPrimaryRiskTitle(constraint),
+      primary_risk: primary_risk_body,
       secondary_risk_title: "Process Interaction Risk",
-      secondary_risk:        secondary_risk_body,
-      mechanism:             mechanism_body,
+      secondary_risk: secondary_risk_body,
+      mechanism: mechanism_body,
 
-      // §05
-      stability:           quality.stability,
-      stability_note:      quality.stabilityNote,
-      consistency:         quality.consistency,
-      consistency_note:    quality.consistencyNote,
-      expected_deviations: generateExpectedDeviations(input, scores),
+      stability: quality.stability,
+      stability_note: quality.stabilityNote,
+      consistency: quality.consistency,
+      consistency_note: quality.consistencyNote,
+      expected_deviations: expected_devs_html,
 
       pha_score: scores.total,
 
-      // §06
-      base_image:      "https://ilnautico.github.io/visual-base.png",
+      base_image: "https://ilnautico.github.io/visual-base.png",
       dynamic_overlay: `<div style="position:relative;width:700px;height:240px;margin:0 auto;">
   <img src="https://ilnautico.github.io/visual-base.png"
        style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:contain;z-index:1;" />
   ${generateOverlay(scores)}
 </div>`,
 
-      // §07
-      next_step:       next_step_body,
-      decision:        decision.decision,
+      next_step: next_step_body,
+      decision: decision.decision,
       economic_impact: economic,
 
-      // CTA
       call_to_action:
         "Request a Technical Screening Report (Equivalent: $200) — Delivered within 48 hours",
     };
@@ -971,21 +1109,23 @@ async function handleReport(req, res) {
     res.setHeader("Content-Disposition", "attachment; filename=fairvia-report.pdf");
     res.setHeader("Content-Length", pdf.length);
     res.send(pdf);
-
   } catch (err) {
     console.error("[PDF ERROR]", {
       message: err.message,
-      stack:   err.stack,
-      input:   req.body,
+      stack: err.stack,
+      input: req.body,
     });
     res.status(500).json({ error: "PDF generation failed", detail: err.message });
   }
 }
 
-// --- PDF renderer — page lifecycle only; browser singleton is retained ---
+// ══════════════════════════════════════════════════════════════
+// PDF renderer — page lifecycle only; browser singleton is retained
+// ══════════════════════════════════════════════════════════════
+
 async function renderPdf(html) {
   const browser = await getBrowser();
-  const page    = await browser.newPage();
+  const page = await browser.newPage();
   if (!page) throw new Error("Puppeteer page creation failed");
 
   let closed = false;
@@ -997,17 +1137,19 @@ async function renderPdf(html) {
     }
   };
 
-  page.on("error",     safeClose);
+  page.on("error", safeClose);
   page.on("pageerror", safeClose);
 
   try {
-    await page.setContent(html, { waitUntil: "networkidle0", timeout: 30000 })
-      .catch(() => { throw new Error("HTML render timeout — networkidle0 not reached within 30s"); });
+    await page
+      .setContent(html, { waitUntil: "networkidle0", timeout: 30000 })
+      .catch(() => {
+        throw new Error("HTML render timeout — networkidle0 not reached within 30s");
+      });
 
     await page.evaluate(async () => await document.fonts.ready);
 
     return await page.pdf({ format: "A4", printBackground: true });
-
   } finally {
     await safeClose();
   }
