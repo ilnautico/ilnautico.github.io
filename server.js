@@ -1,8 +1,8 @@
 import express from "express";
-import puppeteer from "puppeteer";　
+import puppeteer from "puppeteer";
 import fs from "fs";
 import path from "path";
-import { fileURLToPath } from "url";　
+import { fileURLToPath } from "url";
 import PQueue from "p-queue";
 
 const fetchFn = global.fetch
@@ -48,6 +48,7 @@ let _browser = null;
 
 async function getBrowser() {
   if (_browser && _browser.isConnected()) return _browser;
+
   _browser = await puppeteer.launch({
     args: [
       "--no-sandbox",
@@ -56,9 +57,11 @@ async function getBrowser() {
       "--disable-gpu",
     ],
   });
+
   _browser.on("disconnected", () => {
     _browser = null;
   });
+
   return _browser;
 }
 
@@ -93,11 +96,13 @@ function validateNarrative(obj) {
     "application_implication",
     "next_step",
   ];
+
   for (const k of keys) {
     if (!obj || typeof obj[k] !== "string") {
       throw new Error(`Invalid narrative structure — missing or non-string key: ${k}`);
     }
   }
+
   return obj;
 }
 
@@ -105,6 +110,7 @@ function validateMechanism(obj) {
   if (!obj || typeof obj.mechanism !== "string") {
     throw new Error("Invalid mechanism structure — missing or non-string key: mechanism");
   }
+
   if (
     !Array.isArray(obj.expected_deviations) ||
     obj.expected_deviations.length !== 3 ||
@@ -112,6 +118,7 @@ function validateMechanism(obj) {
   ) {
     throw new Error("Invalid mechanism structure — expected_deviations must be array of 3 strings");
   }
+
   return obj;
 }
 
@@ -158,7 +165,6 @@ function normalizeInput(raw) {
     const value = Array.isArray(f.value) ? f.value.join(", ") : norm(f.value);
     const type = low(f.type);
 
-    // ---- exact / high-confidence field mapping ----
     if (label === "project name") parsed.project_name = value;
     else if (label === "project stage") parsed.project_stage = value;
     else if (label === "product type") parsed.product_type = value;
@@ -175,22 +181,20 @@ function normalizeInput(raw) {
     else if (label === "production scale") parsed.scale = value;
     else if (label === "primary concern") parsed.concern = value;
     else if (label === "additional notes") parsed.notes = value;
-
-    // ---- option labels from Tally ----
     else if (label.includes("visual requirement")) parsed.requirement_focus = "VISUAL";
     else if (label.includes("environment condition")) parsed.requirement_focus = "ENVIRONMENT";
     else if (label.includes("product stability")) parsed.current_material_focus = "PRODUCT_STABILITY";
     else if (label.includes("transition purpose")) {
       parsed.transition_focus = "PURPOSE";
       if (value) parsed.transition_goal = value;
+    } else if (label.includes("certification requirement")) {
+      parsed.transition_focus = "CERTIFICATION";
+    } else if (label.includes("critical area")) {
+      parsed.risk_focus = "CRITICAL_AREA";
     }
-    else if (label.includes("certification requirement")) parsed.transition_focus = "CERTIFICATION";
-    else if (label.includes("critical area")) parsed.risk_focus = "CRITICAL_AREA";
 
-    // ---- fallback multiple choice parsing ----
     if (type.includes("multiple") || type.includes("choice")) {
       const lv = low(value);
-
       if (lv.includes("visual")) parsed.requirement_focus = "VISUAL";
       if (lv.includes("environment")) parsed.requirement_focus = "ENVIRONMENT";
       if (lv.includes("product stability")) parsed.current_material_focus = "PRODUCT_STABILITY";
@@ -200,7 +204,6 @@ function normalizeInput(raw) {
     }
   }
 
-  // ---- hard cleanup: prevent bio_material pollution ----
   const badBio =
     !parsed.bio_material ||
     /replace fossil plastic|biodegradable alternative|transition purpose|certification/i.test(parsed.bio_material);
@@ -209,10 +212,10 @@ function normalizeInput(raw) {
     parsed.bio_material = "";
   }
 
-  // fallback: if target material missing, try raw direct body keys
   if (!parsed.bio_material && raw.target_material) {
     parsed.bio_material = norm(raw.target_material);
   }
+
   if (!parsed.material && raw.current_material) {
     parsed.material = norm(raw.current_material);
   }
@@ -245,36 +248,34 @@ function classifyApplication(application, processing) {
   const p = safe(processing, "").toUpperCase();
   const text = `${a} ${p}`;
 
-  if (
-    text.includes("HOT-FILL") ||
-    text.includes("HOT FILL") ||
-    text.includes("HEAT EXPOSURE")
-  ) return "HOT_FILL_RIGID";
+  if (text.includes("HOT-FILL") || text.includes("HOT FILL") || text.includes("HEAT EXPOSURE")) {
+    return "HOT_FILL_RIGID";
+  }
 
-  if (
-    text.includes("MICROWAVE") ||
-    text.includes("MICROWAVEABLE") ||
-    text.includes("MICROWAVABLE")
-  ) return "MICROWAVEABLE_RIGID";
+  if (text.includes("MICROWAVE") || text.includes("MICROWAVEABLE") || text.includes("MICROWAVABLE")) {
+    return "MICROWAVEABLE_RIGID";
+  }
 
   if (
     text.includes("HIGH-TEMPERATURE") ||
     text.includes("HIGH TEMPERATURE") ||
     text.includes("HEAT LOAD") ||
     text.includes("HEAT RESISTANCE")
-  ) return "HEAT_EXPOSED_RIGID";
+  ) {
+    return "HEAT_EXPOSED_RIGID";
+  }
 
-  if (
-    text.includes("LOW-TEMPERATURE") ||
-    text.includes("LOW TEMPERATURE") ||
-    text.includes("FROZEN")
-  ) return "LOW_TEMP_FILM";
+  if (text.includes("LOW-TEMPERATURE") || text.includes("LOW TEMPERATURE") || text.includes("FROZEN")) {
+    return "LOW_TEMP_FILM";
+  }
 
   if (
     text.includes("HIGH-SPEED FILM") ||
     text.includes("HIGH SPEED FILM") ||
     (text.includes("FILM") && text.includes("HIGH-SPEED"))
-  ) return "HIGH_SPEED_FILM";
+  ) {
+    return "HIGH_SPEED_FILM";
+  }
 
   if (text.includes("FILM")) return "GENERAL_FILM";
   if (text.includes("INJECTION")) return "GENERAL_INJECTION";
@@ -376,6 +377,7 @@ function applyOptionModifiers(scores, context) {
 
   return next;
 }
+
 function getNarrativeSpecialization(context) {
   const mc = context.material_class;
   const tc = context.target_material_class;
@@ -409,6 +411,7 @@ function shouldForceDeterministicMechanism(context) {
 function shouldForceDeterministicDeviations(context) {
   return getNarrativeSpecialization(context) !== "GENERIC";
 }
+
 // ══════════════════════════════════════════════════════════════
 // § 3  SCORING ENGINE
 // ══════════════════════════════════════════════════════════════
@@ -596,7 +599,6 @@ function determineDecisionBand(total, scores, context) {
 function buildConstraintArchitecture(scores, context) {
   const primary = getConstraint(scores);
 
-  let secondaryTitle = "Process Interaction Risk";
   let secondaryType = "";
   let enablingType = "";
 
@@ -620,7 +622,7 @@ function buildConstraintArchitecture(scores, context) {
   return {
     primary_constraint: primary,
     secondary_interaction: {
-      title: secondaryTitle,
+      title: "Process Interaction Risk",
       type: secondaryType,
       score: scoreMap[secondaryType],
     },
@@ -746,6 +748,7 @@ function generateExecutive(scores, decision, economic, constraint) {
     `Deployment Decision: GO — Proceed to controlled pilot validation and systematic scale-up.`
   );
 }
+
 function generateMechanism(input, constraint, context) {
   const spec = getNarrativeSpecialization(context);
   const source = safe(input.material, "the source material");
@@ -789,6 +792,7 @@ function generateMechanism(input, constraint, context) {
     `Under ${app} conditions, this property mismatch generates instability in ${constraint.factor}, causing ${constraint.impact} to fall outside commercially acceptable limits.`
   );
 }
+
 // ══════════════════════════════════════════════════════════════
 // § 8  RISK STRUCTURE
 // ══════════════════════════════════════════════════════════════
@@ -814,9 +818,6 @@ function generateRisk(scores, constraintArch, input, context) {
   let secondaryText = "";
   let mechanismText = "";
 
-  // ─────────────────────────────────────────────
-  // A) PE → PHA / blown-film family
-  // ─────────────────────────────────────────────
   if (
     context.material_class === "POLYOLEFIN_PE" &&
     context.target_material_class === "PHA_BASED" &&
@@ -838,9 +839,6 @@ function generateRisk(scores, constraintArch, input, context) {
     };
   }
 
-  // ─────────────────────────────────────────────
-  // B) PP → PLA / thermal-stress family
-  // ─────────────────────────────────────────────
   if (
     context.material_class === "POLYOLEFIN_PP" &&
     context.target_material_class === "PLA_BASED" &&
@@ -862,9 +860,6 @@ function generateRisk(scores, constraintArch, input, context) {
     };
   }
 
-  // ─────────────────────────────────────────────
-  // C) PET → PLA / thermal-stress family
-  // ─────────────────────────────────────────────
   if (
     context.material_class === "PET" &&
     context.target_material_class === "PLA_BASED" &&
@@ -886,9 +881,6 @@ function generateRisk(scores, constraintArch, input, context) {
     };
   }
 
-  // ─────────────────────────────────────────────
-  // Generic fallback
-  // ─────────────────────────────────────────────
   if (primary.type === "FLOW") {
     secondaryText =
       `Thermal sensitivity (${scores.thermal}/100) interacts with mechanical consistency (${scores.mechanical}/100), creating downstream process-level effects once flow stability begins to drift. ` +
@@ -913,6 +905,13 @@ function generateRisk(scores, constraintArch, input, context) {
     mechanism: mechanismText,
   };
 }
+
+function getPrimaryRiskTitle(constraint) {
+  if (constraint.type === "THERMAL") return "Thermal Instability";
+  if (constraint.type === "FLOW") return "Process Flow Variability";
+  return "Mechanical Performance Limitation";
+}
+
 // ══════════════════════════════════════════════════════════════
 // § 9  PROCESSING SECTION
 // ══════════════════════════════════════════════════════════════
@@ -1038,24 +1037,18 @@ function generateQuality(scores) {
   const stability = minScore >= 75 ? "High" : minScore >= 55 ? "Moderate" : "Low";
   const stabilityNote =
     minScore >= 75
-      ? `Process stability index: ${minScore}/100. Compliant with commercial deployment ` +
-        `under standard quality control protocol.`
+      ? `Process stability index: ${minScore}/100. Compliant with commercial deployment under standard quality control protocol.`
       : minScore >= 55
-        ? `Process stability index: ${minScore}/100. Conditionally acceptable — enhanced ` +
-          `in-line monitoring and statistical process control (SPC) are required.`
-        : `Process stability index: ${minScore}/100. Below the commercial acceptance threshold. ` +
-          `Process redesign is required prior to deployment.`;
+        ? `Process stability index: ${minScore}/100. Conditionally acceptable — enhanced in-line monitoring and statistical process control (SPC) are required.`
+        : `Process stability index: ${minScore}/100. Below the commercial acceptance threshold. Process redesign is required prior to deployment.`;
 
   const consistency = scores.flow >= 75 ? "High" : scores.flow >= 55 ? "Moderate" : "Low";
   const consistencyNote =
     scores.flow >= 75
-      ? `Flow consistency index: ${scores.flow}/100. Production consistency is attainable ` +
-        `within standard parameter tolerance limits.`
+      ? `Flow consistency index: ${scores.flow}/100. Production consistency is attainable within standard parameter tolerance limits.`
       : scores.flow >= 55
-        ? `Flow consistency index: ${scores.flow}/100. Closed-loop pressure control is ` +
-          `recommended to restrict inter-batch variability to acceptable levels.`
-        : `Flow consistency index: ${scores.flow}/100. High inter-batch variability is anticipated. ` +
-          `Output consistency cannot be assured without active flow stabilisation measures.`;
+        ? `Flow consistency index: ${scores.flow}/100. Closed-loop pressure control is recommended to restrict inter-batch variability to acceptable levels.`
+        : `Flow consistency index: ${scores.flow}/100. High inter-batch variability is anticipated. Output consistency cannot be assured without active flow stabilisation measures.`;
 
   return { stability, stabilityNote, consistency, consistencyNote };
 }
@@ -1121,32 +1114,10 @@ function generateExpectedDeviations(input, scores, context, constraintArch) {
 
   return items.map((item) => `<li>${item}</li>`).join("\n");
 }
+
 // ══════════════════════════════════════════════════════════════
 // § 13  APPLICATION IMPLICATION
 // ══════════════════════════════════════════════════════════════
-
-function generateApplicationImplication(decision, input) {
-  const app = safe(input.application, "this application");
-
-  if (decision.level === "HIGH") {
-    return (
-      `${app} is technically feasible for commercial deployment. ` +
-      `The material transition is compatible with the current processing framework. ` +
-      `Standard monitoring protocols apply during the initial production ramp-up phase.`
-    );
-  }
-  if (decision.level === "MODERATE") {
-    return (
-      `${app} is technically feasible subject to process optimisation. ` +
-      `Pilot-scale validation is required and must be successfully completed prior to any commercial commitment. ` +
-      `Constraint control measures must be implemented and verified before full-scale deployment.`
-    );
-  }
-  return (
-    `${app} is not recommended for commercial deployment at the current feasibility level. ` +
-    `Material reformulation or application redesign is required prior to re-evaluation.`
-  );
-}
 
 function generateApplicationImplicationV2(decisionBand, context, constraintArch, input) {
   const app = safe(input.application, "this application");
@@ -1159,7 +1130,6 @@ function generateApplicationImplicationV2(decisionBand, context, constraintArch,
     );
   }
 
-  // A) PE → PHA / blown film
   if (
     context.material_class === "POLYOLEFIN_PE" &&
     context.target_material_class === "PHA_BASED" &&
@@ -1171,7 +1141,6 @@ function generateApplicationImplicationV2(decisionBand, context, constraintArch,
     );
   }
 
-  // B) PP → PLA / thermal-stress
   if (
     context.material_class === "POLYOLEFIN_PP" &&
     context.target_material_class === "PLA_BASED" &&
@@ -1183,7 +1152,6 @@ function generateApplicationImplicationV2(decisionBand, context, constraintArch,
     );
   }
 
-  // C) PET → PLA / thermal-stress
   if (
     context.material_class === "PET" &&
     context.target_material_class === "PLA_BASED" &&
@@ -1214,51 +1182,10 @@ function generateApplicationImplicationV2(decisionBand, context, constraintArch,
     `Pilot-scale validation is required and must be successfully completed prior to commercial commitment.`
   );
 }
+
 // ══════════════════════════════════════════════════════════════
 // § 14  NEXT STEPS
 // ══════════════════════════════════════════════════════════════
-
-function generateNextStep(decision, constraint, scores) {
-  if (decision.level === "HIGH") {
-    return (
-      `Based on the HIGH feasibility determination (Composite: ${scores.total}/100), ` +
-      `the system is qualified for controlled pilot deployment.\n\n` +
-      `Initiate pilot production with continuous monitoring focused on ${constraint.factor}. ` +
-      `Verify yield stability and product conformance under sustained production conditions ` +
-      `prior to committing to full commercial scale-up. ` +
-      `Document all validated process parameters as the baseline reference for ongoing quality management.`
-    );
-  }
-
-  if (decision.level === "MODERATE") {
-    const targetingPhrase =
-      constraint.type === "THERMAL"
-        ? "thermal stability control"
-        : constraint.type === "FLOW"
-          ? "flow stability control"
-          : "mechanical performance stability";
-
-    return (
-      `Based on the MODERATE feasibility determination (Composite: ${scores.total}/100), ` +
-      `engineering validation targeting ${targetingPhrase} ` +
-      `is required prior to pilot approval and must be completed before any commercial commitment.\n\n` +
-      `Implement control measures for ${constraint.control}. ` +
-      `Execute structured parameter trials to define the qualified processing envelope. ` +
-      `Re-assess system stability following confirmation of stabilisation controls, ` +
-      `then proceed to pilot validation against defined acceptance criteria.`
-    );
-  }
-
-  return (
-    `Based on the LOW feasibility determination (Composite: ${scores.total}/100), ` +
-    `commercial transition under the current configuration is not recommended.\n\n` +
-    `Suspend transition activities and evaluate alternative material grades ` +
-    `or process architecture modifications. ` +
-    `Address the critical constraint identified in ${constraint.factor}. ` +
-    `A revised evaluation submission is required following validation ` +
-    `of design modifications at laboratory scale.`
-  );
-}
 
 function generateNextStepV2(decisionBand, constraintArch, context, scores, input) {
   const primary = constraintArch.primary_constraint;
@@ -1271,7 +1198,6 @@ function generateNextStepV2(decisionBand, constraintArch, context, scores, input
     );
   }
 
-  // A) PE → PHA / blown film
   if (
     context.material_class === "POLYOLEFIN_PE" &&
     context.target_material_class === "PHA_BASED" &&
@@ -1284,7 +1210,6 @@ function generateNextStepV2(decisionBand, constraintArch, context, scores, input
     );
   }
 
-  // B) PP → PLA / thermal-stress
   if (
     context.material_class === "POLYOLEFIN_PP" &&
     context.target_material_class === "PLA_BASED" &&
@@ -1297,7 +1222,6 @@ function generateNextStepV2(decisionBand, constraintArch, context, scores, input
     );
   }
 
-  // C) PET → PLA / thermal-stress
   if (
     context.material_class === "PET" &&
     context.target_material_class === "PLA_BASED" &&
@@ -1451,15 +1375,6 @@ Mechanical: {{mechanical}}
 Total: {{total}}
 Constraint: {{constraint}}
 
-INTERPRETATION RULES
-- LOW (<55): not viable → HOLD
-- MODERATE (55-74): conditional → requires validation
-- HIGH (75+): viable → proceed
-- Primary risk = lowest score dimension
-- Secondary risk = interaction of remaining two dimensions
-- Mechanism = explain mismatch between material and process
-- No speculation beyond input
-
 OUTPUT FORMAT (STRICT JSON ONLY)
 {
   "executive_summary": "",
@@ -1507,7 +1422,6 @@ async function callClaudeForNarrative(input, scores, constraint) {
   if (!res.ok) throw new Error(`Claude API error: ${res.status}`);
 
   const data = await res.json();
-
   const raw = Array.isArray(data.content)
     ? data.content.map((b) => (b.type === "text" ? b.text : "")).join("").trim()
     : "";
@@ -1515,10 +1429,7 @@ async function callClaudeForNarrative(input, scores, constraint) {
   if (!raw) throw new Error("Empty Claude response");
 
   const parsed = safeParseJSON(raw);
-  const result = validateNarrative(parsed);
-
-  console.log("[Claude OK] narrative generated successfully");
-  return result;
+  return validateNarrative(parsed);
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -1552,23 +1463,6 @@ Primary Constraint: {{constraint}}
 Application: {{application}}
 Processing Method: {{equipment}}
 Known Issues: {{concern}}
-
-INSTRUCTIONS
-
-Mechanism
-- Clearly explain the fundamental material difference between current and target materials.
-- Focus on: thermal stability, rheology, degradation sensitivity.
-- Must directly connect to the PRIMARY CONSTRAINT.
-- Avoid generic phrasing.
-- Make it sound like expert-level material science reasoning.
-
-Expected Deviations
-- Generate 3 bullet points.
-- Each must reflect: real processing risks, material-specific behavior.
-- Must align with: the constraint, the application.
-- Avoid generic "process variability" phrases.
-- Be specific to material behavior (e.g. degradation, deformation, instability patterns).
-- If the target material is PLA-based: consider hydrolytic degradation sensitivity and lower thermal resistance compared to polyolefins.
 
 OUTPUT FORMAT (STRICT JSON ONLY — no text before or after)
 {
@@ -1613,7 +1507,6 @@ async function callClaudeForMechanism(input, scores, constraint) {
   if (!res.ok) throw new Error(`Claude API error (mechanism): ${res.status}`);
 
   const data = await res.json();
-
   const raw = Array.isArray(data.content)
     ? data.content.map((b) => (b.type === "text" ? b.text : "")).join("").trim()
     : "";
@@ -1621,10 +1514,7 @@ async function callClaudeForMechanism(input, scores, constraint) {
   if (!raw) throw new Error("Empty Claude response (mechanism)");
 
   const parsed = safeParseJSON(raw);
-  const result = validateMechanism(parsed);
-
-  console.log("[Claude OK] mechanism refined successfully");
-  return result;
+  return validateMechanism(parsed);
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -1683,27 +1573,35 @@ async function handleReport(req, res) {
 
     const primary_risk_body = narrative?.risk_primary || risk.primary;
     const secondary_risk_body = narrative?.risk_secondary || risk.secondary;
+
     const deterministic_mechanism = generateMechanism(input, constraint, context);
-const deterministic_deviations = generateExpectedDeviations(input, scores, context, constraintArch);
-const mechanism_body = shouldForceDeterministicMechanism(context)
-  ? deterministic_mechanism
-  : (mechanismData?.mechanism || deterministic_mechanism);
-const expected_devs_raw = mechanismData?.expected_deviations;
-const expected_devs_html = shouldForceDeterministicDeviations(context)
-  ? deterministic_deviations
-  : (
-      Array.isArray(expected_devs_raw)
-        ? expected_devs_raw
-            .filter(Boolean)
-            .map((d) => `<li>${String(d).trim().slice(0, 220)}</li>`)
-            .join("\n")
-        : deterministic_deviations
-    );
+    const deterministic_deviations = generateExpectedDeviations(input, scores, context, constraintArch);
+
+    const mechanism_body = shouldForceDeterministicMechanism(context)
+      ? deterministic_mechanism
+      : (mechanismData?.mechanism || deterministic_mechanism);
+
+    const expected_devs_raw = mechanismData?.expected_deviations;
+    const expected_devs_html = shouldForceDeterministicDeviations(context)
+      ? deterministic_deviations
+      : (
+          Array.isArray(expected_devs_raw)
+            ? expected_devs_raw
+                .filter(Boolean)
+                .map((d) => `<li>${String(d).trim().slice(0, 220)}</li>`)
+                .join("\n")
+            : deterministic_deviations
+        );
+
     const proc_window_note = narrative?.processing_window_note || processing.processingWindow;
     const app_implication =
-      narrative?.application_implication || generateApplicationImplicationV2(decisionBand, context, constraintArch, input);
+      narrative?.application_implication ||
+      generateApplicationImplicationV2(decisionBand, context, constraintArch, input);
+
     const next_step_body =
-  narrative?.next_step || generateNextStepV2(decisionBand, constraintArch, context, scores, input);
+      narrative?.next_step ||
+      generateNextStepV2(decisionBand, constraintArch, context, scores, input);
+
     const htmlData = {
       assessment_type: "Technical Hypothesis",
       application: safe(input.application),
@@ -1801,11 +1699,9 @@ async function renderPdf(html) {
   page.on("pageerror", safeClose);
 
   try {
-    await page
-      .setContent(html, { waitUntil: "networkidle0", timeout: 30000 })
-      .catch(() => {
-        throw new Error("HTML render timeout — networkidle0 not reached within 30s");
-      });
+    await page.setContent(html, { waitUntil: "networkidle0", timeout: 30000 }).catch(() => {
+      throw new Error("HTML render timeout — networkidle0 not reached within 30s");
+    });
 
     await page.evaluate(async () => await document.fonts.ready);
 
@@ -1841,7 +1737,7 @@ app.get("/health", (_req, res) => {
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
   console.log(`[FairVia] Server running on port ${PORT}`);
-});　
+});
 const html_3man =`;
 <!DOCTYPE html>
 <html>
