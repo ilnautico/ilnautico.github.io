@@ -686,14 +686,20 @@ function generateRisk(scores, constraintArch, input, context) {
     primaryText =
       `Variability in ${primary.factor} (${primary.score}/100) constitutes the primary operational risk for this material transition. ` +
       `This directly impacts ${primary.impact} and must be managed through rigorous control of ${primary.control}. ` +
-      `Risk exposure increases as production duration, throughput, or thermal burden move toward the boundary of the qualified operating range.`;
+      `Risk exposure increases as production duration, throughput, or application stress move toward the boundary of the qualified operating range.`;
   }
 
   let secondaryText = "";
   if (primary.type === "FLOW") {
-    secondaryText =
-      `Thermal sensitivity (${scores.thermal}/100) interacts with mechanical consistency (${scores.mechanical}/100), creating downstream process-level effects once flow stability begins to drift. ` +
-      `Where melt behaviour moves toward the boundary of the qualified operating range, structural performance and output uniformity may deteriorate beyond the influence of the primary constraint alone.`;
+    if (context.process_family === "BLOWN_FILM" || context.process_family === "FILM_EXTRUSION") {
+      secondaryText =
+        `Thermal sensitivity (${scores.thermal}/100) interacts with mechanical consistency (${scores.mechanical}/100), creating downstream process-level effects once flow stability begins to drift. ` +
+        `In film production, this interaction is most likely to appear as widening gauge variation, local seal-area inconsistency, and progressive loss of output uniformity during extended runs.`;
+    } else {
+      secondaryText =
+        `Thermal sensitivity (${scores.thermal}/100) interacts with mechanical consistency (${scores.mechanical}/100), creating downstream process-level effects once flow stability begins to drift. ` +
+        `Where melt behaviour moves toward the boundary of the qualified operating range, structural performance and output uniformity may deteriorate beyond the influence of the primary constraint alone.`;
+    }
   } else if (primary.type === "THERMAL") {
     secondaryText =
       `Flow sensitivity (${scores.flow}/100) interacts with mechanical consistency (${scores.mechanical}/100), creating downstream process-level effects across the production system. ` +
@@ -705,7 +711,17 @@ function generateRisk(scores, constraintArch, input, context) {
   }
 
   let mechanismText = "";
+
   if (
+    context.material_class === "POLYOLEFIN_PE" &&
+    context.target_material_class === "PHA_BASED" &&
+    context.process_family === "BLOWN_FILM"
+  ) {
+    mechanismText =
+      `${mat} provides relatively broad film-forming tolerance and stable extrusion behaviour under continuous blown-film production, whereas ${bio} introduces greater sensitivity in melt stability, crystallisation-driven flow response, and long-run uniformity control. ` +
+      `Under ${app} conditions, this mismatch is most likely to appear as instability in bubble behaviour, cross-web thickness control, seal-area consistency, and extended-run output stability rather than as a purely thermal limitation. ` +
+      `As a result, production consistency, yield rate, and operational efficiency may deteriorate when flow stability is not tightly maintained.`;
+  } else if (
     context.material_class === "POLYOLEFIN_PP" &&
     context.target_material_class === "PLA_BASED" &&
     context.use_condition_family === "THERMAL_STRESS"
@@ -722,15 +738,6 @@ function generateRisk(scores, constraintArch, input, context) {
     mechanismText =
       `${mat} provides a wider thermal processing margin and stronger dimensional retention under heat-exposed rigid packaging conditions, whereas ${bio} enters a narrower stability range with earlier softening and degradation sensitivity. ` +
       `Under ${app} conditions, this difference is likely to appear as reduced dimensional reliability and progressive loss of heat tolerance once production or use temperature approaches the upper boundary of the qualified range.`;
-  } else if (
-    context.material_class === "POLYOLEFIN_PE" &&
-    context.target_material_class === "PHA_BASED" &&
-    context.process_family === "BLOWN_FILM"
-  ) {
-    mechanismText =
-      `${mat} provides relatively broad film-forming tolerance and stable extrusion behaviour under continuous pouch production, whereas ${bio} introduces greater sensitivity in melt stability and crystallisation-driven flow response. ` +
-      `Under ${app} conditions, this mismatch is more likely to appear as instability in film formation, seal-area consistency, and extended-run output control rather than as a purely thermal limitation. ` +
-      `As a result, production consistency, yield rate, and operational efficiency may deteriorate when flow stability is not tightly maintained.`;
   } else {
     mechanismText =
       `${mat} exhibits broader thermal and rheological tolerance under standard processing conditions, whereas ${bio} introduces a narrower operational window governed by crystallisation kinetics and degradation onset sensitivity. ` +
@@ -743,7 +750,6 @@ function generateRisk(scores, constraintArch, input, context) {
     mechanism: mechanismText,
   };
 }
-
 // ══════════════════════════════════════════════════════════════
 // § 9  PROCESSING SECTION
 // ══════════════════════════════════════════════════════════════
@@ -899,6 +905,23 @@ function generateExpectedDeviations(input, scores, context, constraintArch) {
   const items = [];
 
   if (
+    context.material_class === "POLYOLEFIN_PE" &&
+    context.target_material_class === "PHA_BASED" &&
+    context.process_family === "BLOWN_FILM" &&
+    context.application_family === "LOW_TEMP_FILM"
+  ) {
+    items.push("Local film stiffness variation may reduce pouch-forming consistency under low-temperature handling conditions");
+    items.push("Seal-area thickness imbalance may emerge where melt stability shifts during extended extrusion runs");
+    items.push("Cold-chain flex performance may vary across production output when flow uniformity deteriorates over time");
+  } else if (
+    context.material_class === "POLYOLEFIN_PE" &&
+    context.target_material_class === "PHA_BASED" &&
+    context.process_family === "BLOWN_FILM"
+  ) {
+    items.push("Cross-web gauge drift may increase as melt stability moves toward the boundary of the qualified operating range");
+    items.push("Local seal-area non-uniformity may emerge where bubble behaviour and thickness balance begin to fluctuate during extended runs");
+    items.push("Extended-run output may show progressive variation in film uniformity, winding consistency, and off-specification zone frequency");
+  } else if (
     context.material_class === "POLYOLEFIN_PP" &&
     context.target_material_class === "PLA_BASED" &&
     context.use_condition_family === "THERMAL_STRESS"
@@ -914,24 +937,6 @@ function generateExpectedDeviations(input, scores, context, constraintArch) {
     items.push("Dimensional drift may increase at precision edges where thermal exposure approaches the qualified limit");
     items.push("Local wall-section distortion may appear after repeated heat loading or high-temperature filling cycles");
     items.push("Container geometry retention may vary between cycles where thermal stability is insufficient for the required use condition");
-  } else if (
-    context.material_class === "POLYOLEFIN_PE" &&
-    context.target_material_class === "PHA_BASED" &&
-    context.process_family === "BLOWN_FILM" &&
-    context.application_family === "LOW_TEMP_FILM"
-  ) {
-    items.push("Local film stiffness variation may reduce pouch-forming consistency under low-temperature handling conditions");
-    items.push("Seal-area thickness imbalance may emerge where melt stability shifts during extended extrusion runs");
-    items.push("Cold-chain flex performance may vary across production output when flow uniformity deteriorates over time");
-  } else if (
-    context.material_class === "POLYOLEFIN_PE" &&
-    context.target_material_class === "PHA_BASED" &&
-    context.process_family === "BLOWN_FILM"
-  ) {
-    const gaugeRange = scores.flow < 65 ? "±15–25%" : "±8–12%";
-    items.push(`Film gauge variation ${gaugeRange} across web width under steady-state production conditions`);
-    items.push("Longitudinal thickness non-uniformity correlated with melt pressure fluctuation during extended extrusion runs");
-    items.push("Flow instability events during die thermal cycling producing off-specification material zones");
   } else if (context.process_family === "INJECTION") {
     const dimRange = scores.mechanical < 65 ? "±0.3–0.8mm" : "±0.1–0.3mm";
     items.push(`Dimensional deviation ${dimRange} on critical part features under process parameter fluctuation`);
@@ -945,7 +950,6 @@ function generateExpectedDeviations(input, scores, context, constraintArch) {
 
   return items.map((item) => `<li>${item}</li>`).join("\n");
 }
-
 // ══════════════════════════════════════════════════════════════
 // § 12b  PRIMARY / SECONDARY RISK TITLE
 // ══════════════════════════════════════════════════════════════
