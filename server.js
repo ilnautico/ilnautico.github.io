@@ -690,16 +690,87 @@ function generateRisk(scores, constraintArch, input, context) {
   }
 
   let secondaryText = "";
+  let mechanismText = "";
+
+  // ─────────────────────────────────────────────
+  // A) PE → PHA / blown-film family
+  // ─────────────────────────────────────────────
+  if (
+    context.material_class === "POLYOLEFIN_PE" &&
+    context.target_material_class === "PHA_BASED" &&
+    context.process_family === "BLOWN_FILM"
+  ) {
+    secondaryText =
+      `Thermal sensitivity (${scores.thermal}/100) interacts with mechanical consistency (${scores.mechanical}/100), creating downstream process-level effects once flow stability begins to drift. ` +
+      `In blown-film production, this interaction is most likely to appear as widening gauge variation, localized seal-area inconsistency, and progressive loss of output uniformity during extended runs.`;
+
+    mechanismText =
+      `${mat} provides relatively broad film-forming tolerance and stable extrusion behaviour under continuous blown-film production, whereas ${bio} introduces greater sensitivity in melt stability, crystallisation-driven flow response, and long-run uniformity control. ` +
+      `Under ${app} conditions, this mismatch is most likely to appear as instability in bubble behaviour, cross-web thickness control, seal-area consistency, and extended-run output stability rather than as a purely thermal limitation. ` +
+      `As a result, production consistency, yield rate, and operational efficiency may deteriorate when flow stability is not tightly maintained.`;
+
+    return {
+      primary: primaryText,
+      secondary: secondaryText,
+      mechanism: mechanismText,
+    };
+  }
+
+  // ─────────────────────────────────────────────
+  // B) PP → PLA / thermal-stress family
+  // ─────────────────────────────────────────────
+  if (
+    context.material_class === "POLYOLEFIN_PP" &&
+    context.target_material_class === "PLA_BASED" &&
+    context.use_condition_family === "THERMAL_STRESS"
+  ) {
+    secondaryText =
+      `Flow sensitivity (${scores.flow}/100) interacts with mechanical consistency (${scores.mechanical}/100) at the boundary of the qualified thermal envelope, creating downstream process-level effects once thermal load begins to influence part retention. ` +
+      `Even where molding output remains visually stable, local softening, seal-area deformation, or shape relaxation may progressively amplify functional variability beyond the primary thermal constraint alone.`;
+
+    mechanismText =
+      `${mat} maintains broader tolerance to elevated processing and use-phase thermal exposure, whereas ${bio} operates within a narrower thermal stability range governed by earlier softening and heat-induced property decline. ` +
+      `Under ${app} conditions, this material gap becomes critical because repeated heating affects not only dimensional retention but also localized rigidity, seal stability, and structural consistency after conversion. ` +
+      `The transition is therefore constrained primarily by thermal instability rather than by baseline melt flow uniformity or initial part formation capability.`;
+
+    return {
+      primary: primaryText,
+      secondary: secondaryText,
+      mechanism: mechanismText,
+    };
+  }
+
+  // ─────────────────────────────────────────────
+  // C) PET → PLA / thermal-stress family
+  // ─────────────────────────────────────────────
+  if (
+    context.material_class === "PET" &&
+    context.target_material_class === "PLA_BASED" &&
+    context.use_condition_family === "THERMAL_STRESS"
+  ) {
+    secondaryText =
+      `Flow sensitivity (${scores.flow}/100) interacts with mechanical consistency (${scores.mechanical}/100) at the boundary of the qualified thermal envelope, creating downstream process-level effects once heat exposure begins to influence dimensional retention. ` +
+      `Even where the molded article is initially formed within visual and dimensional acceptance, localized relaxation, edge distortion, or geometry drift may progressively amplify functional variability beyond the primary thermal constraint alone.`;
+
+    mechanismText =
+      `${mat} provides a wider thermal processing margin and stronger dimensional retention under precision rigid-packaging conditions, whereas ${bio} enters a narrower stability range with earlier softening and heat-induced property decline. ` +
+      `Under ${app} conditions, this difference becomes critical because tolerance-sensitive geometry must remain stable not only immediately after molding, but also during downstream handling and thermal exposure. ` +
+      `The transition is therefore constrained primarily by thermal-driven dimensional instability rather than by baseline melt flow uniformity or initial cavity filling performance.`;
+
+    return {
+      primary: primaryText,
+      secondary: secondaryText,
+      mechanism: mechanismText,
+    };
+  }
+
+  // ─────────────────────────────────────────────
+  // Generic fallback
+  // ─────────────────────────────────────────────
   if (primary.type === "FLOW") {
-    if (context.process_family === "BLOWN_FILM" || context.process_family === "FILM_EXTRUSION") {
-      secondaryText =
-        `Thermal sensitivity (${scores.thermal}/100) interacts with mechanical consistency (${scores.mechanical}/100), creating downstream process-level effects once flow stability begins to drift. ` +
-        `In film production, this interaction is most likely to appear as widening gauge variation, local seal-area inconsistency, and progressive loss of output uniformity during extended runs.`;
-    } else {
-      secondaryText =
-        `Thermal sensitivity (${scores.thermal}/100) interacts with mechanical consistency (${scores.mechanical}/100), creating downstream process-level effects once flow stability begins to drift. ` +
-        `Where melt behaviour moves toward the boundary of the qualified operating range, structural performance and output uniformity may deteriorate beyond the influence of the primary constraint alone.`;
-    }
+    secondaryText =
+      `Thermal sensitivity (${scores.thermal}/100) interacts with mechanical consistency (${scores.mechanical}/100), creating downstream process-level effects once flow stability begins to drift. ` +
+      `Where melt behaviour moves toward the boundary of the qualified operating range, structural performance and output uniformity may deteriorate beyond the influence of the primary constraint alone.`;
   } else if (primary.type === "THERMAL") {
     secondaryText =
       `Flow sensitivity (${scores.flow}/100) interacts with mechanical consistency (${scores.mechanical}/100), creating downstream process-level effects across the production system. ` +
@@ -710,39 +781,9 @@ function generateRisk(scores, constraintArch, input, context) {
       `As process conditions drift, both dimensional reliability and production consistency may deteriorate together.`;
   }
 
-  let mechanismText = "";
-
-  if (
-    context.material_class === "POLYOLEFIN_PE" &&
-    context.target_material_class === "PHA_BASED" &&
-    context.process_family === "BLOWN_FILM"
-  ) {
-    mechanismText =
-      `${mat} provides relatively broad film-forming tolerance and stable extrusion behaviour under continuous blown-film production, whereas ${bio} introduces greater sensitivity in melt stability, crystallisation-driven flow response, and long-run uniformity control. ` +
-      `Under ${app} conditions, this mismatch is most likely to appear as instability in bubble behaviour, cross-web thickness control, seal-area consistency, and extended-run output stability rather than as a purely thermal limitation. ` +
-      `As a result, production consistency, yield rate, and operational efficiency may deteriorate when flow stability is not tightly maintained.`;
-  } else if (
-    context.material_class === "POLYOLEFIN_PP" &&
-    context.target_material_class === "PLA_BASED" &&
-    context.use_condition_family === "THERMAL_STRESS"
-  ) {
-    mechanismText =
-      `${mat} maintains broader tolerance to elevated processing and use-phase heat exposure, whereas ${bio} operates within a narrower thermal stability range governed by earlier softening and degradation onset sensitivity. ` +
-      `Under ${app} conditions, this material gap becomes critical because repeated thermal exposure directly affects shape retention, seal stability, and structural reliability after heating. ` +
-      `This mismatch therefore manifests primarily as thermal instability under processing and downstream application conditions.`;
-  } else if (
-    context.material_class === "PET" &&
-    context.target_material_class === "PLA_BASED" &&
-    context.use_condition_family === "THERMAL_STRESS"
-  ) {
-    mechanismText =
-      `${mat} provides a wider thermal processing margin and stronger dimensional retention under heat-exposed rigid packaging conditions, whereas ${bio} enters a narrower stability range with earlier softening and degradation sensitivity. ` +
-      `Under ${app} conditions, this difference is likely to appear as reduced dimensional reliability and progressive loss of heat tolerance once production or use temperature approaches the upper boundary of the qualified range.`;
-  } else {
-    mechanismText =
-      `${mat} exhibits broader thermal and rheological tolerance under standard processing conditions, whereas ${bio} introduces a narrower operational window governed by crystallisation kinetics and degradation onset sensitivity. ` +
-      `Under ${app} conditions, this property mismatch generates instability in ${primary.factor}, causing ${primary.impact} to fall outside commercially acceptable limits.`;
-  }
+  mechanismText =
+    `${mat} exhibits broader thermal and rheological tolerance under standard processing conditions, whereas ${bio} introduces a narrower operational window governed by crystallisation kinetics and degradation onset sensitivity. ` +
+    `Under ${app} conditions, this property mismatch generates instability in ${primary.factor}, causing ${primary.impact} to fall outside commercially acceptable limits.`;
 
   return {
     primary: primaryText,
@@ -904,6 +945,7 @@ function generateQuality(scores) {
 function generateExpectedDeviations(input, scores, context, constraintArch) {
   const items = [];
 
+  // A) PE → PHA / blown film / low-temp film
   if (
     context.material_class === "POLYOLEFIN_PE" &&
     context.target_material_class === "PHA_BASED" &&
@@ -913,36 +955,51 @@ function generateExpectedDeviations(input, scores, context, constraintArch) {
     items.push("Local film stiffness variation may reduce pouch-forming consistency under low-temperature handling conditions");
     items.push("Seal-area thickness imbalance may emerge where melt stability shifts during extended extrusion runs");
     items.push("Cold-chain flex performance may vary across production output when flow uniformity deteriorates over time");
-  } else if (
+  }
+
+  // B) PE → PHA / blown film / general high-speed film
+  else if (
     context.material_class === "POLYOLEFIN_PE" &&
     context.target_material_class === "PHA_BASED" &&
     context.process_family === "BLOWN_FILM"
   ) {
-    items.push("Cross-web gauge drift may increase as melt stability moves toward the boundary of the qualified operating range");
-    items.push("Local seal-area non-uniformity may emerge where bubble behaviour and thickness balance begin to fluctuate during extended runs");
-    items.push("Extended-run output may show progressive variation in film uniformity, winding consistency, and off-specification zone frequency");
-  } else if (
+    items.push("Gauge control may become less stable across web width during sustained high-speed operation, with variability exceeding the current PE reference as melt response becomes more flow-sensitive");
+    items.push("Seal-area consistency may deteriorate where extended-run flow drift produces localized thickness imbalance and uneven film formation prior to conversion");
+    items.push("Commercial output may show progressive loss of uniformity over time, increasing the likelihood of roll-to-roll variation, localized film instability, and off-specification recovery requirements");
+  }
+
+  // C) PP → PLA / thermal-stress
+  else if (
     context.material_class === "POLYOLEFIN_PP" &&
     context.target_material_class === "PLA_BASED" &&
     context.use_condition_family === "THERMAL_STRESS"
   ) {
-    items.push("Heat-induced deformation may emerge where thermal retention is insufficient for the intended application");
-    items.push("Local loss of stiffness or structural stability may appear under repeated thermal exposure");
-    items.push("Material response may become inconsistent when thermal load approaches the upper limit of the qualified operating window");
-  } else if (
+    items.push("Local softening or shape distortion may appear during repeated heating exposure, particularly in areas with reduced thermal retention margin");
+    items.push("Seal-area deformation risk may increase where heat distribution becomes uneven across the formed structure after conversion");
+    items.push("Heat-induced stiffness variation may produce non-uniform functional performance and reduced dimensional retention over repeated heating cycles");
+  }
+
+  // D) PET → PLA / thermal-stress
+  else if (
     context.material_class === "PET" &&
     context.target_material_class === "PLA_BASED" &&
     context.use_condition_family === "THERMAL_STRESS"
   ) {
-    items.push("Dimensional drift may increase at precision edges where thermal exposure approaches the qualified limit");
-    items.push("Local wall-section distortion may appear after repeated heat loading or high-temperature filling cycles");
-    items.push("Container geometry retention may vary between cycles where thermal stability is insufficient for the required use condition");
-  } else if (context.process_family === "INJECTION") {
+    items.push("Dimensional drift may increase at precision edges or tolerance-sensitive features when thermal exposure approaches the upper limit of the qualified operating range");
+    items.push("Local wall-section distortion or geometry relaxation may appear after repeated heat loading or elevated-temperature product contact");
+    items.push("Container shape retention may vary between production lots where thermal stability is insufficient to preserve downstream dimensional consistency");
+  }
+
+  // E) generic injection fallback
+  else if (context.process_family === "INJECTION") {
     const dimRange = scores.mechanical < 65 ? "±0.3–0.8mm" : "±0.1–0.3mm";
     items.push(`Dimensional deviation ${dimRange} on critical part features under process parameter fluctuation`);
     items.push("Warpage or local sink behaviour may appear where cooling balance shifts across the molded section");
     items.push("Surface or geometry retention may vary when material response approaches the boundary of the qualified processing window");
-  } else {
+  }
+
+  // F) generic fallback
+  else {
     items.push("Moderate process variability is anticipated during initial production runs and parameter optimisation activities");
     items.push("Potential output non-conformance at the boundary of the validated processing window under fluctuating ambient conditions");
     items.push("Further deviation characterisation is required under full-scale production conditions prior to commercial acceptance");
@@ -950,16 +1007,6 @@ function generateExpectedDeviations(input, scores, context, constraintArch) {
 
   return items.map((item) => `<li>${item}</li>`).join("\n");
 }
-// ══════════════════════════════════════════════════════════════
-// § 12b  PRIMARY / SECONDARY RISK TITLE
-// ══════════════════════════════════════════════════════════════
-
-function getPrimaryRiskTitle(constraint) {
-  if (constraint.type === "THERMAL") return "Thermal Instability";
-  if (constraint.type === "FLOW") return "Process Flow Variability";
-  return "Mechanical Performance Limitation";
-}
-
 // ══════════════════════════════════════════════════════════════
 // § 13  APPLICATION IMPLICATION
 // ══════════════════════════════════════════════════════════════
@@ -998,6 +1045,42 @@ function generateApplicationImplicationV2(decisionBand, context, constraintArch,
     );
   }
 
+  // A) PE → PHA / blown film
+  if (
+    context.material_class === "POLYOLEFIN_PE" &&
+    context.target_material_class === "PHA_BASED" &&
+    context.process_family === "BLOWN_FILM"
+  ) {
+    return (
+      `${app} is technically feasible only under controlled process optimisation. ` +
+      `Pilot-scale validation must confirm that flow stability, gauge control, and downstream film consistency can be maintained over extended runs before full-scale commercial deployment is considered.`
+    );
+  }
+
+  // B) PP → PLA / thermal-stress
+  if (
+    context.material_class === "POLYOLEFIN_PP" &&
+    context.target_material_class === "PLA_BASED" &&
+    context.use_condition_family === "THERMAL_STRESS"
+  ) {
+    return (
+      `${app} is technically feasible subject to tightly controlled process optimisation. ` +
+      `Pilot-scale validation is required before commercial commitment, with particular emphasis on thermal margin, post-heating structural reliability, and repeated heat-exposure performance.`
+    );
+  }
+
+  // C) PET → PLA / thermal-stress
+  if (
+    context.material_class === "PET" &&
+    context.target_material_class === "PLA_BASED" &&
+    context.use_condition_family === "THERMAL_STRESS"
+  ) {
+    return (
+      `${app} is technically feasible subject to tightly controlled process optimisation. ` +
+      `Pilot-scale validation is required before commercial commitment, with particular emphasis on dimensional reliability, tolerance retention, and post-molding geometry stability under thermal exposure.`
+    );
+  }
+
   if (decisionBand.level === "MODERATE" && context.use_condition_family === "THERMAL_STRESS") {
     return (
       `${app} is technically feasible subject to tightly controlled process optimisation. ` +
@@ -1017,7 +1100,6 @@ function generateApplicationImplicationV2(decisionBand, context, constraintArch,
     `Pilot-scale validation is required and must be successfully completed prior to commercial commitment.`
   );
 }
-
 // ══════════════════════════════════════════════════════════════
 // § 14  NEXT STEPS
 // ══════════════════════════════════════════════════════════════
@@ -1064,7 +1146,7 @@ function generateNextStep(decision, constraint, scores) {
   );
 }
 
-function generateNextStepV2(decisionBand, constraintArch, context, scores) {
+function generateNextStepV2(decisionBand, constraintArch, context, scores, input) {
   const primary = constraintArch.primary_constraint;
 
   if (decisionBand.level === "LOW") {
@@ -1072,6 +1154,45 @@ function generateNextStepV2(decisionBand, constraintArch, context, scores) {
       `Based on the LOW feasibility determination (Composite: ${scores.total}/100), the current transition path is not recommended for pilot approval.\n\n` +
       `Suspend deployment planning and review either an alternative grade or a modified process architecture that can address ${primary.factor}. ` +
       `Re-submission should follow only after a revised material or processing path has been technically screened at laboratory level.`
+    );
+  }
+
+  // A) PE → PHA / blown film
+  if (
+    context.material_class === "POLYOLEFIN_PE" &&
+    context.target_material_class === "PHA_BASED" &&
+    context.process_family === "BLOWN_FILM"
+  ) {
+    return (
+      `Based on the MODERATE feasibility determination (Composite: ${scores.total}/100), engineering validation targeting flow stability control is required prior to pilot approval and must be completed before any commercial commitment.\n\n` +
+      `Validation should focus on confirming stable melt uniformity, pressure balance, gauge consistency, and extended-run output control under representative operating conditions. ` +
+      `Structured pilot trials should define the qualified production envelope for long-run film manufacture, after which system stability, yield reliability, and downstream converting consistency should be reassessed against commercial acceptance criteria.`
+    );
+  }
+
+  // B) PP → PLA / thermal-stress
+  if (
+    context.material_class === "POLYOLEFIN_PP" &&
+    context.target_material_class === "PLA_BASED" &&
+    context.use_condition_family === "THERMAL_STRESS"
+  ) {
+    return (
+      `Based on the MODERATE feasibility determination (Composite: ${scores.total}/100), engineering validation targeting thermal stability control is required prior to pilot approval and must be completed before any commercial commitment.\n\n` +
+      `Validation should focus on heat-retention margin, post-heating dimensional retention, and structural reliability after repeated thermal exposure. ` +
+      `Execute structured pilot trials to define the qualified processing and downstream-use envelope, then re-assess system stability before proceeding to commercial-scale deployment.`
+    );
+  }
+
+  // C) PET → PLA / thermal-stress
+  if (
+    context.material_class === "PET" &&
+    context.target_material_class === "PLA_BASED" &&
+    context.use_condition_family === "THERMAL_STRESS"
+  ) {
+    return (
+      `Based on the MODERATE feasibility determination (Composite: ${scores.total}/100), engineering validation targeting thermal stability control is required prior to pilot approval and must be completed before any commercial commitment.\n\n` +
+      `Validation should focus on post-molding dimensional retention, tolerance stability at critical features, and structural consistency after realistic heat-exposure conditions. ` +
+      `Execute structured pilot trials to define the qualified thermal and dimensional acceptance envelope, then re-assess system stability before proceeding to commercial-scale deployment.`
     );
   }
 
@@ -1460,8 +1581,7 @@ async function handleReport(req, res) {
     const app_implication =
       narrative?.application_implication || generateApplicationImplicationV2(decisionBand, context, constraintArch, input);
     const next_step_body =
-      narrative?.next_step || generateNextStepV2(decisionBand, constraintArch, context, scores);
-
+  narrative?.next_step || generateNextStepV2(decisionBand, constraintArch, context, scores, input);
     const htmlData = {
       assessment_type: "Technical Hypothesis",
       application: safe(input.application),
