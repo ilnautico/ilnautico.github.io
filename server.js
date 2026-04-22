@@ -122,54 +122,102 @@ function validateMechanism(obj) {
 function normalizeInput(raw) {
   if (!raw) return {};
 
-  if (raw.data && Array.isArray(raw.data.fields)) {
-    const parsed = {};
-    const fields = raw.data.fields;
-
-    fields.forEach((f) => {
-      const label = (f.label || "").toLowerCase();
-      const value = Array.isArray(f.value) ? f.value.join(", ") : (f.value || "");
-      const type = (f.type || "").toLowerCase();
-
-      if (label.includes("project name")) parsed.project_name = value;
-      if (label.includes("project stage")) parsed.project_stage = value;
-      if (label.includes("product type")) parsed.product_type = value;
-      if (label.includes("application")) parsed.application = value;
-      if (label.includes("mechanical requirement")) parsed.mechanical_requirement = value;
-      if (label.includes("current material")) parsed.material = value;
-      if (label.includes("known issues")) parsed.issues = value;
-      if (label.includes("target material")) parsed.bio_material = value;
-      if (label.includes("processing method")) parsed.processing = value;
-      if (label.includes("equipment type")) parsed.equipment = value;
-      if (label.includes("screw diameter")) parsed.screw_diameter = value;
-      if (label === "l/d" || label.includes("l/d")) parsed.ld_ratio = value;
-      if (label.includes("die / mold") || label.includes("die/mold")) parsed.die_mold = value;
-      if (label.includes("production scale")) parsed.scale = value;
-      if (label.includes("primary concern")) parsed.concern = value;
-      if (label.includes("additional notes")) parsed.notes = value;
-
-      if (label.includes("visual requirement")) parsed.requirement_focus = "VISUAL";
-      if (label.includes("environment condition")) parsed.requirement_focus = "ENVIRONMENT";
-      if (label.includes("product stability")) parsed.current_material_focus = "PRODUCT_STABILITY";
-      if (label.includes("transition purpose")) parsed.transition_focus = "PURPOSE";
-      if (label.includes("certification requirement")) parsed.transition_focus = "CERTIFICATION";
-      if (label.includes("critical area")) parsed.risk_focus = "CRITICAL_AREA";
-
-      if (type.includes("multiple") || type.includes("choice")) {
-        const lowerValue = value.toLowerCase();
-        if (lowerValue.includes("visual")) parsed.requirement_focus = "VISUAL";
-        if (lowerValue.includes("environment")) parsed.requirement_focus = "ENVIRONMENT";
-        if (lowerValue.includes("product stability")) parsed.current_material_focus = "PRODUCT_STABILITY";
-        if (lowerValue.includes("transition purpose")) parsed.transition_focus = "PURPOSE";
-        if (lowerValue.includes("certification")) parsed.transition_focus = "CERTIFICATION";
-        if (lowerValue.includes("critical area")) parsed.risk_focus = "CRITICAL_AREA";
-      }
-    });
-
-    return parsed;
+  if (!(raw.data && Array.isArray(raw.data.fields))) {
+    return raw;
   }
 
-  return raw;
+  const parsed = {
+    project_name: "",
+    project_stage: "",
+    product_type: "",
+    application: "",
+    mechanical_requirement: "",
+    material: "",
+    issues: "",
+    bio_material: "",
+    transition_goal: "",
+    processing: "",
+    equipment: "",
+    screw_diameter: "",
+    ld_ratio: "",
+    die_mold: "",
+    scale: "",
+    concern: "",
+    notes: "",
+    requirement_focus: null,
+    current_material_focus: null,
+    transition_focus: null,
+    risk_focus: null,
+  };
+
+  const norm = (s) => String(s || "").trim();
+  const low = (s) => norm(s).toLowerCase();
+
+  for (const f of raw.data.fields) {
+    const label = low(f.label);
+    const value = Array.isArray(f.value) ? f.value.join(", ") : norm(f.value);
+    const type = low(f.type);
+
+    // ---- exact / high-confidence field mapping ----
+    if (label === "project name") parsed.project_name = value;
+    else if (label === "project stage") parsed.project_stage = value;
+    else if (label === "product type") parsed.product_type = value;
+    else if (label === "application") parsed.application = value;
+    else if (label === "mechanical requirement") parsed.mechanical_requirement = value;
+    else if (label === "current material") parsed.material = value;
+    else if (label === "known issues") parsed.issues = value;
+    else if (label === "target material") parsed.bio_material = value;
+    else if (label === "processing method") parsed.processing = value;
+    else if (label === "equipment type") parsed.equipment = value;
+    else if (label === "screw diameter") parsed.screw_diameter = value;
+    else if (label === "l/d") parsed.ld_ratio = value;
+    else if (label === "die / mold" || label === "die/mold") parsed.die_mold = value;
+    else if (label === "production scale") parsed.scale = value;
+    else if (label === "primary concern") parsed.concern = value;
+    else if (label === "additional notes") parsed.notes = value;
+
+    // ---- option labels from Tally ----
+    else if (label.includes("visual requirement")) parsed.requirement_focus = "VISUAL";
+    else if (label.includes("environment condition")) parsed.requirement_focus = "ENVIRONMENT";
+    else if (label.includes("product stability")) parsed.current_material_focus = "PRODUCT_STABILITY";
+    else if (label.includes("transition purpose")) {
+      parsed.transition_focus = "PURPOSE";
+      if (value) parsed.transition_goal = value;
+    }
+    else if (label.includes("certification requirement")) parsed.transition_focus = "CERTIFICATION";
+    else if (label.includes("critical area")) parsed.risk_focus = "CRITICAL_AREA";
+
+    // ---- fallback multiple choice parsing ----
+    if (type.includes("multiple") || type.includes("choice")) {
+      const lv = low(value);
+
+      if (lv.includes("visual")) parsed.requirement_focus = "VISUAL";
+      if (lv.includes("environment")) parsed.requirement_focus = "ENVIRONMENT";
+      if (lv.includes("product stability")) parsed.current_material_focus = "PRODUCT_STABILITY";
+      if (lv.includes("transition purpose")) parsed.transition_focus = "PURPOSE";
+      if (lv.includes("certification")) parsed.transition_focus = "CERTIFICATION";
+      if (lv.includes("critical area")) parsed.risk_focus = "CRITICAL_AREA";
+    }
+  }
+
+  // ---- hard cleanup: prevent bio_material pollution ----
+  const badBio =
+    !parsed.bio_material ||
+    /replace fossil plastic|biodegradable alternative|transition purpose|certification/i.test(parsed.bio_material);
+
+  if (badBio) {
+    parsed.bio_material = "";
+  }
+
+  // fallback: if target material missing, try raw direct body keys
+  if (!parsed.bio_material && raw.target_material) {
+    parsed.bio_material = norm(raw.target_material);
+  }
+  if (!parsed.material && raw.current_material) {
+    parsed.material = norm(raw.current_material);
+  }
+
+  return parsed;
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -328,7 +376,39 @@ function applyOptionModifiers(scores, context) {
 
   return next;
 }
+function getNarrativeSpecialization(context) {
+  const mc = context.material_class;
+  const tc = context.target_material_class;
+  const pf = context.process_family;
+  const af = context.application_family;
+  const uf = context.use_condition_family;
 
+  if (mc === "POLYOLEFIN_PE" && tc === "PHA_BASED" && pf === "BLOWN_FILM" && af === "LOW_TEMP_FILM") {
+    return "LDPE_PHA_LOW_TEMP_FILM";
+  }
+
+  if (mc === "POLYOLEFIN_PE" && (tc === "PHA_BASED" || tc === "OTHER_BIO") && pf === "BLOWN_FILM" && af === "HIGH_SPEED_FILM") {
+    return "LDPE_BIO_HIGH_SPEED_FILM";
+  }
+
+  if (mc === "POLYOLEFIN_PP" && tc === "PLA_BASED" && uf === "THERMAL_STRESS") {
+    return "PP_PLA_THERMAL_STRESS";
+  }
+
+  if (mc === "PET" && tc === "PLA_BASED" && uf === "THERMAL_STRESS") {
+    return "PET_PLA_THERMAL_STRESS";
+  }
+
+  return "GENERIC";
+}
+
+function shouldForceDeterministicMechanism(context) {
+  return getNarrativeSpecialization(context) !== "GENERIC";
+}
+
+function shouldForceDeterministicDeviations(context) {
+  return getNarrativeSpecialization(context) !== "GENERIC";
+}
 // ══════════════════════════════════════════════════════════════
 // § 3  SCORING ENGINE
 // ══════════════════════════════════════════════════════════════
@@ -943,66 +1023,58 @@ function generateQuality(scores) {
 // ══════════════════════════════════════════════════════════════
 
 function generateExpectedDeviations(input, scores, context, constraintArch) {
-  const items = [];
+  const spec = getNarrativeSpecialization(context);
+  let items = [];
 
-  // A) PE → PHA / blown film / low-temp film
-  if (
-    context.material_class === "POLYOLEFIN_PE" &&
-    context.target_material_class === "PHA_BASED" &&
-    context.process_family === "BLOWN_FILM" &&
-    context.application_family === "LOW_TEMP_FILM"
-  ) {
-    items.push("Local film stiffness variation may reduce pouch-forming consistency under low-temperature handling conditions");
-    items.push("Seal-area thickness imbalance may emerge where melt stability shifts during extended extrusion runs");
-    items.push("Cold-chain flex performance may vary across production output when flow uniformity deteriorates over time");
-  }
-
-  // B) PE → PHA / blown film / general high-speed film
-  else if (
-    context.material_class === "POLYOLEFIN_PE" &&
-    context.target_material_class === "PHA_BASED" &&
-    context.process_family === "BLOWN_FILM"
-  ) {
-    items.push("Gauge control may become less stable across web width during sustained high-speed operation, with variability exceeding the current PE reference as melt response becomes more flow-sensitive");
-    items.push("Seal-area consistency may deteriorate where extended-run flow drift produces localized thickness imbalance and uneven film formation prior to conversion");
-    items.push("Commercial output may show progressive loss of uniformity over time, increasing the likelihood of roll-to-roll variation, localized film instability, and off-specification recovery requirements");
-  }
-
-  // C) PP → PLA / thermal-stress
-  else if (
-    context.material_class === "POLYOLEFIN_PP" &&
-    context.target_material_class === "PLA_BASED" &&
-    context.use_condition_family === "THERMAL_STRESS"
-  ) {
-    items.push("Local softening or shape distortion may appear during repeated heating exposure, particularly in areas with reduced thermal retention margin");
-    items.push("Seal-area deformation risk may increase where heat distribution becomes uneven across the formed structure after conversion");
-    items.push("Heat-induced stiffness variation may produce non-uniform functional performance and reduced dimensional retention over repeated heating cycles");
-  }
-
-  // D) PET → PLA / thermal-stress
-  else if (
-    context.material_class === "PET" &&
-    context.target_material_class === "PLA_BASED" &&
-    context.use_condition_family === "THERMAL_STRESS"
-  ) {
-    items.push("Dimensional drift may increase at precision edges or tolerance-sensitive features when thermal exposure approaches the upper limit of the qualified operating range");
-    items.push("Local wall-section distortion or geometry relaxation may appear after repeated heat loading or elevated-temperature product contact");
-    items.push("Container shape retention may vary between production lots where thermal stability is insufficient to preserve downstream dimensional consistency");
-  }
-
-  // E) generic injection fallback
-  else if (context.process_family === "INJECTION") {
+  if (spec === "LDPE_PHA_LOW_TEMP_FILM") {
+    items = [
+      `Local film stiffness variation may reduce pouch-forming consistency under low-temperature handling conditions`,
+      `Seal-area thickness imbalance may emerge where melt stability shifts during extended extrusion runs`,
+      `Cold-chain flex performance may vary across production output when flow uniformity deteriorates over time`,
+    ];
+  } else if (spec === "LDPE_BIO_HIGH_SPEED_FILM") {
+    items = [
+      `Cross-web gauge drift may increase as melt stability moves toward the boundary of the qualified operating range`,
+      `Local seal-area non-uniformity may emerge where thickness balance and melt stability shift during extended high-speed runs`,
+      `Extended-run output may show progressive variation in film uniformity, winding consistency, and off-specification zone frequency`,
+    ];
+  } else if (spec === "PP_PLA_THERMAL_STRESS") {
+    items = [
+      `Heat-induced deformation may emerge where thermal retention is insufficient for the intended application`,
+      `Local loss of stiffness or structural stability may appear under repeated thermal exposure`,
+      `Material response may become inconsistent when thermal load approaches the upper limit of the qualified operating window`,
+    ];
+  } else if (spec === "PET_PLA_THERMAL_STRESS") {
+    items = [
+      `Dimensional drift may increase at precision edges where thermal exposure approaches the qualified limit`,
+      `Local wall-section distortion may appear after repeated heat loading or elevated-temperature use cycles`,
+      `Container geometry retention may vary between cycles where thermal stability is insufficient for the required service condition`,
+    ];
+  } else if (context.process_family === "INJECTION") {
     const dimRange = scores.mechanical < 65 ? "±0.3–0.8mm" : "±0.1–0.3mm";
-    items.push(`Dimensional deviation ${dimRange} on critical part features under process parameter fluctuation`);
-    items.push("Warpage or local sink behaviour may appear where cooling balance shifts across the molded section");
-    items.push("Surface or geometry retention may vary when material response approaches the boundary of the qualified processing window");
-  }
-
-  // F) generic fallback
-  else {
-    items.push("Moderate process variability is anticipated during initial production runs and parameter optimisation activities");
-    items.push("Potential output non-conformance at the boundary of the validated processing window under fluctuating ambient conditions");
-    items.push("Further deviation characterisation is required under full-scale production conditions prior to commercial acceptance");
+    items = [
+      `Dimensional deviation ${dimRange} on critical part features under process parameter fluctuation`,
+      `Warpage or local sink behaviour may appear where cooling balance shifts across the molded section`,
+      `Surface or geometry retention may vary when material response approaches the boundary of the qualified processing window`,
+    ];
+  } else if (constraintArch.primary_constraint.type === "FLOW") {
+    items = [
+      `Output consistency variation may appear during extended production runs where melt uniformity drifts outside the qualified range`,
+      `Surface or profile non-uniformity may increase under pressure fluctuation during steady-state conversion`,
+      `Production stability may decline as line conditions move toward the edge of the validated flow envelope`,
+    ];
+  } else if (constraintArch.primary_constraint.type === "THERMAL") {
+    items = [
+      `Heat-induced deformation may emerge where thermal retention is insufficient for the intended application`,
+      `Local loss of stiffness or structural stability may appear under repeated thermal exposure`,
+      `Material response may become inconsistent when thermal load approaches the upper limit of the qualified operating window`,
+    ];
+  } else {
+    items = [
+      `Mechanical property variation may affect structural consistency across production output`,
+      `Dimensional deviation may appear on critical features under fluctuating process conditions`,
+      `Further deviation characterisation is required under full-scale production conditions prior to commercial acceptance`,
+    ];
   }
 
   return items.map((item) => `<li>${item}</li>`).join("\n");
@@ -1569,14 +1641,22 @@ async function handleReport(req, res) {
 
     const primary_risk_body = narrative?.risk_primary || risk.primary;
     const secondary_risk_body = narrative?.risk_secondary || risk.secondary;
-    const mechanism_body = mechanismData?.mechanism || risk.mechanism;
-    const expected_devs_raw = mechanismData?.expected_deviations;
-    const expected_devs_html = Array.isArray(expected_devs_raw)
-      ? expected_devs_raw
-          .filter(Boolean)
-          .map((d) => `<li>${String(d).trim().slice(0, 220)}</li>`)
-          .join("\n")
-      : generateExpectedDeviations(input, scores, context, constraintArch);
+    const deterministic_mechanism = generateMechanism(input, constraint, context);
+const deterministic_deviations = generateExpectedDeviations(input, scores, context, constraintArch);
+const mechanism_body = shouldForceDeterministicMechanism(context)
+  ? deterministic_mechanism
+  : (mechanismData?.mechanism || deterministic_mechanism);
+const expected_devs_raw = mechanismData?.expected_deviations;
+const expected_devs_html = shouldForceDeterministicDeviations(context)
+  ? deterministic_deviations
+  : (
+      Array.isArray(expected_devs_raw)
+        ? expected_devs_raw
+            .filter(Boolean)
+            .map((d) => `<li>${String(d).trim().slice(0, 220)}</li>`)
+            .join("\n")
+        : deterministic_deviations
+    );
     const proc_window_note = narrative?.processing_window_note || processing.processingWindow;
     const app_implication =
       narrative?.application_implication || generateApplicationImplicationV2(decisionBand, context, constraintArch, input);
