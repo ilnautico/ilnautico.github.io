@@ -746,7 +746,49 @@ function generateExecutive(scores, decision, economic, constraint) {
     `Deployment Decision: GO — Proceed to controlled pilot validation and systematic scale-up.`
   );
 }
+function generateMechanism(input, constraint, context) {
+  const spec = getNarrativeSpecialization(context);
+  const source = safe(input.material, "the source material");
+  const target = safe(input.bio_material, "the target biodegradable material");
+  const app = safe(input.application, "the specified application");
 
+  if (spec === "LDPE_PHA_LOW_TEMP_FILM") {
+    return (
+      `${source} provides relatively broad film-forming tolerance and stable extrusion behaviour under continuous pouch production, whereas ${target} introduces greater sensitivity in melt stability, crystallisation-driven flow response, and low-temperature flex behaviour. ` +
+      `Under ${app} conditions, this mismatch is most likely to emerge as instability in film formation, seal-area consistency, and extended-run output control rather than as a purely thermal limitation. ` +
+      `As a result, production consistency, yield rate, and operational efficiency may deteriorate when flow stability is not tightly maintained.`
+    );
+  }
+
+  if (spec === "LDPE_BIO_HIGH_SPEED_FILM") {
+    return (
+      `${source} exhibits broader film-processing tolerance and more stable rheological behaviour under continuous blown-film conversion, whereas ${target} operates within a narrower window shaped by melt stability sensitivity, structure-development effects, and extended-run control limitations. ` +
+      `Under ${app} conditions, this mismatch is most likely to appear as instability in gauge control, seal-area consistency, and output uniformity as line speed and run length increase. ` +
+      `This directly constrains production consistency, yield stability, and overall operational efficiency.`
+    );
+  }
+
+  if (spec === "PP_PLA_THERMAL_STRESS") {
+    return (
+      `${source} maintains broader tolerance to elevated processing and use-phase heat exposure, whereas ${target} operates within a narrower thermal stability range governed by earlier softening and degradation onset sensitivity. ` +
+      `Under ${app} conditions, this material gap becomes critical because repeated or sustained thermal loading directly affects shape retention, stiffness retention, and structural reliability after molding. ` +
+      `This mismatch therefore manifests primarily as thermal instability under processing and downstream application conditions.`
+    );
+  }
+
+  if (spec === "PET_PLA_THERMAL_STRESS") {
+    return (
+      `${source} retains a wider thermal processing margin and stronger dimensional retention under heat-exposed rigid packaging conditions, whereas ${target} enters a narrower stability range with earlier softening and heat-induced property decline. ` +
+      `Under ${app} conditions, this difference is likely to emerge as reduced dimensional reliability, local deformation risk, and lower retention of structural precision once thermal demand approaches the upper boundary of the qualified range. ` +
+      `The transition is therefore primarily constrained by thermal stability rather than by baseline molding capability.`
+    );
+  }
+
+  return (
+    `${source} exhibits broader thermal and rheological tolerance under standard processing conditions, whereas ${target} introduces a narrower operational window governed by crystallisation kinetics and degradation onset sensitivity. ` +
+    `Under ${app} conditions, this property mismatch generates instability in ${constraint.factor}, causing ${constraint.impact} to fall outside commercially acceptable limits.`
+  );
+}
 // ══════════════════════════════════════════════════════════════
 // § 8  RISK STRUCTURE
 // ══════════════════════════════════════════════════════════════
