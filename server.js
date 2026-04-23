@@ -178,6 +178,21 @@ function normalizeInput(raw) {
   if (!parsed.bio_material && raw.target_material)  parsed.bio_material = norm(raw.target_material);
   if (!parsed.material      && raw.current_material) parsed.material     = norm(raw.current_material);
 
+  // Hard cleanup: generic transition-purpose text must not become target material
+  if (
+    parsed.bio_material &&
+    /replace fossil plastic|biodegradable alternative|transition purpose|certification/i.test(parsed.bio_material)
+  ) {
+    parsed.bio_material = "";
+  }
+
+  if (!parsed.bio_material && parsed.transition_goal) {
+    const goal = String(parsed.transition_goal).trim();
+    if (!/replace fossil plastic|biodegradable alternative/i.test(goal)) {
+      parsed.bio_material = goal;
+    }
+  }
+
   return parsed;
 }
 
@@ -525,6 +540,197 @@ function generateMechanism(input, constraint, context) {
     `${source} exhibits broader thermal and rheological tolerance under standard processing conditions, whereas ${target} introduces a narrower operational window governed by crystallisation kinetics and degradation onset sensitivity. ` +
     `Under ${app} conditions, this property mismatch generates instability in ${constraint.factor}, causing ${constraint.impact} to fall outside commercially acceptable limits.`
   );
+}
+
+// ══════════════════════════════════════════════════════════════
+// § 7b  SPECIALIZED NARRATIVE GENERATORS
+// ══════════════════════════════════════════════════════════════
+
+function generateExecutiveSpecialized(input, scores, context, constraintArch, economic) {
+  const spec   = getNarrativeSpecialization(context);
+  const source = safe(input.material,    "Current material");
+  const target = safe(input.bio_material, "target biodegradable material");
+  const app    = safe(input.application,  "the target application");
+
+  if (spec === "LDPE_BIO_HIGH_SPEED_FILM") {
+    return (
+      `${source} replacement with ${target} for ${app} is assessed at MODERATE feasibility under the declared processing configuration. ` +
+      `The scoring profile indicates that thermal stability (${scores.thermal}/100) and mechanical consistency (${scores.mechanical}/100) remain conditionally supportive, while flow performance (${scores.flow}/100) is the primary limiting factor, resulting in a composite score of ${scores.total}/100. ` +
+      `For this application, the principal concern is not baseline convertibility alone, but the ability to maintain melt uniformity, gauge control, and downstream film consistency during extended high-speed production runs. ` +
+      `Commercial transition is therefore not excluded, but should proceed only through controlled pilot validation focused on flow stability, long-run output consistency, and scrap-rate containment. ` +
+      `Indicative material cost variance remains in the ${economic} range under the current transition scenario.`
+    );
+  }
+
+  if (spec === "LDPE_PHA_LOW_TEMP_FILM") {
+    return (
+      `${source} replacement with ${target} for ${app} is assessed at MODERATE feasibility under the declared processing configuration. ` +
+      `Thermal stability (${scores.thermal}/100) and baseline structural performance (${scores.mechanical}/100) remain conditionally workable, but flow performance (${scores.flow}/100) is the primary constraint, producing a composite score of ${scores.total}/100. ` +
+      `For low-temperature pouch and film applications, this limitation is most likely to appear in film-forming consistency, seal-area balance, and flex-performance stability across extended runs. ` +
+      `A commercial transition may be possible, but only after controlled validation confirms stable long-run output and acceptable low-temperature handling behaviour. ` +
+      `Indicative material cost variance remains in the ${economic} range under the current transition scenario.`
+    );
+  }
+
+  if (spec === "PP_PLA_THERMAL_STRESS") {
+    return (
+      `${source} replacement with ${target} for ${app} is assessed at MODERATE feasibility under the declared processing configuration. ` +
+      `The scoring profile indicates that flow behaviour (${scores.flow}/100) and baseline mechanical formation (${scores.mechanical}/100) remain conditionally supportive, while thermal stability (${scores.thermal}/100) is the primary limiting factor, resulting in a composite score of ${scores.total}/100. ` +
+      `The key commercial concern is not initial molding alone, but retention of shape, rigidity, and structural reliability once the article is exposed to repeated or sustained thermal load. ` +
+      `Commercial transition should therefore proceed only through controlled pilot validation focused on thermal margin, post-heating dimensional stability, and downstream performance retention. ` +
+      `Indicative material cost variance remains in the ${economic} range under the current transition scenario.`
+    );
+  }
+
+  if (spec === "PET_PLA_THERMAL_STRESS") {
+    return (
+      `${source} replacement with ${target} for ${app} is assessed at MODERATE feasibility under the declared processing configuration. ` +
+      `Thermal stability (${scores.thermal}/100) is the primary limiting parameter, while flow behaviour (${scores.flow}/100) and mechanical formation (${scores.mechanical}/100) remain conditionally supportive, producing a composite score of ${scores.total}/100. ` +
+      `For this transition, the commercial issue is not basic cavity filling, but maintenance of dimensional precision, geometry retention, and post-molding stability once heat exposure approaches the upper boundary of the qualified range. ` +
+      `Commercial transition should therefore proceed only through controlled pilot validation focused on thermal margin, dimensional reliability, and tolerance retention at critical features. ` +
+      `Indicative material cost variance remains in the ${economic} range under the current transition scenario.`
+    );
+  }
+
+  return null;
+}
+
+function generatePrimaryRiskSpecialized(scores, context, constraintArch) {
+  const spec    = getNarrativeSpecialization(context);
+  const primary = constraintArch.primary_constraint;
+
+  if (spec === "LDPE_BIO_HIGH_SPEED_FILM") {
+    return (
+      `Variability in ${primary.factor} (${primary.score}/100) constitutes the primary operational risk for this material transition. ` +
+      `Under high-speed blown-film conditions, inadequate melt stability is likely to reduce gauge control robustness, disturb seal-area consistency, and widen output variation during extended runs. ` +
+      `This directly affects production consistency, yield rate, and operational efficiency, and must be managed through rigorous control of pressure stability, melt uniformity, and extrusion flow balance.`
+    );
+  }
+
+  if (spec === "LDPE_PHA_LOW_TEMP_FILM") {
+    return (
+      `Variability in ${primary.factor} (${primary.score}/100) constitutes the primary operational risk for this material transition. ` +
+      `In low-temperature film and pouch applications, drift in melt stability is likely to propagate into film-forming inconsistency, seal-area imbalance, and non-uniform flex-performance across production output. ` +
+      `This directly affects production consistency, converting reliability, and downstream application robustness, and must be managed through rigorous control of pressure stability, melt uniformity, and extrusion flow balance.`
+    );
+  }
+
+  if (spec === "PP_PLA_THERMAL_STRESS" || spec === "PET_PLA_THERMAL_STRESS") {
+    return (
+      `Variability in ${primary.factor} (${primary.score}/100) constitutes the primary operational risk for this material transition. ` +
+      `The main concern is not limited to processing exposure itself, but the loss of thermal margin that can translate into deformation risk, dimensional drift, and reduced post-heating structural reliability in downstream use. ` +
+      `This directly affects material degradation risk and process reliability and must be managed through rigorous control of temperature control precision and thermal distribution uniformity.`
+    );
+  }
+
+  return null;
+}
+
+function generateSecondaryRiskSpecialized(scores, context, constraintArch) {
+  const spec = getNarrativeSpecialization(context);
+
+  if (spec === "LDPE_BIO_HIGH_SPEED_FILM") {
+    return (
+      `Thermal sensitivity (${scores.thermal}/100) interacts with mechanical consistency (${scores.mechanical}/100), creating downstream process-level effects once flow stability begins to drift. ` +
+      `In high-speed film production, this interaction is most likely to appear as widening gauge variation, localized seal-area inconsistency, winding instability, and progressive loss of output uniformity during extended runs.`
+    );
+  }
+
+  if (spec === "LDPE_PHA_LOW_TEMP_FILM") {
+    return (
+      `Thermal sensitivity (${scores.thermal}/100) interacts with mechanical consistency (${scores.mechanical}/100), creating downstream process-level effects once flow stability begins to drift. ` +
+      `In low-temperature pouch and film production, this interaction is most likely to appear as localized seal imbalance, non-uniform film stiffness, and variable flex-response across production output.`
+    );
+  }
+
+  if (spec === "PP_PLA_THERMAL_STRESS") {
+    return (
+      `Flow sensitivity (${scores.flow}/100) interacts with mechanical consistency (${scores.mechanical}/100) at the boundary of the qualified thermal envelope. ` +
+      `Even where molded output remains visually stable, local softening, shape relaxation, and stiffness decline may progressively amplify functional variability beyond the primary thermal constraint alone.`
+    );
+  }
+
+  if (spec === "PET_PLA_THERMAL_STRESS") {
+    return (
+      `Flow sensitivity (${scores.flow}/100) interacts with mechanical consistency (${scores.mechanical}/100) at the boundary of the qualified thermal envelope. ` +
+      `Even where the molded article is initially formed within dimensional acceptance, localized relaxation, edge distortion, and tolerance drift may progressively amplify functional variability beyond the primary thermal constraint alone.`
+    );
+  }
+
+  return null;
+}
+
+function generateApplicationImplicationSpecialized(decisionBand, context, constraintArch, input) {
+  const spec = getNarrativeSpecialization(context);
+  const app  = safe(input.application, "this application");
+
+  if (spec === "LDPE_BIO_HIGH_SPEED_FILM") {
+    return (
+      `${app} is technically feasible subject to controlled process optimisation. ` +
+      `Pilot-scale validation is required and must verify flow stability, gauge consistency, seal-area reliability, and extended-run output uniformity before full-scale commercial deployment is considered.`
+    );
+  }
+
+  if (spec === "LDPE_PHA_LOW_TEMP_FILM") {
+    return (
+      `${app} is technically feasible subject to controlled process optimisation. ` +
+      `Pilot-scale validation is required and must verify flow stability, film-forming consistency, seal-area balance, and low-temperature handling performance before full-scale deployment is considered.`
+    );
+  }
+
+  if (spec === "PP_PLA_THERMAL_STRESS") {
+    return (
+      `${app} is technically feasible subject to tightly controlled process optimisation. ` +
+      `Pilot-scale validation is required before commercial commitment, with particular emphasis on thermal margin, post-heating dimensional retention, and structural reliability after repeated heat exposure.`
+    );
+  }
+
+  if (spec === "PET_PLA_THERMAL_STRESS") {
+    return (
+      `${app} is technically feasible subject to tightly controlled process optimisation. ` +
+      `Pilot-scale validation is required before commercial commitment, with particular emphasis on dimensional reliability, tolerance retention, and post-molding geometry stability under thermal exposure.`
+    );
+  }
+
+  return null;
+}
+
+function generateNextStepSpecialized(decisionBand, constraintArch, context, scores, input) {
+  const spec = getNarrativeSpecialization(context);
+
+  if (spec === "LDPE_BIO_HIGH_SPEED_FILM") {
+    return (
+      `Based on the MODERATE feasibility determination (Composite: ${scores.total}/100), engineering validation targeting flow stability control is required prior to pilot approval and must be completed before any commercial commitment.\n\n` +
+      `Validation should focus on confirming stable melt uniformity, pressure balance, gauge consistency, seal-area reliability, and extended-run output control under representative high-speed operating conditions. ` +
+      `Structured pilot trials should define the qualified production envelope for long-run film manufacture, after which system stability, yield reliability, and downstream converting consistency should be reassessed against commercial acceptance criteria.`
+    );
+  }
+
+  if (spec === "LDPE_PHA_LOW_TEMP_FILM") {
+    return (
+      `Based on the MODERATE feasibility determination (Composite: ${scores.total}/100), engineering validation targeting flow stability control is required prior to pilot approval and must be completed before any commercial commitment.\n\n` +
+      `Validation should focus on stable melt uniformity, film-forming control, seal-area consistency, and low-temperature handling performance under representative production conditions. ` +
+      `Structured pilot trials should define the qualified envelope for long-run film production and downstream pouch conversion before commercial-scale deployment is considered.`
+    );
+  }
+
+  if (spec === "PP_PLA_THERMAL_STRESS") {
+    return (
+      `Based on the MODERATE feasibility determination (Composite: ${scores.total}/100), engineering validation targeting thermal stability control is required prior to pilot approval and must be completed before any commercial commitment.\n\n` +
+      `Validation should focus on heat-retention margin, post-heating dimensional retention, and structural reliability after repeated thermal exposure. ` +
+      `Execute structured pilot trials to define the qualified processing and downstream-use envelope, then re-assess system stability before proceeding to commercial-scale deployment.`
+    );
+  }
+
+  if (spec === "PET_PLA_THERMAL_STRESS") {
+    return (
+      `Based on the MODERATE feasibility determination (Composite: ${scores.total}/100), engineering validation targeting thermal stability control is required prior to pilot approval and must be completed before any commercial commitment.\n\n` +
+      `Validation should focus on post-molding dimensional retention, tolerance stability at critical features, and structural consistency after realistic heat-exposure conditions. ` +
+      `Execute structured pilot trials to define the qualified thermal and dimensional acceptance envelope, then re-assess system stability before proceeding to commercial-scale deployment.`
+    );
+  }
+
+  return null;
 }
 
 function generateRisk(scores, constraintArch, input, context) {
@@ -1192,7 +1398,13 @@ async function handleReport(req, res) {
       else console.warn("[Claude ERROR] mechanism:", e.message);
     }
 
-    let exec_summary = narrative?.executive_summary || generateExecutive(scores, decision, economic, constraint);
+    const specialized_exec =
+      generateExecutiveSpecialized(input, scores, context, constraintArch, economic);
+
+    let exec_summary =
+      specialized_exec ||
+      narrative?.executive_summary ||
+      generateExecutive(scores, decision, economic, constraint);
     if (decision.level === "MODERATE") {
       exec_summary = exec_summary.replace(
         /Deployment Decision:\s*CONDITIONAL GO.*/i,
@@ -1200,8 +1412,21 @@ async function handleReport(req, res) {
       );
     }
 
-    const primary_risk_body   = narrative?.risk_primary   || risk.primary;
-    const secondary_risk_body = narrative?.risk_secondary || risk.secondary;
+    const specialized_primary =
+      generatePrimaryRiskSpecialized(scores, context, constraintArch);
+
+    const specialized_secondary =
+      generateSecondaryRiskSpecialized(scores, context, constraintArch);
+
+    const primary_risk_body =
+      specialized_primary ||
+      narrative?.risk_primary ||
+      risk.primary;
+
+    const secondary_risk_body =
+      specialized_secondary ||
+      narrative?.risk_secondary ||
+      risk.secondary;
 
     const deterministic_mechanism   = generateMechanism(input, constraint, context);
     const deterministic_deviations  = generateExpectedDeviations(input, scores, context, constraintArch);
@@ -1223,10 +1448,21 @@ async function handleReport(req, res) {
         );
 
     const proc_window_note = narrative?.processing_window_note || processing.processingWindow;
-    const app_implication  = narrative?.application_implication
-      || generateApplicationImplicationV2(decisionBand, context, constraintArch, input);
-    const next_step_body   = narrative?.next_step
-      || generateNextStepV2(decisionBand, constraintArch, context, scores, input);
+    const specialized_app_implication =
+      generateApplicationImplicationSpecialized(decisionBand, context, constraintArch, input);
+
+    const specialized_next_step =
+      generateNextStepSpecialized(decisionBand, constraintArch, context, scores, input);
+
+    const app_implication =
+      specialized_app_implication ||
+      narrative?.application_implication ||
+      generateApplicationImplicationV2(decisionBand, context, constraintArch, input);
+
+    const next_step_body =
+      specialized_next_step ||
+      narrative?.next_step ||
+      generateNextStepV2(decisionBand, constraintArch, context, scores, input);
 
     const htmlData = {
       assessment_type:    "Technical Hypothesis",
