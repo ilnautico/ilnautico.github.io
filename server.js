@@ -84,7 +84,6 @@ function safeParseJSON(text) {
 
 function validateNarrative(obj) {
   const keys = [
-    "material_transition",
     "executive_summary", "risk_primary", "risk_secondary",
     "mechanism", "processing_window_note", "application_implication", "next_step",
   ];
@@ -182,7 +181,7 @@ function normalizeInput(raw) {
   // Hard cleanup: generic transition-purpose text must not become target material
   if (
     parsed.bio_material &&
-    /replace fossil plastic|biodegradable alternative|transition purpose|certification/i.test(parsed.bio_material)
+    /replac(e|ing) fossil|bio-?degradable alternative|transition (purpose|to|goal)|certification|sustainability/i.test(parsed.bio_material)
   ) {
     parsed.bio_material = "";
   }
@@ -502,7 +501,7 @@ function generateExecutive(scores, decision, economic, constraint) {
 function generateMechanism(input, constraint, context) {
   const spec   = getNarrativeSpecialization(context);
   const source = safe(input.material,    "the source material");
-  const target = safe(input.bio_material,"the target biodegradable material");
+  const target = input.bio_material || "the target biodegradable material";
   const app    = safe(input.application, "the specified application");
 
   if (spec === "LDPE_PHA_LOW_TEMP_FILM") {
@@ -550,7 +549,7 @@ function generateMechanism(input, constraint, context) {
 function generateExecutiveSpecialized(input, scores, context, constraintArch, economic) {
   const spec   = getNarrativeSpecialization(context);
   const source = safe(input.material,    "Current material");
-  const target = input.bio_material || "target biodegradable material";
+  const target = safe(input.bio_material, "target biodegradable material");
   const app    = safe(input.application,  "the target application");
 
   if (spec === "LDPE_BIO_HIGH_SPEED_FILM") {
@@ -734,13 +733,15 @@ function generateNextStepSpecialized(decisionBand, constraintArch, context, scor
   return null;
 }
 
-function generateRisk(scores, constraintArch, input, context) {
+function generateRisk(scores, constraintArch, input, context, decision) {
   const primary = constraintArch.primary_constraint;
-  const mat = safe(input.material,     "the source material");
-  const bio = safe(input.bio_material, "the target biodegradable material");
-  const app = safe(input.application,  "the specified processing application");
+  const mat = safe(input.material, "the source material");
+  const bio = input.bio_material || "the target biodegradable material";
+  const app = safe(input.application, "the specified processing application");
 
-  const primaryText = primary.score < 55
+  const isLowDecision = decision?.level === "LOW";
+
+  const primaryText = isLowDecision
     ? `Critical instability in ${primary.factor} (${primary.score}/100) is expected to prevent commercially stable production under the declared operating conditions. ` +
       `This directly compromises ${primary.impact} and creates a high probability of failure, scrap escalation, and non-compliant output.`
     : `Variability in ${primary.factor} (${primary.score}/100) constitutes the primary operational risk for this material transition. ` +
@@ -748,7 +749,11 @@ function generateRisk(scores, constraintArch, input, context) {
       `Risk exposure increases as production duration, throughput, or application stress move toward the boundary of the qualified operating range.`;
 
   // Specialised secondary + mechanism overrides
-  if (context.material_class === "POLYOLEFIN_PE" && context.target_material_class === "PHA_BASED" && context.process_family === "BLOWN_FILM") {
+  if (
+    context.material_class === "POLYOLEFIN_PE" &&
+    context.target_material_class === "PHA_BASED" &&
+    context.process_family === "BLOWN_FILM"
+  ) {
     return {
       primary: primaryText,
       secondary:
@@ -761,7 +766,11 @@ function generateRisk(scores, constraintArch, input, context) {
     };
   }
 
-  if (context.material_class === "POLYOLEFIN_PP" && context.target_material_class === "PLA_BASED" && context.use_condition_family === "THERMAL_STRESS") {
+  if (
+    context.material_class === "POLYOLEFIN_PP" &&
+    context.target_material_class === "PLA_BASED" &&
+    context.use_condition_family === "THERMAL_STRESS"
+  ) {
     return {
       primary: primaryText,
       secondary:
@@ -774,7 +783,11 @@ function generateRisk(scores, constraintArch, input, context) {
     };
   }
 
-  if (context.material_class === "PET" && context.target_material_class === "PLA_BASED" && context.use_condition_family === "THERMAL_STRESS") {
+  if (
+    context.material_class === "PET" &&
+    context.target_material_class === "PLA_BASED" &&
+    context.use_condition_family === "THERMAL_STRESS"
+  ) {
     return {
       primary: primaryText,
       secondary:
@@ -1099,15 +1112,7 @@ function generateNextStepV2(decisionBand, constraintArch, context, scores, input
   );
 }
 
-function resolveMaterialTransition(input, narrative, context) {
-  if (
-    narrative?.material_transition &&
-    narrative.material_transition !== "—" &&
-    narrative.material_transition.trim() !== ""
-  ) {
-    return narrative.material_transition;
-  }
-
+function resolveMaterialTransition(input, context) {
   if (
     input.bio_material &&
     input.bio_material !== "—" &&
@@ -1139,7 +1144,7 @@ function resolveMaterialLabels(input, context, narrative) {
     safe(input.material, "").trim() || "Current material";
 
   const targetMaterial =
-    resolveMaterialTransition(input, narrative, context);
+    resolveMaterialTransition(input, context);
 
   return {
     currentMaterialLabel: currentMaterial.toUpperCase(),
@@ -1251,13 +1256,6 @@ You MUST NOT suggest processing parameters, suppliers, or materials.
 You MUST NOT change technical conclusions beyond given scores.
 You MUST NOT output anything outside JSON.
 
-ADDITIONAL RULE — MATERIAL TRANSITION
-- If "Target Bio Material" is missing or empty, you MUST infer a realistic biodegradable material description based on context.
-- For polyethylene (PE/LDPE) film applications, default to: "PHA-based biodegradable film compound"
-- The output must sound commercially valid. Avoid vague phrases such as "biodegradable alternative".
-- Prefer commercially realistic naming (e.g., "PHA-based compound", "PLA-based rigid material").
-- Keep it concise and specific to the application.
-
 INPUT DATA (READ ONLY)
 Application: {{application}}
 Material: {{material}}
@@ -1275,7 +1273,6 @@ INTERPRETATION RULES
 
 OUTPUT FORMAT (STRICT JSON ONLY)
 {
-  "material_transition": "",
   "executive_summary": "",
   "risk_primary": "",
   "risk_secondary": "",
@@ -1440,21 +1437,11 @@ app.post("/generate-report", (req, res) => {
 
 async function handleReport(req, res) {
   try {
-    const input          = normalizeInput(req.body);
+    const input = normalizeInput(req.body);
 
-    // Pre-fill bio_material before scoring so context classification and
-    // PHA/PLA score adjustments operate on a non-empty target material.
-    if (!input.bio_material || input.bio_material === "—" || !String(input.bio_material).trim()) {
-      if (upper(input.material).includes("PE")) {
-        input.bio_material = "PHA-based biodegradable blown film compound";
-      } else if (upper(input.material).includes("PP")) {
-        input.bio_material = "PLA-based rigid biodegradable material";
-      } else if (upper(input.material).includes("PET")) {
-        input.bio_material = "PLA-based thermoformable biodegradable material";
-      } else {
-        input.bio_material = "Biodegradable polymer compound (commercial-grade)";
-      }
-    }
+    const preliminaryContext = interpretInputContext(input);
+    const finalMaterial = resolveMaterialTransition(input, preliminaryContext);
+    input.bio_material = finalMaterial;
 
     const context        = interpretInputContext(input);
     const scores         = calculateScores(input, context);
@@ -1465,7 +1452,7 @@ async function handleReport(req, res) {
     const economic       = calculateEconomic(scores.total);
     const constraintArch = buildConstraintArchitecture(scores);
 
-    const risk       = generateRisk(scores, constraintArch, input, context);
+    const risk       = generateRisk(scores, constraintArch, input, context, decision);
     const processing = generateProcessing(scores, constraint);
     const product    = generateProduct(scores);
     const quality    = generateQuality(scores);
@@ -1572,11 +1559,7 @@ async function handleReport(req, res) {
       current_material_label: materialLabels.currentMaterialLabel,
       target_material_label: materialLabels.targetMaterialLabel,
       conceptual_note: "Illustrative thermal comparison only. Values are directional indicators, not operating conditions.",
-      material_transition: resolveMaterialTransition(
-        input,
-        allowSpecializedNarrative ? narrative : null,
-        context
-      ),
+      material_transition: input.bio_material,
       report_date:         new Date().toISOString().split("T")[0],
 
       subtitle_note:
