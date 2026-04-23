@@ -84,6 +84,7 @@ function safeParseJSON(text) {
 
 function validateNarrative(obj) {
   const keys = [
+    "material_transition",
     "executive_summary", "risk_primary", "risk_secondary",
     "mechanism", "processing_window_note", "application_implication", "next_step",
   ];
@@ -1098,6 +1099,41 @@ function generateNextStepV2(decisionBand, constraintArch, context, scores, input
   );
 }
 
+function resolveMaterialTransition(input, narrative, context) {
+  if (
+    narrative?.material_transition &&
+    narrative.material_transition !== "—" &&
+    narrative.material_transition.trim() !== ""
+  ) {
+    return narrative.material_transition;
+  }
+
+  if (
+    input.bio_material &&
+    input.bio_material !== "—" &&
+    input.bio_material.trim() !== ""
+  ) {
+    return input.bio_material;
+  }
+
+  if (context.material_class === "POLYOLEFIN_PE") {
+    if (context.process_family === "BLOWN_FILM") {
+      return "PHA-based biodegradable blown film compound";
+    }
+    return "PHA-based biodegradable film compound";
+  }
+
+  if (context.material_class === "POLYOLEFIN_PP") {
+    return "PLA-based rigid biodegradable material";
+  }
+
+  if (context.material_class === "PET") {
+    return "PLA-based thermoformable biodegradable material";
+  }
+
+  return "Biodegradable polymer compound (commercial-grade)";
+}
+
 // ══════════════════════════════════════════════════════════════
 // § 15  HTML INJECTION
 // ══════════════════════════════════════════════════════════════
@@ -1186,10 +1222,17 @@ You MUST NOT suggest processing parameters, suppliers, or materials.
 You MUST NOT change technical conclusions beyond given scores.
 You MUST NOT output anything outside JSON.
 
+ADDITIONAL RULE — MATERIAL TRANSITION
+- If "Target Bio Material" is missing or empty, you MUST infer a realistic biodegradable material description based on context.
+- For polyethylene (PE/LDPE) film applications, default to: "PHA-based biodegradable film compound"
+- The output must sound commercially valid. Avoid vague phrases such as "biodegradable alternative".
+- Prefer commercially realistic naming (e.g., "PHA-based compound", "PLA-based rigid material").
+- Keep it concise and specific to the application.
+
 INPUT DATA (READ ONLY)
 Application: {{application}}
 Material: {{material}}
-Target Bio Material: {{bio_material}}
+Target Bio Material: {{bio_material}} (may be empty)
 Scores — Thermal: {{thermal}} / Flow: {{flow}} / Mechanical: {{mechanical}} / Total: {{total}}
 Constraint: {{constraint}}
 
@@ -1203,6 +1246,7 @@ INTERPRETATION RULES
 
 OUTPUT FORMAT (STRICT JSON ONLY)
 {
+  "material_transition": "",
   "executive_summary": "",
   "risk_primary": "",
   "risk_secondary": "",
@@ -1219,7 +1263,7 @@ async function callClaudeForNarrative(input, scores, constraint) {
   const userContent = NARRATIVE_USER_TEMPLATE
     .replace("{{application}}",  safe(input.application,    "Not specified"))
     .replace("{{material}}",     safe(input.material,       "Not specified"))
-    .replace("{{bio_material}}", safe(input.bio_material,   "Not specified"))
+    .replace("{{bio_material}}", input.bio_material ? String(input.bio_material) : "")
     .replace("{{thermal}}",      String(scores.thermal))
     .replace("{{flow}}",         String(scores.flow))
     .replace("{{mechanical}}",   String(scores.mechanical))
@@ -1314,7 +1358,7 @@ async function callClaudeForMechanism(input, scores, constraint) {
 
   const userContent = MECHANISM_USER_TEMPLATE
     .replace("{{material}}",     safe(input.material,       "Not specified"))
-    .replace("{{bio_material}}", safe(input.bio_material,   "Not specified"))
+    .replace("{{bio_material}}", input.bio_material ? String(input.bio_material) : "")
     .replace("{{thermal}}",      String(scores.thermal))
     .replace("{{flow}}",         String(scores.flow))
     .replace("{{mechanical}}",   String(scores.mechanical))
@@ -1368,6 +1412,21 @@ app.post("/generate-report", (req, res) => {
 async function handleReport(req, res) {
   try {
     const input          = normalizeInput(req.body);
+
+    // Pre-fill bio_material before scoring so context classification and
+    // PHA/PLA score adjustments operate on a non-empty target material.
+    if (!input.bio_material || input.bio_material === "—" || !String(input.bio_material).trim()) {
+      if (upper(input.material).includes("PE")) {
+        input.bio_material = "PHA-based biodegradable blown film compound";
+      } else if (upper(input.material).includes("PP")) {
+        input.bio_material = "PLA-based rigid biodegradable material";
+      } else if (upper(input.material).includes("PET")) {
+        input.bio_material = "PLA-based thermoformable biodegradable material";
+      } else {
+        input.bio_material = "Biodegradable polymer compound (commercial-grade)";
+      }
+    }
+
     const context        = interpretInputContext(input);
     const scores         = calculateScores(input, context);
     const constraint     = getConstraint(scores);
@@ -1467,7 +1526,7 @@ async function handleReport(req, res) {
     const htmlData = {
       assessment_type:    "Technical Hypothesis",
       application:         safe(input.application),
-      material_transition: safe(input.bio_material),
+      material_transition: resolveMaterialTransition(input, narrative, context),
       report_date:         new Date().toISOString().split("T")[0],
 
       subtitle_note:
