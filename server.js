@@ -1431,6 +1431,7 @@ async function handleReport(req, res) {
     const scores         = calculateScores(input, context);
     const constraint     = getConstraint(scores);
     const decision       = determineDecision(scores.total);
+    const allowSpecializedNarrative = decision.level !== "LOW";
     const decisionBand   = determineDecisionBand(scores.total);
     const economic       = calculateEconomic(scores.total);
     const constraintArch = buildConstraintArchitecture(scores);
@@ -1457,12 +1458,13 @@ async function handleReport(req, res) {
       else console.warn("[Claude ERROR] mechanism:", e.message);
     }
 
-    const specialized_exec =
-      generateExecutiveSpecialized(input, scores, context, constraintArch, economic);
+    const specialized_exec = allowSpecializedNarrative
+      ? generateExecutiveSpecialized(input, scores, context, constraintArch, economic)
+      : null;
 
     let exec_summary =
       specialized_exec ||
-      narrative?.executive_summary ||
+      (allowSpecializedNarrative ? narrative?.executive_summary : null) ||
       generateExecutive(scores, decision, economic, constraint);
     if (decision.level === "MODERATE") {
       exec_summary = exec_summary.replace(
@@ -1471,62 +1473,75 @@ async function handleReport(req, res) {
       );
     }
 
-    const specialized_primary =
-      generatePrimaryRiskSpecialized(scores, context, constraintArch);
+    const specialized_primary = allowSpecializedNarrative
+      ? generatePrimaryRiskSpecialized(scores, context, constraintArch)
+      : null;
 
-    const specialized_secondary =
-      generateSecondaryRiskSpecialized(scores, context, constraintArch);
+    const specialized_secondary = allowSpecializedNarrative
+      ? generateSecondaryRiskSpecialized(scores, context, constraintArch)
+      : null;
 
     const primary_risk_body =
       specialized_primary ||
-      narrative?.risk_primary ||
+      (allowSpecializedNarrative ? narrative?.risk_primary : null) ||
       risk.primary;
 
     const secondary_risk_body =
       specialized_secondary ||
-      narrative?.risk_secondary ||
+      (allowSpecializedNarrative ? narrative?.risk_secondary : null) ||
       risk.secondary;
 
     const deterministic_mechanism   = generateMechanism(input, constraint, context);
     const deterministic_deviations  = generateExpectedDeviations(input, scores, context, constraintArch);
 
-    const mechanism_body = shouldForceDeterministicMechanism(context)
-      ? deterministic_mechanism
-      : (mechanismData?.mechanism || deterministic_mechanism);
+    const mechanism_body =
+      !allowSpecializedNarrative || shouldForceDeterministicMechanism(context)
+        ? deterministic_mechanism
+        : (mechanismData?.mechanism || deterministic_mechanism);
 
     const expected_devs_raw  = mechanismData?.expected_deviations;
-    const expected_devs_html = shouldForceDeterministicDeviations(context)
-      ? deterministic_deviations
-      : (
-          Array.isArray(expected_devs_raw)
-            ? expected_devs_raw
-                .filter(Boolean)
-                .map((d) => `<li>${String(d).trim().slice(0, 220)}</li>`)
-                .join("\n")
-            : deterministic_deviations
-        );
+    const expected_devs_html =
+      !allowSpecializedNarrative || shouldForceDeterministicDeviations(context)
+        ? deterministic_deviations
+        : (
+            Array.isArray(expected_devs_raw)
+              ? expected_devs_raw
+                  .filter(Boolean)
+                  .map((d) => `<li>${String(d).trim().slice(0, 220)}</li>`)
+                  .join("\n")
+              : deterministic_deviations
+          );
 
-    const proc_window_note = narrative?.processing_window_note || processing.processingWindow;
-    const specialized_app_implication =
-      generateApplicationImplicationSpecialized(decisionBand, context, constraintArch, input);
+    const proc_window_note =
+      (allowSpecializedNarrative ? narrative?.processing_window_note : null) ||
+      processing.processingWindow;
 
-    const specialized_next_step =
-      generateNextStepSpecialized(decisionBand, constraintArch, context, scores, input);
+    const specialized_app_implication = allowSpecializedNarrative
+      ? generateApplicationImplicationSpecialized(decisionBand, context, constraintArch, input)
+      : null;
+
+    const specialized_next_step = allowSpecializedNarrative
+      ? generateNextStepSpecialized(decisionBand, constraintArch, context, scores, input)
+      : null;
 
     const app_implication =
       specialized_app_implication ||
-      narrative?.application_implication ||
+      (allowSpecializedNarrative ? narrative?.application_implication : null) ||
       generateApplicationImplicationV2(decisionBand, context, constraintArch, input);
 
     const next_step_body =
       specialized_next_step ||
-      narrative?.next_step ||
+      (allowSpecializedNarrative ? narrative?.next_step : null) ||
       generateNextStepV2(decisionBand, constraintArch, context, scores, input);
 
     const htmlData = {
       assessment_type:    "Technical Hypothesis",
       application:         safe(input.application),
-      material_transition: resolveMaterialTransition(input, narrative, context),
+      material_transition: resolveMaterialTransition(
+        input,
+        allowSpecializedNarrative ? narrative : null,
+        context
+      ),
       report_date:         new Date().toISOString().split("T")[0],
 
       subtitle_note:
