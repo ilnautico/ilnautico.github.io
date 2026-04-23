@@ -550,7 +550,7 @@ function generateMechanism(input, constraint, context) {
 function generateExecutiveSpecialized(input, scores, context, constraintArch, economic) {
   const spec   = getNarrativeSpecialization(context);
   const source = safe(input.material,    "Current material");
-  const target = safe(input.bio_material, "target biodegradable material");
+  const target = input.bio_material || "target biodegradable material";
   const app    = safe(input.application,  "the target application");
 
   if (spec === "LDPE_BIO_HIGH_SPEED_FILM") {
