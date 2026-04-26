@@ -20,7 +20,9 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 const htmlTemplate = fs.readFileSync(path.join(__dirname, "template.html"), "utf8");
-
+const visualBasePath = path.join(__dirname, "visual-base.png");
+const visualBaseBase64 = fs.readFileSync(visualBasePath).toString("base64");
+const visualBaseDataUri = `data:image/png;base64,${visualBaseBase64}`;
 if (!process.env.ANTHROPIC_API_KEY) {
   console.warn("⚠️  ANTHROPIC_API_KEY not set — Claude narrative disabled, deterministic fallback active");
 }
@@ -1593,9 +1595,9 @@ async function handleReport(req, res) {
 
       pha_score: scores.total,
 
-      base_image: "https://ilnautico.github.io/visual-base.png",
+      base_image: visualBaseDataUri,
       dynamic_overlay: `<div style="position:relative;width:700px;height:240px;margin:0 auto;">
-  <img src="https://ilnautico.github.io/visual-base.png"
+  <img src="${visualBaseDataUri}"
        style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:contain;z-index:1;" />
   ${generateOverlay(scores, visualizationTemps)}
 </div>`,
