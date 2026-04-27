@@ -138,6 +138,23 @@ function normalizeInput(raw) {
     const value = Array.isArray(f.value) ? f.value.join(", ") : norm(f.value);
     const type  = low(f.type);
 
+    // Tally key-based mapping
+    if (f.key === "question_OPNkWR") parsed.project_stage = value;
+    else if (f.key === "question_PEqkaV") parsed.product_type = value;
+    else if (f.key === "question_rKZvxN") parsed.material = value;
+    else if (f.key === "question_E1OM44") parsed.application = value;
+    else if (f.key === "question_jMVvda") parsed.processing = value;
+    else if (f.key === "question_4kbzWX") parsed.bio_material = value;
+    else if (f.key === "question_2k67qj") parsed.equipment = value;
+    else if (f.key === "question_xQWvkr") {
+      parsed.transition_goal = value;
+      parsed.transition_focus = "PURPOSE";
+    }
+
+    if (f.key && f.key.startsWith("question_")) {
+      continue;
+    }
+
     if      (label === "project name")          parsed.project_name            = value;
     else if (label === "project stage")         parsed.project_stage           = value;
     else if (label === "product type")          parsed.product_type            = value;
@@ -1685,7 +1702,7 @@ app.get("/health", (_req, res) => {
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
   console.log(`[FairVia] Server running on port ${PORT}`);
-});
+})
 const html_3man =`;
 <!DOCTYPE html>
 <html>
