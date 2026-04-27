@@ -1439,6 +1439,8 @@ app.post("/generate-report", (req, res) => {
 
 async function handleReport(req, res) {
   try {
+    console.log("RAW BODY:", JSON.stringify(req.body, null, 2));
+
     const input = normalizeInput(req.body);
 
     const preliminaryContext = interpretInputContext(input);
