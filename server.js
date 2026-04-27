@@ -135,24 +135,43 @@ function normalizeInput(raw) {
 
   for (const f of raw.data.fields) {
     const label = low(f.label);
-    const value = Array.isArray(f.value) ? f.value.join(", ") : norm(f.value);
+    const value = Array.isArray(f.value)
+      ? f.value.map((id) => {
+          const opt = Array.isArray(f.options)
+            ? f.options.find((o) => o.id === id)
+            : null;
+          return opt ? opt.text : id;
+        }).join(", ")
+      : norm(f.value);
     const type  = low(f.type);
 
-    // Tally key-based mapping
-    if (f.key === "question_OPNkWR") parsed.project_stage = value;
-    else if (f.key === "question_PEqkaV") parsed.product_type = value;
-    else if (f.key === "question_rKZvxN") parsed.material = value;
-    else if (f.key === "question_E1OM44") parsed.application = value;
-    else if (f.key === "question_jMVvda") parsed.processing = value;
-    else if (f.key === "question_4kbzWX") parsed.bio_material = value;
-    else if (f.key === "question_2k67qj") parsed.equipment = value;
-    else if (f.key === "question_xQWvkr") {
-      parsed.transition_goal = value;
-      parsed.transition_focus = "PURPOSE";
+    // Tally placeholder-label based mapping
+    if (label.includes("film pouch") || label.includes("rigid tray") || label.includes("container")) {
+      parsed.product_type = value;
     }
 
-    if (f.key && f.key.startsWith("question_")) {
-      continue;
+    else if (label.includes("frozen food packaging") || label.includes("hot-fill use") || label.includes("shopping bag")) {
+      parsed.application = value;
+    }
+
+    else if (label.includes("pp / pet / ldpe")) {
+      parsed.material = value;
+    }
+
+    else if (label.includes("blown film extrusion") || label.includes("cast film extrusion") || label.includes("injection molding") || label.includes("thermoforming")) {
+      parsed.processing = value;
+    }
+
+    else if (label.includes("blown film line") || label.includes("injection molding line")) {
+      parsed.equipment = value;
+    }
+
+    else if (label.includes("pla") || label.includes("pha") || label.includes("target biodegradable")) {
+      parsed.bio_material = value;
+    }
+
+    else if (label.includes("heat resistance") || label.includes("flow stability") || label.includes("seal strength")) {
+      parsed.concern = value;
     }
 
     if      (label === "project name")          parsed.project_name            = value;
@@ -1702,7 +1721,7 @@ app.get("/health", (_req, res) => {
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
   console.log(`[FairVia] Server running on port ${PORT}`);
-})
+});
 const html_3man =`;
 <!DOCTYPE html>
 <html>
