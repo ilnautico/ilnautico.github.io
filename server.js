@@ -425,7 +425,7 @@ function getConstraint(scores) {
     type:    "THERMAL",
     score:   scores.thermal,
     factor:  "thermal stability under processing conditions",
-    impact:  "material degradation risk and process reliability",
+    impact:  "degradation control and process reliability",
     control: "temperature control precision and thermal distribution uniformity",
   };
 
@@ -487,8 +487,8 @@ function generateExecutive(scores, decision, economic, constraint) {
       `This assessment determines LOW technical feasibility for the evaluated material transition within the current processing configuration. ` +
       `${scoreBlock} Although certain individual parameters may remain supportive, the overall feasibility is limited by the ${constraint.type.toLowerCase()} constraint, which represents the controlling factor for this application. ` +
       `The system is critically constrained by instability in ${constraint.factor} (score: ${constraint.score}/100). ` +
-      `This constraint directly compromises stable ${constraint.impact}, and commercial production is not recommended under the declared conditions without material or process reassessment. ` +
-      `Material cost variance is projected at ${economic}, reflecting the scope of re-engineering likely required. ` +
+      `This constraint directly compromises ${constraint.impact}, and commercial production is not recommended under the declared conditions without material or process reassessment. ` +
+      `Material cost variance is projected at ${economic}, reflecting the scope of re-engineering required. ` +
       `Deployment Decision: HOLD — Commercial-scale implementation is not recommended under the current configuration. ` +
       `A fundamental reassessment of material compatibility or processing architecture is required prior to any further validation activity.`
     );
@@ -529,7 +529,7 @@ function generateExecutive(scores, decision, economic, constraint) {
     `${scoreBlock} The system demonstrates strong compatibility across all key processing parameters. ` +
     `Residual sensitivity to ${constraint.factor} (score: ${constraint.score}/100) does not materially compromise ${constraint.impact} under standard operating conditions. ` +
     `Material cost variance is projected at ${economic}. ` +
-    `Deployment Decision: GO — Proceed to controlled pilot validation and systematic scale-up. Full-scale commercial deployment should follow only after pilot validation confirms stable operating performance.`
+    `Deployment Decision: GO — Proceed to controlled pilot validation and systematic scale-up.`
   );
 }
 
@@ -658,7 +658,7 @@ function generatePrimaryRiskSpecialized(scores, context, constraintArch) {
     return (
       `Variability in ${primary.factor} (${primary.score}/100) constitutes the primary operational risk for this material transition. ` +
       `The main concern is not limited to processing exposure itself, but the loss of thermal margin that can translate into deformation risk, dimensional drift, and reduced post-heating structural reliability in downstream use. ` +
-      `This directly affects material degradation risk and process reliability and must be managed through rigorous control of temperature control precision and thermal distribution uniformity.`
+      `This directly affects degradation control and process reliability and must be managed through rigorous control of temperature control precision and thermal distribution uniformity.`
     );
   }
 
@@ -1051,21 +1051,33 @@ function generateApplicationImplicationV2(decisionBand, context, constraintArch,
     );
   }
 
-  if (context.material_class === "POLYOLEFIN_PE" && context.target_material_class === "PHA_BASED" && context.process_family === "BLOWN_FILM") {
+  if (
+    context.material_class === "POLYOLEFIN_PE" &&
+    context.target_material_class === "PHA_BASED" &&
+    context.process_family === "BLOWN_FILM"
+  ) {
     return (
       `${app} is technically feasible only under controlled process optimisation. ` +
       `Pilot-scale validation must confirm that flow stability, gauge control, and downstream film consistency can be maintained over extended runs before full-scale commercial deployment is considered.`
     );
   }
 
-  if (context.material_class === "POLYOLEFIN_PP" && context.target_material_class === "PLA_BASED" && context.use_condition_family === "THERMAL_STRESS") {
+  if (
+    context.material_class === "POLYOLEFIN_PP" &&
+    context.target_material_class === "PLA_BASED" &&
+    context.use_condition_family === "THERMAL_STRESS"
+  ) {
     return (
       `${app} is technically feasible subject to tightly controlled process optimisation. ` +
       `Pilot-scale validation is required before commercial commitment, with particular emphasis on thermal margin, post-heating structural reliability, and repeated heat-exposure performance.`
     );
   }
 
-  if (context.material_class === "PET" && context.target_material_class === "PLA_BASED" && context.use_condition_family === "THERMAL_STRESS") {
+  if (
+    context.material_class === "PET" &&
+    context.target_material_class === "PLA_BASED" &&
+    context.use_condition_family === "THERMAL_STRESS"
+  ) {
     return (
       `${app} is technically feasible subject to tightly controlled process optimisation. ` +
       `Pilot-scale validation is required before commercial commitment, with particular emphasis on dimensional reliability, tolerance retention, and post-moulding geometry stability under thermal exposure.`
@@ -1107,7 +1119,11 @@ function generateNextStepV2(decisionBand, constraintArch, context, scores, input
     );
   }
 
-  if (context.material_class === "POLYOLEFIN_PE" && context.target_material_class === "PHA_BASED" && context.process_family === "BLOWN_FILM") {
+  if (
+    context.material_class === "POLYOLEFIN_PE" &&
+    context.target_material_class === "PHA_BASED" &&
+    context.process_family === "BLOWN_FILM"
+  ) {
     return (
       `Based on the MODERATE feasibility determination (Composite: ${scores.total}/100), engineering validation targeting flow stability control is required prior to pilot approval and must be completed before any commercial commitment.\n\n` +
       `Validation should focus on confirming stable melt uniformity, pressure balance, gauge consistency, and extended-run output control under representative operating conditions. ` +
@@ -1115,7 +1131,11 @@ function generateNextStepV2(decisionBand, constraintArch, context, scores, input
     );
   }
 
-  if (context.material_class === "POLYOLEFIN_PP" && context.target_material_class === "PLA_BASED" && context.use_condition_family === "THERMAL_STRESS") {
+  if (
+    context.material_class === "POLYOLEFIN_PP" &&
+    context.target_material_class === "PLA_BASED" &&
+    context.use_condition_family === "THERMAL_STRESS"
+  ) {
     return (
       `Based on the MODERATE feasibility determination (Composite: ${scores.total}/100), engineering validation targeting thermal stability control is required prior to pilot approval and must be completed before any commercial commitment.\n\n` +
       `Validation should focus on heat-retention margin, post-heating dimensional retention, and structural reliability after repeated thermal exposure. ` +
@@ -1123,7 +1143,11 @@ function generateNextStepV2(decisionBand, constraintArch, context, scores, input
     );
   }
 
-  if (context.material_class === "PET" && context.target_material_class === "PLA_BASED" && context.use_condition_family === "THERMAL_STRESS") {
+  if (
+    context.material_class === "PET" &&
+    context.target_material_class === "PLA_BASED" &&
+    context.use_condition_family === "THERMAL_STRESS"
+  ) {
     return (
       `Based on the MODERATE feasibility determination (Composite: ${scores.total}/100), engineering validation targeting thermal stability control is required prior to pilot approval and must be completed before any commercial commitment.\n\n` +
       `Validation should focus on post-moulding dimensional retention, tolerance stability at critical features, and structural consistency after realistic heat-exposure conditions. ` +
