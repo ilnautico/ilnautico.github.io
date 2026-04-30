@@ -1710,7 +1710,7 @@ app.get("/latest-pdf", (_req, res) => {
   res.send(latestPdfBuffer);
 });
 
-app.get("/health", (_req, res) => {
+app.get("/health", (_req, res) => {　
   res.json({ status: "ok", timestamp: new Date().toISOString() });
 });
 
