@@ -939,7 +939,7 @@ function generateProduct(scores) {
     ? `Structural consistency is attainable within the defined processing envelope. Dimensional stability and wall thickness uniformity conform to pilot validation acceptance criteria.`
     : scores.total >= 55
     ? `Structural consistency is conditional on process parameter control (Composite: ${scores.total}/100). Dimensional variation at processing window margins requires tooling and cooling parameter adjustments.`
-    : `Structural consistency is unattainable under the current process conditions (Composite: ${scores.total}/100). Dimensional variance and structural non-compliance exceed commercial tolerance limits without process redesign.`;
+    : `Structural consistency is unlikely to meet commercial tolerance requirements under the current process conditions without process redesign (Composite: ${scores.total}/100). Dimensional variance and structural non-compliance may exceed commercial tolerance limits unless the process architecture is reassessed.`;
 
   return { mechanical, surface, structural };
 }
