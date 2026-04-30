@@ -485,10 +485,11 @@ function generateExecutive(scores, decision, economic, constraint) {
   if (decision.level === "LOW") {
     return (
       `This assessment determines LOW technical feasibility for the evaluated material transition within the current processing configuration. ` +
-      `${scoreBlock} The system is critically constrained by instability in ${constraint.factor} (score: ${constraint.score}/100). ` +
-      `This constraint directly prevents stable ${constraint.impact}, rendering commercial production unattainable under existing conditions. ` +
-      `Material cost variance is projected at ${economic}, reflecting the scope of re-engineering required. ` +
-      `Deployment Decision: HOLD — Commercial-scale implementation is not recommended. ` +
+      `${scoreBlock} Although certain individual parameters may remain supportive, the overall feasibility is limited by the ${constraint.type.toLowerCase()} constraint, which represents the controlling factor for this application. ` +
+      `The system is critically constrained by instability in ${constraint.factor} (score: ${constraint.score}/100). ` +
+      `This constraint directly compromises stable ${constraint.impact}, and commercial production is not recommended under the declared conditions without material or process reassessment. ` +
+      `Material cost variance is projected at ${economic}, reflecting the scope of re-engineering likely required. ` +
+      `Deployment Decision: HOLD — Commercial-scale implementation is not recommended under the current configuration. ` +
       `A fundamental reassessment of material compatibility or processing architecture is required prior to any further validation activity.`
     );
   }
@@ -528,7 +529,7 @@ function generateExecutive(scores, decision, economic, constraint) {
     `${scoreBlock} The system demonstrates strong compatibility across all key processing parameters. ` +
     `Residual sensitivity to ${constraint.factor} (score: ${constraint.score}/100) does not materially compromise ${constraint.impact} under standard operating conditions. ` +
     `Material cost variance is projected at ${economic}. ` +
-    `Deployment Decision: GO — Proceed to controlled pilot validation and systematic scale-up.`
+    `Deployment Decision: GO — Proceed to controlled pilot validation and systematic scale-up. Full-scale commercial deployment should follow only after pilot validation confirms stable operating performance.`
   );
 }
 
@@ -780,8 +781,8 @@ function generateRisk(scores, constraintArch, input, context, decision) {
   const isLowDecision = decision?.level === "LOW";
 
   const primaryText = isLowDecision
-    ? `Critical instability in ${primary.factor} (${primary.score}/100) is expected to prevent commercially stable production under the declared operating conditions. ` +
-      `This directly compromises ${primary.impact} and creates a high probability of failure, scrap escalation, and non-compliant output.`
+    ? `Critical instability in ${primary.factor} (${primary.score}/100) is expected to prevent reliable commercial-scale implementation under the declared operating conditions without material or process reassessment. ` +
+      `This directly compromises ${primary.impact} and creates a high probability of scrap escalation, output variation, and non-compliant production if deployment proceeds without redesign.`
     : `Variability in ${primary.factor} (${primary.score}/100) constitutes the primary operational risk for this material transition. ` +
       `This directly impacts ${primary.impact} and must be managed through rigorous control of ${primary.control}. ` +
       `Risk exposure increases as production duration, throughput, or application stress move toward the boundary of the qualified operating range.`;
@@ -1045,7 +1046,7 @@ function generateApplicationImplicationV2(decisionBand, context, constraintArch,
 
   if (decisionBand.level === "LOW") {
     return (
-      `${app} is not suitable for commercial deployment under the declared configuration. ` +
+      `${app} is not recommended for commercial deployment under the declared configuration without further material or process reassessment. ` +
       `The primary blocker is ${primary.factor}, and the current material transition path does not provide sufficient margin for reliable implementation.`
     );
   }
@@ -1101,7 +1102,7 @@ function generateNextStepV2(decisionBand, constraintArch, context, scores, input
   if (decisionBand.level === "LOW") {
     return (
       `Based on the LOW feasibility determination (Composite: ${scores.total}/100), the current transition path is not recommended for pilot approval.\n\n` +
-      `Suspend deployment planning and review either an alternative grade or a modified process architecture that can address ${primary.factor}. ` +
+      `Deployment planning should be suspended at this stage, and either an alternative material grade or a modified process architecture should be reviewed to address ${primary.factor}. ` +
       `Re-submission should follow only after a revised material or processing path has been technically screened at laboratory level.`
     );
   }
@@ -1487,7 +1488,7 @@ async function handleReport(req, res) {
     const scores         = calculateScores(input, context);
     const constraint     = getConstraint(scores);
     const decision       = determineDecision(scores.total);
-    const allowSpecializedNarrative = decision.level !== "LOW";
+    const allowSpecializedNarrative = decision.level === "MODERATE";
     const decisionBand   = determineDecisionBand(scores.total);
     const economic       = calculateEconomic(scores.total);
     const constraintArch = buildConstraintArchitecture(scores);
@@ -1598,7 +1599,7 @@ async function handleReport(req, res) {
       application:         safe(input.application),
       current_material_label: materialLabels.currentMaterialLabel,
       target_material_label: materialLabels.targetMaterialLabel,
-      conceptual_note: "Illustrative thermal comparison only. Values are directional indicators, not operating conditions.",
+      conceptual_note: "Illustrative comparison only. Temperature values and scores are conceptual indicators of relative processing tolerance, not recommended operating conditions.",
       material_transition: input.bio_material,
       report_date:         new Date().toISOString().split("T")[0],
 
@@ -1634,11 +1635,7 @@ async function handleReport(req, res) {
       pha_score: scores.total,
 
       base_image: visualBaseDataUri,
-      dynamic_overlay: `<div style="position:relative;width:700px;height:240px;margin:0 auto;">
-  <img src="${visualBaseDataUri}"
-       style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:contain;z-index:1;" />
-  ${generateOverlay(scores, visualizationTemps)}
-</div>`,
+      dynamic_overlay: generateOverlay(scores, visualizationTemps),
 
       next_step:      next_step_body,
       decision:       decision.decision,
