@@ -1719,8 +1719,10 @@ app.get("/health", (_req, res) => {　
 // ══════════════════════════════════════════════════════════════
 
 const PORT = process.env.PORT || 8080;
+
 app.listen(PORT, () => {
-  console.log(`[FairVia] Server running on port ${PORT}`
+  console.log(`[FairVia] Server running on port ${PORT}`);
+});
 const html_3man =`;
 <!DOCTYPE html>
 <html>
