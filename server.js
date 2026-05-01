@@ -399,6 +399,18 @@ function calculateScores(input, context = null) {
   let scores = { thermal, flow, mechanical, total: 0, tokens: appTokens };
   scores = applyOptionModifiers(scores, context);
 
+  // Guardrail: avoid over-penalising PE/LDPE → PHA blown-film transitions.
+  // High-speed blown film is a controlled validation case in this screening model,
+  // not an automatic HOLD case, unless other severe constraints are introduced later.
+  if (
+    context.material_class === "POLYOLEFIN_PE" &&
+    context.target_material_class === "PHA_BASED" &&
+    context.process_family === "BLOWN_FILM" &&
+    context.application_family === "HIGH_SPEED_FILM"
+  ) {
+    scores.flow = Math.max(scores.flow, 55);
+  }
+
   const bottleneck = Math.min(scores.thermal, scores.flow, scores.mechanical);
   const avg        = (scores.thermal + scores.flow + scores.mechanical) / 3;
   const total      = Math.round(bottleneck * 0.7 + avg * 0.3);
