@@ -151,6 +151,7 @@ function normalizeInput(raw) {
 
   for (const f of raw.data.fields) {
     const label = low(f.label);
+    const key   = norm(f.key);
     const value = Array.isArray(f.value)
       ? f.value.map((id) => {
           const opt = Array.isArray(f.options)
@@ -190,15 +191,30 @@ function normalizeInput(raw) {
       parsed.concern = value;
     }
 
-    else if (label.includes("email") || label.includes("e-mail")) {
+    else if (
+      type.includes("email") ||
+      label.includes("email") ||
+      label.includes("e-mail") ||
+      key === "question_R47OMp"
+    ) {
       parsed.email = value;
     }
 
-    else if (label.includes("company") || label.includes("organization") || label.includes("organisation")) {
+    else if (
+      label.includes("company") ||
+      label.includes("organization") ||
+      label.includes("organisation") ||
+      key === "question_oB4JeX"
+    ) {
       parsed.company_name = value;
     }
 
-    else if (label.includes("contact person") || label.includes("your name") || label === "name") {
+    else if (
+      label.includes("contact person") ||
+      label.includes("your name") ||
+      label === "name" ||
+      key === "question_G12M92"
+    ) {
       parsed.contact_person = value;
     }
 
@@ -218,9 +234,25 @@ function normalizeInput(raw) {
     else if (label.includes("production scale")) parsed.scale                  = value;
     else if (label.includes("primary concern")) parsed.concern                 = value;
     else if (label.includes("additional notes")) parsed.notes                  = value;
-    else if (label === "email" || label.includes("email address") || label.includes("e-mail")) parsed.email = value;
-    else if (label.includes("company") || label.includes("organization") || label.includes("organisation")) parsed.company_name = value;
-    else if (label.includes("contact person") || label.includes("your name") || label === "name") parsed.contact_person = value;
+    else if (
+      type.includes("email") ||
+      label === "email" ||
+      label.includes("email address") ||
+      label.includes("e-mail") ||
+      key === "question_R47OMp"
+    ) parsed.email = value;
+    else if (
+      label.includes("company") ||
+      label.includes("organization") ||
+      label.includes("organisation") ||
+      key === "question_oB4JeX"
+    ) parsed.company_name = value;
+    else if (
+      label.includes("contact person") ||
+      label.includes("your name") ||
+      label === "name" ||
+      key === "question_G12M92"
+    ) parsed.contact_person = value;
     else if (label.includes("visual requirement"))    parsed.requirement_focus    = "VISUAL";
     else if (label.includes("environment condition")) parsed.requirement_focus    = "ENVIRONMENT";
     else if (label.includes("product stability"))     parsed.current_material_focus = "PRODUCT_STABILITY";
@@ -241,6 +273,34 @@ function normalizeInput(raw) {
       if (lv.includes("transition purpose")) parsed.transition_focus       = "PURPOSE";
       if (lv.includes("certification"))      parsed.transition_focus       = "CERTIFICATION";
       if (lv.includes("critical area"))      parsed.risk_focus             = "CRITICAL_AREA";
+    }
+  }
+
+  // Fallback scan for Tally fields with null labels.
+  // Some Tally input fields arrive with label:null, so type/key/value must be used.
+  for (const f of raw.data.fields) {
+    const label = low(f.label);
+    const key   = norm(f.key);
+    const type  = low(f.type);
+    const value = Array.isArray(f.value)
+      ? f.value.map((id) => {
+          const opt = Array.isArray(f.options)
+            ? f.options.find((o) => o.id === id)
+            : null;
+          return opt ? opt.text : id;
+        }).join(", ")
+      : norm(f.value);
+
+    if (!parsed.email && value && (type.includes("email") || key === "question_R47OMp")) {
+      parsed.email = value;
+    }
+
+    if (!parsed.company_name && value && (label.includes("company") || key === "question_oB4JeX")) {
+      parsed.company_name = value;
+    }
+
+    if (!parsed.contact_person && value && (label.includes("contact person") || label.includes("your name") || key === "question_G12M92")) {
+      parsed.contact_person = value;
     }
   }
 
