@@ -4,6 +4,8 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import PQueue from "p-queue";
+import { Resend } from "resend";
+import crypto from "crypto";
 
 const fetchFn = global.fetch
   ? global.fetch.bind(global)
@@ -18,6 +20,22 @@ const __dirname  = path.dirname(__filename);
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// ══════════════════════════════════════════════════════════════
+// EMAIL DELIVERY / PUBLIC URL CONFIG
+// ══════════════════════════════════════════════════════════════
+
+const resend = process.env.RESEND_API_KEY
+  ? new Resend(process.env.RESEND_API_KEY)
+  : null;
+
+if (!process.env.RESEND_API_KEY) {
+  console.warn("⚠️  RESEND_API_KEY not set — email delivery disabled");
+}
+
+const FROM_EMAIL = process.env.FROM_EMAIL || "FairVia <reports@example.com>";
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "";
+const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || "";
 
 const htmlTemplate = fs.readFileSync(path.join(__dirname, "template.html"), "utf8");
 const visualBasePath = path.join(__dirname, "visual-base.png");
@@ -126,6 +144,7 @@ function normalizeInput(raw) {
     issues: "", bio_material: "", transition_goal: "",
     processing: "", equipment: "", screw_diameter: "",
     ld_ratio: "", die_mold: "", scale: "", concern: "", notes: "",
+    email: "", company_name: "", contact_person: "",
     requirement_focus: null, current_material_focus: null,
     transition_focus: null, risk_focus: null,
   };
@@ -174,6 +193,18 @@ function normalizeInput(raw) {
       parsed.concern = value;
     }
 
+    else if (label.includes("email") || label.includes("e-mail")) {
+      parsed.email = value;
+    }
+
+    else if (label.includes("company") || label.includes("organization") || label.includes("organisation")) {
+      parsed.company_name = value;
+    }
+
+    else if (label.includes("contact person") || label.includes("your name") || label === "name") {
+      parsed.contact_person = value;
+    }
+
     if      (label === "project name")          parsed.project_name            = value;
     else if (label === "project stage")         parsed.project_stage           = value;
     else if (label === "product type")          parsed.product_type            = value;
@@ -190,6 +221,9 @@ function normalizeInput(raw) {
     else if (label.includes("production scale")) parsed.scale                  = value;
     else if (label.includes("primary concern")) parsed.concern                 = value;
     else if (label.includes("additional notes")) parsed.notes                  = value;
+    else if (label === "email" || label.includes("email address") || label.includes("e-mail")) parsed.email = value;
+    else if (label.includes("company") || label.includes("organization") || label.includes("organisation")) parsed.company_name = value;
+    else if (label.includes("contact person") || label.includes("your name") || label === "name") parsed.contact_person = value;
     else if (label.includes("visual requirement"))    parsed.requirement_focus    = "VISUAL";
     else if (label.includes("environment condition")) parsed.requirement_focus    = "ENVIRONMENT";
     else if (label.includes("product stability"))     parsed.current_material_focus = "PRODUCT_STABILITY";
@@ -215,6 +249,9 @@ function normalizeInput(raw) {
 
   if (!parsed.bio_material && raw.target_material)  parsed.bio_material = norm(raw.target_material);
   if (!parsed.material      && raw.current_material) parsed.material     = norm(raw.current_material);
+  if (!parsed.email         && raw.email)            parsed.email        = norm(raw.email);
+  if (!parsed.company_name  && raw.company_name)     parsed.company_name = norm(raw.company_name);
+  if (!parsed.contact_person && raw.contact_person)  parsed.contact_person = norm(raw.contact_person);
 
   // Hard cleanup: generic transition-purpose text must not become target material
   if (
@@ -1665,6 +1702,38 @@ async function handleReport(req, res) {
 
     latestPdfBuffer = pdf;
 
+    // Create a user-specific download URL without changing the existing PDF logic.
+    cleanupExpiredReports();
+    const reportId = crypto.randomUUID();
+
+    reportStore.set(reportId, {
+      pdf,
+      email: safe(input.email, "").trim(),
+      company_name: safe(input.company_name, ""),
+      createdAt: Date.now(),
+    });
+
+    // Send the report by email if Resend is configured.
+    // Email failure does not block PDF generation.
+    try {
+      await sendReportEmails({ pdf, input, scores, decision, reportId });
+    } catch (emailErr) {
+      console.warn("[Email delivery failed]", emailErr.message);
+    }
+
+    // Tally Webhook / LP return flow:
+    // Use /generate-report?delivery=email to avoid forcing a browser PDF response.
+    if (req.query.delivery === "email") {
+      return res.json({
+        ok: true,
+        message: "Report generated and email delivery attempted.",
+        report_id: reportId,
+        compatibility_level: decision.level,
+        composite_score: scores.total,
+      });
+    }
+
+    // Default direct POST behaviour remains unchanged: return PDF download.
     res.setHeader("Content-Type",        "application/pdf");
     res.setHeader("Content-Disposition", "attachment; filename=fairvia-report.pdf");
     res.setHeader("Content-Length",      pdf.length);
@@ -1673,6 +1742,102 @@ async function handleReport(req, res) {
   } catch (err) {
     console.error("[PDF ERROR]", { message: err.message, stack: err.stack, input: req.body });
     res.status(500).json({ error: "PDF generation failed", detail: err.message });
+  }
+}
+
+
+// ══════════════════════════════════════════════════════════════
+// EMAIL DELIVERY
+// ══════════════════════════════════════════════════════════════
+
+async function sendReportEmails({ pdf, input, scores, decision, reportId }) {
+  if (!resend) {
+    console.warn("[Email skipped] RESEND_API_KEY not configured");
+    return;
+  }
+
+  const userEmail = safe(input.email, "").trim();
+  const companyName = safe(input.company_name, "Not specified");
+  const contactPerson = safe(input.contact_person, "Client");
+
+  const downloadUrl =
+    PUBLIC_BASE_URL && reportId
+      ? `${PUBLIC_BASE_URL.replace(/\/$/, "")}/download-report/${reportId}`
+      : "";
+
+  const attachment = {
+    filename: "FairVia-Technical-Hypothesis-Report.pdf",
+    content: Buffer.from(pdf).toString("base64"),
+  };
+
+  const userBody = `Dear ${contactPerson && contactPerson !== "—" ? contactPerson : "Client"},
+
+Thank you for completing the FairVia™ technical diagnostic.
+
+Your FairVia™ Technical Hypothesis Report has been generated and is attached to this email.
+
+Assessment result:
+- Compatibility Level: ${decision.level}
+- Composite Score: ${scores.total}/100
+
+${downloadUrl ? `You can also download your report here:\n${downloadUrl}\n` : ""}
+This report is intended to support early-stage decision-making before pilot validation or commercial implementation.
+
+Best regards,
+FairVia™`;
+
+  const adminBody = `New FairVia™ Technical Hypothesis Report generated.
+
+Company: ${companyName}
+Contact: ${contactPerson}
+Email: ${userEmail || "Not provided"}
+
+Application: ${safe(input.application)}
+Current Material: ${safe(input.material)}
+Target Material: ${safe(input.bio_material)}
+Processing: ${safe(input.processing)}
+Equipment: ${safe(input.equipment)}
+Primary Concern: ${safe(input.concern)}
+
+Compatibility Level: ${decision.level}
+Composite Score: ${scores.total}/100
+
+${downloadUrl ? `Download URL: ${downloadUrl}` : ""}`;
+
+  const jobs = [];
+
+  if (userEmail && userEmail.includes("@")) {
+    jobs.push(
+      resend.emails.send({
+        from: FROM_EMAIL,
+        to: userEmail,
+        subject: "Your FairVia™ Technical Hypothesis Report",
+        text: userBody,
+        attachments: [attachment],
+      })
+    );
+  } else {
+    console.warn("[Email skipped] user email missing or invalid:", userEmail);
+  }
+
+  if (ADMIN_EMAIL && ADMIN_EMAIL.includes("@")) {
+    jobs.push(
+      resend.emails.send({
+        from: FROM_EMAIL,
+        to: ADMIN_EMAIL,
+        subject: "New FairVia™ Report Generated",
+        text: adminBody,
+        attachments: [attachment],
+      })
+    );
+  }
+
+  const results = await Promise.allSettled(jobs);
+
+  for (const r of results) {
+    if (r.status === "rejected") {
+      console.warn("[Email ERROR]", r.reason?.message || r.reason);
+    }
   }
 }
 
@@ -1711,6 +1876,38 @@ async function renderPdf(html) {
 
 let latestPdfBuffer = null;
 
+const reportStore = new Map();
+const REPORT_TTL_MS = 1000 * 60 * 60 * 24; // 24 hours
+
+function cleanupExpiredReports() {
+  const now = Date.now();
+
+  for (const [reportId, item] of reportStore.entries()) {
+    if (!item?.createdAt || now - item.createdAt > REPORT_TTL_MS) {
+      reportStore.delete(reportId);
+    }
+  }
+}
+
+app.get("/download-report/:reportId", (req, res) => {
+  cleanupExpiredReports();
+
+  const { reportId } = req.params;
+  const item = reportStore.get(reportId);
+
+  if (!item || !item.pdf) {
+    return res.status(404).send("Report not found or expired.");
+  }
+
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader(
+    "Content-Disposition",
+    "attachment; filename=FairVia-Technical-Hypothesis-Report.pdf"
+  );
+  res.setHeader("Content-Length", item.pdf.length);
+  res.send(item.pdf);
+});
+
 app.get("/latest-pdf", (_req, res) => {
   if (!latestPdfBuffer) return res.status(404).send("No PDF generated yet.");
   res.setHeader("Content-Type",        "application/pdf");
@@ -1718,7 +1915,7 @@ app.get("/latest-pdf", (_req, res) => {
   res.send(latestPdfBuffer);
 });
 
-app.get("/health", (_req, res) => {　
+app.get("/health", (_req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });
 });
 
