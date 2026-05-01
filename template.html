@@ -583,6 +583,41 @@ body {
 
 .page4-wrap .section + .section { padding-top: 18px; }
 
+
+/* =========================
+   CLOSING SECTION FIT FIX
+   Keeps section 08 on the same final page as section 07.
+   This does not change scoring logic or report content.
+========================= */
+
+.section.closing-section {
+  page-break-before: auto !important;
+  break-before: auto !important;
+  page-break-inside: auto !important;
+  break-inside: auto !important;
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+}
+
+.section + .section.closing-section {
+  padding-top: 18px !important;
+  border-top: 1px solid var(--sep);
+}
+
+.closing-section .section-header {
+  margin-bottom: 10px !important;
+}
+
+.closing-section .closing-block {
+  padding: 12px 16px !important;
+  gap: 14px !important;
+}
+
+.closing-section .closing-text {
+  font-size: 10.8px !important;
+  line-height: 1.55 !important;
+}
+
 @media print {
 
   * { box-shadow: none !important; }
@@ -1255,7 +1290,7 @@ body {
 
     <!-- 08 Closing Note -->
 
-    <div class="section">
+    <div class="section closing-section">
 
       <div class="section-header">
 
