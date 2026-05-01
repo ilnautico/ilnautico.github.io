@@ -1,4 +1,4 @@
-import express from "express";　
+import express from "express";
 import puppeteer from "puppeteer";
 import fs from "fs";
 import path from "path";
@@ -565,9 +565,8 @@ function generateMechanism(input, constraint, context) {
 
   if (spec === "LDPE_BIO_HIGH_SPEED_FILM") {
     return (
-      `${source} exhibits broader film-processing tolerance and more stable rheological behaviour under continuous blown-film conversion, whereas ${target} operates within a narrower window shaped by melt stability sensitivity, structure-development effects, and extended-run control limitations. ` +
-      `Under ${app} conditions, this mismatch is most likely to appear as instability in gauge control, seal-area consistency, and output uniformity as line speed and run length increase. ` +
-      `This directly constrains production consistency, yield stability, and overall operational efficiency.`
+      `${source} offers broad blown-film processing tolerance, while ${target} operates within a narrower melt-stability and structure-development window. ` +
+      `Under ${app} conditions, this mismatch is expected to appear mainly as gauge-control, seal-area, and extended-run output variability.`
     );
   }
 
@@ -652,9 +651,9 @@ function generatePrimaryRiskSpecialized(scores, context, constraintArch) {
 
   if (spec === "LDPE_BIO_HIGH_SPEED_FILM") {
     return (
-      `Variability in ${primary.factor} (${primary.score}/100) constitutes the primary operational risk for this material transition. ` +
-      `Under high-speed blown-film conditions, inadequate melt stability is likely to reduce gauge control robustness, disturb seal-area consistency, and widen output variation during extended runs. ` +
-      `This directly affects production consistency, yield rate, and operational efficiency, and must be managed through rigorous control of pressure stability, melt uniformity, and extrusion flow balance.`
+      `Flow variability (${primary.score}/100) is the primary operational risk for this material transition. ` +
+      `Under high-speed blown-film conditions, melt instability may reduce gauge control, seal-area consistency, and output uniformity during extended runs. ` +
+      `This risk should be managed through pressure stability, melt uniformity, and extrusion flow balance.`
     );
   }
 
@@ -682,8 +681,8 @@ function generateSecondaryRiskSpecialized(scores, context, constraintArch) {
 
   if (spec === "LDPE_BIO_HIGH_SPEED_FILM") {
     return (
-      `Thermal sensitivity (${scores.thermal}/100) interacts with mechanical consistency (${scores.mechanical}/100), creating downstream process-level effects once flow stability begins to drift. ` +
-      `In high-speed film production, this interaction is most likely to appear as widening gauge variation, localized seal-area inconsistency, winding instability, and progressive loss of output uniformity during extended runs.`
+      `Thermal sensitivity (${scores.thermal}/100) may amplify mechanical variation once flow stability begins to drift. ` +
+      `In high-speed film production, this interaction is most likely to appear as gauge variation, local seal-area inconsistency, winding instability, and reduced output uniformity.`
     );
   }
 
@@ -751,9 +750,9 @@ function generateNextStepSpecialized(decisionBand, constraintArch, context, scor
 
   if (spec === "LDPE_BIO_HIGH_SPEED_FILM") {
     return (
-      `Based on the MODERATE feasibility determination (Composite: ${scores.total}/100), engineering validation targeting flow stability control is required prior to pilot approval and must be completed before any commercial commitment.\n\n` +
-      `Validation should focus on confirming stable melt uniformity, pressure balance, gauge consistency, seal-area reliability, and extended-run output control under representative high-speed operating conditions. ` +
-      `Structured pilot trials should define the qualified production envelope for long-run film manufacture, after which system stability, yield reliability, and downstream converting consistency should be reassessed against commercial acceptance criteria.`
+      `Based on the MODERATE feasibility determination (Composite: ${scores.total}/100), engineering validation targeting flow stability control is required before commercial commitment. ` +
+      `Validation should confirm melt uniformity, pressure balance, gauge consistency, seal-area reliability, and extended-run output control under representative high-speed conditions. ` +
+      `Pilot approval should follow only after the qualified production envelope and downstream converting consistency are confirmed.`
     );
   }
 
@@ -1121,9 +1120,9 @@ function generateNextStepV2(decisionBand, constraintArch, context, scores, input
 
   if (context.material_class === "POLYOLEFIN_PE" && context.target_material_class === "PHA_BASED" && context.process_family === "BLOWN_FILM") {
     return (
-      `Based on the MODERATE feasibility determination (Composite: ${scores.total}/100), engineering validation targeting flow stability control is required prior to pilot approval and must be completed before any commercial commitment.\n\n` +
-      `Validation should focus on confirming stable melt uniformity, pressure balance, gauge consistency, and extended-run output control under representative operating conditions. ` +
-      `Structured pilot trials should define the qualified production envelope for long-run film manufacture, after which system stability, yield reliability, and downstream converting consistency should be reassessed against commercial acceptance criteria.`
+      `Based on the MODERATE feasibility determination (Composite: ${scores.total}/100), engineering validation targeting flow stability control is required before commercial commitment. ` +
+      `Validation should confirm melt uniformity, pressure balance, gauge consistency, and extended-run output control under representative operating conditions. ` +
+      `Pilot approval should follow only after the qualified production envelope and downstream converting consistency are confirmed.`
     );
   }
 
