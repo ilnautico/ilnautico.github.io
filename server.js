@@ -2075,6 +2075,719 @@ function renderPaidAccessFormPage(token = "") {
       --ink: #173766;
       --ink-soft: #425f82;
       --ink-muted: #748dad;
+      --blue: #2952a3;
+      --blue-strong: #0d73ff;
+      --blue-pale: #edf5ff;
+      --bg: #f4f7fb;
+      --surface: #ffffff;
+      --field: #ffffff;
+      --line: rgba(23,55,102,0.12);
+      --line-strong: rgba(23,55,102,0.20);
+      --shadow: 0 14px 36px rgba(23,55,102,0.08);
+      --max: 1040px;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      background:
+        linear-gradient(rgba(23,55,102,0.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(23,55,102,0.035) 1px, transparent 1px),
+        var(--bg);
+      background-size: 38px 38px;
+      color: #303744;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, Helvetica, sans-serif;
+      font-size: 15px;
+      line-height: 1.65;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .page {
+      width: min(calc(100% - 40px), var(--max));
+      margin: 0 auto;
+      padding: 44px 0 72px;
+    }
+
+    .topline {
+      position: relative;
+      margin-bottom: 30px;
+      padding: 38px 42px;
+      background: rgba(255,255,255,0.94);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .topline::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 5px;
+      height: 100%;
+      background: linear-gradient(180deg, #0d73ff, #2952a3);
+    }
+
+    h1 {
+      max-width: 760px;
+      margin: 0 0 18px;
+      color: var(--ink);
+      font-size: clamp(34px, 4.4vw, 52px);
+      line-height: 1.08;
+      font-weight: 760;
+      letter-spacing: -0.035em;
+    }
+
+    .intro {
+      max-width: 760px;
+      margin: 0;
+      color: #3f5878;
+      font-size: clamp(16px, 1.45vw, 19px);
+      line-height: 1.72;
+      font-weight: 400;
+    }
+
+    .secure-note {
+      max-width: 760px;
+      margin: 22px 0 0;
+      padding: 13px 15px;
+      background: #f0f6fc;
+      border: 1px solid #d7e5f5;
+      border-radius: 10px;
+      color: #425f82;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    form {
+      display: grid;
+      gap: 18px;
+    }
+
+    .step {
+      margin-top: 0;
+      padding: 30px 34px 8px;
+      background: rgba(255,255,255,0.96);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      box-shadow: 0 10px 26px rgba(23,55,102,0.055);
+    }
+
+    .step h2 {
+      margin: 0 0 26px;
+      color: var(--ink);
+      font-size: clamp(22px, 2.3vw, 30px);
+      line-height: 1.25;
+      font-weight: 760;
+      letter-spacing: -0.02em;
+    }
+
+    .q {
+      margin: 0 0 30px;
+      padding: 0 0 28px;
+      border-bottom: 1px solid rgba(23,55,102,0.07);
+    }
+
+    .q:last-child {
+      border-bottom: none;
+      padding-bottom: 10px;
+    }
+
+    .q-title {
+      margin: 0 0 8px;
+      color: #26364c;
+      font-size: 16px;
+      line-height: 1.45;
+      font-weight: 700;
+      text-decoration: none;
+    }
+
+    .q-text {
+      max-width: 760px;
+      margin: 0 0 6px;
+      color: #3b4f6b;
+      font-size: 14.5px;
+      line-height: 1.65;
+      font-weight: 400;
+    }
+
+    .q-help {
+      display: block;
+      margin: 0 0 12px;
+      color: #4472b5;
+      font-size: 13px;
+      line-height: 1.55;
+      font-weight: 400;
+    }
+
+    .optional {
+      margin: 0 0 10px;
+      color: #3b4f6b;
+      font-size: 14.5px;
+      line-height: 1.55;
+    }
+
+    .required-dot {
+      display: inline-grid;
+      place-items: center;
+      width: 18px;
+      height: 18px;
+      margin-left: 6px;
+      border-radius: 50%;
+      background: #edf2f7;
+      color: #2b3445;
+      font-size: 14px;
+      line-height: 1;
+      vertical-align: 2px;
+      font-weight: 800;
+      text-decoration: none;
+    }
+
+    input[type="text"], input[type="email"], textarea, select {
+      width: min(560px, 100%);
+      min-height: 46px;
+      padding: 11px 13px;
+      border: 1px solid rgba(23,55,102,0.18);
+      border-radius: 9px;
+      background: var(--field);
+      color: #26364c;
+      font-family: inherit;
+      font-size: 14.5px;
+      line-height: 1.35;
+      box-shadow: 0 1px 2px rgba(23,55,102,0.05);
+      outline: none;
+      transition: border-color 0.18s ease, box-shadow 0.18s ease;
+    }
+
+    textarea {
+      min-height: 92px;
+      resize: vertical;
+    }
+
+    select {
+      appearance: none;
+      background-image: linear-gradient(45deg, transparent 50%, #748dad 50%), linear-gradient(135deg, #748dad 50%, transparent 50%);
+      background-position: calc(100% - 21px) 19px, calc(100% - 14px) 19px;
+      background-size: 7px 7px, 7px 7px;
+      background-repeat: no-repeat;
+      padding-right: 42px;
+    }
+
+    input::placeholder, textarea::placeholder { color: #aeb9c6; }
+
+    input:focus, textarea:focus, select:focus {
+      border-color: #5a8fe5;
+      box-shadow: 0 0 0 4px rgba(41,82,163,0.12);
+    }
+
+    .choice-list {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-start;
+      gap: 10px;
+      margin-top: 12px;
+      max-width: 820px;
+    }
+
+    .choice {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      min-height: 42px;
+      padding: 9px 15px 9px 45px;
+      border: 1px solid rgba(23,55,102,0.16);
+      border-radius: 999px;
+      background: #fff;
+      color: #30435f;
+      font-size: 14px;
+      line-height: 1.25;
+      cursor: pointer;
+      box-shadow: 0 1px 2px rgba(23,55,102,0.05);
+      transition: border-color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+      user-select: none;
+    }
+
+    .choice input {
+      position: absolute;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .choice .letter {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      display: grid;
+      place-items: center;
+      width: 24px;
+      height: 24px;
+      border-radius: 6px;
+      background: #7c8795;
+      color: #fff;
+      font-size: 12px;
+      font-weight: 800;
+      line-height: 1;
+    }
+
+    .choice:hover {
+      border-color: #77a4e6;
+      box-shadow: 0 0 0 4px rgba(41,82,163,0.09);
+      transform: translateY(-1px);
+    }
+
+    .choice:has(input:checked) {
+      border-color: var(--blue);
+      background: var(--blue-pale);
+      box-shadow: 0 0 0 4px rgba(41,82,163,0.12);
+    }
+
+    .choice:has(input:checked) .letter {
+      background: var(--blue);
+    }
+
+    .submit-block {
+      margin-top: 8px;
+      padding: 28px 34px;
+      background: #ffffff;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      box-shadow: 0 10px 26px rgba(23,55,102,0.055);
+    }
+
+    .submit-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      min-height: 48px;
+      padding: 0 22px;
+      border: none;
+      border-radius: 9px;
+      background: linear-gradient(135deg, #244f9f 0%, #2f65c8 100%);
+      color: #fff;
+      font-size: 14px;
+      font-weight: 760;
+      cursor: pointer;
+      box-shadow: 0 10px 22px rgba(36,79,159,0.20);
+      transition: transform 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease;
+    }
+
+    .submit-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 14px 30px rgba(36,79,159,0.24);
+    }
+
+    .submit-btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+
+    .status {
+      margin-top: 16px;
+      color: #425f82;
+      font-size: 14px;
+      line-height: 1.55;
+    }
+
+    .error {
+      color: #b42318;
+    }
+
+    .field-error {
+      margin-top: 9px;
+      color: #b42318;
+      font-size: 13px;
+      display: none;
+    }
+
+    @media (max-width: 700px) {
+      .page { width: min(calc(100% - 24px), var(--max)); padding-top: 24px; }
+      .topline { padding: 30px 24px; }
+      .step { padding: 26px 22px 6px; }
+      .step h2 { margin-bottom: 24px; }
+      .q { margin-bottom: 26px; padding-bottom: 24px; }
+      .choice-list { flex-direction: column; }
+      .choice { width: 100%; max-width: 100%; border-radius: 12px; }
+      input[type="text"], input[type="email"], textarea, select { width: 100%; }
+      .submit-block { padding: 24px 22px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="topline">
+      <h1>FairVia™ Equipment Compatibility Assessment</h1>
+      <p class="intro">
+        Tell us about your product, current material, and manufacturing setup.<br>
+        We will assess whether biodegradable material transition is technically feasible with your existing process.
+      </p>
+      <div class="secure-note">
+        Secure paid-access form. Your submission is used only for diagnostic processing and PDF report generation.
+      </div>
+    </section>
+
+    <form id="fairvia-form" novalidate>
+      <input type="hidden" name="access_token" value="${safeToken}" />
+
+      <section class="step">
+        <h2>STEP 1 — Product Overview</h2>
+
+        <div class="q">
+          <div class="q-title">1. Project stage</div>
+          <p class="q-text">Please select the stage that best matches your current situation.<span class="required-dot">*</span></p>
+          <select name="project_stage" required>
+            <option value="">Select project stage</option>
+            <option value="Early investigation">Early investigation</option>
+            <option value="Pre-commercial validation">Pre-commercial validation</option>
+            <option value="Pilot preparation">Pilot preparation</option>
+            <option value="Commercial production review">Commercial production review</option>
+            <option value="Not specified">Not specified</option>
+          </select>
+          <div class="field-error">Please select a project stage.</div>
+        </div>
+
+        <div class="q">
+          <div class="q-title">2. Product type</div>
+          <p class="q-text">What product are you making?</p>
+          <span class="q-help">Example: film pouch, rigid tray, injection-molded container</span>
+          <input type="text" name="product_type" required placeholder="film pouch / rigid tray / container" />
+          <span class="required-dot">*</span>
+          <div class="field-error">Please enter the product type.</div>
+        </div>
+
+        <div class="q">
+          <div class="q-title">3. Application</div>
+          <p class="q-text">Where and how will the product be used?</p>
+          <span class="q-help">Example: frozen food packaging, hot-fill food container, retail shopping bag</span>
+          <input type="text" name="application" required placeholder="frozen food packaging / hot-fill use / retail shopping bag" />
+          <span class="required-dot">*</span>
+          <div class="field-error">Please enter the application.</div>
+        </div>
+      </section>
+
+      <section class="step">
+        <h2>STEP 2 — Current Setup</h2>
+
+        <div class="q">
+          <div class="q-title">4. Current material</div>
+          <p class="q-text">What material are you currently using?</p>
+          <span class="q-help">Example: PP, PET, LDPE, multilayer PE film</span>
+          <input type="text" name="material" required placeholder="PP / PET / LDPE" />
+          <span class="required-dot">*</span>
+          <div class="field-error">Please enter the current material.</div>
+        </div>
+
+        <div class="q">
+          <div class="q-title">5. Processing method</div>
+          <p class="q-text">How is the product manufactured?<span class="required-dot">*</span></p>
+          <div class="choice-list" data-required-group="processing">
+            <label class="choice"><input type="radio" name="processing" value="Blown film extrusion" required><span class="letter">A</span>Blown film extrusion</label>
+            <label class="choice"><input type="radio" name="processing" value="Cast film extrusion"><span class="letter">B</span>Cast film extrusion</label>
+            <label class="choice"><input type="radio" name="processing" value="Injection molding"><span class="letter">C</span>Injection molding</label>
+            <label class="choice"><input type="radio" name="processing" value="Thermoforming"><span class="letter">D</span>Thermoforming</label>
+            <label class="choice"><input type="radio" name="processing" value="Blow molding"><span class="letter">E</span>Blow molding</label>
+            <label class="choice"><input type="radio" name="processing" value="Other / Not sure"><span class="letter">F</span>Other / Not sure</label>
+          </div>
+          <div class="field-error">Please select a processing method.</div>
+        </div>
+
+        <div class="q">
+          <div class="q-title">6. Equipment type</div>
+          <p class="q-text">What kind of machine or production line do you use?</p>
+          <span class="q-help">Example: blown film line, 3-layer film line, injection molding line</span>
+          <input type="text" name="equipment" required placeholder="blown film line / injection molding line" />
+          <span class="required-dot">*</span>
+          <div class="field-error">Please enter the equipment type.</div>
+        </div>
+      </section>
+
+      <section class="step">
+        <h2>STEP 3 — Transition Goal <span class="required-dot">*</span></h2>
+
+        <div class="q">
+          <div class="q-title">7. Target biodegradable material</div>
+          <p class="q-text">If you already have a candidate material, enter it here.<br>If not, leave this blank.</p>
+          <span class="q-help">Example: PLA, PHA-based compound, PBAT blend</span>
+          <input type="text" name="bio_material" placeholder="PLA / PHA-based compound / PBAT blend" />
+        </div>
+
+        <div class="q">
+          <div class="q-title">8. Why are you considering this transition?</div>
+          <p class="optional">Optional. Choose the closest reason.</p>
+          <div class="choice-list">
+            <label class="choice"><input type="radio" name="transition_goal" value="Sustainability goals"><span class="letter">A</span>Sustainability goals</label>
+            <label class="choice"><input type="radio" name="transition_goal" value="Regulatory compliance"><span class="letter">B</span>Regulatory compliance</label>
+            <label class="choice"><input type="radio" name="transition_goal" value="Customer request"><span class="letter">C</span>Customer request</label>
+            <label class="choice"><input type="radio" name="transition_goal" value="Branding / market positioning"><span class="letter">D</span>Branding / market positioning</label>
+            <label class="choice"><input type="radio" name="transition_goal" value="Cost exploration"><span class="letter">E</span>Cost exploration</label>
+            <label class="choice"><input type="radio" name="transition_goal" value="Not sure yet"><span class="letter">F</span>Not sure yet</label>
+          </div>
+        </div>
+
+        <div class="q">
+          <div class="q-title">9. Main technical concern</div>
+          <p class="q-text">What is the main technical risk or uncertainty?</p>
+          <span class="q-help">Example: heat resistance, flow stability, seal strength, dimensional stability</span>
+          <input type="text" name="concern" required placeholder="heat resistance / flow stability / seal strength" />
+          <span class="required-dot">*</span>
+          <div class="field-error">Please enter the main technical concern.</div>
+        </div>
+
+        <div class="q">
+          <div class="q-title">10. Known issues with the current product or process</div>
+          <p class="optional">Optional.</p>
+          <span class="q-help">Example: warpage, unstable sealing, thickness variation, poor output consistency</span>
+          <input type="text" name="issues" placeholder="Describe any current issues if applicable" />
+        </div>
+
+        <div class="q">
+          <div class="q-title">11. Additional notes</div>
+          <p class="optional">Optional. Add technical details if known.</p>
+          <span class="q-help">Example: no equipment modification preferred, high-speed production, hot-fill use</span>
+          <input type="text" name="notes" placeholder="Add any technical details if known" />
+        </div>
+      </section>
+
+      <section class="step">
+        <h2>STEP 5 — Optional Technical Details</h2>
+        <p class="q-text">If known, please provide the following technical details.<br>You may leave these blank if unavailable.</p>
+
+        <div class="q">
+          <div class="q-title">12. Screw diameter</div>
+          <p class="optional">Optional. Enter if known.</p>
+          <input type="text" name="screw_diameter" placeholder="Example: 65 mm" />
+        </div>
+
+        <div class="q">
+          <div class="q-title">13. L/D ratio</div>
+          <p class="optional">Optional. Enter if known.</p>
+          <input type="text" name="ld_ratio" placeholder="Example: 28:1" />
+        </div>
+
+        <div class="q">
+          <div class="q-title">14. Die / mold information</div>
+          <p class="optional">Optional. Enter if known.</p>
+          <input type="text" name="die_mold" placeholder="flat die / 3-layer die / cavity mold" />
+        </div>
+
+        <div class="q">
+          <div class="q-title">15. What matters most for this product?</div>
+          <p class="optional">Optional. Choose the factor that matters most.</p>
+          <div class="choice-list">
+            <label class="choice"><input type="radio" name="requirement_focus" value="VISUAL"><span class="letter">A</span>Visual appearance</label>
+            <label class="choice"><input type="radio" name="requirement_focus" value="ENVIRONMENT"><span class="letter">B</span>Environmental condition</label>
+            <label class="choice"><input type="radio" name="requirement_focus" value="PRODUCT_STABILITY"><span class="letter">C</span>Product stability</label>
+            <label class="choice"><input type="radio" name="requirement_focus" value="MECHANICAL"><span class="letter">D</span>Mechanical performance</label>
+            <label class="choice"><input type="radio" name="requirement_focus" value="NOT_SURE"><span class="letter">E</span>Not sure</label>
+          </div>
+        </div>
+
+        <div class="q">
+          <div class="q-title">16. Which area is most critical?</div>
+          <p class="optional">Optional. Choose the area that seems most important.</p>
+          <div class="choice-list">
+            <label class="choice"><input type="radio" name="risk_focus" value="PROCESSING_STABILITY"><span class="letter">A</span>Processing stability</label>
+            <label class="choice"><input type="radio" name="risk_focus" value="THERMAL_RESISTANCE"><span class="letter">B</span>Thermal resistance</label>
+            <label class="choice"><input type="radio" name="risk_focus" value="DIMENSIONAL_ACCURACY"><span class="letter">C</span>Dimensional accuracy</label>
+            <label class="choice"><input type="radio" name="risk_focus" value="SURFACE_QUALITY"><span class="letter">D</span>Surface quality</label>
+            <label class="choice"><input type="radio" name="risk_focus" value="SEAL_PERFORMANCE"><span class="letter">E</span>Seal performance</label>
+            <label class="choice"><input type="radio" name="risk_focus" value="NOT_SURE"><span class="letter">F</span>Not sure</label>
+          </div>
+        </div>
+      </section>
+
+      <section class="step">
+        <h2>STEP 6 — Contact Information</h2>
+
+        <div class="q">
+          <div class="q-title">17. Email address</div>
+          <input type="email" name="email" required placeholder="" />
+          <span class="required-dot">*</span>
+          <div class="field-error">Please enter a valid email address.</div>
+        </div>
+
+        <div class="q">
+          <div class="q-title">18. Company name</div>
+          <input type="text" name="company_name" required placeholder="" />
+          <span class="required-dot">*</span>
+          <div class="field-error">Please enter your company name.</div>
+        </div>
+
+        <div class="q">
+          <div class="q-title">19. Contact person</div>
+          <input type="text" name="contact_person" required placeholder="" />
+          <span class="required-dot">*</span>
+          <div class="field-error">Please enter a contact person.</div>
+        </div>
+      </section>
+
+      <div class="submit-block">
+        <button id="submit-btn" type="submit" class="submit-btn">Submit →</button>
+        <div id="status" class="status"></div>
+      </div>
+    </form>
+  </main>
+
+  <script>
+    const form = document.getElementById("fairvia-form");
+    const submitBtn = document.getElementById("submit-btn");
+    const statusEl = document.getElementById("status");
+    const REPORT_READY_URL = ${JSON.stringify(reportReadyUrl)};
+
+    function showFieldErrors() {
+      let ok = true;
+      const fields = Array.from(form.querySelectorAll("input[required], select[required], textarea[required]"));
+      fields.forEach((field) => {
+        const q = field.closest(".q");
+        const error = q ? q.querySelector(".field-error") : null;
+        if (!field.checkValidity()) {
+          ok = false;
+          if (error) error.style.display = "block";
+        } else {
+          if (error) error.style.display = "none";
+        }
+      });
+      return ok;
+    }
+
+    function collectPayload() {
+      const formData = new FormData(form);
+      const payload = Object.fromEntries(formData.entries());
+
+      // Stable defaults keep the diagnostic narrative deterministic when optional fields are left blank.
+      payload.project_stage = payload.project_stage || "Not specified";
+      payload.product_type = payload.product_type || "Not specified";
+      payload.application = payload.application || "Not specified";
+      payload.material = payload.material || "Not specified";
+      payload.processing = payload.processing || "Not specified";
+      payload.equipment = payload.equipment || "Not specified";
+      payload.bio_material = payload.bio_material || "";
+      payload.transition_goal = payload.transition_goal || "";
+      payload.concern = payload.concern || "Not specified";
+      payload.issues = payload.issues || "";
+      payload.notes = payload.notes || "";
+      payload.screw_diameter = payload.screw_diameter || "";
+      payload.ld_ratio = payload.ld_ratio || "";
+      payload.die_mold = payload.die_mold || "";
+      payload.requirement_focus = payload.requirement_focus || null;
+      payload.risk_focus = payload.risk_focus || null;
+      payload.company_name = payload.company_name || "";
+      payload.contact_person = payload.contact_person || "";
+      payload.email = payload.email || "";
+
+      return payload;
+    }
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+
+      statusEl.className = "status";
+      statusEl.textContent = "";
+
+      if (!showFieldErrors()) {
+        statusEl.className = "status error";
+        statusEl.textContent = "Please complete the required fields before submitting.";
+        return;
+      }
+
+      submitBtn.disabled = true;
+      statusEl.textContent = "Generating your Technical Hypothesis Report. Please wait...";
+
+      try {
+        const response = await fetch("/generate-report?delivery=email", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(collectPayload())
+        });
+
+        const result = await response.json().catch(() => null);
+
+        if (!response.ok) {
+          throw new Error((result && (result.detail || result.error)) || "Report generation failed.");
+        }
+
+        statusEl.textContent = "Your report has been generated and sent by email.";
+
+        setTimeout(() => {
+          window.location.href = REPORT_READY_URL;
+        }, 900);
+
+      } catch (error) {
+        console.error(error);
+        statusEl.className = "status error";
+        statusEl.textContent = "Report generation failed. Please contact FairVia support.";
+        submitBtn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>`;
+}
+
+app.get("/paid-access", (req, res) => {
+  const token = safe(req.query.token, "");
+  res.setHeader("Content-Type", "text/html; charset=utf-8");
+  res.send(renderPaidAccessFormPage(token));
+});
+
+app.get("/download-report/:reportId", (req, res) => {
+  cleanupExpiredReports();
+
+  const { reportId } = req.params;
+  const item = reportStore.get(reportId);
+
+  if (!item || !item.pdf) {
+    return res.status(404).send("Report not found or expired.");
+  }
+
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader(
+    "Content-Disposition",
+    "attachment; filename=FairVia-Technical-Hypothesis-Report.pdf"
+  );
+  res.setHeader("Content-Length", item.pdf.length);
+  res.send(item.pdf);
+});
+
+app.get("/latest-pdf", (_req, res) => {
+  if (!latestPdfBuffer) return res.status(404).send("No PDF generated yet.");
+  res.setHeader("Content-Type",        "application/pdf");
+  res.setHeader("Content-Disposition", "inline; filename=fairvia-report.pdf");
+  res.send(latestPdfBuffer);
+});
+
+app.get("/health", (_req, res) => {
+  res.json({ status: "ok", timestamp: new Date().toISOString() });
+});
+
+// ══════════════════════════════════════════════════════════════
+// START
+// ══════════════════════════════════════════════════════════════
+
+const PORT = process.env.PORT || 8080;
+
+app.listen(PORT, () => {
+  console.log(`[FairVia] Server running on port ${PORT}`);
+});
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FairVia™ | Equipment Compatibility Assessment</title>
+
+  <style>
+    :root {
+      --ink: #173766;
+      --ink-soft: #425f82;
+      --ink-muted: #748dad;
       --blue: #0d73ff;
       --blue-deep: #244f9f;
       --blue-mid: #2952a3;
