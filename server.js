@@ -4,7 +4,6 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import PQueue from "p-queue";
-import { Resend } from "resend";
 import crypto from "crypto";
 
 const fetchFn = global.fetch
@@ -25,11 +24,9 @@ app.use(express.urlencoded({ extended: true }));
 // EMAIL DELIVERY / PUBLIC URL CONFIG
 // ══════════════════════════════════════════════════════════════
 
-const resend = process.env.RESEND_API_KEY
-  ? new Resend(process.env.RESEND_API_KEY)
-  : null;
+const RESEND_API_KEY = process.env.RESEND_API_KEY || "";
 
-if (!process.env.RESEND_API_KEY) {
+if (!RESEND_API_KEY) {
   console.warn("⚠️  RESEND_API_KEY not set — email delivery disabled");
 }
 
@@ -1750,8 +1747,31 @@ async function handleReport(req, res) {
 // EMAIL DELIVERY
 // ══════════════════════════════════════════════════════════════
 
+async function sendResendEmail(payload) {
+  if (!RESEND_API_KEY) {
+    console.warn("[Email skipped] RESEND_API_KEY not configured");
+    return { skipped: true };
+  }
+
+  const res = await fetchFn("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${RESEND_API_KEY}`,
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) {
+    const detail = await res.text().catch(() => "");
+    throw new Error(`Resend API error: ${res.status} ${detail}`);
+  }
+
+  return res.json().catch(() => ({}));
+}
+
 async function sendReportEmails({ pdf, input, scores, decision, reportId }) {
-  if (!resend) {
+  if (!RESEND_API_KEY) {
     console.warn("[Email skipped] RESEND_API_KEY not configured");
     return;
   }
@@ -1808,7 +1828,7 @@ ${downloadUrl ? `Download URL: ${downloadUrl}` : ""}`;
 
   if (userEmail && userEmail.includes("@")) {
     jobs.push(
-      resend.emails.send({
+      sendResendEmail({
         from: FROM_EMAIL,
         to: userEmail,
         subject: "Your FairVia™ Technical Hypothesis Report",
@@ -1822,7 +1842,7 @@ ${downloadUrl ? `Download URL: ${downloadUrl}` : ""}`;
 
   if (ADMIN_EMAIL && ADMIN_EMAIL.includes("@")) {
     jobs.push(
-      resend.emails.send({
+      sendResendEmail({
         from: FROM_EMAIL,
         to: ADMIN_EMAIL,
         subject: "New FairVia™ Report Generated",
