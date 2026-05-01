@@ -1839,6 +1839,7 @@ async function sendReportEmails({ pdf, input, scores, decision, reportId }) {
   const userEmail = safe(input.email, "").trim();
   const companyName = safe(input.company_name, "Not specified");
   const contactPerson = safe(input.contact_person, "Client");
+  const recipientName = contactPerson && contactPerson !== "—" ? contactPerson : "Client";
 
   const downloadUrl =
     PUBLIC_BASE_URL && reportId
@@ -1846,25 +1847,103 @@ async function sendReportEmails({ pdf, input, scores, decision, reportId }) {
       : "";
 
   const attachment = {
-    filename: "FairVia-Technical-Hypothesis-Report.pdf",
+    filename: "FairVia-Equipment-Compatibility-Assessment-Report.pdf",
     content: Buffer.from(pdf).toString("base64"),
   };
 
-  const userBody = `Dear ${contactPerson && contactPerson !== "—" ? contactPerson : "Client"},
+  const userSubject = "FairVia™ Equipment Compatibility Assessment Report";
 
-Thank you for completing the FairVia™ technical diagnostic.
+  const userText = `Dear ${recipientName},
 
-Your FairVia™ Technical Hypothesis Report has been generated and is attached to this email.
+Thank you for completing the FairVia™ Equipment Compatibility Assessment.
 
-Assessment result:
+Your Technical Hypothesis Report has been generated and is attached to this email as a PDF.
+
+Assessment summary:
 - Compatibility Level: ${decision.level}
 - Composite Score: ${scores.total}/100
 
-${downloadUrl ? `You can also download your report here:\n${downloadUrl}\n` : ""}
-This report is intended to support early-stage decision-making before pilot validation or commercial implementation.
+${downloadUrl ? `You may also access the report using the secure download link below:\n${downloadUrl}\n\n` : ""}This report is intended to support early-stage technical decision-making before material procurement, pilot validation, or commercial production changes.
+
+For follow-up review or a detailed Engineering Compatibility Assessment, please contact FairVia™.
 
 Best regards,
-FairVia™`;
+
+FairVia™ Technical Assessment Team
+Il Nautico Co., Ltd.
+Contact: info@ilnautico.com`;
+
+  const userHtml = `
+<div style="margin:0;padding:0;background:#f4f7fb;font-family:Arial,Helvetica,sans-serif;color:#173766;">
+  <div style="max-width:680px;margin:0 auto;padding:32px 20px;">
+    <div style="background:#ffffff;border:1px solid #dbe5f1;border-radius:10px;overflow:hidden;">
+      <div style="padding:28px 32px;border-bottom:1px solid #e6edf5;">
+        <div style="font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:#2952a3;font-weight:700;">
+          FairVia™ Technical Assessment
+        </div>
+        <h1 style="margin:12px 0 0;font-size:24px;line-height:1.3;color:#173766;font-weight:600;">
+          Equipment Compatibility Assessment Report
+        </h1>
+      </div>
+
+      <div style="padding:30px 32px;">
+        <p style="margin:0 0 18px;font-size:15px;line-height:1.7;">
+          Dear ${recipientName},
+        </p>
+
+        <p style="margin:0 0 18px;font-size:15px;line-height:1.7;">
+          Thank you for completing the FairVia™ Equipment Compatibility Assessment.
+          Your Technical Hypothesis Report has been generated and is attached to this email as a PDF.
+        </p>
+
+        <div style="margin:24px 0;padding:18px 20px;background:#f0f6fc;border:1px solid #d7e5f5;border-radius:8px;">
+          <div style="font-size:13px;color:#748dad;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.08em;">
+            Assessment summary
+          </div>
+          <div style="font-size:15px;line-height:1.8;color:#173766;">
+            <strong>Compatibility Level:</strong> ${decision.level}<br>
+            <strong>Composite Score:</strong> ${scores.total}/100
+          </div>
+        </div>
+
+        ${downloadUrl
+          ? `<p style="margin:0 0 10px;font-size:15px;line-height:1.7;">
+              You may also access the report using the secure download link below:
+            </p>
+            <p style="margin:0 0 24px;">
+              <a href="${downloadUrl}" style="display:inline-block;padding:12px 18px;background:#2952a3;color:#ffffff;text-decoration:none;border-radius:6px;font-size:14px;font-weight:600;">
+                Download report
+              </a>
+            </p>
+            <p style="margin:0 0 24px;font-size:12px;line-height:1.6;color:#748dad;word-break:break-all;">
+              ${downloadUrl}
+            </p>`
+          : ""}
+
+        <p style="margin:0 0 18px;font-size:15px;line-height:1.7;">
+          This report is intended to support early-stage technical decision-making before material procurement,
+          pilot validation, or commercial production changes.
+        </p>
+
+        <p style="margin:0 0 24px;font-size:15px;line-height:1.7;">
+          For follow-up review or a detailed Engineering Compatibility Assessment, please contact FairVia™.
+        </p>
+
+        <div style="padding-top:20px;border-top:1px solid #e6edf5;font-size:14px;line-height:1.7;color:#425f82;">
+          Best regards,<br>
+          <strong style="color:#173766;">FairVia™ Technical Assessment Team</strong><br>
+          Il Nautico Co., Ltd.<br>
+          Contact: <a href="mailto:info@ilnautico.com" style="color:#2952a3;text-decoration:none;">info@ilnautico.com</a>
+        </div>
+      </div>
+    </div>
+
+    <p style="margin:18px 0 0;font-size:11px;line-height:1.6;color:#748dad;">
+      This email was generated in response to a submitted FairVia™ diagnostic form.
+      The attached report is intended for confidential pre-commercial technical review.
+    </p>
+  </div>
+</div>`;
 
   const adminBody = `New FairVia™ Technical Hypothesis Report generated.
 
@@ -1891,8 +1970,9 @@ ${downloadUrl ? `Download URL: ${downloadUrl}` : ""}`;
       sendResendEmail({
         from: FROM_EMAIL,
         to: userEmail,
-        subject: "Your FairVia™ Technical Hypothesis Report",
-        text: userBody,
+        subject: userSubject,
+        text: userText,
+        html: userHtml,
         attachments: [attachment],
       })
     );
@@ -1905,7 +1985,7 @@ ${downloadUrl ? `Download URL: ${downloadUrl}` : ""}`;
       sendResendEmail({
         from: FROM_EMAIL,
         to: ADMIN_EMAIL,
-        subject: "New FairVia™ Report Generated",
+        subject: "New FairVia™ Equipment Compatibility Assessment Report",
         text: adminBody,
         attachments: [attachment],
       })
