@@ -2068,6 +2068,10 @@ app.get("/download-report/:reportId", (req, res) => {
   res.send(item.pdf);
 });
 
+app.get("/paid-access", (_req, res) => {
+  res.sendFile(path.join(__dirname, "paid-access.html"));
+});
+
 app.get("/latest-pdf", (_req, res) => {
   if (!latestPdfBuffer) return res.status(404).send("No PDF generated yet.");
   res.setHeader("Content-Type",        "application/pdf");
@@ -2089,6 +2093,7 @@ app.listen(PORT, () => {
   console.log(`[FairVia] Server running on port ${PORT}`);
 });
 const html_3man =`;
+
 return `<!DOCTYPE html>
 <html lang="en">
 <head>
