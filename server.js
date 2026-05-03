@@ -5,6 +5,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import PQueue from "p-queue";
 import crypto from "crypto";
+import Stripe from "stripe";
 
 const fetchFn = global.fetch
   ? global.fetch.bind(global)
@@ -17,8 +18,6 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
 
 const app = express();
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
 
 // ══════════════════════════════════════════════════════════════
 // EMAIL DELIVERY / PUBLIC URL CONFIG
@@ -33,6 +32,132 @@ if (!RESEND_API_KEY) {
 const FROM_EMAIL = process.env.FROM_EMAIL || "FairVia <reports@example.com>";
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "";
 const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || "";
+
+// ══════════════════════════════════════════════════════════════
+// STRIPE PAID ACCESS CONFIG
+// ══════════════════════════════════════════════════════════════
+
+const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || "";
+const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET || "";
+const PUBLIC_BASE_URL_FOR_STRIPE =
+  process.env.PUBLIC_BASE_URL || "https://ilnauticogithubio-production.up.railway.app";
+
+const stripe = STRIPE_SECRET_KEY ? new Stripe(STRIPE_SECRET_KEY) : null;
+
+// Temporary in-memory token store.
+// This is sufficient for the first Stripe webhook test.
+// For production, replace this with durable DB storage.
+const paidAccessTokens = new Map();
+
+// IMPORTANT:
+// Stripe webhook must be registered BEFORE express.json(),
+// because Stripe signature verification requires the raw request body.
+app.post(
+  "/stripe-webhook",
+  express.raw({ type: "application/json" }),
+  async (req, res) => {
+    if (!stripe || !STRIPE_WEBHOOK_SECRET) {
+      console.error("[Stripe Webhook ERROR] Missing STRIPE_SECRET_KEY or STRIPE_WEBHOOK_SECRET");
+      return res.status(500).send("Stripe webhook not configured");
+    }
+
+    let event;
+
+    try {
+      const signature = req.headers["stripe-signature"];
+      event = stripe.webhooks.constructEvent(
+        req.body,
+        signature,
+        STRIPE_WEBHOOK_SECRET
+      );
+    } catch (err) {
+      console.error("[Stripe Webhook SIGNATURE ERROR]", err.message);
+      return res.status(400).send(`Webhook Error: ${err.message}`);
+    }
+
+    try {
+      if (event.type === "checkout.session.completed") {
+        const session = event.data.object;
+
+        const customerEmail =
+          session.customer_details?.email ||
+          session.customer_email ||
+          "";
+
+        const customerName =
+          session.customer_details?.name ||
+          "Client";
+
+        const paymentStatus = session.payment_status || "";
+
+        if (!customerEmail || !customerEmail.includes("@")) {
+          console.warn("[Stripe Webhook] customer email missing:", session.id);
+          return res.json({ received: true, warning: "customer_email_missing" });
+        }
+
+        if (paymentStatus && paymentStatus !== "paid") {
+          console.warn("[Stripe Webhook] session not paid:", {
+            sessionId: session.id,
+            paymentStatus,
+          });
+          return res.json({ received: true, warning: "payment_not_paid" });
+        }
+
+        const accessToken = crypto.randomUUID();
+
+        paidAccessTokens.set(accessToken, {
+          email: customerEmail,
+          name: customerName,
+          stripeSessionId: session.id,
+          paymentStatus,
+          used: false,
+          createdAt: Date.now(),
+        });
+
+        const formUrl =
+          `${PUBLIC_BASE_URL_FOR_STRIPE.replace(/\/$/, "")}/paid-access?token=${accessToken}`;
+
+        await sendPaidAccessEmail({
+          to: customerEmail,
+          name: customerName,
+          formUrl,
+        });
+
+        if (ADMIN_EMAIL && ADMIN_EMAIL.includes("@")) {
+          await sendResendEmail({
+            from: FROM_EMAIL,
+            to: ADMIN_EMAIL,
+            subject: "FairVia™ Payment Completed",
+            text:
+`A FairVia™ paid assessment payment was completed.
+
+Customer: ${customerName}
+Email: ${customerEmail}
+Stripe Session: ${session.id}
+
+Access URL:
+${formUrl}`,
+          });
+        }
+
+        console.log("[Stripe Webhook] access token issued:", {
+          email: customerEmail,
+          sessionId: session.id,
+          formUrl,
+        });
+      }
+
+      return res.json({ received: true });
+    } catch (err) {
+      console.error("[Stripe Webhook FULFILLMENT ERROR]", err);
+      return res.status(500).json({ error: "stripe_fulfillment_failed" });
+    }
+  }
+);
+
+// Standard parsers must come AFTER /stripe-webhook.
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 const htmlTemplate = fs.readFileSync(path.join(__dirname, "template.html"), "utf8");
 const visualBasePath = path.join(__dirname, "visual-base.png");
@@ -1830,6 +1955,54 @@ async function sendResendEmail(payload) {
   return res.json().catch(() => ({}));
 }
 
+
+async function sendPaidAccessEmail({ to, name, formUrl }) {
+  if (!RESEND_API_KEY) {
+    console.warn("[Paid access email skipped] RESEND_API_KEY not configured");
+    return { skipped: true };
+  }
+
+  const safeName = name && name !== "—" ? name : "Client";
+
+  const html = `
+  <div style="font-family:Arial,sans-serif;color:#173766;line-height:1.6;max-width:680px;">
+    <h2 style="margin:0 0 16px;">FairVia™ Equipment Compatibility Assessment</h2>
+    <p>Dear ${safeName},</p>
+    <p>Thank you for your payment.</p>
+    <p>Your secure assessment form is now available. Please open the link below and complete the required technical information.</p>
+    <p style="margin:24px 0;">
+      <a href="${formUrl}" style="display:inline-block;background:#2952a3;color:#ffffff;padding:12px 18px;border-radius:8px;text-decoration:none;font-weight:700;">
+        Open assessment form
+      </a>
+    </p>
+    <p>If the button does not open, please copy and paste this URL into your browser:</p>
+    <p style="word-break:break-all;color:#425f82;">${formUrl}</p>
+    <p>This access link is intended for the paid assessment associated with this payment.</p>
+    <p>Best regards,<br>FairVia™</p>
+  </div>`;
+
+  const text =
+`Dear ${safeName},
+
+Thank you for your payment.
+
+Your secure FairVia™ assessment form is now available:
+${formUrl}
+
+This access link is intended for the paid assessment associated with this payment.
+
+Best regards,
+FairVia™`;
+
+  return sendResendEmail({
+    from: FROM_EMAIL,
+    to,
+    subject: "Your FairVia™ Assessment Access Link",
+    html,
+    text,
+  });
+}
+
 async function sendReportEmails({ pdf, input, scores, decision, reportId }) {
   if (!RESEND_API_KEY) {
     console.warn("[Email skipped] RESEND_API_KEY not configured");
@@ -2092,7 +2265,6 @@ const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
   console.log(`[FairVia] Server running on port ${PORT}`);
 })
-
 const html_3man =`;
 <!DOCTYPE html>
 <html>
