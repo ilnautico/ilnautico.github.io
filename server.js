@@ -31,7 +31,7 @@ if (!RESEND_API_KEY) {
 
 const FROM_EMAIL = process.env.FROM_EMAIL || "FairVia <reports@example.com>";
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "";
-const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || "";
+const PUBLIC_BASE_URL = String(process.env.PUBLIC_BASE_URL || "").replace(/^PUBLIC_BASE_URL=/, "").trim();
 
 // ══════════════════════════════════════════════════════════════
 // STRIPE PAID ACCESS CONFIG
@@ -39,8 +39,9 @@ const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || "";
 
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || "";
 const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET || "";
-const PUBLIC_BASE_URL_FOR_STRIPE =
-  process.env.PUBLIC_BASE_URL || "https://ilnauticogithubio-production.up.railway.app";
+const PUBLIC_BASE_URL_FOR_STRIPE = String(
+  process.env.PUBLIC_BASE_URL || "https://ilnauticogithubio-production.up.railway.app"
+).replace(/^PUBLIC_BASE_URL=/, "").trim();
 
 const stripe = STRIPE_SECRET_KEY ? new Stripe(STRIPE_SECRET_KEY) : null;
 
@@ -1964,35 +1965,85 @@ async function sendPaidAccessEmail({ to, name, formUrl }) {
 
   const safeName = name && name !== "—" ? name : "Client";
 
+  const cleanFormUrl = String(formUrl || "")
+    .replace(/^PUBLIC_BASE_URL=/, "")
+    .trim();
+
   const html = `
-  <div style="font-family:Arial,sans-serif;color:#173766;line-height:1.6;max-width:680px;">
-    <h2 style="margin:0 0 16px;">FairVia™ Equipment Compatibility Assessment</h2>
-    <p>Dear ${safeName},</p>
-    <p>Thank you for your payment.</p>
-    <p>Your secure assessment form is now available. Please open the link below and complete the required technical information.</p>
-    <p style="margin:24px 0;">
-      <a href="${formUrl}" style="display:inline-block;background:#2952a3;color:#ffffff;padding:12px 18px;border-radius:8px;text-decoration:none;font-weight:700;">
-        Open assessment form
-      </a>
-    </p>
-    <p>If the button does not open, please copy and paste this URL into your browser:</p>
-    <p style="word-break:break-all;color:#425f82;">${formUrl}</p>
-    <p>This access link is intended for the paid assessment associated with this payment.</p>
-    <p>Best regards,<br>FairVia™</p>
+  <div style="margin:0;padding:0;background:#f4f7fb;font-family:Arial,Helvetica,sans-serif;color:#173766;">
+    <div style="max-width:680px;margin:0 auto;padding:32px 20px;">
+      <div style="background:#ffffff;border:1px solid #dbe5f1;border-radius:10px;overflow:hidden;">
+        <div style="padding:28px 32px;border-bottom:1px solid #e6edf5;">
+          <div style="font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:#2952a3;font-weight:700;">
+            FairVia™ Paid Assessment Access
+          </div>
+          <h1 style="margin:12px 0 0;font-size:24px;line-height:1.3;color:#173766;font-weight:600;">
+            Equipment Compatibility Assessment
+          </h1>
+        </div>
+
+        <div style="padding:30px 32px;">
+          <p style="margin:0 0 18px;font-size:15px;line-height:1.7;">
+            Dear ${safeName},
+          </p>
+
+          <p style="margin:0 0 18px;font-size:15px;line-height:1.7;">
+            Thank you for completing your payment for the FairVia™ Equipment Compatibility Assessment.
+          </p>
+
+          <p style="margin:0 0 22px;font-size:15px;line-height:1.7;">
+            Your secure assessment form is now available. Please use the link below to submit the technical information required for your assessment.
+          </p>
+
+          <p style="margin:24px 0;">
+            <a href="${cleanFormUrl}" style="display:inline-block;background:#2952a3;color:#ffffff;padding:13px 20px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;">
+              Open assessment form
+            </a>
+          </p>
+
+          <div style="margin:26px 0;padding:16px 18px;background:#f0f6ff;border:1px solid #dbe8fb;border-radius:8px;">
+            <p style="margin:0 0 8px;font-size:13px;line-height:1.6;color:#425f82;">
+              For your reference, the same access link is also provided below:
+            </p>
+            <p style="margin:0;word-break:break-all;font-size:13px;line-height:1.6;color:#2952a3;">
+              ${cleanFormUrl}
+            </p>
+          </div>
+
+          <p style="margin:0 0 18px;font-size:15px;line-height:1.7;">
+            After the form is submitted, your FairVia™ Technical Hypothesis Report will be generated and delivered to the email address provided.
+          </p>
+
+          <p style="margin:0 0 18px;font-size:15px;line-height:1.7;">
+            This access link is associated with your paid assessment and should not be shared publicly.
+          </p>
+
+          <p style="margin:26px 0 0;font-size:15px;line-height:1.7;">
+            Best regards,<br>
+            FairVia™ Technical Assessment Team<br>
+            Il Nautico Co., Ltd.
+          </p>
+        </div>
+      </div>
+    </div>
   </div>`;
 
   const text =
 `Dear ${safeName},
 
-Thank you for your payment.
+Thank you for completing your payment for the FairVia™ Equipment Compatibility Assessment.
 
-Your secure FairVia™ assessment form is now available:
-${formUrl}
+Your secure assessment form is now available. Please use the link below to submit the technical information required for your assessment.
 
-This access link is intended for the paid assessment associated with this payment.
+${cleanFormUrl}
+
+After the form is submitted, your FairVia™ Technical Hypothesis Report will be generated and delivered to the email address provided.
+
+This access link is associated with your paid assessment and should not be shared publicly.
 
 Best regards,
-FairVia™`;
+FairVia™ Technical Assessment Team
+Il Nautico Co., Ltd.`;
 
   return sendResendEmail({
     from: FROM_EMAIL,
