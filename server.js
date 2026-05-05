@@ -2292,6 +2292,90 @@ app.get("/download-report/:reportId", (req, res) => {
   res.send(item.pdf);
 });
 
+
+// ══════════════════════════════════════════════════════════════
+// TEMP TEST ROUTE — send paid form access email without Stripe
+// Remove this route after testing.
+// Usage:
+//   /test-send-form-email?key=YOUR_TEST_ROUTE_KEY&email=your@email.com
+//
+// Required env:
+//   TEST_ROUTE_KEY=your-secret-test-key
+// Optional:
+//   ADMIN_EMAIL=default recipient when email query is omitted
+// ══════════════════════════════════════════════════════════════
+
+app.get("/test-send-form-email", async (req, res) => {
+  try {
+    const expectedKey = String(process.env.TEST_ROUTE_KEY || "").trim();
+    const providedKey = String(req.query.key || "").trim();
+
+    if (!expectedKey) {
+      return res.status(500).json({
+        error: "TEST_ROUTE_KEY is not set",
+        message: "Set TEST_ROUTE_KEY in Railway environment variables before using this test route.",
+      });
+    }
+
+    if (!providedKey || providedKey !== expectedKey) {
+      return res.status(403).json({
+        error: "forbidden",
+        message: "Invalid or missing test key.",
+      });
+    }
+
+    const testEmail = String(req.query.email || ADMIN_EMAIL || "").trim();
+    const testName = String(req.query.name || "Test Client").trim();
+
+    if (!testEmail || !testEmail.includes("@")) {
+      return res.status(400).json({
+        error: "valid_email_required",
+        message: "Add ?email=your@email.com or set ADMIN_EMAIL.",
+      });
+    }
+
+    const accessToken = crypto.randomUUID();
+
+    paidAccessTokens.set(accessToken, {
+      email: testEmail,
+      name: testName,
+      stripeSessionId: "manual-test-route",
+      paymentStatus: "test",
+      used: false,
+      createdAt: Date.now(),
+      test: true,
+    });
+
+    const formUrl =
+      `${PUBLIC_BASE_URL_FOR_STRIPE.replace(/\/$/, "")}/paid-access?token=${accessToken}`;
+
+    await sendPaidAccessEmail({
+      to: testEmail,
+      name: testName,
+      formUrl,
+    });
+
+    console.log("[Test Route] paid access email sent:", {
+      email: testEmail,
+      formUrl,
+    });
+
+    return res.json({
+      status: "ok",
+      message: "Paid access form email sent.",
+      sentTo: testEmail,
+      formUrl,
+    });
+  } catch (err) {
+    console.error("[Test Route ERROR]", err);
+    return res.status(500).json({
+      error: "test_send_form_email_failed",
+      message: err.message,
+    });
+  }
+});
+
+
 app.get("/paid-access", (_req, res) => {
   res.sendFile(path.join(__dirname, "paid-access.html"));
 });
