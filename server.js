@@ -2293,6 +2293,225 @@ app.get("/download-report/:reportId", (req, res) => {
 });
 
 
+
+// ══════════════════════════════════════════════════════════════
+// TEMP TEST ROUTE — run predefined diagnostic cases without form input
+// Remove this route after expert review / final testing.
+// Usage:
+//   /test-run-case?key=YOUR_TEST_ROUTE_KEY&case=2&email=your@email.com
+//   /test-run-case?key=YOUR_TEST_ROUTE_KEY&case=3&email=your@email.com
+//
+// Required env:
+//   TEST_ROUTE_KEY=your-secret-test-key
+// Optional:
+//   ADMIN_EMAIL=default recipient when email query is omitted
+// ══════════════════════════════════════════════════════════════
+
+function getDiagnosticTestCase(caseId, emailOverride = "") {
+  const email = emailOverride || ADMIN_EMAIL || "fairvia.trading@gmail.com";
+
+  const common = {
+    contact_person: "Keika Test",
+    email,
+  };
+
+  const cases = {
+    "2": {
+      ...common,
+      company_name: "Test Company B",
+      project_stage: "Pilot preparation",
+      product_type: "film pouch",
+      application: "food packaging / dry food pouch",
+      material: "PP",
+      processing: "film extrusion / pouch converting",
+      equipment: "film extrusion line and sealing machine",
+      bio_material: "PHA-based compound",
+      transition_goal: "brand sustainability program",
+      concern: "seal strength and flow stability",
+      issues: "occasional sealing variation and thickness variation",
+      notes: "existing equipment preferred, no major equipment modification preferred",
+      screw_diameter: "60 mm",
+      ld_ratio: "30:1",
+      die_mold: "flat die / pouch converting line",
+      requirement_focus: "PRODUCT_STABILITY",
+      risk_focus: "CRITICAL_AREA",
+      what_matters_most: "Product stability",
+      critical_area: "Processing stability",
+    },
+
+    "3": {
+      ...common,
+      company_name: "Test Company C",
+      project_stage: "Commercial production review",
+      product_type: "rigid container",
+      application: "hot-fill container / heat exposure use",
+      material: "PET",
+      processing: "injection molding",
+      equipment: "injection molding line",
+      bio_material: "PLA-based compound",
+      transition_goal: "replace existing petroleum-based plastic",
+      concern: "heat resistance",
+      issues: "dimensional stability is important, product may deform under heat",
+      notes: "hot-fill use, no equipment modification preferred, commercial production planned soon",
+      screw_diameter: "70 mm",
+      ld_ratio: "24:1",
+      die_mold: "multi-cavity mold",
+      requirement_focus: "PRODUCT_STABILITY",
+      risk_focus: "CRITICAL_AREA",
+      what_matters_most: "Product stability",
+      critical_area: "Thermal resistance",
+    },
+
+    "4": {
+      ...common,
+      company_name: "Test Company D",
+      project_stage: "Not specified",
+      product_type: "container",
+      application: "general packaging",
+      material: "plastic",
+      processing: "Not specified",
+      equipment: "standard production line",
+      bio_material: "biodegradable plastic",
+      transition_goal: "environmental reason",
+      concern: "not sure",
+      issues: "unknown",
+      notes: "we want to know if replacement is possible",
+      screw_diameter: "",
+      ld_ratio: "",
+      die_mold: "",
+      requirement_focus: null,
+      risk_focus: null,
+      what_matters_most: "Not sure",
+      critical_area: "Not sure",
+    },
+
+    "5": {
+      ...common,
+      company_name: "Test Company E",
+      project_stage: "Pre-commercial validation",
+      product_type: "rigid tray",
+      application: "cosmetic tray / small rigid packaging",
+      material: "PP",
+      processing: "injection molding",
+      equipment: "standard injection molding machine",
+      bio_material: "PHA-based compound",
+      transition_goal: "premium sustainable packaging development",
+      concern: "moldability and dimensional consistency",
+      issues: "thin-wall areas, sink marks, occasional warpage",
+      notes: "surface appearance is important, existing mold preferred",
+      screw_diameter: "45 mm",
+      ld_ratio: "22:1",
+      die_mold: "thin-wall cavity mold",
+      requirement_focus: "VISUAL",
+      risk_focus: "CRITICAL_AREA",
+      what_matters_most: "Visual appearance",
+      critical_area: "Dimensional accuracy",
+    },
+  };
+
+  return cases[String(caseId)] || null;
+}
+
+function createJsonCaptureResponse(resolve, reject) {
+  return {
+    statusCode: 200,
+    headers: {},
+    setHeader(name, value) {
+      this.headers[name] = value;
+    },
+    status(code) {
+      this.statusCode = code;
+      return this;
+    },
+    json(payload) {
+      resolve({
+        statusCode: this.statusCode,
+        headers: this.headers,
+        payload,
+      });
+      return this;
+    },
+    send(payload) {
+      resolve({
+        statusCode: this.statusCode,
+        headers: this.headers,
+        payload,
+      });
+      return this;
+    },
+  };
+}
+
+app.get("/test-run-case", async (req, res) => {
+  try {
+    const expectedKey = String(process.env.TEST_ROUTE_KEY || "").trim();
+    const providedKey = String(req.query.key || "").trim();
+
+    if (!expectedKey) {
+      return res.status(500).json({
+        error: "TEST_ROUTE_KEY is not set",
+        message: "Set TEST_ROUTE_KEY in Railway environment variables before using this test route.",
+      });
+    }
+
+    if (!providedKey || providedKey !== expectedKey) {
+      return res.status(403).json({
+        error: "forbidden",
+        message: "Invalid or missing test key.",
+      });
+    }
+
+    const caseId = String(req.query.case || "").trim();
+    const emailOverride = String(req.query.email || "").trim();
+
+    const body = getDiagnosticTestCase(caseId, emailOverride);
+
+    if (!body) {
+      return res.status(400).json({
+        error: "unknown_case",
+        message: "Use case=2, case=3, case=4, or case=5.",
+        available_cases: ["2", "3", "4", "5"],
+      });
+    }
+
+    const result = await queue.add(() =>
+      new Promise((resolve, reject) => {
+        const fakeReq = {
+          body,
+          query: { delivery: "email" },
+        };
+
+        const fakeRes = createJsonCaptureResponse(resolve, reject);
+
+        handleReport(fakeReq, fakeRes).catch(reject);
+      })
+    );
+
+    const reportId = result?.payload?.report_id || "";
+    const downloadUrl = reportId
+      ? `${PUBLIC_BASE_URL_FOR_STRIPE.replace(/\/$/, "")}/report/${reportId}`
+      : null;
+
+    return res.json({
+      ok: true,
+      message: `Test case ${caseId} generated. Email delivery attempted.`,
+      case: caseId,
+      sentTo: body.email,
+      input: body,
+      result: result.payload,
+      downloadUrl,
+    });
+  } catch (err) {
+    console.error("[Test Run Case ERROR]", err);
+    return res.status(500).json({
+      error: "test_run_case_failed",
+      message: err.message,
+    });
+  }
+});
+
+
+
 // ══════════════════════════════════════════════════════════════
 // TEMP TEST ROUTE — send paid form access email without Stripe
 // Remove this route after testing.
