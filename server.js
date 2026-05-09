@@ -2,7 +2,7 @@ import express from "express";
 import puppeteer from "puppeteer";
 import fs from "fs";
 import path from "path";
-import { fileURLToPath } from "url"; 
+import { fileURLToPath } from "url";
 import PQueue from "p-queue";
 import crypto from "crypto";
 import Stripe from "stripe";
@@ -808,7 +808,7 @@ function generateMechanism(input, constraint, context) {
 
   return (
     `${source} exhibits broader thermal and rheological tolerance under standard processing conditions, whereas ${target} introduces a narrower operational window governed by crystallisation kinetics and degradation onset sensitivity. ` +
-    `Under ${app} conditions, this property mismatch generates instability in ${constraint.factor}, causing ${constraint.impact} to fall outside commercially acceptable limits.`
+    `Under ${app} conditions, this property mismatch may reduce ${constraint.impact} if the process is not controlled within the validated operating range.`
   );
 }
 
@@ -1123,8 +1123,8 @@ function generateProcessing(scores, constraint) {
       `Temperature control requirements are consistent with standard biodegradable polymer processing protocol.`;
   } else if (scores.thermal >= 55) {
     thermalBehavior =
-      `Thermally constrained — processing temperature approaches the material degradation threshold (Thermal: ${scores.thermal}/100). ` +
-      `Zone-by-zone temperature monitoring is required to prevent degradation onset during extended production runs.`;
+      `Thermally sensitive — thermal behaviour requires monitored control during extended production runs (Thermal: ${scores.thermal}/100). ` +
+      `Zone-by-zone temperature monitoring is recommended to maintain material stability within the validated processing range.`;
   } else {
     thermalBehavior =
       `Thermally unstable — the operating thermal window is incompatible with stable biodegradable polymer processing (Thermal: ${scores.thermal}/100). ` +
@@ -1238,6 +1238,19 @@ function generateExpectedDeviations(input, scores, context, constraintArch) {
       `Warpage or local sink behaviour may appear where cooling balance shifts across the moulded section`,
       `Surface or geometry retention may vary when material response approaches the boundary of the qualified processing window`,
     ];
+  } else if (
+    constraintArch.primary_constraint.type === "FLOW" &&
+    (
+      context.process_family === "BLOWN_FILM" ||
+      context.process_family === "FILM_EXTRUSION" ||
+      /POUCH|FILM|BAG/i.test(safe(input.application, ""))
+    )
+  ) {
+    items = [
+      `Gauge or thickness variation may appear during extended production runs where melt uniformity drifts outside the qualified range`,
+      `Seal-area non-uniformity may increase when pressure fluctuation affects steady-state conversion`,
+      `Pouch or film-converting stability may decline as line conditions move toward the edge of the validated flow envelope`,
+    ];
   } else if (constraintArch.primary_constraint.type === "FLOW") {
     items = [
       `Output consistency variation may appear during extended production runs where melt uniformity drifts outside the qualified range`,
@@ -1310,10 +1323,17 @@ function generateApplicationImplicationV2(decisionBand, context, constraintArch,
     );
   }
 
-  if (decisionBand.level === "MODERATE" && context.process_family === "BLOWN_FILM") {
+  if (
+    decisionBand.level === "MODERATE" &&
+    (
+      context.process_family === "BLOWN_FILM" ||
+      context.process_family === "FILM_EXTRUSION" ||
+      /POUCH|FILM|BAG/i.test(app)
+    )
+  ) {
     return (
       `${app} is technically feasible subject to process optimisation. ` +
-      `Pilot-scale validation is required and must verify flow stability, output uniformity, and application-level consistency before full-scale deployment.`
+      `Pilot-scale validation should verify flow uniformity, gauge or thickness consistency, seal-area reliability, and downstream pouch or film-converting stability before commercial commitment.`
     );
   }
 
@@ -2489,7 +2509,7 @@ app.get("/test-run-case", async (req, res) => {
 
     const reportId = result?.payload?.report_id || "";
     const downloadUrl = reportId
-      ? `${PUBLIC_BASE_URL_FOR_STRIPE.replace(/\/$/, "")}/report/${reportId}`
+      ? `${PUBLIC_BASE_URL_FOR_STRIPE.replace(/\/$/, "")}/download-report/${reportId}`
       : null;
 
     return res.json({
