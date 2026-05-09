@@ -1119,8 +1119,8 @@ function generateProcessing(scores, constraint) {
   let thermalBehavior;
   if (scores.thermal >= 75) {
     thermalBehavior =
-      `Thermally stable — operating within the defined safe thermal band with acceptable degradation margin (Thermal: ${scores.thermal}/100). ` +
-      `Temperature control requirements are consistent with standard biodegradable polymer processing protocol.`;
+      `Thermally acceptable under the declared conditions — no primary thermal blocker is indicated at this screening stage (Thermal: ${scores.thermal}/100). ` +
+      `Temperature control should still be monitored during validation because biodegradable compounds may show narrower processing tolerance than incumbent materials.`;
   } else if (scores.thermal >= 55) {
     thermalBehavior =
       `Thermally sensitive — thermal behaviour requires monitored control during extended production runs (Thermal: ${scores.thermal}/100). ` +
@@ -1139,7 +1139,7 @@ function generateProcessing(scores, constraint) {
   } else if (scores.flow >= 55) {
     flowCharacteristics =
       `Variable — melt flow requires active stabilisation (Flow: ${scores.flow}/100). ` +
-      `Pressure fluctuation risk during extended extrusion cycles necessitates real-time monitoring, screw speed adjustment, and reduced throughput targets during the validation phase.`;
+      `Pressure fluctuation risk during extended extrusion or converting cycles should be checked through monitoring, screw-speed review, and temporary throughput adjustment if instability appears during validation.`;
   } else {
     flowCharacteristics =
       `Critically unstable — melt behaviour is incompatible with continuous commercial production (Flow: ${scores.flow}/100). ` +
@@ -1155,7 +1155,7 @@ function generateProcessing(scores, constraint) {
 
 function generateProduct(scores) {
   const mechanical = scores.mechanical >= 75
-    ? `Structural integrity of the finished product is attainable under standard processing conditions (Mechanical: ${scores.mechanical}/100). Mechanical performance meets commercial specification without formulation adjustment.`
+    ? `Structural integrity of the finished product appears attainable under the declared processing context (Mechanical: ${scores.mechanical}/100). Mechanical performance is not identified as the primary blocker, but should still be confirmed through application-level validation.`
     : scores.mechanical >= 55
     ? `Mechanical performance is conditionally adequate, subject to process consistency (Mechanical: ${scores.mechanical}/100). Inter-batch property variation results without active control measures.`
     : `Mechanical performance falls below the commercial acceptance threshold (Mechanical: ${scores.mechanical}/100). Structural integrity compliance cannot be assured without material reformulation or process redesign.`;
@@ -1163,7 +1163,7 @@ function generateProduct(scores) {
   const surface = scores.flow >= 75
     ? `Surface finish conforms to specification. Operationally stable melt flow (Flow: ${scores.flow}/100) supports uniform surface formation under standard die and cooling conditions.`
     : scores.flow >= 55
-    ? `Surface quality is conditionally acceptable. Flow variability (Flow: ${scores.flow}/100) directly introduces surface non-uniformities, particularly during die start-up and extended high-speed production runs.`
+    ? `Surface quality is conditionally acceptable. Flow variability (Flow: ${scores.flow}/100) may introduce surface or profile non-uniformities, particularly during start-up, transition, or extended production runs.`
     : `Surface quality is unreliable under current process parameters (Flow: ${scores.flow}/100). Melt instability directly generates streaking, pitting, and non-uniform gloss at commercial production speeds.`;
 
   const structural = scores.total >= 75
@@ -1385,14 +1385,14 @@ function generateNextStepV2(decisionBand, constraintArch, context, scores, input
   if (primary.type === "FLOW") {
     return (
       `Based on the MODERATE feasibility determination (Composite: ${scores.total}/100), engineering validation targeting flow stability control is required prior to pilot approval and must be completed before any commercial commitment.\n\n` +
-      `Implement control measures for ${primary.control}. Execute structured parameter trials to define the qualified processing envelope. Re-assess system stability following confirmation of stabilisation controls, then proceed to pilot validation against defined acceptance criteria.`
+      `Implement control measures for ${primary.control}. For film or pouch applications, validation should also include seal-area reliability, gauge or thickness consistency, and downstream converting stability. Execute structured parameter trials to define the qualified processing envelope. Re-assess system stability following confirmation of stabilisation controls, then proceed to pilot validation against defined acceptance criteria.`
     );
   }
 
   if (primary.type === "THERMAL") {
     return (
       `Based on the MODERATE feasibility determination (Composite: ${scores.total}/100), engineering validation targeting thermal stability control is required prior to pilot approval and must be completed before any commercial commitment.\n\n` +
-      `Implement control measures for ${primary.control}. Execute structured parameter trials to define the qualified processing envelope. Re-assess system stability following confirmation of stabilisation controls, then proceed to pilot validation against defined acceptance criteria.`
+      `Implement control measures for ${primary.control}. For film or pouch applications, validation should also include seal-area reliability, gauge or thickness consistency, and downstream converting stability. Execute structured parameter trials to define the qualified processing envelope. Re-assess system stability following confirmation of stabilisation controls, then proceed to pilot validation against defined acceptance criteria.`
     );
   }
 
