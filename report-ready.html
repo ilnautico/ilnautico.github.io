@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FairVia™ | Report Processing</title>
+  <style>
+    :root {
+      --ink: #173766;
+      --ink-soft: #425f82;
+      --blue: #2952a3;
+      --bg: #f4f7fb;
+      --surface: #ffffff;
+      --line: rgba(23,55,102,0.12);
+      --line-soft: rgba(23,55,102,0.07);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      min-height: 100vh;
+      font-family: Arial, Helvetica, sans-serif;
+      color: var(--ink);
+      background:
+        linear-gradient(var(--line-soft) 1px, transparent 1px),
+        linear-gradient(90deg, var(--line-soft) 1px, transparent 1px),
+        var(--bg);
+      background-size: 42px 42px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 28px;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .card {
+      width: 100%;
+      max-width: 720px;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: rgba(255,255,255,0.96);
+      box-shadow: 0 18px 42px rgba(23,55,102,0.10);
+      padding: 34px 36px;
+    }
+
+    .eyebrow {
+      margin-bottom: 10px;
+      color: var(--blue);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin-bottom: 14px;
+      font-size: clamp(26px, 4vw, 38px);
+      line-height: 1.15;
+      font-weight: 650;
+    }
+
+    p {
+      color: var(--ink-soft);
+      font-size: 15px;
+      margin-bottom: 14px;
+    }
+
+    .notice {
+      margin-top: 22px;
+      padding: 15px 16px;
+      border: 1px solid rgba(41,82,163,0.14);
+      border-radius: 10px;
+      background: #f0f6ff;
+      color: var(--ink-soft);
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    .footer {
+      margin-top: 26px;
+      padding-top: 18px;
+      border-top: 1px solid var(--line);
+      color: rgba(23,55,102,0.55);
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <div class="eyebrow">FairVia™ Assessment Processing</div>
+    <h1>Payment completed.</h1>
+
+    <p>
+      Thank you for completing your FairVia™ Equipment Compatibility Assessment payment.
+    </p>
+
+    <p>
+      Your submitted technical information is now being processed. Once the report generation is complete, your FairVia™ Technical Hypothesis Report will be delivered to the email address entered in the assessment form.
+    </p>
+
+    <div class="notice">
+      Please check your inbox and spam or junk folder. If you do not receive the report within a short time, please contact FairVia™ support.
+    </div>
+
+    <div class="footer">
+      FairVia™ Technical Assessment Team<br>
+      Il Nautico Co., Ltd.
+    </div>
+  </main>
+</body>
+</html>
