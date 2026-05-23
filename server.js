@@ -1,4 +1,4 @@
-import express from "express";　
+import express from "express";
 import puppeteer from "puppeteer";
 import fs from "fs";
 import path from "path";
@@ -15,7 +15,7 @@ const fetchFn = global.fetch
     };
 
 const __filename = fileURLToPath(import.meta.url);
-const __dirname  = path.dirname(__filename);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 
@@ -26,33 +26,73 @@ const app = express();
 const RESEND_API_KEY = process.env.RESEND_API_KEY || "";
 
 if (!RESEND_API_KEY) {
-  console.warn("⚠️  RESEND_API_KEY not set — email delivery disabled");
+  console.warn("⚠️ RESEND_API_KEY not set — email delivery disabled");
 }
 
 const FROM_EMAIL = process.env.FROM_EMAIL || "FairVia <reports@example.com>";
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "";
-const PUBLIC_BASE_URL = String(process.env.PUBLIC_BASE_URL || "").replace(/^PUBLIC_BASE_URL=/, "").trim();
+
+const PUBLIC_BASE_URL = String(process.env.PUBLIC_BASE_URL || "")
+  .replace(/^PUBLIC_BASE_URL=/, "")
+  .trim();
 
 // ══════════════════════════════════════════════════════════════
-// STRIPE PAID ACCESS CONFIG
+// STRIPE CONFIG
 // ══════════════════════════════════════════════════════════════
 
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || "";
 const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET || "";
+
 const PUBLIC_BASE_URL_FOR_STRIPE = String(
   process.env.PUBLIC_BASE_URL || "https://ilnauticogithubio-production.up.railway.app"
-).replace(/^PUBLIC_BASE_URL=/, "").trim();
+)
+  .replace(/^PUBLIC_BASE_URL=/, "")
+  .trim();
+
+const STRIPE_PRICE_ID_BETA = process.env.STRIPE_PRICE_ID_BETA || "";
+
+const CHECKOUT_SUCCESS_URL =
+  process.env.CHECKOUT_SUCCESS_URL ||
+  "https://beta.ilnautico.com/report-ready";
+
+const CHECKOUT_CANCEL_URL =
+  process.env.CHECKOUT_CANCEL_URL ||
+  "https://beta.ilnautico.com/paid-access.html";
 
 const stripe = STRIPE_SECRET_KEY ? new Stripe(STRIPE_SECRET_KEY) : null;
 
-// Temporary in-memory token store.
-// This is sufficient for the first Stripe webhook test.
-// For production, replace this with durable DB storage.
+// ══════════════════════════════════════════════════════════════
+// TEMPORARY STORES
+// ══════════════════════════════════════════════════════════════
+
+// Old flow: payment -> access link email -> form.
+// Keep this for backward compatibility during migration.
 const paidAccessTokens = new Map();
 
+// New flow: form -> checkout -> report email.
+// Temporary in-memory pending report store.
+// For production / association plans, replace this with Supabase or another durable DB.
+const pendingReports = new Map();
+
+const PENDING_REPORT_TTL_MS = 1000 * 60 * 60 * 6; // 6 hours
+
+function cleanupExpiredPendingReports() {
+  const now = Date.now();
+
+  for (const [pendingReportId, item] of pendingReports.entries()) {
+    if (!item?.createdAt || now - item.createdAt > PENDING_REPORT_TTL_MS) {
+      pendingReports.delete(pendingReportId);
+    }
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+// STRIPE WEBHOOK
 // IMPORTANT:
 // Stripe webhook must be registered BEFORE express.json(),
 // because Stripe signature verification requires the raw request body.
+// ══════════════════════════════════════════════════════════════
+
 app.post(
   "/stripe-webhook",
   express.raw({ type: "application/json" }),
@@ -66,6 +106,7 @@ app.post(
 
     try {
       const signature = req.headers["stripe-signature"];
+
       event = stripe.webhooks.constructEvent(
         req.body,
         signature,
@@ -93,7 +134,10 @@ app.post(
 
         if (!customerEmail || !customerEmail.includes("@")) {
           console.warn("[Stripe Webhook] customer email missing:", session.id);
-          return res.json({ received: true, warning: "customer_email_missing" });
+          return res.json({
+            received: true,
+            warning: "customer_email_missing",
+          });
         }
 
         if (paymentStatus && paymentStatus !== "paid") {
@@ -101,8 +145,93 @@ app.post(
             sessionId: session.id,
             paymentStatus,
           });
-          return res.json({ received: true, warning: "payment_not_paid" });
+
+          return res.json({
+            received: true,
+            warning: "payment_not_paid",
+          });
         }
+
+        // ══════════════════════════════════════════════════════════════
+        // NEW FLOW:
+        // form -> checkout -> report email
+        // If this Checkout Session was created from /create-assessment-checkout,
+        // it will include pending_report_id in metadata.
+        // In that case, generate and email the report directly.
+        // No paid-access email is sent.
+        // ══════════════════════════════════════════════════════════════
+
+        const pendingReportId = session.metadata?.pending_report_id || "";
+
+        if (pendingReportId) {
+          cleanupExpiredPendingReports();
+
+          const pending = pendingReports.get(pendingReportId);
+
+          if (!pending) {
+            console.error("[Stripe Webhook] pending report not found:", {
+              pendingReportId,
+              sessionId: session.id,
+            });
+
+            return res.json({
+              received: true,
+              warning: "pending_report_not_found",
+            });
+          }
+
+          if (pending.status === "completed") {
+            console.log("[Stripe Webhook] pending report already completed:", {
+              pendingReportId,
+              sessionId: session.id,
+            });
+
+            return res.json({
+              received: true,
+              status: "already_completed",
+            });
+          }
+
+          pendingReports.set(pendingReportId, {
+            ...pending,
+            status: "paid_processing",
+            stripeSessionId: session.id,
+            paidAt: Date.now(),
+          });
+
+          const input = {
+            ...pending.input,
+            email: pending.input.email || customerEmail,
+            contact_person: pending.input.contact_person || customerName,
+          };
+
+          const result = await generateAndSendReportFromInput(input);
+
+          pendingReports.set(pendingReportId, {
+            ...pendingReports.get(pendingReportId),
+            status: "completed",
+            reportId: result.reportId,
+            completedAt: Date.now(),
+          });
+
+          console.log("[Stripe Webhook] report generated after payment:", {
+            pendingReportId,
+            reportId: result.reportId,
+            email: input.email,
+            sessionId: session.id,
+          });
+
+          return res.json({
+            received: true,
+            flow: "form_first_report_generated",
+          });
+        }
+
+        // ══════════════════════════════════════════════════════════════
+        // OLD FLOW:
+        // payment -> paid access email -> form
+        // Keep this temporarily for existing Payment Link tests.
+        // ══════════════════════════════════════════════════════════════
 
         const accessToken = crypto.randomUUID();
 
@@ -151,7 +280,11 @@ ${formUrl}`,
       return res.json({ received: true });
     } catch (err) {
       console.error("[Stripe Webhook FULFILLMENT ERROR]", err);
-      return res.status(500).json({ error: "stripe_fulfillment_failed" });
+
+      return res.status(500).json({
+        error: "stripe_fulfillment_failed",
+        detail: err.message,
+      });
     }
   }
 );
@@ -160,6 +293,143 @@ ${formUrl}`,
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// ══════════════════════════════════════════════════════════════
+// NEW FLOW: FORM -> STRIPE CHECKOUT -> REPORT EMAIL
+// Non-destructive addition. Existing /generate-report flow remains unchanged.
+// ══════════════════════════════════════════════════════════════
+
+app.post("/create-assessment-checkout", async (req, res) => {
+  try {
+    if (!stripe) {
+      return res.status(500).json({
+        error: "stripe_not_configured",
+        detail: "Stripe secret key is not configured.",
+      });
+    }
+
+    cleanupExpiredPendingReports();
+
+    const input = normalizeInput(req.body);
+    const email = safe(input.email, "").trim();
+
+    if (!email || !email.includes("@")) {
+      return res.status(400).json({
+        error: "email_required",
+        detail: "A valid email address is required before payment.",
+      });
+    }
+
+    const pendingReportId = crypto.randomUUID();
+
+    pendingReports.set(pendingReportId, {
+      input,
+      email,
+      status: "unpaid",
+      createdAt: Date.now(),
+    });
+
+    const sessionPayload = {
+      mode: "payment",
+      customer_email: email,
+      metadata: {
+        pending_report_id: pendingReportId,
+        flow: "equipment_assessment_form_first",
+      },
+      success_url: `${CHECKOUT_SUCCESS_URL}?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: CHECKOUT_CANCEL_URL,
+    };
+
+    if (STRIPE_PRICE_ID_BETA) {
+      sessionPayload.line_items = [
+        {
+          price: STRIPE_PRICE_ID_BETA,
+          quantity: 1,
+        },
+      ];
+    } else {
+      sessionPayload.line_items = [
+        {
+          quantity: 1,
+          price_data: {
+            currency: "usd",
+            unit_amount: 58000,
+            product_data: {
+              name: "FairVia™ Equipment Compatibility Assessment Beta",
+              description: "Beta technical hypothesis report",
+            },
+          },
+        },
+      ];
+    }
+
+    const session = await stripe.checkout.sessions.create(sessionPayload);
+
+    pendingReports.set(pendingReportId, {
+      ...pendingReports.get(pendingReportId),
+      stripeSessionId: session.id,
+    });
+
+    return res.json({
+      ok: true,
+      pending_report_id: pendingReportId,
+      url: session.url,
+    });
+  } catch (err) {
+    console.error("[Create Checkout ERROR]", err);
+
+    return res.status(500).json({
+      error: "checkout_creation_failed",
+      detail: err.message,
+    });
+  }
+});
+
+async function generateAndSendReportFromInput(rawInput) {
+  const fakeReq = {
+    body: rawInput,
+    query: { delivery: "email" },
+  };
+
+  let capturedJson = null;
+  let capturedStatus = 200;
+
+  const fakeRes = {
+    status(code) {
+      capturedStatus = code;
+      return this;
+    },
+    json(payload) {
+      capturedJson = payload;
+      return payload;
+    },
+    setHeader() {
+      return this;
+    },
+    send(payload) {
+      return payload;
+    },
+  };
+
+  await handleReport(fakeReq, fakeRes);
+
+  if (capturedStatus >= 400) {
+    throw new Error(
+      capturedJson?.detail ||
+      capturedJson?.error ||
+      "Report generation failed after payment."
+    );
+  }
+
+  return {
+    reportId: capturedJson?.report_id || "",
+    scores: {
+      total: capturedJson?.composite_score || null,
+    },
+    decision: {
+      level: capturedJson?.compatibility_level || "",
+    },
+  };
+}
 const htmlTemplate = fs.readFileSync(path.join(__dirname, "template.html"), "utf8");
 const visualBasePath = path.join(__dirname, "visual-base.png");
 const visualBaseBase64 = fs.readFileSync(visualBasePath).toString("base64");
