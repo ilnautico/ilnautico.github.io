@@ -73,6 +73,17 @@
       font-size: 14.5px;
     }
 
+    .notice {
+      margin-top: 14px;
+      padding: 13px 14px;
+      border: 1px solid rgba(41,82,163,0.14);
+      border-radius: 10px;
+      background: #f0f6ff;
+      color: var(--ink-soft);
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
     form {
       overflow: hidden;
       border: 1px solid var(--line);
@@ -209,8 +220,11 @@
         <div class="eyebrow">FairVia™ Secure Diagnostic Form</div>
         <h1>Equipment Compatibility Assessment</h1>
         <p class="lead">
-          Please complete the technical intake form below. Your submission will be processed through the FairVia™ diagnostic system, and your Technical Hypothesis Report will be delivered by email as a PDF.
+          Please complete the technical intake form below. After submission, you will be redirected to secure payment. Once payment is confirmed, your FairVia™ Technical Hypothesis Report will be generated and delivered by email as a PDF.
         </p>
+        <div class="notice">
+          Please make sure your email address is correct. The final PDF report will be sent to the email address entered below. After payment, please also check your spam or junk folder.
+        </div>
       </header>
 
       <form id="fairvia-form">
@@ -363,7 +377,7 @@
         </section>
 
         <div class="submit-area">
-          <button id="submit-btn" class="btn" type="submit">Generate Technical Hypothesis Report</button>
+          <button id="submit-btn" class="btn" type="submit">Proceed to Secure Payment</button>
           <div id="status" class="status"></div>
         </div>
       </form>
@@ -382,13 +396,13 @@
       event.preventDefault();
 
       button.disabled = true;
-      statusEl.textContent = "Generating your report. Please wait...";
+      statusEl.textContent = "Preparing secure payment. Please wait...";
 
       const formData = new FormData(form);
       const payload = Object.fromEntries(formData.entries());
 
       try {
-        const response = await fetch("/generate-report?delivery=email", {
+        const response = await fetch("/create-assessment-checkout", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload)
@@ -397,18 +411,23 @@
         const result = await response.json().catch(() => null);
 
         if (!response.ok) {
-          throw new Error(result && (result.detail || result.error) ? (result.detail || result.error) : "Report generation failed.");
+          throw new Error(
+            result && (result.detail || result.error)
+              ? (result.detail || result.error)
+              : "Payment session creation failed."
+          );
         }
 
-        statusEl.textContent = "Your report has been generated and sent by email.";
+        if (!result || !result.url) {
+          throw new Error("Payment URL was not created.");
+        }
 
-        setTimeout(() => {
-          window.location.href = "https://fairvia-assessment.netlify.app/report-ready";
-        }, 900);
+        statusEl.textContent = "Redirecting to secure payment...";
+        window.location.href = result.url;
 
       } catch (error) {
         console.error(error);
-        statusEl.textContent = "Report generation failed. Please contact FairVia support.";
+        statusEl.textContent = "Payment preparation failed. Please contact FairVia support.";
         button.disabled = false;
       }
     });
