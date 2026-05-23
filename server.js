@@ -2586,6 +2586,17 @@ app.get("/download-report/:reportId", (req, res) => {
 app.get("/paid-access", (_req, res) => {
   res.sendFile(path.join(__dirname, "paid-access.html"));
 });
+app.get("/paid-access.html", (_req, res) => {
+  res.sendFile(path.join(__dirname, "paid-access.html"));
+});
+
+app.get("/report-ready", (_req, res) => {
+  res.sendFile(path.join(__dirname, "report-ready.html"));
+});
+
+app.get("/report-ready.html", (_req, res) => {
+  res.sendFile(path.join(__dirname, "report-ready.html"));
+});
 
 app.get("/latest-pdf", (_req, res) => {
   if (!latestPdfBuffer) return res.status(404).send("No PDF generated yet.");
