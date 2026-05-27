@@ -2233,7 +2233,7 @@ function isDemoAccessAllowed(req) {
   return keyFromQuery === DEMO_ACCESS_KEY || keyFromBody === DEMO_ACCESS_KEY;
 }
 
-app.get("/paid-access-demo", (req, res) => {
+app.get("/research-demo", (req, res) => {
   if (!isDemoAccessAllowed(req)) {
     return res.status(403).send("Demo access denied.");
   }
@@ -2456,8 +2456,8 @@ app.get("/paid-access-demo", (req, res) => {
         <div class="eyebrow">FairVia™ Research Demo</div>
         <h1>Equipment Compatibility Assessment Demo</h1>
         <p class="lead">
-          This demo allows technical reviewers to test the assessment form and PDF report generation workflow without payment.
-        </p>
+statusEl.textContent = "This is a demo assessment. The PDF report has been generated and sent to the email address provided.";        
+</p>
         <div class="demo-notice">
           No payment is required for this demo. Submitted information is used only to generate a demo report for review.
           Please do not enter confidential formulations, proprietary recipes, or sensitive production know-how.
