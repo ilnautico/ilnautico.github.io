@@ -1,4450 +1,2139 @@
-import express from "express";
-import puppeteer from "puppeteer";　 
-import fs from "fs";
-import path from "path";
-import { fileURLToPath } from "url";
-import PQueue from "p-queue";
-import crypto from "crypto";
-import Stripe from "stripe";
+'use strict';
 
-const fetchFn = global.fetch
-  ? global.fetch.bind(global)
-  : async (...args) => {
-      const mod = await import("node-fetch");
-      return mod.default(...args);
-    };
+/**
+ * FairVia™ Advanced Technical Screening Server
+ * @file   server_advanced.js
+ * @version 1.0.8
+ *
+ * IMPORTANT:
+ * - Test console code has been removed.
+ * - Production endpoints only:
+ *   POST /advanced-webhook
+ *   GET  /latest-advanced-pdf
+ *   GET  /advanced-access
+ *   GET  /advanced-access-demo?key=...
+ *   POST /generate-advanced-demo-report
+ *   GET  /download-advanced-report/:reportId
+ *   GET  /health
+ * - Confidence output from fairvia-scoring-engine.js is passed to template_advanced.html.
+ */
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const fs        = require('fs');
+const path      = require('path');
+const crypto    = require('crypto');
+const express   = require('express');
+const puppeteer = require('puppeteer');
 
-const app = express();
+const scoringEngine = require('./fairvia-scoring-engine');
+
+
+const {
+  calculateFoodContactRisk,
+  calculateMedicalHealthcareRisk,
+  ENGINE_VERSION,
+} = scoringEngine;
+
+const SERVER_VERSION    = '1.0.8';
+const PDF_OUTPUT_PATH   = process.env.PDF_OUTPUT_PATH ?? '/tmp/latest-advanced.pdf';
+const ADVANCED_PORT     = Number(process.env.PORT ?? process.env.ADVANCED_PORT ?? 3001);
+const CLAUDE_TIMEOUT_MS = Number(process.env.CLAUDE_TIMEOUT_MS ?? 28000);
+const AI_ENABLED        = process.env.ENABLE_AI_NARRATIVE !== 'false';
+const CLAUDE_MODEL      = process.env.CLAUDE_MODEL ?? 'claude-sonnet-4-6';
+const PUPPETEER_ARGS    = (process.env.PUPPETEER_ARGS ?? '--no-sandbox --disable-setuid-sandbox')
+  .split(' ')
+  .filter(Boolean);
+
+const TEMPLATE_PATH = path.join(__dirname, 'template_advanced.html');
 
 // ══════════════════════════════════════════════════════════════
-// EMAIL DELIVERY / PUBLIC URL CONFIG
+// EMAIL DELIVERY / DEMO ACCESS CONFIG
 // ══════════════════════════════════════════════════════════════
 
-const RESEND_API_KEY = process.env.RESEND_API_KEY || "";
+const RESEND_API_KEY = process.env.RESEND_API_KEY ?? '';
+const FROM_EMAIL     = process.env.FROM_EMAIL ?? 'FairVia <info@ilnautico.com>';
+const ADMIN_EMAIL    = process.env.ADMIN_EMAIL ?? '';
+const PUBLIC_BASE_URL = String(process.env.PUBLIC_BASE_URL ?? '')
+  .replace(/^PUBLIC_BASE_URL=/, '')
+  .trim();
+const TEST_ROUTE_KEY = process.env.TEST_ROUTE_KEY ?? process.env.ADVANCED_TEST_ROUTE_KEY ?? 'fairvia-test-2026';
 
 if (!RESEND_API_KEY) {
-  console.warn("⚠️ RESEND_API_KEY not set — email delivery disabled");
+  console.warn('[server_advanced] RESEND_API_KEY not set — result email delivery disabled.');
 }
 
-const FROM_EMAIL = process.env.FROM_EMAIL || "FairVia <reports@example.com>";
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "";
+const advancedReportStore = new Map();
+const ADVANCED_REPORT_TTL_MS = 1000 * 60 * 60 * 24; // 24 hours
 
-const PUBLIC_BASE_URL = String(process.env.PUBLIC_BASE_URL || "")
-  .replace(/^PUBLIC_BASE_URL=/, "")
-  .trim();
-
-// ══════════════════════════════════════════════════════════════
-// STRIPE CONFIG
-// ══════════════════════════════════════════════════════════════
-
-const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || "";
-const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET || "";
-
-const PUBLIC_BASE_URL_FOR_STRIPE = String(
-  process.env.PUBLIC_BASE_URL || "https://ilnauticogithubio-production.up.railway.app"
-)
-  .replace(/^PUBLIC_BASE_URL=/, "")
-  .trim();
-
-const STRIPE_PRICE_ID_BETA = process.env.STRIPE_PRICE_ID_BETA || "";
-
-const CHECKOUT_SUCCESS_URL =
-  process.env.CHECKOUT_SUCCESS_URL ||
-  "https://beta.ilnautico.com/report-ready";
-
-const CHECKOUT_CANCEL_URL =
-  process.env.CHECKOUT_CANCEL_URL ||
-  "https://beta.ilnautico.com/paid-access.html";
-
-const stripe = STRIPE_SECRET_KEY ? new Stripe(STRIPE_SECRET_KEY) : null;
-
-// ══════════════════════════════════════════════════════════════
-// TEMPORARY STORES
-// ══════════════════════════════════════════════════════════════
-
-// Old flow: payment -> access link email -> form.
-// Keep this for backward compatibility during migration.
-const paidAccessTokens = new Map();
-
-// New flow: form -> checkout -> report email.
-// Temporary in-memory pending report store.
-// For production / association plans, replace this with Supabase or another durable DB.
-const pendingReports = new Map();
-
-const PENDING_REPORT_TTL_MS = 1000 * 60 * 60 * 6; // 6 hours
-
-function cleanupExpiredPendingReports() {
+function cleanupExpiredAdvancedReports() {
   const now = Date.now();
-
-  for (const [pendingReportId, item] of pendingReports.entries()) {
-    if (!item?.createdAt || now - item.createdAt > PENDING_REPORT_TTL_MS) {
-      pendingReports.delete(pendingReportId);
+  for (const [reportId, item] of advancedReportStore.entries()) {
+    if (!item?.createdAt || now - item.createdAt > ADVANCED_REPORT_TTL_MS) {
+      advancedReportStore.delete(reportId);
     }
   }
 }
 
-// ══════════════════════════════════════════════════════════════
-// STRIPE WEBHOOK
-// IMPORTANT:
-// Stripe webhook must be registered BEFORE express.json(),
-// because Stripe signature verification requires the raw request body.
-// ══════════════════════════════════════════════════════════════
 
-app.post(
-  "/stripe-webhook",
-  express.raw({ type: "application/json" }),
-  async (req, res) => {
-    if (!stripe || !STRIPE_WEBHOOK_SECRET) {
-      console.error("[Stripe Webhook ERROR] Missing STRIPE_SECRET_KEY or STRIPE_WEBHOOK_SECRET");
-      return res.status(500).send("Stripe webhook not configured");
-    }
-
-    let event;
-
-    try {
-      const signature = req.headers["stripe-signature"];
-
-      event = stripe.webhooks.constructEvent(
-        req.body,
-        signature,
-        STRIPE_WEBHOOK_SECRET
-      );
-    } catch (err) {
-      console.error("[Stripe Webhook SIGNATURE ERROR]", err.message);
-      return res.status(400).send(`Webhook Error: ${err.message}`);
-    }
-
-    try {
-      if (event.type === "checkout.session.completed") {
-        const session = event.data.object;
-
-        const customerEmail =
-          session.customer_details?.email ||
-          session.customer_email ||
-          "";
-
-        const customerName =
-          session.customer_details?.name ||
-          "Client";
-
-        const paymentStatus = session.payment_status || "";
-
-        if (!customerEmail || !customerEmail.includes("@")) {
-          console.warn("[Stripe Webhook] customer email missing:", session.id);
-          return res.json({
-            received: true,
-            warning: "customer_email_missing",
-          });
-        }
-
-        if (paymentStatus && paymentStatus !== "paid") {
-          console.warn("[Stripe Webhook] session not paid:", {
-            sessionId: session.id,
-            paymentStatus,
-          });
-
-          return res.json({
-            received: true,
-            warning: "payment_not_paid",
-          });
-        }
-
-        // ══════════════════════════════════════════════════════════════
-        // NEW FLOW:
-        // form -> checkout -> report email
-        // If this Checkout Session was created from /create-assessment-checkout,
-        // it will include pending_report_id in metadata.
-        // In that case, generate and email the report directly.
-        // No paid-access email is sent.
-        // ══════════════════════════════════════════════════════════════
-
-        const pendingReportId = session.metadata?.pending_report_id || "";
-
-        if (pendingReportId) {
-          cleanupExpiredPendingReports();
-
-          const pending = pendingReports.get(pendingReportId);
-
-          if (!pending) {
-            console.error("[Stripe Webhook] pending report not found:", {
-              pendingReportId,
-              sessionId: session.id,
-            });
-
-            return res.json({
-              received: true,
-              warning: "pending_report_not_found",
-            });
-          }
-
-          if (pending.status === "completed") {
-            console.log("[Stripe Webhook] pending report already completed:", {
-              pendingReportId,
-              sessionId: session.id,
-            });
-
-            return res.json({
-              received: true,
-              status: "already_completed",
-            });
-          }
-
-          pendingReports.set(pendingReportId, {
-            ...pending,
-            status: "paid_processing",
-            stripeSessionId: session.id,
-            paidAt: Date.now(),
-          });
-
-          const input = {
-            ...pending.input,
-            email: pending.input.email || customerEmail,
-            contact_person: pending.input.contact_person || customerName,
-          };
-
-          const result = await generateAndSendReportFromInput(input);
-
-          pendingReports.set(pendingReportId, {
-            ...pendingReports.get(pendingReportId),
-            status: "completed",
-            reportId: result.reportId,
-            completedAt: Date.now(),
-          });
-
-          console.log("[Stripe Webhook] report generated after payment:", {
-            pendingReportId,
-            reportId: result.reportId,
-            email: input.email,
-            sessionId: session.id,
-          });
-
-          return res.json({
-            received: true,
-            flow: "form_first_report_generated",
-          });
-        }
-
-        // ══════════════════════════════════════════════════════════════
-        // OLD FLOW:
-        // payment -> paid access email -> form
-        // Keep this temporarily for existing Payment Link tests.
-        // ══════════════════════════════════════════════════════════════
-
-        const accessToken = crypto.randomUUID();
-
-        paidAccessTokens.set(accessToken, {
-          email: customerEmail,
-          name: customerName,
-          stripeSessionId: session.id,
-          paymentStatus,
-          used: false,
-          createdAt: Date.now(),
-        });
-
-        const formUrl =
-          `${PUBLIC_BASE_URL_FOR_STRIPE.replace(/\/$/, "")}/paid-access?token=${accessToken}`;
-
-        await sendPaidAccessEmail({
-          to: customerEmail,
-          name: customerName,
-          formUrl,
-        });
-
-        if (ADMIN_EMAIL && ADMIN_EMAIL.includes("@")) {
-          await sendResendEmail({
-            from: FROM_EMAIL,
-            to: ADMIN_EMAIL,
-            subject: "FairVia™ Payment Completed",
-            text:
-`A FairVia™ paid assessment payment was completed.
-
-Customer: ${customerName}
-Email: ${customerEmail}
-Stripe Session: ${session.id}
-
-Access URL:
-${formUrl}`,
-          });
-        }
-
-        console.log("[Stripe Webhook] access token issued:", {
-          email: customerEmail,
-          sessionId: session.id,
-          formUrl,
-        });
-      }
-
-      return res.json({ received: true });
-    } catch (err) {
-      console.error("[Stripe Webhook FULFILLMENT ERROR]", err);
-
-      return res.status(500).json({
-        error: "stripe_fulfillment_failed",
-        detail: err.message,
-      });
-    }
-  }
-);
-
-// Standard parsers must come AFTER /stripe-webhook.
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-
-// ══════════════════════════════════════════════════════════════
-// NEW FLOW: FORM -> STRIPE CHECKOUT -> REPORT EMAIL
-// Non-destructive addition. Existing /generate-report flow remains unchanged.
-// ══════════════════════════════════════════════════════════════
-
-app.post("/create-assessment-checkout", async (req, res) => {
-  try {
-    if (!stripe) {
-      return res.status(500).json({
-        error: "stripe_not_configured",
-        detail: "Stripe secret key is not configured.",
-      });
-    }
-
-    cleanupExpiredPendingReports();
-
-    const input = normalizeInput(req.body);
-    const email = safe(input.email, "").trim();
-
-    if (!email || !email.includes("@")) {
-      return res.status(400).json({
-        error: "email_required",
-        detail: "A valid email address is required before payment.",
-      });
-    }
-
-    const pendingReportId = crypto.randomUUID();
-
-    pendingReports.set(pendingReportId, {
-      input,
-      email,
-      status: "unpaid",
-      createdAt: Date.now(),
-    });
-
-    const sessionPayload = {
-      mode: "payment",
-      customer_email: email,
-      metadata: {
-        pending_report_id: pendingReportId,
-        flow: "equipment_assessment_form_first",
-      },
-      success_url: `${CHECKOUT_SUCCESS_URL}?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: CHECKOUT_CANCEL_URL,
-    };
-
-    if (STRIPE_PRICE_ID_BETA) {
-      sessionPayload.line_items = [
-        {
-          price: STRIPE_PRICE_ID_BETA,
-          quantity: 1,
-        },
-      ];
-    } else {
-      sessionPayload.line_items = [
-        {
-          quantity: 1,
-          price_data: {
-            currency: "usd",
-            unit_amount: 58000,
-            product_data: {
-              name: "FairVia™ Equipment Compatibility Assessment Beta",
-              description: "Beta technical hypothesis report",
-            },
-          },
-        },
-      ];
-    }
-
-    const session = await stripe.checkout.sessions.create(sessionPayload);
-
-    pendingReports.set(pendingReportId, {
-      ...pendingReports.get(pendingReportId),
-      stripeSessionId: session.id,
-    });
-
-    return res.json({
-      ok: true,
-      pending_report_id: pendingReportId,
-      url: session.url,
-    });
-  } catch (err) {
-    console.error("[Create Checkout ERROR]", err);
-
-    return res.status(500).json({
-      error: "checkout_creation_failed",
-      detail: err.message,
-    });
-  }
-});
-
-async function generateAndSendReportFromInput(rawInput) {
-  const fakeReq = {
-    body: rawInput,
-    query: { delivery: "email" },
-  };
-
-  let capturedJson = null;
-  let capturedStatus = 200;
-
-  const fakeRes = {
-    status(code) {
-      capturedStatus = code;
-      return this;
-    },
-    json(payload) {
-      capturedJson = payload;
-      return payload;
-    },
-    setHeader() {
-      return this;
-    },
-    send(payload) {
-      return payload;
-    },
-  };
-
-  await handleReport(fakeReq, fakeRes);
-
-  if (capturedStatus >= 400) {
-    throw new Error(
-      capturedJson?.detail ||
-      capturedJson?.error ||
-      "Report generation failed after payment."
-    );
+function validateEnvironment() {
+  if (AI_ENABLED && !process.env.ANTHROPIC_API_KEY) {
+    console.warn('[server_advanced] ANTHROPIC_API_KEY is missing. AI narrative will be skipped and deterministic fallback narrative will be used.');
   }
 
-  return {
-    reportId: capturedJson?.report_id || "",
-    scores: {
-      total: capturedJson?.composite_score || null,
-    },
-    decision: {
-      level: capturedJson?.compatibility_level || "",
-    },
-  };
-}
-const htmlTemplate = fs.readFileSync(path.join(__dirname, "template.html"), "utf8");
-const visualBasePath = path.join(__dirname, "visual-base.png");
-const visualBaseBase64 = fs.readFileSync(visualBasePath).toString("base64");
-const visualBaseDataUri = `data:image/png;base64,${visualBaseBase64}`;
-if (!process.env.ANTHROPIC_API_KEY) {
-  console.warn("⚠️  ANTHROPIC_API_KEY not set — Claude narrative disabled, deterministic fallback active");
-}
+  if (!AI_ENABLED) {
+    console.warn('[server_advanced] AI narrative disabled by ENABLE_AI_NARRATIVE=false.');
+  }
 
-// ══════════════════════════════════════════════════════════════
-// CONCURRENCY CONTROL — max 2 simultaneous Puppeteer jobs
-// ══════════════════════════════════════════════════════════════
-
-const queue = new PQueue({ concurrency: 2 });
-
-// ══════════════════════════════════════════════════════════════
-// GLOBAL TIMEOUT HELPER
-// ══════════════════════════════════════════════════════════════
-
-const globalTimeout = (ms) =>
-  new Promise((_, reject) =>
-    setTimeout(() => reject(new Error(`Global PDF generation timeout after ${ms}ms`)), ms)
-  );
-
-// ══════════════════════════════════════════════════════════════
-// BROWSER SINGLETON — reuse across requests; auto-restart on crash
-// ══════════════════════════════════════════════════════════════
-
-let _browser = null;
-
-async function getBrowser() {
-  if (_browser && _browser.isConnected()) return _browser;
-  _browser = await puppeteer.launch({
-    headless: "new",
-    args: [
-      "--no-sandbox",
-      "--disable-setuid-sandbox",
-      "--disable-dev-shm-usage",
-      "--disable-gpu",
-    ],
+  console.log('[server_advanced] Starting with configuration:', {
+    port:            ADVANCED_PORT,
+    model:           CLAUDE_MODEL,
+    aiEnabled:       AI_ENABLED && !!process.env.ANTHROPIC_API_KEY,
+    claudeTimeoutMs: CLAUDE_TIMEOUT_MS,
+    pdfOutputPath:   PDF_OUTPUT_PATH,
+    signatureVerify: !!process.env.TALLY_WEBHOOK_SECRET,
+    puppeteerArgs:   PUPPETEER_ARGS,
+    engineVersion:   ENGINE_VERSION,
+    emailEnabled:    !!RESEND_API_KEY,
+    publicBaseUrl:   PUBLIC_BASE_URL || '(request host fallback)',
   });
-  _browser.on("disconnected", () => { _browser = null; });
-  return _browser;
 }
 
-// ══════════════════════════════════════════════════════════════
-// § 1  UTILITIES
-// ══════════════════════════════════════════════════════════════
+const REPORT_DISCLAIMER =
+  'This report constitutes an initial technical risk screening only. It is produced by an ' +
+  'automated system combining deterministic risk scoring with AI-assisted technical narrative ' +
+  'generation. It does not constitute a regulatory compliance determination, food contact ' +
+  'safety assessment, biocompatibility evaluation, product approval, or certification of any ' +
+  'kind. No regulatory body has reviewed or endorsed the contents of this report. The client ' +
+  'is solely responsible for ensuring compliance with all applicable regulations in their ' +
+  'target markets. Engagement of qualified specialists in materials science, regulatory ' +
+  'affairs, and — where applicable — toxicology is required before any commercial use of a ' +
+  'material transition. FairVia™ / Il Nautico Co., Ltd. accepts no liability for decisions ' +
+  'made on the basis of this screening report without appropriate specialist validation.';
 
-const safe  = (v, fallback = "—") => {
-  if (v === undefined || v === null || v === "") return fallback;
-  return String(v);
+const BURDEN_LEVEL_DISPLAY = {
+  low_medium: 'Low–Medium',
+  medium:     'Medium',
+  high:       'High',
+  very_high:  'Very High',
+  critical:   'Critical — Specialist Reassessment Required',
 };
-const clamp = (v) => Math.max(0, Math.min(100, v));
-const upper = (v) => safe(v, "").toUpperCase();
 
-function safeParseJSON(text) {
+const ROUTE_LABEL = {
+  food:    'Food Contact / Food Packaging',
+  medical: 'Medical / Healthcare',
+};
+
+const MARKET_LABEL = {
+  japan:       'Japan',
+  eu:          'European Union',
+  uk:          'United Kingdom',
+  us:          'United States',
+  canada:      'Canada',
+  middle_east: 'Middle East',
+  gcc:         'GCC / Middle East',
+  china:       'China',
+  india:       'India',
+  anz:         'Australia / New Zealand',
+  sea:         'Southeast Asia',
+  asean:       'ASEAN',
+  other:       'Other markets',
+  other_market:'Other / Not Decided Yet',
+};
+
+const FOOD_FRAMEWORK = {
+  japan:       'MHLW Notification 370',
+  eu:          'EU Regulation 10/2011',
+  uk:          'UK Food Contact Materials Regulations',
+  us:          'FDA 21 CFR (food contact)',
+  canada:      'Health Canada / Canadian food packaging framework',
+  middle_east: 'National framework (country-dependent)',
+  gcc:         'GSO / national GCC food-contact frameworks (country-dependent)',
+  china:       'GB 4806 series',
+  india:       'FSSAI food-contact packaging framework',
+  anz:         'FSANZ / Australia-New Zealand food packaging framework',
+  sea:         'National frameworks (vary by country)',
+  asean:       'ASEAN national food-contact frameworks (country-dependent)',
+  other:       'Applicable national framework (to be confirmed)',
+  other_market:'Applicable national framework (to be confirmed)',
+};
+
+const MEDICAL_FRAMEWORK = {
+  japan:       'PMDA / MHLW',
+  eu:          'EU MDR 2017/745',
+  uk:          'MHRA (UK MDR 2002 as amended)',
+  us:          'FDA 21 CFR Part 820 / 510(k) / PMA',
+  canada:      'Health Canada medical-device framework',
+  middle_east: 'National regulatory framework (country-dependent)',
+  gcc:         'GCC national medical-device frameworks (country-dependent)',
+  china:       'NMPA',
+  india:       'CDSCO medical-device framework',
+  anz:         'TGA / Medsafe medical-device frameworks',
+  sea:         'National frameworks (vary by country)',
+  asean:       'ASEAN national medical-device frameworks (country-dependent)',
+  other:       'Applicable national framework (to be confirmed)',
+  other_market:'Applicable national framework (to be confirmed)',
+};
+
+const PROHIBITED_PATTERNS = [
+  /\bapproved?\b(?!\s+(?:laboratory|body|protocol|method|supplier))/gi,
+  /\bis\s+compliant\b/gi,
+  /\bare\s+compliant\b/gi,
+  /\bfully\s+compliant\b/gi,
+  /\bfood[- ]safe\b/gi,
+  /\bis\s+biocompatible\b/gi,
+  /\bare\s+biocompatible\b/gi,
+  /\bconfirmed\s+(?:as\s+)?biocompatible\b/gi,
+  /\bsafe\s+for\s+(?:medical|patient|clinical|consumer|food|human)\b/gi,
+  /\bmedically\s+safe\b/gi,
+  /\bno\s+(?:migration|toxicity|safety|contamination)\s+risk\b/gi,
+  /\bsuitable\s+for\s+(?:direct\s+)?(?:food|patient|medical|clinical|consumer)\s+contact\b/gi,
+  /\bmeets?\s+(?:the\s+)?(?:requirements?|limits?|standards?|specifications?)\b/gi,
+  /\bhas\s+been\s+validated\s+for\b/gi,
+  /\bvalidated\s+(?:material|grade|product|packaging|resin)\b/gi,
+  /\bcertified\s+(?:material|grade|polymer|resin|product)\b(?!\s+(?:compostable|by|under|to))/gi,
+  /\bno\s+safety\s+(?:concerns?|issues?|risks?)\b/gi,
+];
+
+function generateReportId() {
+  const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+  const hex  = crypto.randomBytes(3).toString('hex').toUpperCase();
+  return `FVA-${date}-${hex}`;
+}
+
+function formatDateDisplay(date) {
+  return date.toLocaleDateString('en-GB', {
+    day:   '2-digit',
+    month: 'long',
+    year:  'numeric',
+  });
+}
+
+function errorResponse(res, status, code, message) {
+  return res.status(status).json({
+    success:   false,
+    error:     code,
+    message,
+    timestamp: new Date().toISOString(),
+  });
+}
+
+function verifyTallySignature(req) {
+  const secret = process.env.TALLY_WEBHOOK_SECRET;
+  if (!secret) return true;
+
+  const signature = req.headers['tally-signature'];
+  if (!signature) return false;
+
   try {
-    const match = text.match(/\{[\s\S]*\}/);
-    if (!match) throw new Error("No JSON object found in response");
-    return JSON.parse(match[0]);
+    const computed = crypto
+      .createHmac('sha256', secret)
+      .update(JSON.stringify(req.body))
+      .digest('hex');
+
+    return crypto.timingSafeEqual(
+      Buffer.from(signature, 'hex'),
+      Buffer.from(computed, 'hex')
+    );
   } catch {
-    throw new Error("JSON parse failed");
+    return false;
   }
 }
 
-function validateNarrative(obj) {
-  const keys = [
-    "executive_summary", "risk_primary", "risk_secondary",
-    "mechanism", "processing_window_note", "application_implication", "next_step",
-  ];
-  for (const k of keys) {
-    if (!obj || typeof obj[k] !== "string") {
-      throw new Error(`Invalid narrative structure — missing or non-string key: ${k}`);
-    }
+function normalizeTallyPayload(raw) {
+  if (!raw?.data?.fields || !Array.isArray(raw.data.fields)) {
+    const err = new Error('Missing data.fields array in Tally webhook body.');
+    err.code = 'INVALID_PAYLOAD';
+    throw err;
   }
-  return obj;
-}
 
-function validateMechanism(obj) {
-  if (!obj || typeof obj.mechanism !== "string") {
-    throw new Error("Invalid mechanism structure — missing or non-string key: mechanism");
+  const fieldMap = {};
+  for (const field of raw.data.fields) {
+    if (field.key) fieldMap[field.key] = field.value ?? null;
   }
-  if (
-    !Array.isArray(obj.expected_deviations) ||
-    obj.expected_deviations.length !== 3 ||
-    obj.expected_deviations.some((d) => typeof d !== "string")
-  ) {
-    throw new Error("Invalid mechanism structure — expected_deviations must be array of 3 strings");
-  }
-  return obj;
-}
 
-// ══════════════════════════════════════════════════════════════
-// § 2  INPUT NORMALIZATION
-// ══════════════════════════════════════════════════════════════
-
-function normalizeInput(raw) {
-  if (!raw) return {};
-
-  if (!(raw.data && Array.isArray(raw.data.fields))) return raw;
-
-  const parsed = {
-    project_name: "", project_stage: "", product_type: "",
-    application: "", mechanical_requirement: "", material: "",
-    issues: "", bio_material: "", transition_goal: "",
-    processing: "", equipment: "", screw_diameter: "",
-    ld_ratio: "", die_mold: "", scale: "", concern: "", notes: "",
-    email: "", company_name: "", contact_person: "",
-    requirement_focus: null, current_material_focus: null,
-    transition_focus: null, risk_focus: null,
+  const str = (key, fallback = null) => {
+    const v = fieldMap[key];
+    return (typeof v === 'string' && v.trim()) ? v.trim().toLowerCase() : fallback;
   };
 
-  const norm = (s) => String(s || "").trim();
-  const low  = (s) => norm(s).toLowerCase();
-
-  for (const f of raw.data.fields) {
-    const label = low(f.label);
-    const key   = norm(f.key);
-    const value = Array.isArray(f.value)
-      ? f.value.map((id) => {
-          const opt = Array.isArray(f.options)
-            ? f.options.find((o) => o.id === id)
-            : null;
-          return opt ? opt.text : id;
-        }).join(", ")
-      : norm(f.value);
-    const type  = low(f.type);
-
-    // Tally placeholder-label based mapping
-    if (label.includes("film pouch") || label.includes("rigid tray") || label.includes("container")) {
-      parsed.product_type = value;
+  const strAny = (keys, fallback = null) => {
+    for (const key of keys) {
+      const v = fieldMap[key];
+      if (typeof v === 'string' && v.trim()) {
+        return v.trim().toLowerCase();
+      }
     }
+    return fallback;
+  };
 
-    else if (label.includes("frozen food packaging") || label.includes("hot-fill use") || label.includes("shopping bag")) {
-      parsed.application = value;
-    }
+  const rawStr = (key) => {
+    const v = fieldMap[key];
+    return (typeof v === 'string' && v.trim()) ? v.trim() : null;
+  };
 
-    else if (label.includes("pp / pet / ldpe")) {
-      parsed.material = value;
-    }
+  const arr = (key) => {
+    const v = fieldMap[key];
+    if (!v) return [];
+    return (Array.isArray(v) ? v : [v])
+      .map(s => (typeof s === 'string' ? s.trim().toLowerCase() : s))
+      .filter(Boolean);
+  };
 
-    else if (label.includes("blown film extrusion") || label.includes("cast film extrusion") || label.includes("injection molding") || label.includes("thermoforming")) {
-      parsed.processing = value;
-    }
+  const hasFile = (key) => {
+    const v = fieldMap[key];
+    return Array.isArray(v) ? v.length > 0 : !!v;
+  };
 
-    else if (label.includes("blown film line") || label.includes("injection molding line")) {
-      parsed.equipment = value;
-    }
-
-    else if (label.includes("pla") || label.includes("pha") || label.includes("target biodegradable")) {
-      parsed.bio_material = value;
-    }
-
-    else if (label.includes("heat resistance") || label.includes("flow stability") || label.includes("seal strength")) {
-      parsed.concern = value;
-    }
-
-    else if (
-      type.includes("email") ||
-      label.includes("email") ||
-      label.includes("e-mail") ||
-      key === "question_R47OMp"
-    ) {
-      parsed.email = value;
-    }
-
-    else if (
-      label.includes("company") ||
-      label.includes("organization") ||
-      label.includes("organisation") ||
-      key === "question_oB4JeX"
-    ) {
-      parsed.company_name = value;
-    }
-
-    else if (
-      label.includes("contact person") ||
-      label.includes("your name") ||
-      label === "name" ||
-      key === "question_G12M92"
-    ) {
-      parsed.contact_person = value;
-    }
-
-    if      (label === "project name")          parsed.project_name            = value;
-    else if (label === "project stage")         parsed.project_stage           = value;
-    else if (label === "product type")          parsed.product_type            = value;
-    else if (label === "application")           parsed.application             = value;
-    else if (label === "mechanical requirement") parsed.mechanical_requirement = value;
-    else if (label.includes("current material")) parsed.material               = value;
-    else if (label === "known issues")          parsed.issues                  = value;
-    else if (label.includes("target material")) parsed.bio_material            = value;
-    else if (label.includes("processing method")) parsed.processing            = value;
-    else if (label.includes("equipment type"))  parsed.equipment               = value;
-    else if (label === "screw diameter")        parsed.screw_diameter          = value;
-    else if (label === "l/d" || label.includes("l/d")) parsed.ld_ratio        = value;
-    else if (label === "die / mold" || label === "die/mold") parsed.die_mold  = value;
-    else if (label.includes("production scale")) parsed.scale                  = value;
-    else if (label.includes("primary concern")) parsed.concern                 = value;
-    else if (label.includes("additional notes")) parsed.notes                  = value;
-    else if (
-      type.includes("email") ||
-      label === "email" ||
-      label.includes("email address") ||
-      label.includes("e-mail") ||
-      key === "question_R47OMp"
-    ) parsed.email = value;
-    else if (
-      label.includes("company") ||
-      label.includes("organization") ||
-      label.includes("organisation") ||
-      key === "question_oB4JeX"
-    ) parsed.company_name = value;
-    else if (
-      label.includes("contact person") ||
-      label.includes("your name") ||
-      label === "name" ||
-      key === "question_G12M92"
-    ) parsed.contact_person = value;
-    else if (label.includes("visual requirement"))    parsed.requirement_focus    = "VISUAL";
-    else if (label.includes("environment condition")) parsed.requirement_focus    = "ENVIRONMENT";
-    else if (label.includes("product stability"))     parsed.current_material_focus = "PRODUCT_STABILITY";
-    else if (label.includes("transition purpose")) {
-      parsed.transition_focus = "PURPOSE";
-      if (value) parsed.transition_goal = value;
-    } else if (label.includes("certification requirement")) {
-      parsed.transition_focus = "CERTIFICATION";
-    } else if (label.includes("critical area")) {
-      parsed.risk_focus = "CRITICAL_AREA";
-    }
-
-    if (type.includes("multiple") || type.includes("choice")) {
-      const lv = low(value);
-      if (lv.includes("visual"))             parsed.requirement_focus      = "VISUAL";
-      if (lv.includes("environment"))        parsed.requirement_focus      = "ENVIRONMENT";
-      if (lv.includes("product stability"))  parsed.current_material_focus = "PRODUCT_STABILITY";
-      if (lv.includes("transition purpose")) parsed.transition_focus       = "PURPOSE";
-      if (lv.includes("certification"))      parsed.transition_focus       = "CERTIFICATION";
-      if (lv.includes("critical area"))      parsed.risk_focus             = "CRITICAL_AREA";
-    }
+  const route = str('route');
+  if (!['food', 'medical'].includes(route)) {
+    const err = new Error(`route field is "${route ?? 'missing'}". Expected "food" or "medical".`);
+    err.code = 'INVALID_ROUTE';
+    throw err;
   }
 
-  // Fallback scan for Tally fields with null labels.
-  // Some Tally input fields arrive with label:null, so type/key/value must be used.
-  for (const f of raw.data.fields) {
-    const label = low(f.label);
-    const key   = norm(f.key);
-    const type  = low(f.type);
-    const value = Array.isArray(f.value)
-      ? f.value.map((id) => {
-          const opt = Array.isArray(f.options)
-            ? f.options.find((o) => o.id === id)
-            : null;
-          return opt ? opt.text : id;
-        }).join(", ")
-      : norm(f.value);
+  const targetMarkets     = arr('target_markets');
+  const candidateMaterial = arr('candidate_material');
 
-    if (!parsed.email && value && (type.includes("email") || key === "question_R47OMp")) {
-      parsed.email = value;
-    }
-
-    if (!parsed.company_name && value && (label.includes("company") || key === "question_oB4JeX")) {
-      parsed.company_name = value;
-    }
-
-    if (!parsed.contact_person && value && (label.includes("contact person") || label.includes("your name") || key === "question_G12M92")) {
-      parsed.contact_person = value;
-    }
-  }
-
-  if (!parsed.bio_material && raw.target_material)  parsed.bio_material = norm(raw.target_material);
-  if (!parsed.material      && raw.current_material) parsed.material     = norm(raw.current_material);
-  if (!parsed.email         && raw.email)            parsed.email        = norm(raw.email);
-  if (!parsed.company_name  && raw.company_name)     parsed.company_name = norm(raw.company_name);
-  if (!parsed.contact_person && raw.contact_person)  parsed.contact_person = norm(raw.contact_person);
-
-  // Hard cleanup: generic transition-purpose text must not become target material
-  if (
-    parsed.bio_material &&
-    /replac(e|ing) fossil|bio-?degradable alternative|transition (purpose|to|goal)|certification|sustainability/i.test(parsed.bio_material)
-  ) {
-    parsed.bio_material = "";
-  }
-
-  if (!parsed.bio_material && parsed.transition_goal) {
-    const goal = String(parsed.transition_goal).trim();
-    if (!/replace fossil plastic|biodegradable alternative/i.test(goal)) {
-      parsed.bio_material = goal;
-    }
-  }
-
-  return parsed;
-}
-
-// ══════════════════════════════════════════════════════════════
-// § 2b  CONTEXT HELPERS
-// ══════════════════════════════════════════════════════════════
-
-function classifyMaterial(material) {
-  const m = upper(material);
-  if (m.includes("PET"))  return "PET";
-  if (m.includes("LLDPE") || m.includes("LDPE") || m.includes("HDPE") || m.includes("PE")) return "POLYOLEFIN_PE";
-  if (m.includes("CPP") || m.includes("PP"))   return "POLYOLEFIN_PP";
-  if (m.includes("PLA"))  return "PLA_BASED";
-  if (m.includes("PHA") || m.includes("PHB"))  return "PHA_BASED";
-  return "OTHER";
-}
-
-function classifyApplication(application, processing) {
-  const text = `${upper(application)} ${upper(processing)}`;
-  if (text.includes("HOT-FILL") || text.includes("HOT FILL") || text.includes("HEAT EXPOSURE")) return "HOT_FILL_RIGID";
-  if (text.includes("MICROWAVE")) return "MICROWAVEABLE_RIGID";
-  if (text.includes("HIGH-TEMPERATURE") || text.includes("HIGH TEMPERATURE") || text.includes("HEAT RESISTANCE")) return "HEAT_EXPOSED_RIGID";
-  if (text.includes("LOW-TEMPERATURE") || text.includes("LOW TEMPERATURE") || text.includes("FROZEN")) return "LOW_TEMP_FILM";
-  if (text.includes("HIGH-SPEED FILM") || (text.includes("FILM") && text.includes("HIGH-SPEED"))) return "HIGH_SPEED_FILM";
-  if (text.includes("FILM")) return "GENERAL_FILM";
-  if (text.includes("INJECTION")) return "GENERAL_INJECTION";
-  return "GENERAL";
-}
-
-function extractNoteFlags(notes) {
-  const n = upper(notes);
-  const flags = new Set();
-  if (n.includes("NO EQUIPMENT MODIFICATION") || n.includes("NO EQUIPMENT CHANGE")) flags.add("NO_EQUIPMENT_CHANGE");
-  if (n.includes("REPEATED HEAT") || n.includes("REPEATED HEATING")) flags.add("REPEATED_HEAT");
-  if (n.includes("LONG RUN") || n.includes("EXTENDED RUN")) flags.add("LONG_RUN");
-  if (n.includes("LOW TEMP") || n.includes("LOW-TEMPERATURE") || n.includes("FROZEN")) flags.add("LOW_TEMP_USE");
-  if (n.includes("SEAL"))      flags.add("SEAL_IMPORTANT");
-  if (n.includes("DIMENSION")) flags.add("DIMENSION_CRITICAL");
-  if (n.includes("HIGH SPEED") || n.includes("HIGH-SPEED")) flags.add("HIGH_SPEED");
-  if (n.includes("SURFACE"))   flags.add("SURFACE_IMPORTANT");
-  return [...flags];
-}
-
-function interpretInputContext(input) {
-  const processText = `${safe(input.processing, "")} ${safe(input.mechanical_requirement, "")} ${safe(input.equipment, "")}`.toUpperCase();
-  const applicationFamily   = classifyApplication(input.application, input.processing);
-  const materialClass       = classifyMaterial(input.material);
-  const targetMaterialClass = classifyMaterial(input.bio_material);
-  const noteFlags           = extractNoteFlags(input.notes);
-
-  let process_family = "GENERAL";
-  if (processText.includes("BLOWN FILM"))  process_family = "BLOWN_FILM";
-  else if (processText.includes("FILM"))   process_family = "FILM_EXTRUSION";
-  else if (processText.includes("INJECTION")) process_family = "INJECTION";
-
-  let use_condition_family = "GENERAL";
-  if (["HOT_FILL_RIGID", "MICROWAVEABLE_RIGID", "HEAT_EXPOSED_RIGID"].includes(applicationFamily)) {
-    use_condition_family = "THERMAL_STRESS";
-  } else if (["HIGH_SPEED_FILM", "GENERAL_FILM"].includes(applicationFamily)) {
-    use_condition_family = "FLOW_STRESS";
-  } else if (applicationFamily === "LOW_TEMP_FILM") {
-    use_condition_family = "LOW_TEMP_HANDLING";
-  }
-
-  return {
-    process_family,
-    application_family:   applicationFamily,
-    use_condition_family,
-    note_flags:           noteFlags,
-    option_flags: {
-      requirement_focus:      input.requirement_focus      || null,
-      transition_focus:       input.transition_focus       || null,
-      current_material_focus: input.current_material_focus || null,
-      risk_focus:             input.risk_focus             || null,
+  const input = {
+    route,
+    company_name:       rawStr('company_name'),
+    contact_person:     rawStr('contact_person'),
+    email:              rawStr('email'),
+    access_token:       rawStr('access_token'),
+    project_name:       rawStr('project_name'),
+    product_format:     str('product_format'),
+    transition_reason:  str('transition_reason'),
+    target_markets:     targetMarkets,
+    n_markets:          targetMarkets.length,
+    timeline:           str('timeline'),
+    current_material:   str('current_material'),
+    current_compliance: arr('current_compliance'),
+    shelf_life:         str('shelf_life'),
+    distribution_temp:  str('distribution_temp'),
+    candidate_material: candidateMaterial,
+    tds_available:      str('tds_available'),
+    supplier_data:      str('supplier_data'),
+    eol_claim:          str('eol_claim', 'none'),
+    eol_cert:           str('eol_cert', 'unknown'),
+    internal_ra:        str('internal_ra'),
+    regulator_dialogue: str('regulator_dialogue'),
+    validation_budget:  str('validation_budget'),
+    additional_context: rawStr('additional_context'),
+    report_language:    str('report_language', 'en'),
+    uploads: {
+      tds:       hasFile('upload_tds'),
+      decl:      hasFile('upload_decl'),
+      migration: hasFile('upload_migration'),
+      iso_10993: hasFile('upload_iso'),
+      spec:      hasFile('upload_spec'),
     },
-    material_class:        materialClass,
-    target_material_class: targetMaterialClass,
-  };
-}
-
-function applyOptionModifiers(scores, context) {
-  const next = { ...scores };
-  if (context.option_flags.requirement_focus === "ENVIRONMENT") next.flow      = clamp(next.flow      - 2);
-  if (context.option_flags.requirement_focus === "VISUAL")      next.flow      = clamp(next.flow      - 3);
-  if (context.option_flags.current_material_focus === "PRODUCT_STABILITY") next.mechanical = clamp(next.mechanical - 2);
-  return next;
-}
-
-function getNarrativeSpecialization(context) {
-  const mc = context.material_class;
-  const tc = context.target_material_class;
-  const pf = context.process_family;
-  const af = context.application_family;
-  const uf = context.use_condition_family;
-
-  if (mc === "POLYOLEFIN_PE" && tc === "PHA_BASED"  && pf === "BLOWN_FILM"   && af === "LOW_TEMP_FILM")   return "LDPE_PHA_LOW_TEMP_FILM";
-  if (mc === "POLYOLEFIN_PE" && (tc === "PHA_BASED" || tc === "OTHER") && pf === "BLOWN_FILM" && af === "HIGH_SPEED_FILM") return "LDPE_BIO_HIGH_SPEED_FILM";
-  if (mc === "POLYOLEFIN_PP" && tc === "PLA_BASED"  && uf === "THERMAL_STRESS") return "PP_PLA_THERMAL_STRESS";
-  if (mc === "PET"           && tc === "PLA_BASED"  && uf === "THERMAL_STRESS") return "PET_PLA_THERMAL_STRESS";
-  return "GENERIC";
-}
-
-const shouldForceDeterministicMechanism  = (ctx) => getNarrativeSpecialization(ctx) !== "GENERIC";
-const shouldForceDeterministicDeviations = (ctx) => getNarrativeSpecialization(ctx) !== "GENERIC";
-
-// ══════════════════════════════════════════════════════════════
-// § 3  SCORING ENGINE
-// ══════════════════════════════════════════════════════════════
-
-function calculateScores(input, context = null) {
-  let thermal   = 85;
-  let flow       = 85;
-  let mechanical = 85;
-
-  const mat        = upper(input.material);
-  const bio        = upper(input.bio_material);
-  const app        = upper(input.application);
-  const processing = upper(input.processing);
-  const appTokens  = app.split(/\W+/);
-
-  if (!context) context = interpretInputContext(input);
-
-  // Material adjustments
-  if ((mat.includes("CPP") || mat.includes("PP")) && !mat.includes("PET")) thermal -= 10;
-  if (mat.includes("PE") && !mat.includes("PET")) thermal -= 5;
-  if (mat.includes("PET")) thermal -= 25;
-
-  // Biomaterial adjustments
-  if (bio.includes("PLA")) thermal -= 10;
-  if (bio.includes("PHA") || bio.includes("PHB")) flow -= 10;
-
-  // Application adjustments
-  const isFilm = app.includes("FILM") || appTokens.includes("FILM") || processing.includes("FILM");
-  const isInjection =
-    app.includes("INJECT") || app.includes("MOLD") || app.includes("MOULD") ||
-    appTokens.includes("IM") || processing.includes("INJECTION");
-
-  if (isFilm)      flow       -= 15;
-  if (isInjection) mechanical -= 10;
-
-  // Context-based adjustments
-  if (context.application_family === "MICROWAVEABLE_RIGID")  thermal -= 10;
-  if (context.application_family === "HOT_FILL_RIGID")       thermal -= 15;
-  if (context.application_family === "HEAT_EXPOSED_RIGID")   thermal -= 10;
-  if (context.application_family === "HIGH_SPEED_FILM")      flow    -= 10;
-  if (context.application_family === "LOW_TEMP_FILM") { flow -= 5; mechanical -= 3; }
-
-  if (context.note_flags.includes("NO_EQUIPMENT_CHANGE")) thermal    -= 5;
-  if (context.note_flags.includes("REPEATED_HEAT"))       thermal    -= 5;
-  if (context.note_flags.includes("LONG_RUN"))            flow       -= 5;
-  if (context.note_flags.includes("LOW_TEMP_USE"))        mechanical -= 3;
-  if (context.note_flags.includes("SEAL_IMPORTANT"))      flow       -= 3;
-  if (context.note_flags.includes("DIMENSION_CRITICAL"))  mechanical -= 5;
-  if (context.note_flags.includes("HIGH_SPEED"))          flow       -= 5;
-  if (context.note_flags.includes("SURFACE_IMPORTANT"))   flow       -= 2;
-
-  // Material × application interaction adjustments
-  if (context.material_class === "POLYOLEFIN_PP" && context.target_material_class === "PLA_BASED" && context.use_condition_family === "THERMAL_STRESS") thermal -= 10;
-  if (context.material_class === "PET"           && context.target_material_class === "PLA_BASED" && context.use_condition_family === "THERMAL_STRESS") thermal -= 5;
-  if (context.material_class === "POLYOLEFIN_PE" && context.target_material_class === "PHA_BASED" && context.process_family    === "BLOWN_FILM")        flow    -= 5;
-
-  thermal   = clamp(thermal);
-  flow       = clamp(flow);
-  mechanical = clamp(mechanical);
-
-  let scores = { thermal, flow, mechanical, total: 0, tokens: appTokens };
-  scores = applyOptionModifiers(scores, context);
-
-  // Guardrail: avoid over-penalising PE/LDPE → PHA blown-film transitions.
-  // High-speed blown film is a controlled validation case in this screening model,
-  // not an automatic HOLD case, unless other severe constraints are introduced later.
-  if (
-    context.material_class === "POLYOLEFIN_PE" &&
-    context.target_material_class === "PHA_BASED" &&
-    context.process_family === "BLOWN_FILM" &&
-    context.application_family === "HIGH_SPEED_FILM"
-  ) {
-    scores.flow = Math.max(scores.flow, 55);
-  }
-
-  const bottleneck = Math.min(scores.thermal, scores.flow, scores.mechanical);
-  const avg        = (scores.thermal + scores.flow + scores.mechanical) / 3;
-  const total      = Math.round(bottleneck * 0.7 + avg * 0.3);
-
-  return { ...scores, total };
-}
-
-// ══════════════════════════════════════════════════════════════
-// § 4  CONSTRAINT / DECISION
-// ══════════════════════════════════════════════════════════════
-
-function getConstraint(scores) {
-  const min = Math.min(scores.thermal, scores.flow, scores.mechanical);
-
-  if (scores.flow === min) return {
-    type:    "FLOW",
-    score:   scores.flow,
-    factor:  "flow consistency during extended production runs",
-    impact:  "production consistency, yield rate, and operational efficiency",
-    control: "pressure stability, melt uniformity, and extrusion flow balance",
+    food:    null,
+    medical: null,
   };
 
-  if (scores.thermal === min) return {
-    type:    "THERMAL",
-    score:   scores.thermal,
-    factor:  "thermal stability under processing conditions",
-    impact:  "degradation control and process reliability",
-    control: "temperature control precision and thermal distribution uniformity",
-  };
-
-  return {
-    type:    "MECHANICAL",
-    score:   scores.mechanical,
-    factor:  "mechanical integrity under load conditions",
-    impact:  "product strength and structural performance",
-    control: "material strength consistency and structural reliability",
-  };
-}
-
-function determineDecision(total) {
-  if (total >= 75) return { decision: "GO",             level: "HIGH"     };
-  if (total >= 55) return { decision: "CONDITIONAL GO", level: "MODERATE" };
-  return              { decision: "HOLD",            level: "LOW"      };
-}
-
-function determineDecisionBand(total) {
-  if (total >= 75) return { level: "HIGH",     sublevel: null };
-  if (total >= 70) return { level: "MODERATE", sublevel: "A" };
-  if (total >= 62) return { level: "MODERATE", sublevel: "B" };
-  if (total >= 55) return { level: "MODERATE", sublevel: "C" };
-  return              { level: "LOW",      sublevel: null };
-}
-
-function calculateEconomic(total) {
-  if (total >= 75) return "+5–15%";
-  if (total >= 55) return "+15–30%";
-  return "+30%+";
-}
-
-function buildConstraintArchitecture(scores) {
-  const primary = getConstraint(scores);
-  const scoreMap = { THERMAL: scores.thermal, FLOW: scores.flow, MECHANICAL: scores.mechanical };
-
-  let secondaryType = "", enablingType = "";
-  if (primary.type === "FLOW")    { secondaryType = "THERMAL";    enablingType = "MECHANICAL"; }
-  else if (primary.type === "THERMAL") { secondaryType = "FLOW"; enablingType = "MECHANICAL"; }
-  else                            { secondaryType = "THERMAL";    enablingType = "FLOW"; }
-
-  return {
-    primary_constraint: primary,
-    secondary_interaction: { title: "Process Interaction Risk", type: secondaryType, score: scoreMap[secondaryType] },
-    enabling_factor:        { type: enablingType, score: scoreMap[enablingType] },
-  };
-}
-
-// ══════════════════════════════════════════════════════════════
-// § 5  EXECUTIVE SUMMARY
-// ══════════════════════════════════════════════════════════════
-
-function generateExecutive(scores, decision, economic, constraint) {
-  const { thermal, flow, mechanical, total } = scores;
-  const scoreBlock = `Thermal (${thermal}) / Flow (${flow}) / Mechanical (${mechanical}) / Composite: ${total}`;
-
-  if (decision.level === "LOW") {
-    return (
-      `This assessment determines LOW technical feasibility for the evaluated material transition within the current processing configuration. ` +
-      `${scoreBlock} Although certain individual parameters may remain supportive, the overall feasibility is limited by the ${constraint.type.toLowerCase()} constraint, which represents the controlling factor for this application. ` +
-      `The system is critically constrained by instability in ${constraint.factor} (score: ${constraint.score}/100). ` +
-      `This constraint directly compromises ${constraint.impact}, and commercial production is not recommended under the declared conditions without material or process reassessment. ` +
-      `Material cost variance is projected at ${economic}, reflecting the scope of re-engineering likely required. ` +
-      `Deployment Decision: HOLD — Commercial-scale implementation is not recommended under the current configuration. ` +
-      `A fundamental reassessment of material compatibility or processing architecture is required prior to any further validation activity.`
-    );
-  }
-
-  if (decision.level === "MODERATE" && constraint.type === "FLOW") {
-    return (
-      `This assessment determines MODERATE technical feasibility for the evaluated material transition within the current processing configuration. ` +
-      `${scoreBlock} The system is operationally viable, subject to constraint by flow-related instability. ` +
-      `Variability in ${constraint.factor} (score: ${constraint.score}/100) directly impacts ${constraint.impact}, with elevated sensitivity under extended production cycles and high line-speed conditions. ` +
-      `Material cost variance is projected at ${economic}. A controlled pilot validation phase is recommended, with primary focus on ${constraint.control}. ` +
-      `Deployment Decision: CONDITIONAL GO — Controlled pilot validation required prior to commercial commitment.`
-    );
-  }
-
-  if (decision.level === "MODERATE" && constraint.type === "THERMAL") {
-    return (
-      `This assessment determines MODERATE technical feasibility for the evaluated material transition within the current processing configuration. ` +
-      `${scoreBlock} The system is operationally viable, subject to thermal constraint. ` +
-      `Instability in ${constraint.factor} (score: ${constraint.score}/100) directly impacts ${constraint.impact}, with elevated sensitivity under elevated or fluctuating processing temperatures. ` +
-      `Material cost variance is projected at ${economic}. Pilot validation is recommended with primary emphasis on ${constraint.control}. ` +
-      `Deployment Decision: CONDITIONAL GO — Controlled pilot validation required prior to commercial commitment.`
-    );
-  }
-
-  if (decision.level === "MODERATE") {
-    return (
-      `This assessment determines MODERATE technical feasibility for the evaluated material transition within the current processing configuration. ` +
-      `${scoreBlock} The system is technically feasible, subject to structural performance constraints under load conditions. ` +
-      `Limitations in ${constraint.factor} (score: ${constraint.score}/100) directly impact ${constraint.impact}. ` +
-      `Material cost variance is projected at ${economic}. Pilot validation is recommended with primary focus on ${constraint.control}. ` +
-      `Deployment Decision: CONDITIONAL GO — Controlled pilot validation required prior to commercial commitment.`
-    );
-  }
-
-  return (
-    `This assessment determines HIGH technical feasibility for the evaluated material transition within the current processing configuration. ` +
-    `${scoreBlock} The system demonstrates strong compatibility across all key processing parameters. ` +
-    `Residual sensitivity to ${constraint.factor} (score: ${constraint.score}/100) does not materially compromise ${constraint.impact} under standard operating conditions. ` +
-    `Material cost variance is projected at ${economic}. ` +
-    `Deployment Decision: GO — Proceed to controlled pilot validation and systematic scale-up. Full-scale commercial deployment should follow only after pilot validation confirms stable operating performance.`
-  );
-}
-
-// ══════════════════════════════════════════════════════════════
-// § 8  RISK / MECHANISM
-// ══════════════════════════════════════════════════════════════
-
-function generateMechanism(input, constraint, context) {
-  const spec   = getNarrativeSpecialization(context);
-  const source = safe(input.material,    "the source material");
-  const target = input.bio_material || "the target biodegradable material";
-  const app    = safe(input.application, "the specified application");
-
-  if (spec === "LDPE_PHA_LOW_TEMP_FILM") {
-    return (
-      `${source} provides relatively broad film-forming tolerance and stable extrusion behaviour under continuous pouch production, whereas ${target} introduces greater sensitivity in melt stability, crystallisation-driven flow response, and low-temperature flex behaviour. ` +
-      `Under ${app} conditions, this mismatch is most likely to emerge as instability in film formation, seal-area consistency, and extended-run output control rather than as a purely thermal limitation. ` +
-      `As a result, production consistency, yield rate, and operational efficiency may deteriorate when flow stability is not tightly maintained.`
-    );
-  }
-
-  if (spec === "LDPE_BIO_HIGH_SPEED_FILM") {
-    return (
-      `${source} offers broad blown-film processing tolerance, while ${target} operates within a narrower melt-stability and structure-development window. ` +
-      `Under ${app} conditions, this mismatch is expected to appear mainly as gauge-control, seal-area, and extended-run output variability.`
-    );
-  }
-
-  if (spec === "PP_PLA_THERMAL_STRESS") {
-    return (
-      `${source} maintains broader tolerance to elevated processing and use-phase heat exposure, whereas ${target} operates within a narrower thermal stability range governed by earlier softening and degradation onset sensitivity. ` +
-      `Under ${app} conditions, this material gap becomes critical because repeated or sustained thermal loading directly affects shape retention, stiffness retention, and structural reliability after moulding. ` +
-      `This mismatch manifests primarily as thermal instability under processing and downstream application conditions.`
-    );
-  }
-
-  if (spec === "PET_PLA_THERMAL_STRESS") {
-    return (
-      `${source} retains a wider thermal processing margin and stronger dimensional retention under heat-exposed rigid packaging conditions, whereas ${target} enters a narrower stability range with earlier softening and heat-induced property decline. ` +
-      `Under ${app} conditions, this difference is likely to emerge as reduced dimensional reliability, local deformation risk, and lower retention of structural precision once thermal demand approaches the upper boundary of the qualified range. ` +
-      `The transition is therefore primarily constrained by thermal stability rather than by baseline moulding capability.`
-    );
-  }
-
-  return (
-    `${source} exhibits broader thermal and rheological tolerance under standard processing conditions, whereas ${target} introduces a narrower operational window governed by crystallisation kinetics and degradation onset sensitivity. ` +
-    `Under ${app} conditions, this property mismatch may reduce ${constraint.impact} if the process is not controlled within the validated operating range.`
-  );
-}
-
-// ══════════════════════════════════════════════════════════════
-// § 7b  SPECIALIZED NARRATIVE GENERATORS
-// ══════════════════════════════════════════════════════════════
-
-function generateExecutiveSpecialized(input, scores, context, constraintArch, economic) {
-  const spec   = getNarrativeSpecialization(context);
-  const source = safe(input.material,    "Current material");
-  const target = safe(input.bio_material, "target biodegradable material");
-  const app    = safe(input.application,  "the target application");
-
-  if (spec === "LDPE_BIO_HIGH_SPEED_FILM") {
-    return (
-      `${source} replacement with ${target} for ${app} is assessed at MODERATE feasibility under the declared processing configuration. ` +
-      `The scoring profile indicates that thermal stability (${scores.thermal}/100) and mechanical consistency (${scores.mechanical}/100) remain conditionally supportive, while flow performance (${scores.flow}/100) is the primary limiting factor, resulting in a composite score of ${scores.total}/100. ` +
-      `For this application, the principal concern is not baseline convertibility alone, but the ability to maintain melt uniformity, gauge control, and downstream film consistency during extended high-speed production runs. ` +
-      `Commercial transition is therefore not excluded, but should proceed only through controlled pilot validation focused on flow stability, long-run output consistency, and scrap-rate containment. ` +
-      `Indicative material cost variance remains in the ${economic} range under the current transition scenario.`
-    );
-  }
-
-  if (spec === "LDPE_PHA_LOW_TEMP_FILM") {
-    return (
-      `${source} replacement with ${target} for ${app} is assessed at MODERATE feasibility under the declared processing configuration. ` +
-      `Thermal stability (${scores.thermal}/100) and baseline structural performance (${scores.mechanical}/100) remain conditionally workable, but flow performance (${scores.flow}/100) is the primary constraint, producing a composite score of ${scores.total}/100. ` +
-      `For low-temperature pouch and film applications, this limitation is most likely to appear in film-forming consistency, seal-area balance, and flex-performance stability across extended runs. ` +
-      `A commercial transition may be possible, but only after controlled validation confirms stable long-run output and acceptable low-temperature handling behaviour. ` +
-      `Indicative material cost variance remains in the ${economic} range under the current transition scenario.`
-    );
-  }
-
-  if (spec === "PP_PLA_THERMAL_STRESS") {
-    return (
-      `${source} replacement with ${target} for ${app} is assessed at MODERATE feasibility under the declared processing configuration. ` +
-      `The scoring profile indicates that flow behaviour (${scores.flow}/100) and baseline mechanical formation (${scores.mechanical}/100) remain conditionally supportive, while thermal stability (${scores.thermal}/100) is the primary limiting factor, resulting in a composite score of ${scores.total}/100. ` +
-      `The key commercial concern is not initial molding alone, but retention of shape, rigidity, and structural reliability once the article is exposed to repeated or sustained thermal load. ` +
-      `Commercial transition should therefore proceed only through controlled pilot validation focused on thermal margin, post-heating dimensional stability, and downstream performance retention. ` +
-      `Indicative material cost variance remains in the ${economic} range under the current transition scenario.`
-    );
-  }
-
-  if (spec === "PET_PLA_THERMAL_STRESS") {
-    return (
-      `${source} replacement with ${target} for ${app} is assessed at MODERATE feasibility under the declared processing configuration. ` +
-      `Thermal stability (${scores.thermal}/100) is the primary limiting parameter, while flow behaviour (${scores.flow}/100) and mechanical formation (${scores.mechanical}/100) remain conditionally supportive, producing a composite score of ${scores.total}/100. ` +
-      `For this transition, the commercial issue is not basic cavity filling, but maintenance of dimensional precision, geometry retention, and post-molding stability once heat exposure approaches the upper boundary of the qualified range. ` +
-      `Commercial transition should therefore proceed only through controlled pilot validation focused on thermal margin, dimensional reliability, and tolerance retention at critical features. ` +
-      `Indicative material cost variance remains in the ${economic} range under the current transition scenario.`
-    );
-  }
-
-  return null;
-}
-
-function generatePrimaryRiskSpecialized(scores, context, constraintArch) {
-  const spec    = getNarrativeSpecialization(context);
-  const primary = constraintArch.primary_constraint;
-
-  if (spec === "LDPE_BIO_HIGH_SPEED_FILM") {
-    return (
-      `Flow variability (${primary.score}/100) is the primary operational risk for this material transition. ` +
-      `Under high-speed blown-film conditions, melt instability may reduce gauge control, seal-area consistency, and output uniformity during extended runs. ` +
-      `This risk should be managed through pressure stability, melt uniformity, and extrusion flow balance.`
-    );
-  }
-
-  if (spec === "LDPE_PHA_LOW_TEMP_FILM") {
-    return (
-      `Variability in ${primary.factor} (${primary.score}/100) constitutes the primary operational risk for this material transition. ` +
-      `In low-temperature film and pouch applications, drift in melt stability is likely to propagate into film-forming inconsistency, seal-area imbalance, and non-uniform flex-performance across production output. ` +
-      `This directly affects production consistency, converting reliability, and downstream application robustness, and must be managed through rigorous control of pressure stability, melt uniformity, and extrusion flow balance.`
-    );
-  }
-
-  if (spec === "PP_PLA_THERMAL_STRESS" || spec === "PET_PLA_THERMAL_STRESS") {
-    return (
-      `Variability in ${primary.factor} (${primary.score}/100) constitutes the primary operational risk for this material transition. ` +
-      `The main concern is not limited to processing exposure itself, but the loss of thermal margin that can translate into deformation risk, dimensional drift, and reduced post-heating structural reliability in downstream use. ` +
-      `This directly compromises degradation control and process reliability and must be managed through rigorous control of temperature control precision and thermal distribution uniformity.`
-    );
-  }
-
-  return null;
-}
-
-function generateSecondaryRiskSpecialized(scores, context, constraintArch) {
-  const spec = getNarrativeSpecialization(context);
-
-  if (spec === "LDPE_BIO_HIGH_SPEED_FILM") {
-    return (
-      `Thermal sensitivity (${scores.thermal}/100) may amplify mechanical variation once flow stability begins to drift. ` +
-      `In high-speed film production, this interaction is most likely to appear as gauge variation, local seal-area inconsistency, winding instability, and reduced output uniformity.`
-    );
-  }
-
-  if (spec === "LDPE_PHA_LOW_TEMP_FILM") {
-    return (
-      `Thermal sensitivity (${scores.thermal}/100) interacts with mechanical consistency (${scores.mechanical}/100), creating downstream process-level effects once flow stability begins to drift. ` +
-      `In low-temperature pouch and film production, this interaction is most likely to appear as localized seal imbalance, non-uniform film stiffness, and variable flex-response across production output.`
-    );
-  }
-
-  if (spec === "PP_PLA_THERMAL_STRESS") {
-    return (
-      `Flow sensitivity (${scores.flow}/100) interacts with mechanical consistency (${scores.mechanical}/100) at the boundary of the qualified thermal envelope. ` +
-      `Even where molded output remains visually stable, local softening, shape relaxation, and stiffness decline may progressively amplify functional variability beyond the primary thermal constraint alone.`
-    );
-  }
-
-  if (spec === "PET_PLA_THERMAL_STRESS") {
-    return (
-      `Flow sensitivity (${scores.flow}/100) interacts with mechanical consistency (${scores.mechanical}/100) at the boundary of the qualified thermal envelope. ` +
-      `Even where the molded article is initially formed within dimensional acceptance, localized relaxation, edge distortion, and tolerance drift may progressively amplify functional variability beyond the primary thermal constraint alone.`
-    );
-  }
-
-  return null;
-}
-
-function generateApplicationImplicationSpecialized(decisionBand, context, constraintArch, input) {
-  const spec = getNarrativeSpecialization(context);
-  const app  = safe(input.application, "this application");
-
-  if (spec === "LDPE_BIO_HIGH_SPEED_FILM") {
-    return (
-      `${app} is technically feasible subject to controlled process optimisation. ` +
-      `Pilot-scale validation is required and must verify flow stability, gauge consistency, seal-area reliability, and extended-run output uniformity before full-scale commercial deployment is considered.`
-    );
-  }
-
-  if (spec === "LDPE_PHA_LOW_TEMP_FILM") {
-    return (
-      `${app} is technically feasible subject to controlled process optimisation. ` +
-      `Pilot-scale validation is required and must verify flow stability, film-forming consistency, seal-area balance, and low-temperature handling performance before full-scale deployment is considered.`
-    );
-  }
-
-  if (spec === "PP_PLA_THERMAL_STRESS") {
-    return (
-      `${app} is technically feasible subject to tightly controlled process optimisation. ` +
-      `Pilot-scale validation is required before commercial commitment, with particular emphasis on thermal margin, post-heating dimensional retention, and structural reliability after repeated heat exposure.`
-    );
-  }
-
-  if (spec === "PET_PLA_THERMAL_STRESS") {
-    return (
-      `${app} is technically feasible subject to tightly controlled process optimisation. ` +
-      `Pilot-scale validation is required before commercial commitment, with particular emphasis on dimensional reliability, tolerance retention, and post-molding geometry stability under thermal exposure.`
-    );
-  }
-
-  return null;
-}
-
-function generateNextStepSpecialized(decisionBand, constraintArch, context, scores, input) {
-  const spec = getNarrativeSpecialization(context);
-
-  if (spec === "LDPE_BIO_HIGH_SPEED_FILM") {
-    return (
-      `Based on the MODERATE feasibility determination (Composite: ${scores.total}/100), engineering validation targeting flow stability control is required before commercial commitment. ` +
-      `Validation should confirm melt uniformity, pressure balance, gauge consistency, seal-area reliability, and extended-run output control under representative high-speed conditions. ` +
-      `Pilot approval should follow only after the qualified production envelope and downstream converting consistency are confirmed.`
-    );
-  }
-
-  if (spec === "LDPE_PHA_LOW_TEMP_FILM") {
-    return (
-      `Based on the MODERATE feasibility determination (Composite: ${scores.total}/100), engineering validation targeting flow stability control is required prior to pilot approval and must be completed before any commercial commitment.\n\n` +
-      `Validation should focus on stable melt uniformity, film-forming control, seal-area consistency, and low-temperature handling performance under representative production conditions. ` +
-      `Structured pilot trials should define the qualified envelope for long-run film production and downstream pouch conversion before commercial-scale deployment is considered.`
-    );
-  }
-
-  if (spec === "PP_PLA_THERMAL_STRESS") {
-    return (
-      `Based on the MODERATE feasibility determination (Composite: ${scores.total}/100), engineering validation targeting thermal stability control is required prior to pilot approval and must be completed before any commercial commitment.\n\n` +
-      `Validation should focus on heat-retention margin, post-heating dimensional retention, and structural reliability after repeated thermal exposure. ` +
-      `Execute structured pilot trials to define the qualified processing and downstream-use envelope, then re-assess system stability before proceeding to commercial-scale deployment.`
-    );
-  }
-
-  if (spec === "PET_PLA_THERMAL_STRESS") {
-    return (
-      `Based on the MODERATE feasibility determination (Composite: ${scores.total}/100), engineering validation targeting thermal stability control is required prior to pilot approval and must be completed before any commercial commitment.\n\n` +
-      `Validation should focus on post-molding dimensional retention, tolerance stability at critical features, and structural consistency after realistic heat-exposure conditions. ` +
-      `Execute structured pilot trials to define the qualified thermal and dimensional acceptance envelope, then re-assess system stability before proceeding to commercial-scale deployment.`
-    );
-  }
-
-  return null;
-}
-
-function generateRisk(scores, constraintArch, input, context, decision) {
-  const primary = constraintArch.primary_constraint;
-  const mat = safe(input.material, "the source material");
-  const bio = input.bio_material || "the target biodegradable material";
-  const app = safe(input.application, "the specified processing application");
-
-  const isLowDecision = decision?.level === "LOW";
-
-  const primaryText = isLowDecision
-    ? `Critical instability in ${primary.factor} (${primary.score}/100) is expected to prevent reliable commercial-scale implementation under the declared operating conditions without material or process reassessment. ` +
-      `This directly compromises ${primary.impact} and creates a high probability of scrap escalation, output variation, and non-compliant production if deployment proceeds without redesign.`
-    : `Variability in ${primary.factor} (${primary.score}/100) constitutes the primary operational risk for this material transition. ` +
-      `This directly impacts ${primary.impact} and must be managed through rigorous control of ${primary.control}. ` +
-      `Risk exposure increases as production duration, throughput, or application stress move toward the boundary of the qualified operating range.`;
-
-  // Specialised secondary + mechanism overrides
-  if (
-    context.material_class === "POLYOLEFIN_PE" &&
-    context.target_material_class === "PHA_BASED" &&
-    context.process_family === "BLOWN_FILM"
-  ) {
-    return {
-      primary: primaryText,
-      secondary:
-        `Thermal sensitivity (${scores.thermal}/100) interacts with mechanical consistency (${scores.mechanical}/100), creating downstream process-level effects once flow stability begins to drift. ` +
-        `In blown-film production, this interaction is most likely to appear as widening gauge variation, localised seal-area inconsistency, and progressive loss of output uniformity during extended runs.`,
-      mechanism:
-        `${mat} provides relatively broad film-forming tolerance and stable extrusion behaviour under continuous blown-film production, whereas ${bio} introduces greater sensitivity in melt stability, crystallisation-driven flow response, and long-run uniformity control. ` +
-        `Under ${app} conditions, this mismatch is most likely to appear as instability in bubble behaviour, cross-web thickness control, seal-area consistency, and extended-run output stability. ` +
-        `Production consistency, yield rate, and operational efficiency may deteriorate when flow stability is not tightly maintained.`,
+  if (route === 'food') {
+    input.food = {
+      food_type:        str('food_type'),
+      contact_temp:     str('contact_temp'),
+      contact_duration: str('contact_duration'),
+      inpack_process:   strAny([
+        'inpack_process',
+        'in_pack_process',
+        'inpackProcess',
+        'inpack_processing',
+        'in_pack_processing',
+        'food_inpack_process',
+        'food_in_pack_process',
+        'food_inpack_processing',
+        'food_in_pack_processing',
+        'inpack_process_food',
+        'in_pack_process_food',
+      ], 'unknown'),
+      seal_temp:        str('seal_temp'),
+      barrier_layer:    arr('barrier_layer'),
     };
   }
 
-  if (
-    context.material_class === "POLYOLEFIN_PP" &&
-    context.target_material_class === "PLA_BASED" &&
-    context.use_condition_family === "THERMAL_STRESS"
-  ) {
-    return {
-      primary: primaryText,
-      secondary:
-        `Flow sensitivity (${scores.flow}/100) interacts with mechanical consistency (${scores.mechanical}/100) at the boundary of the qualified thermal envelope. ` +
-        `Even where moulding output remains visually stable, local softening, seal-area deformation, or shape relaxation may progressively amplify functional variability beyond the primary thermal constraint alone.`,
-      mechanism:
-        `${mat} maintains broader tolerance to elevated processing and use-phase thermal exposure, whereas ${bio} operates within a narrower thermal stability range governed by earlier softening and heat-induced property decline. ` +
-        `Under ${app} conditions, repeated heating affects not only dimensional retention but also localised rigidity, seal stability, and structural consistency after conversion. ` +
-        `The transition is constrained primarily by thermal instability rather than by baseline melt flow uniformity.`,
+  if (route === 'medical') {
+    input.medical = {
+      device_type:            str('device_type'),
+      patient_contact:        str('patient_contact'),
+      contact_duration_med:   str('contact_duration_med'),
+      device_class:           str('device_class', 'unknown'),
+      sterilisation_medical:  str('sterilisation_medical'),
+      body_fluid_contact:     str('body_fluid_contact'),
+      medical_grade_supplier: str('medical_grade_supplier'),
+      iso_13485_supplier:     str('iso_13485_supplier'),
     };
   }
 
-  if (
-    context.material_class === "PET" &&
-    context.target_material_class === "PLA_BASED" &&
-    context.use_condition_family === "THERMAL_STRESS"
-  ) {
-    return {
-      primary: primaryText,
-      secondary:
-        `Flow sensitivity (${scores.flow}/100) interacts with mechanical consistency (${scores.mechanical}/100) at the boundary of the qualified thermal envelope. ` +
-        `Even where the moulded article is initially formed within visual and dimensional acceptance, localised relaxation, edge distortion, or geometry drift may progressively amplify functional variability beyond the primary thermal constraint alone.`,
-      mechanism:
-        `${mat} provides a wider thermal processing margin and stronger dimensional retention under precision rigid-packaging conditions, whereas ${bio} enters a narrower stability range with earlier softening and heat-induced property decline. ` +
-        `Under ${app} conditions, tolerance-sensitive geometry must remain stable not only immediately after moulding, but also during downstream handling and thermal exposure. ` +
-        `The transition is constrained primarily by thermal-driven dimensional instability rather than by baseline melt flow uniformity.`,
-    };
-  }
-
-  // Generic secondary
-  let secondary = "";
-  if (primary.type === "FLOW") {
-    secondary =
-      `Thermal sensitivity (${scores.thermal}/100) interacts with mechanical consistency (${scores.mechanical}/100), creating downstream process-level effects once flow stability begins to drift. ` +
-      `Where melt behaviour moves toward the boundary of the qualified operating range, structural performance and output uniformity may deteriorate beyond the influence of the primary constraint alone.`;
-  } else if (primary.type === "THERMAL") {
-    secondary =
-      `Flow sensitivity (${scores.flow}/100) interacts with mechanical consistency (${scores.mechanical}/100), creating downstream process-level effects across the production system. ` +
-      `Where thermal conditions move toward the boundary of the qualified operating range, mechanical performance may be conditionally affected, resulting in compounded output variation.`;
-  } else {
-    secondary =
-      `Thermal sensitivity (${scores.thermal}/100) interacts with flow stability (${scores.flow}/100), increasing the effect of the structural limitation at the edge of the qualified operating range. ` +
-      `As process conditions drift, both dimensional reliability and production consistency may deteriorate together.`;
-  }
-
-  return {
-    primary: primaryText,
-    secondary,
-    mechanism:
-      `${mat} exhibits broader thermal and rheological tolerance under standard processing conditions, whereas ${bio} introduces a narrower operational window governed by crystallisation kinetics and degradation onset sensitivity. ` +
-      `Under ${app} conditions, this property mismatch generates instability in ${primary.factor}, causing ${primary.impact} to fall outside commercially acceptable limits.`,
-  };
+  return input;
 }
 
-// ══════════════════════════════════════════════════════════════
-// § 9  PROCESSING SECTION
-// ══════════════════════════════════════════════════════════════
-
-function generateProcessing(scores, constraint) {
-  let processingWindow;
-  if (constraint.score < 55) {
-    processingWindow =
-      `The processing window is critically narrow and operationally unstable. ` +
-      `The ${constraint.type} constraint (${constraint.score}/100) restricts usable parameters to conditions incompatible with continuous commercial production. ` +
-      `Significant process control intervention and probable equipment modification are required before validation activity can be initiated.`;
-  } else if (constraint.score < 75) {
-    processingWindow =
-      `The processing window is operable but restricted by ${constraint.factor} (${constraint.score}/100). ` +
-      `Sustained production requires tightly validated operating parameters; deviations outside the qualified range will generate measurable output instability and elevated scrap rates.`;
-  } else {
-    processingWindow =
-      `The processing window is broad and fully compatible with standard operating parameters. ` +
-      `${constraint.factor.charAt(0).toUpperCase() + constraint.factor.slice(1)} (${constraint.score}/100) does not impose critical operational restrictions under normal production conditions.`;
-  }
-
-  let thermalBehavior;
-  if (scores.thermal >= 75) {
-    thermalBehavior =
-      `Thermally acceptable under the declared conditions — no primary thermal blocker is indicated at this screening stage (Thermal: ${scores.thermal}/100). ` +
-      `Temperature control should still be monitored during validation because biodegradable compounds may show narrower processing tolerance than incumbent materials.`;
-  } else if (scores.thermal >= 55) {
-    thermalBehavior =
-      `Thermally sensitive — thermal behaviour requires monitored control during extended production runs (Thermal: ${scores.thermal}/100). ` +
-      `Zone-by-zone temperature monitoring is recommended to maintain material stability within the validated processing range.`;
-  } else {
-    thermalBehavior =
-      `Thermally unstable — the operating thermal window is incompatible with stable biodegradable polymer processing (Thermal: ${scores.thermal}/100). ` +
-      `Degradation risk under standard processing temperatures is high; thermal profile redesign is required prior to pilot validation.`;
-  }
-
-  let flowCharacteristics;
-  if (scores.flow >= 75) {
-    flowCharacteristics =
-      `Operationally stable — melt rheology within the qualified processing range (Flow: ${scores.flow}/100). ` +
-      `Standard screw configuration and pressure settings are confirmed to maintain melt uniformity across production runs without active process intervention.`;
-  } else if (scores.flow >= 55) {
-    flowCharacteristics =
-      `Variable — melt flow requires active stabilisation (Flow: ${scores.flow}/100). ` +
-      `Pressure fluctuation risk during extended extrusion or converting cycles should be checked through monitoring, screw-speed review, and temporary throughput adjustment if instability appears during validation.`;
-  } else {
-    flowCharacteristics =
-      `Critically unstable — melt behaviour is incompatible with continuous commercial production (Flow: ${scores.flow}/100). ` +
-      `Significant flow instability directly results in unacceptable gauge variation, potential line stoppages, and elevated off-specification output rates.`;
-  }
-
-  return { processingWindow, thermalBehavior, flowCharacteristics };
+function clonePlainObject(obj) {
+  return JSON.parse(JSON.stringify(obj));
 }
 
-// ══════════════════════════════════════════════════════════════
-// § 10  PRODUCT SECTION
-// ══════════════════════════════════════════════════════════════
-
-function generateProduct(scores) {
-  const mechanical = scores.mechanical >= 75
-    ? `Structural integrity of the finished product appears attainable under the declared processing context (Mechanical: ${scores.mechanical}/100). Mechanical performance is not identified as the primary blocker, but should still be confirmed through application-level validation.`
-    : scores.mechanical >= 55
-    ? `Mechanical performance is conditionally adequate, subject to process consistency (Mechanical: ${scores.mechanical}/100). Inter-batch property variation results without active control measures.`
-    : `Mechanical performance falls below the commercial acceptance threshold (Mechanical: ${scores.mechanical}/100). Structural integrity compliance cannot be assured without material reformulation or process redesign.`;
-
-  const surface = scores.flow >= 75
-    ? `Surface finish conforms to specification. Operationally stable melt flow (Flow: ${scores.flow}/100) supports uniform surface formation under standard die and cooling conditions.`
-    : scores.flow >= 55
-    ? `Surface quality is conditionally acceptable. Flow variability (Flow: ${scores.flow}/100) may introduce surface or profile non-uniformities, particularly during start-up, transition, or extended production runs.`
-    : `Surface quality is unreliable under current process parameters (Flow: ${scores.flow}/100). Melt instability directly generates streaking, pitting, and non-uniform gloss at commercial production speeds.`;
-
-  const structural = scores.total >= 75
-    ? `Structural consistency is attainable within the defined processing envelope. Dimensional stability and wall thickness uniformity conform to pilot validation acceptance criteria.`
-    : scores.total >= 55
-    ? `Structural consistency is conditional on process parameter control (Composite: ${scores.total}/100). Dimensional variation at processing window margins requires tooling and cooling parameter adjustments.`
-    : `Structural consistency is unlikely to meet commercial tolerance requirements under the current process conditions without process redesign (Composite: ${scores.total}/100). Dimensional variance and structural non-compliance may exceed commercial tolerance limits unless the process architecture is reassessed.`;
-
-  return { mechanical, surface, structural };
+function mapValue(value, map) {
+  if (value === null || value === undefined) return value;
+  if (Array.isArray(value)) return value.map(v => mapValue(v, map));
+  return map[value] ?? value;
 }
 
-// ══════════════════════════════════════════════════════════════
-// § 11  QUALITY SECTION
-// ══════════════════════════════════════════════════════════════
+function normalizeInputForScoring(input) {
+  const out = clonePlainObject(input);
 
-function generateQuality(scores) {
-  const minScore = Math.min(scores.thermal, scores.flow, scores.mechanical);
-
-  const stability     = minScore >= 75 ? "High" : minScore >= 55 ? "Moderate" : "Low";
-  const stabilityNote = minScore >= 75
-    ? `Process stability index: ${minScore}/100. Compliant with commercial deployment under standard quality control protocol.`
-    : minScore >= 55
-    ? `Process stability index: ${minScore}/100. Conditionally acceptable — enhanced in-line monitoring and statistical process control (SPC) are required.`
-    : `Process stability index: ${minScore}/100. Below the commercial acceptance threshold. Process redesign is required prior to deployment.`;
-
-  const consistency     = scores.flow >= 75 ? "High" : scores.flow >= 55 ? "Moderate" : "Low";
-  const consistencyNote = scores.flow >= 75
-    ? `Flow consistency index: ${scores.flow}/100. Production consistency is attainable within standard parameter tolerance limits.`
-    : scores.flow >= 55
-    ? `Flow consistency index: ${scores.flow}/100. Closed-loop pressure control is recommended to restrict inter-batch variability to acceptable levels.`
-    : `Flow consistency index: ${scores.flow}/100. High inter-batch variability results. Output consistency cannot be assured without active flow stabilisation measures.`;
-
-  return { stability, stabilityNote, consistency, consistencyNote };
-}
-
-// ══════════════════════════════════════════════════════════════
-// § 12  EXPECTED DEVIATIONS / RISK TITLES
-// ══════════════════════════════════════════════════════════════
-
-function generateExpectedDeviations(input, scores, context, constraintArch) {
-  const spec = getNarrativeSpecialization(context);
-  let items  = [];
-
-  if (spec === "LDPE_PHA_LOW_TEMP_FILM") {
-    items = [
-      `Local film stiffness variation may reduce pouch-forming consistency under low-temperature handling conditions`,
-      `Seal-area thickness imbalance may emerge where melt stability shifts during extended extrusion runs`,
-      `Cold-chain flex performance may vary across production output when flow uniformity deteriorates over time`,
-    ];
-  } else if (spec === "LDPE_BIO_HIGH_SPEED_FILM") {
-    items = [
-      `Cross-web gauge drift may increase as melt stability moves toward the boundary of the qualified operating range`,
-      `Local seal-area non-uniformity may emerge where thickness balance and melt stability shift during extended high-speed runs`,
-      `Extended-run output may show progressive variation in film uniformity, winding consistency, and off-specification zone frequency`,
-    ];
-  } else if (spec === "PP_PLA_THERMAL_STRESS") {
-    items = [
-      `Heat-induced deformation may emerge where thermal retention is insufficient for the intended application`,
-      `Local loss of stiffness or structural stability may appear under repeated thermal exposure`,
-      `Material response may become inconsistent when thermal load approaches the upper limit of the qualified operating window`,
-    ];
-  } else if (spec === "PET_PLA_THERMAL_STRESS") {
-    items = [
-      `Dimensional drift may increase at precision edges where thermal exposure approaches the qualified limit`,
-      `Local wall-section distortion may appear after repeated heat loading or elevated-temperature use cycles`,
-      `Container geometry retention may vary between cycles where thermal stability is insufficient for the required service condition`,
-    ];
-  } else if (context.process_family === "INJECTION") {
-    const dimRange = scores.mechanical < 65 ? "±0.3–0.8mm" : "±0.1–0.3mm";
-    items = [
-      `Dimensional deviation ${dimRange} on critical part features under process parameter fluctuation`,
-      `Warpage or local sink behaviour may appear where cooling balance shifts across the moulded section`,
-      `Surface or geometry retention may vary when material response approaches the boundary of the qualified processing window`,
-    ];
-  } else if (
-    constraintArch.primary_constraint.type === "FLOW" &&
-    (
-      context.process_family === "BLOWN_FILM" ||
-      context.process_family === "FILM_EXTRUSION" ||
-      /POUCH|FILM|BAG/i.test(safe(input.application, ""))
-    )
-  ) {
-    items = [
-      `Gauge or thickness variation may appear during extended production runs where melt uniformity drifts outside the qualified range`,
-      `Seal-area non-uniformity may increase when pressure fluctuation affects steady-state conversion`,
-      `Pouch or film-converting stability may decline as line conditions move toward the edge of the validated flow envelope`,
-    ];
-  } else if (constraintArch.primary_constraint.type === "FLOW") {
-    items = [
-      `Output consistency variation may appear during extended production runs where melt uniformity drifts outside the qualified range`,
-      `Surface or profile non-uniformity may increase under pressure fluctuation during steady-state conversion`,
-      `Production stability may decline as line conditions move toward the edge of the validated flow envelope`,
-    ];
-  } else if (constraintArch.primary_constraint.type === "THERMAL") {
-    items = [
-      `Heat-induced deformation may emerge where thermal retention is insufficient for the intended application`,
-      `Local loss of stiffness or structural stability may appear under repeated thermal exposure`,
-      `Material response may become inconsistent when thermal load approaches the upper limit of the qualified operating window`,
-    ];
-  } else {
-    items = [
-      `Mechanical property variation may affect structural consistency across production output`,
-      `Dimensional deviation may appear on critical features under fluctuating process conditions`,
-      `Further deviation characterisation is required under full-scale production conditions prior to commercial acceptance`,
-    ];
-  }
-
-  return items.map((item) => `<li>${item}</li>`).join("\n");
-}
-
-function getPrimaryRiskTitle(constraint) {
-  if (constraint.type === "THERMAL")   return "Thermal Instability";
-  if (constraint.type === "FLOW")      return "Process Flow Variability";
-  return "Mechanical Performance Limitation";
-}
-
-// ══════════════════════════════════════════════════════════════
-// § 13  APPLICATION IMPLICATION
-// ══════════════════════════════════════════════════════════════
-
-function generateApplicationImplicationV2(decisionBand, context, constraintArch, input) {
-  const app     = safe(input.application, "this application");
-  const primary = constraintArch.primary_constraint;
-
-  if (decisionBand.level === "LOW") {
-    return (
-      `${app} is not recommended for commercial deployment under the declared configuration without further material or process reassessment. ` +
-      `The primary blocker is ${primary.factor}, and the current material transition path does not provide sufficient margin for reliable implementation.`
-    );
-  }
-
-  if (context.material_class === "POLYOLEFIN_PE" && context.target_material_class === "PHA_BASED" && context.process_family === "BLOWN_FILM") {
-    return (
-      `${app} is technically feasible only under controlled process optimisation. ` +
-      `Pilot-scale validation must confirm that flow stability, gauge control, and downstream film consistency can be maintained over extended runs before full-scale commercial deployment is considered.`
-    );
-  }
-
-  if (context.material_class === "POLYOLEFIN_PP" && context.target_material_class === "PLA_BASED" && context.use_condition_family === "THERMAL_STRESS") {
-    return (
-      `${app} is technically feasible subject to tightly controlled process optimisation. ` +
-      `Pilot-scale validation is required before commercial commitment, with particular emphasis on thermal margin, post-heating structural reliability, and repeated heat-exposure performance.`
-    );
-  }
-
-  if (context.material_class === "PET" && context.target_material_class === "PLA_BASED" && context.use_condition_family === "THERMAL_STRESS") {
-    return (
-      `${app} is technically feasible subject to tightly controlled process optimisation. ` +
-      `Pilot-scale validation is required before commercial commitment, with particular emphasis on dimensional reliability, tolerance retention, and post-moulding geometry stability under thermal exposure.`
-    );
-  }
-
-  if (decisionBand.level === "MODERATE" && context.use_condition_family === "THERMAL_STRESS") {
-    return (
-      `${app} is technically feasible subject to tightly controlled process optimisation. ` +
-      `Pilot-scale validation is required before commercial commitment, with particular emphasis on maintaining thermal margin and downstream dimensional reliability.`
-    );
-  }
-
-  if (
-    decisionBand.level === "MODERATE" &&
-    (
-      context.process_family === "BLOWN_FILM" ||
-      context.process_family === "FILM_EXTRUSION" ||
-      /POUCH|FILM|BAG/i.test(app)
-    )
-  ) {
-    return (
-      `${app} is technically feasible subject to process optimisation. ` +
-      `Pilot-scale validation should verify flow uniformity, gauge or thickness consistency, seal-area reliability, and downstream pouch or film-converting stability before commercial commitment.`
-    );
-  }
-
-  return (
-    `${app} is technically feasible subject to process optimisation. ` +
-    `Pilot-scale validation is required and must be successfully completed prior to commercial commitment.`
-  );
-}
-
-// ══════════════════════════════════════════════════════════════
-// § 14  NEXT STEP
-// ══════════════════════════════════════════════════════════════
-
-function generateNextStepV2(decisionBand, constraintArch, context, scores, input) {
-  const primary = constraintArch.primary_constraint;
-
-  if (decisionBand.level === "LOW") {
-    return (
-      `Based on the LOW feasibility determination (Composite: ${scores.total}/100), the current transition path is not recommended for pilot approval.\n\n` +
-      `Deployment planning should be suspended at this stage, and either an alternative material grade or a modified process architecture should be reviewed to address ${primary.factor}. ` +
-      `Re-submission should follow only after a revised material or processing path has been technically screened at laboratory level.`
-    );
-  }
-
-  if (context.material_class === "POLYOLEFIN_PE" && context.target_material_class === "PHA_BASED" && context.process_family === "BLOWN_FILM") {
-    return (
-      `Based on the MODERATE feasibility determination (Composite: ${scores.total}/100), engineering validation targeting flow stability control is required before commercial commitment. ` +
-      `Validation should confirm melt uniformity, pressure balance, gauge consistency, and extended-run output control under representative operating conditions. ` +
-      `Pilot approval should follow only after the qualified production envelope and downstream converting consistency are confirmed.`
-    );
-  }
-
-  if (context.material_class === "POLYOLEFIN_PP" && context.target_material_class === "PLA_BASED" && context.use_condition_family === "THERMAL_STRESS") {
-    return (
-      `Based on the MODERATE feasibility determination (Composite: ${scores.total}/100), engineering validation targeting thermal stability control is required prior to pilot approval and must be completed before any commercial commitment.\n\n` +
-      `Validation should focus on heat-retention margin, post-heating dimensional retention, and structural reliability after repeated thermal exposure. ` +
-      `Execute structured pilot trials to define the qualified processing and downstream-use envelope, then re-assess system stability before proceeding to commercial-scale deployment.`
-    );
-  }
-
-  if (context.material_class === "PET" && context.target_material_class === "PLA_BASED" && context.use_condition_family === "THERMAL_STRESS") {
-    return (
-      `Based on the MODERATE feasibility determination (Composite: ${scores.total}/100), engineering validation targeting thermal stability control is required prior to pilot approval and must be completed before any commercial commitment.\n\n` +
-      `Validation should focus on post-moulding dimensional retention, tolerance stability at critical features, and structural consistency after realistic heat-exposure conditions. ` +
-      `Execute structured pilot trials to define the qualified thermal and dimensional acceptance envelope, then re-assess system stability before proceeding to commercial-scale deployment.`
-    );
-  }
-
-  if (primary.type === "FLOW") {
-    return (
-      `Based on the MODERATE feasibility determination (Composite: ${scores.total}/100), engineering validation targeting flow stability control is required prior to pilot approval and must be completed before any commercial commitment.\n\n` +
-      `Implement control measures for ${primary.control}. For film or pouch applications, validation should also include seal-area reliability, gauge or thickness consistency, and downstream converting stability. Execute structured parameter trials to define the qualified processing envelope. Re-assess system stability following confirmation of stabilisation controls, then proceed to pilot validation against defined acceptance criteria.`
-    );
-  }
-
-  if (primary.type === "THERMAL") {
-    return (
-      `Based on the MODERATE feasibility determination (Composite: ${scores.total}/100), engineering validation targeting thermal stability control is required prior to pilot approval and must be completed before any commercial commitment.\n\n` +
-      `Implement control measures for ${primary.control}. For film or pouch applications, validation should also include seal-area reliability, gauge or thickness consistency, and downstream converting stability. Execute structured parameter trials to define the qualified processing envelope. Re-assess system stability following confirmation of stabilisation controls, then proceed to pilot validation against defined acceptance criteria.`
-    );
-  }
-
-  return (
-    `Based on the MODERATE feasibility determination (Composite: ${scores.total}/100), engineering validation targeting structural performance stability is required prior to pilot approval and must be completed before any commercial commitment.\n\n` +
-    `Implement control measures for ${primary.control}. Execute structured validation trials, then proceed to pilot review against defined structural acceptance criteria.`
-  );
-}
-
-function resolveMaterialTransition(input, context) {
-  if (
-    input.bio_material &&
-    input.bio_material !== "—" &&
-    input.bio_material.trim() !== ""
-  ) {
-    return input.bio_material;
-  }
-
-  if (context.material_class === "POLYOLEFIN_PE") {
-    if (context.process_family === "BLOWN_FILM") {
-      return "PHA-based biodegradable blown film compound";
-    }
-    return "PHA-based biodegradable film compound";
-  }
-
-  if (context.material_class === "POLYOLEFIN_PP") {
-    return "PLA-based rigid biodegradable material";
-  }
-
-  if (context.material_class === "PET") {
-    return "PLA-based thermoformable biodegradable material";
-  }
-
-  return "Biodegradable polymer compound (commercial-grade)";
-}
-
-function resolveMaterialLabels(input, context, narrative) {
-  const currentMaterial =
-    safe(input.material, "").trim() || "Current material";
-
-  const targetMaterial =
-    resolveMaterialTransition(input, context);
-
-  return {
-    currentMaterialLabel: currentMaterial.toUpperCase(),
-    targetMaterialLabel: targetMaterial
-  };
-}
-
-function resolveVisualizationTemperatures(context) {
-  if (context.material_class === "POLYOLEFIN_PE") {
-    return { leftTemp: "230°C", rightTemp: "180°C" };
-  }
-
-  if (context.material_class === "POLYOLEFIN_PP") {
-    return { leftTemp: "220°C", rightTemp: "170°C" };
-  }
-
-  if (context.material_class === "PET") {
-    return { leftTemp: "260°C", rightTemp: "180°C" };
-  }
-
-  return { leftTemp: "230°C", rightTemp: "180°C" };
-}
-
-// ══════════════════════════════════════════════════════════════
-// § 15  HTML INJECTION
-// ══════════════════════════════════════════════════════════════
-
-function injectHtml(template, data) {
-  return template.replace(/{{\s*(\w+)\s*}}/g, (_, key) => {
-    const val = data[key];
-    if (val === undefined || val === null) return "—";
-    return String(val);
+  out.supplier_data = mapValue(out.supplier_data ?? 'unknown', {
+    complete: 'decl_compliance',
+    available: 'decl_compliance',
+    partial: 'test_data',
+    none: 'none',
+    unknown: 'unknown',
   });
-}
 
-// ══════════════════════════════════════════════════════════════
-// § 16  DYNAMIC OVERLAY
-// ══════════════════════════════════════════════════════════════
-
-function generateOverlay(scores, temps) {
-  const angle = -90 + scores.total * 1.8;
-
-  function getAmplitude(score) {
-    if (score >= 85) return 1.6;
-    if (score >= 80) return 3;
-    if (score >= 70) return 5;
-    if (score >= 60) return 9;
-    return 13;
-  }
-
-  const ampLeft  = getAmplitude(scores.thermal);
-  const ampRight = getAmplitude(scores.flow);
-
-  return `
-  <div style="position:absolute;top:40px;left:140px;text-align:center;z-index:3;">
-    <div style="font-size:28px;color:#2f3a44;">${temps.leftTemp}</div>
-    <div style="font-size:16px;color:#5b6770;">${scores.thermal}</div>
-  </div>
-  <div style="position:absolute;top:40px;right:140px;text-align:center;z-index:3;">
-    <div style="font-size:28px;color:#d62c2c;">${temps.rightTemp}</div>
-    <div style="font-size:16px;color:#d62c2c;">${scores.flow}</div>
-  </div>
-  <svg style="position:absolute;left:280px;bottom:85px;z-index:2;" width="90" height="35">
-    <path d="M0 18 C15 ${18 - ampLeft}, 30 ${18 + ampLeft}, 45 18 C60 ${18 - ampLeft}, 75 ${18 + ampLeft}, 90 18"
-      fill="none" stroke="#4f7c8a" stroke-width="1.8" opacity="0.85"/>
-  </svg>
-  <svg style="position:absolute;left:420px;bottom:85px;z-index:2;" width="90" height="35">
-    <path d="M0 18 C15 ${18 - ampRight}, 30 ${18 + ampRight}, 45 18 C60 ${18 - ampRight}, 75 ${18 + ampRight}, 90 18"
-      fill="none" stroke="#d62c2c" stroke-width="1.8" opacity="0.85"/>
-  </svg>
-  <svg style="position:absolute;right:40px;bottom:10px;z-index:3;" viewBox="0 0 200 120" width="140" height="90">
-    <defs>
-      <linearGradient id="g">
-        <stop offset="0%"   stop-color="#22c55e"/>
-        <stop offset="50%"  stop-color="#fde047"/>
-        <stop offset="100%" stop-color="#ef4444"/>
-      </linearGradient>
-    </defs>
-    <path d="M20 100 A80 80 0 0 1 180 100 L100 100 Z" fill="url(#g)"/>
-    <g transform="rotate(${angle} 100 100)">
-      <line x1="100" y1="100" x2="100" y2="30" stroke="#111" stroke-width="3"/>
-    </g>
-    <circle cx="100" cy="100" r="4" fill="#111"/>
-  </svg>`;
-}
-
-// ══════════════════════════════════════════════════════════════
-// § 16b  CLAUDE NARRATIVE API
-// ══════════════════════════════════════════════════════════════
-
-const NARRATIVE_USER_TEMPLATE = `You are a JSON generation module embedded inside a production system.
-You are NOT an assistant. You are NOT allowed to think freely. You are NOT allowed to explain anything.
-Your output will be directly parsed by a backend system. If you break the format, the system will fail.
-
-SYSTEM ROLE (FIXED)
-- You ONLY generate structured JSON
-- You DO NOT modify system logic or scores
-- You DO NOT generate HTML, markdown, or explanation text
-
-CRITICAL OUTPUT RULES (MANDATORY)
-1. Output must be valid JSON — no text before or after
-2. No markdown (no backtick blocks)
-3. No comments, no trailing commas, no missing quotes
-4. No additional keys; all keys must exist; all values must be strings
-5. Do not include null or undefined
-
-STRICT PROHIBITIONS
-You MUST NOT suggest processing parameters, suppliers, or materials.
-You MUST NOT change technical conclusions beyond given scores.
-You MUST NOT output anything outside JSON.
-
-INPUT DATA (READ ONLY)
-Application: {{application}}
-Material: {{material}}
-Target Bio Material: {{bio_material}} (may be empty)
-Scores — Thermal: {{thermal}} / Flow: {{flow}} / Mechanical: {{mechanical}} / Total: {{total}}
-Constraint: {{constraint}}
-
-INTERPRETATION RULES
-- LOW (<55): not viable → HOLD
-- MODERATE (55-74): conditional → requires validation
-- HIGH (75+): viable → proceed
-- Primary risk = lowest score dimension
-- Secondary risk = interaction of remaining two dimensions
-- Mechanism = material mismatch cause of constraint
-
-OUTPUT FORMAT (STRICT JSON ONLY)
-{
-  "executive_summary": "",
-  "risk_primary": "",
-  "risk_secondary": "",
-  "mechanism": "",
-  "processing_window_note": "",
-  "application_implication": "",
-  "next_step": ""
-}`;
-
-async function callClaudeForNarrative(input, scores, constraint) {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) throw new Error("ANTHROPIC_API_KEY not set");
-
-  const userContent = NARRATIVE_USER_TEMPLATE
-    .replace("{{application}}",  safe(input.application,    "Not specified"))
-    .replace("{{material}}",     safe(input.material,       "Not specified"))
-    .replace("{{bio_material}}", input.bio_material ? String(input.bio_material) : "")
-    .replace("{{thermal}}",      String(scores.thermal))
-    .replace("{{flow}}",         String(scores.flow))
-    .replace("{{mechanical}}",   String(scores.mechanical))
-    .replace("{{total}}",        String(scores.total))
-    .replace("{{constraint}}",   constraint.type);
-
-  const controller = new AbortController();
-  const timeoutId  = setTimeout(() => controller.abort(), 8000);
-
-  const res = await fetchFn("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key":    apiKey,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({
-      model: "claude-opus-4-5", max_tokens: 1024, temperature: 0,
-      messages: [{ role: "user", content: userContent }],
-    }),
-    signal: controller.signal,
-  }).finally(() => clearTimeout(timeoutId));
-
-  if (!res.ok) throw new Error(`Claude API error: ${res.status}`);
-
-  const data = await res.json();
-  const raw  = Array.isArray(data.content)
-    ? data.content.map(b => b.type === "text" ? b.text : "").join("").trim()
-    : "";
-
-  if (!raw) throw new Error("Empty Claude response");
-
-  const parsed = safeParseJSON(raw);
-  const result = validateNarrative(parsed);
-  console.log("[Claude OK] narrative generated successfully");
-  return result;
-}
-
-// ══════════════════════════════════════════════════════════════
-// § 16c  CLAUDE MECHANISM API
-// ══════════════════════════════════════════════════════════════
-
-const MECHANISM_USER_TEMPLATE = `You are a professional materials and processing consultant specializing in biodegradable polymers.
-Your role is to refine specific sections of a technical feasibility report to achieve a high-end, consulting-grade output.
-
-CRITICAL RULES
-- Do NOT change any scores or evaluation logic.
-- Do NOT introduce new assumptions beyond the provided data.
-- Do NOT provide processing parameters, formulations, or supplier recommendations.
-- Keep explanations technical, precise, and professional.
-- Output must be valid JSON only. Each field must be concise (2-4 sentences max).
-
-TASK: Refine ONLY Mechanism and Expected Deviations.
-
-INPUT DATA
-Current Material: {{material}}
-Target Material: {{bio_material}}
-Scores — Thermal: {{thermal}} / Flow: {{flow}} / Mechanical: {{mechanical}}
-Primary Constraint: {{constraint}}
-Application: {{application}}
-Processing Method: {{equipment}}
-Known Issues: {{concern}}
-
-INSTRUCTIONS
-Mechanism: Explain the fundamental material difference (thermal stability, rheology, degradation sensitivity). Connect directly to the PRIMARY CONSTRAINT. Expert-level material science reasoning only.
-Expected Deviations: 3 bullet points reflecting real processing risks and material-specific behaviour aligned with the constraint and application. Avoid generic phrases. Be specific to material behaviour.
-If the target material is PLA-based: consider hydrolytic degradation sensitivity and lower thermal resistance compared to polyolefins.
-
-OUTPUT FORMAT (STRICT JSON ONLY — no text before or after)
-{
-  "mechanism": "...",
-  "expected_deviations": ["...", "...", "..."]
-}`;
-
-function validateMechanismStrict(obj) {
-  if (!obj || typeof obj.mechanism !== "string") {
-    throw new Error("Invalid mechanism structure — missing or non-string key: mechanism");
-  }
-  if (
-    !Array.isArray(obj.expected_deviations) ||
-    obj.expected_deviations.length !== 3 ||
-    obj.expected_deviations.some((d) => typeof d !== "string")
-  ) {
-    throw new Error("Invalid mechanism structure — expected_deviations must be array of 3 strings");
-  }
-  return obj;
-}
-
-async function callClaudeForMechanism(input, scores, constraint) {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) throw new Error("ANTHROPIC_API_KEY not set");
-
-  const userContent = MECHANISM_USER_TEMPLATE
-    .replace("{{material}}",     safe(input.material,       "Not specified"))
-    .replace("{{bio_material}}", input.bio_material ? String(input.bio_material) : "")
-    .replace("{{thermal}}",      String(scores.thermal))
-    .replace("{{flow}}",         String(scores.flow))
-    .replace("{{mechanical}}",   String(scores.mechanical))
-    .replace("{{constraint}}",   constraint.type)
-    .replace("{{application}}",  safe(input.application,    "Not specified"))
-    .replace("{{equipment}}",    safe(input.equipment,      "Not specified"))
-    .replace("{{concern}}",      safe(input.concern,        "None noted"));
-
-  const controller = new AbortController();
-  const timeoutId  = setTimeout(() => controller.abort(), 8000);
-
-  const res = await fetchFn("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key":    apiKey,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({
-      model: "claude-opus-4-5", max_tokens: 1024, temperature: 0,
-      messages: [{ role: "user", content: userContent }],
-    }),
-    signal: controller.signal,
-  }).finally(() => clearTimeout(timeoutId));
-
-  if (!res.ok) throw new Error(`Claude API error (mechanism): ${res.status}`);
-
-  const data = await res.json();
-  const raw  = Array.isArray(data.content)
-    ? data.content.map(b => b.type === "text" ? b.text : "").join("").trim()
-    : "";
-
-  if (!raw) throw new Error("Empty Claude response (mechanism)");
-
-  const parsed = safeParseJSON(raw);
-  const result = validateMechanismStrict(parsed);
-  console.log("[Claude OK] mechanism refined successfully");
-  return result;
-}
-
-// ══════════════════════════════════════════════════════════════
-// § 17  MAIN ROUTE
-// ══════════════════════════════════════════════════════════════
-
-app.post("/generate-report", (req, res) => {
-  queue.add(() => handleReport(req, res)).catch((err) => {
-    console.error("[Queue error]", err.message);
+  out.eol_claim = mapValue(out.eol_claim ?? 'none', {
+    industrial_compostable: 'industrial_compost',
+    home_compostable: 'home_compost',
+    soil_biodegradable: 'biodegradable',
+    marine_biodegradable: 'biodegradable',
+    not_sure: 'tbd',
+    none: 'none',
   });
-});
 
-async function handleReport(req, res) {
+  out.eol_cert = mapValue(out.eol_cert ?? 'unknown', {
+    available: 'other_cert',
+    planned: 'unknown',
+    none: 'no',
+    no: 'no',
+    unknown: 'unknown',
+  });
+
+  out.internal_ra = mapValue(out.internal_ra ?? 'unknown', {
+    available: 'dedicated',
+    yes: 'dedicated',
+    partial: 'parttime',
+    limited: 'parttime',
+    no: 'none',
+    none: 'none',
+    unknown: 'unknown',
+  });
+
+  out.regulator_dialogue = mapValue(out.regulator_dialogue ?? 'none', {
+    active: 'formal',
+    already_started: 'formal',
+    yes: 'formal',
+    informal: 'informal',
+    none: 'none',
+    no: 'none',
+    unknown: 'none',
+  });
+
+  if (out.route === 'food' && out.food) {
+    out.food.contact_temp = mapValue(out.food.contact_temp ?? 'unknown', {
+      frozen: 'lt_5c',
+      chilled: 'lt_5c',
+      ambient: 'lt_25c',
+      room_temp: 'lt_25c',
+      '40_70c': '40_70c',
+      above_70c: 'above_70',
+      above_70: 'above_70',
+      microwave: 'microwave',
+      unknown: 'unknown',
+    });
+
+    out.food.contact_duration = mapValue(out.food.contact_duration ?? 'unknown', {
+      short: 'lt_24h',
+      lt_24h: 'lt_24h',
+      '1_7_days': '1_7d',
+      '1_7d': '1_7d',
+      '7_30_days': '7_30d',
+      '7_30d': '7_30d',
+      over_30_days: '1_6m',
+      '1_6m': '1_6m',
+      gt_6m: 'gt_6m',
+      unknown: 'unknown',
+    });
+
+    out.food.inpack_process = mapValue(out.food.inpack_process ?? 'unknown', {
+      none: 'none',
+      hot_fill: 'pasteurise',
+      pasteurisation: 'pasteurise',
+      pasteurization: 'pasteurise',
+      pasteurise: 'pasteurise',
+      retort: 'retort',
+      microwave: 'retort',
+      hpp: 'hpp',
+      map: 'map',
+      unknown: 'unknown',
+    });
+
+    out.food.seal_temp = mapValue(out.food.seal_temp ?? 'unknown', {
+      below_100c: 'lt_120',
+      '100_120c': 'lt_120',
+      '120_140c': '120_140',
+      above_140c: '140_160',
+      '140_160c': '140_160',
+      '160_180c': '160_180',
+      above_180c: 'gt_180',
+      unknown: 'unknown',
+    });
+  }
+
+  if (out.route === 'medical' && out.medical) {
+    out.medical.patient_contact = mapValue(out.medical.patient_contact ?? 'unknown', {
+      none: 'none',
+      skin: 'surface_intact',
+      mucosal: 'mucosal',
+      blood_or_fluid_path: 'blood_path',
+      blood_path: 'blood_path',
+      implant_contact: 'implant_contact',
+      unknown: 'unknown',
+    });
+
+    out.medical.contact_duration_med = mapValue(out.medical.contact_duration_med ?? 'unknown', {
+      limited: 'lt_24h',
+      prolonged: '24h_30d',
+      long_term: 'gt_30d',
+      unknown: 'unknown',
+    });
+
+    out.medical.sterilisation_medical = mapValue(out.medical.sterilisation_medical ?? 'tbd', {
+      none: 'none_required',
+      eto: 'eo',
+      eo: 'eo',
+      gamma: 'gamma',
+      e_beam: 'ebeam',
+      steam: 'steam',
+      unknown: 'tbd',
+    });
+
+    out.medical.medical_grade_supplier = mapValue(out.medical.medical_grade_supplier ?? 'unknown', {
+      yes: 'yes',
+      confirmed: 'yes',
+      partial: 'unknown',
+      no: 'no',
+      unknown: 'unknown',
+    });
+
+    out.medical.iso_13485_supplier = mapValue(out.medical.iso_13485_supplier ?? 'unknown', {
+      yes: 'yes',
+      confirmed: 'yes',
+      partial: 'unknown',
+      no: 'no',
+      unknown: 'unknown',
+    });
+  }
+
+  return out;
+}
+
+const DISPLAY_LABELS = {
+  target_markets: MARKET_LABEL,
+  food_type: {
+    dry: 'dry food',
+    aqueous: 'aqueous food',
+    acidic: 'acidic food',
+    fatty: 'fatty food contact',
+    alcoholic: 'alcoholic contact',
+    mixed: 'mixed / unspecified food contact',
+  },
+  contact_temp: {
+    lt_5c: 'chilled / refrigerated',
+    lt_25c: 'ambient',
+    lt_40c: 'elevated ambient',
+    above_70: 'above 70°C',
+    microwave: 'microwave heating',
+    frozen: 'frozen',
+    chilled: 'chilled',
+    ambient: 'ambient',
+    '40_70c': '40–70°C',
+    'above_70c': 'above 70°C',
+  },
+  contact_duration: {
+    lt_24h: 'short contact',
+    '1_7d': '1–7 days',
+    '7_30d': '7–30 days',
+    '1_6m': '1–6 months',
+    gt_6m: 'over 6 months',
+    short: 'short contact',
+    '1_7_days': '1–7 days',
+    '7_30_days': '7–30 days',
+    'over_30_days': 'over 30 days',
+  },
+  inpack_process: {
+    pasteurise: 'pasteurisation / hot fill',
+    unknown: 'unknown',
+    hpp: 'high pressure processing',
+    map: 'modified atmosphere packaging',
+    none: 'none',
+    pasteurisation: 'pasteurisation',
+    hot_fill: 'hot fill',
+    retort: 'retort',
+    microwave: 'microwave heating',
+  },
+  seal_temp: {
+    lt_120: 'below 120°C',
+    '120_140': '120–140°C',
+    '140_160': '140–160°C',
+    '160_180': '160–180°C',
+    gt_180: 'above 180°C',
+    'below_100c': 'below 100°C',
+    '100_120c': '100–120°C',
+    '120_140c': '120–140°C',
+    'above_140c': 'above 140°C',
+    unknown: 'unknown',
+  },
+  barrier_layer: {
+    none: 'none',
+    evoh: 'EVOH',
+    aluminium: 'aluminium / metallised layer',
+    coating: 'functional coating',
+    unknown: 'unknown',
+  },
+  candidate_material: {
+    pla: 'PLA',
+    pha: 'PHA',
+    pbat: 'PBAT blend',
+    starch_blend: 'starch blend',
+    unknown: 'not yet specified',
+  },
+  current_material: {
+    pe: 'PE / LDPE / HDPE',
+    pp: 'PP',
+    pet: 'PET',
+    ps: 'PS',
+    pvc: 'PVC',
+    multilayer: 'multilayer structure',
+    unknown: 'unknown',
+  },
+  supplier_data: {
+    decl_compliance: 'declaration / compliance evidence available',
+    test_data: 'test data available',
+    complete: 'complete',
+    partial: 'partially available',
+    none: 'not available',
+    unknown: 'unknown',
+  },
+  eol_claim: {
+    industrial_compost: 'industrial compostability claim',
+    home_compost: 'home compostability claim',
+    biodegradable: 'biodegradation claim',
+    tbd: 'not yet defined',
+    none: 'no end-of-life claim',
+    industrial_compostable: 'industrial compostability claim',
+    home_compostable: 'home compostability claim',
+    soil_biodegradable: 'soil biodegradation claim',
+    marine_biodegradable: 'marine biodegradation claim',
+    not_sure: 'not yet defined',
+  },
+  eol_cert: {
+    no: 'not available',
+    other_cert: 'available',
+    available: 'available',
+    planned: 'planned',
+    none: 'not available',
+    unknown: 'unknown',
+    tuv_austria: 'TÜV Austria certification',
+    din_certco: 'DIN CERTCO certification',
+    bpi: 'BPI certification',
+  },
+  device_type: {
+    packaging_non_sterile: 'non-sterile healthcare packaging',
+    sterile_barrier_packaging: 'sterile barrier packaging',
+    external_device_component: 'external device component',
+    fluid_path_component: 'fluid-path component',
+    implantable: 'implantable / long-term internal contact',
+  },
+  patient_contact: {
+    none: 'no patient contact',
+    surface_intact: 'skin contact',
+    skin: 'skin contact',
+    mucosal: 'mucosal contact',
+    blood_path: 'blood / fluid-path contact',
+    blood_or_fluid_path: 'blood / fluid-path contact',
+    implant_contact: 'implant contact',
+  },
+  contact_duration_med: {
+    lt_24h: 'limited contact duration',
+    '24h_30d': 'prolonged contact duration',
+    gt_30d: 'long-term contact duration',
+    limited: 'limited contact duration',
+    prolonged: 'prolonged contact duration',
+    long_term: 'long-term contact duration',
+  },
+  sterilisation_medical: {
+    none_required: 'none',
+    none: 'none',
+    eo: 'EtO sterilisation',
+    eto: 'EtO sterilisation',
+    gamma: 'gamma irradiation',
+    ebeam: 'e-beam sterilisation',
+    e_beam: 'e-beam sterilisation',
+    steam: 'steam / autoclave sterilisation',
+    tbd: 'unknown',
+    unknown: 'unknown',
+  },
+};
+
+function displayValue(field, value) {
+  if (value === null || value === undefined || value === '') return 'unspecified';
+
+  if (Array.isArray(value)) {
+    const mapped = value
+      .filter(v => v !== null && v !== undefined && v !== '')
+      .map(v => displayValue(field, v));
+    return mapped.length ? mapped.join(', ') : 'unspecified';
+  }
+
+  const raw = String(value);
+  return DISPLAY_LABELS[field]?.[raw] ?? raw
+    .replace(/_/g, ' ')
+    .replace(/\b([a-z])/g, m => m.toUpperCase());
+}
+
+function beautifyTechnicalText(value) {
+  if (value === null || value === undefined) return value;
+  if (Array.isArray(value)) return value.map(beautifyTechnicalText);
+  if (typeof value !== 'string') return value;
+
+  return value
+    .replace(/"7_30_days"/g, '"7–30 days"')
+    .replace(/"1_7_days"/g, '"1–7 days"')
+    .replace(/"120_140c"/g, '"120–140°C"')
+    .replace(/"100_120c"/g, '"100–120°C"')
+    .replace(/"below_100c"/g, '"below 100°C"')
+    .replace(/"above_140c"/g, '"above 140°C"')
+    .replace(/"40_70c"/g, '"40–70°C"')
+    .replace(/"lt_5c"/g, '"chilled / refrigerated"')
+    .replace(/"lt_25c"/g, '"ambient"')
+    .replace(/"lt_40c"/g, '"elevated ambient"')
+    .replace(/"above_70"/g, '"above 70°C"')
+    .replace(/"lt_24h"/g, '"short contact"')
+    .replace(/"1_7d"/g, '"1–7 days"')
+    .replace(/"7_30d"/g, '"7–30 days"')
+    .replace(/"1_6m"/g, '"1–6 months"')
+    .replace(/"gt_6m"/g, '"over 6 months"')
+    .replace(/"lt_120"/g, '"below 120°C"')
+    .replace(/"120_140"/g, '"120–140°C"')
+    .replace(/"140_160"/g, '"140–160°C"')
+    .replace(/"160_180"/g, '"160–180°C"')
+    .replace(/"gt_180"/g, '"above 180°C"')
+    .replace(/\bevoh\b/g, 'EVOH')
+    .replace(/\bpla\b/g, 'PLA')
+    .replace(/\bpha\b/g, 'PHA')
+    .replace(/\bpbat\b/g, 'PBAT')
+    .replace(/TDS status "partial"/g, 'TDS status "partially available"')
+    .replace(/Supplier compliance status "partial"/g, 'Supplier compliance status "partially available"')
+    .replace(/Supplier data status "partial"/g, 'Supplier data status "partially available"')
+    .replace(/Sterilisation method "none"/g, 'Sterilisation method "none specified"')
+    .replace(/Sterilisation method "eo"/g, 'Sterilisation method "EtO sterilisation"');
+}
+
+
+function cleanDisplayText(value) {
+  if (value === null || value === undefined) return value;
+  if (Array.isArray(value)) return value.map(cleanDisplayText);
+  if (typeof value !== 'string') return value;
+
+  return value
+    .replace(/Complex barrier system present\s*\(\s*\)\s*— equivalent biopolymer performance is uncertain/g,
+      'Barrier information is incomplete — barrier performance should be confirmed if required')
+    .replace(/Complex barrier system present\s*\(\s*\)/g,
+      'Barrier information is incomplete');
+}
+
+function beautifyRiskDriver(driver) {
+  if (!driver || typeof driver !== 'object') return driver;
+  return {
+    ...driver,
+    label: cleanDisplayText(beautifyTechnicalText(driver.label)),
+    contributingFactors: (driver.contributingFactors ?? []).map(v => cleanDisplayText(beautifyTechnicalText(v))),
+  };
+}
+
+const SYSTEM_PROMPT = `You are a senior materials and processing consultant specialising in biodegradable polymer transitions for regulated food contact and medical/healthcare applications. You generate technical screening report narrative sections based on structured scoring data.
+
+TASK
+You will receive a JSON object called scoring_data. Generate exactly the seven narrative sections specified below. Return only a valid JSON object — no markdown fences, no preamble, no text outside the JSON object.
+
+SCORING DATA CONTRACT
+- finalScore: deterministic risk score (0-100). Do not dispute or modify.
+- decisionBand: decision classification. Do not modify.
+- decisionLabel: display string for the decision band.
+- hardTriggers: active technical review flags. Reproduce their technical substance accurately. Do not add or remove triggers.
+- categoryScores: per-category scoring breakdown. Use to calibrate analytical depth per dimension.
+- topRiskFactors: ranked contributing risk factors. Use as primary narrative anchors.
+- validationBurden: estimated test programme scope and complexity level.
+- formInputs: typed form field values. Use only these — do not invent additional parameters.
+
+REQUIRED OUTPUT — return a JSON object with exactly these keys:
+
+"exec_summary": 80-140 words. Open with the decisionLabel and finalScore. Name the top 1-2 risk drivers. State the immediate recommended action.
+"application_analysis": 120-200 words. Analyse the contact scenario or device application. Reference the relevant regulatory framework by name. Do not assert compliance or non-compliance.
+"processing_behaviour": 120-200 words. Describe processing compatibility risk indicators for the candidate material class. Reference specific scoring dimensions. Where data is absent, describe the absence.
+"risk_analysis": 150-250 words. Analyse the primary and secondary risk drivers. If hardTriggers are active, explain their technical basis in context. Do not characterise any material as safe, biocompatible, or suitable for contact.
+"regulatory_burden": 80-150 words. Describe regulatory pathway complexity based on target markets and application class. Name applicable frameworks. Do not state compliance status.
+"validation_summary": 80-150 words. Describe the indicated test programme scope based on validationBurden. Use "indicated" or "recommended" language. Reference specific test categories from estimatedTestCategories.
+"recommended_next_step": 90-160 words. State specific bounded next actions as a paid technical review plan. Include 3-5 practical actions such as supplier evidence collection, test scope definition, processing compatibility checks, seal/barrier or sterilisation validation as applicable, and a pilot-readiness decision gate. Reference technical review flag conditions to be resolved first. End with specialist disciplines to be engaged.
+
+ABSOLUTE PROHIBITIONS:
+approved / food-safe / is biocompatible / are biocompatible / safe for medical use / safe for patient contact / medically safe / no migration risk / no toxicity risk / no safety concerns / is compliant / are compliant / fully compliant / meets requirements / has been validated for / validated material / validated grade / certified material / certified grade / suitable for food contact / suitable for patient contact / no safety issues
+
+PROHIBITED INVENTIONS:
+Do not generate specific material grades, trade names, supplier names, processing parameters, regulatory approval numbers, migration test results, biocompatibility results, or certification numbers not present in formInputs. If a field is null or absent, describe the absence.`;
+
+function buildClaudePrompt(scoringResult) {
+  const n = scoringResult.aiNarrativeInputs;
+
+  const payload = {
+    scoring_data: {
+      route:              n.route,
+      finalScore:         n.finalScore,
+      decisionBand:       n.decisionBand,
+      decisionLabel:      n.decisionLabel,
+      hardTriggerCount:   n.hardTriggerCount,
+      activeHardTriggers: n.activeHardTriggers,
+      categoryScores:     n.categoryScores,
+      topRiskFactors:     n.topRiskFactors,
+      validationBurden: {
+        level:                   scoringResult.validationBurden.level,
+        estimatedTestCategories: refineValidationBurdenForApplication(scoringResult.validationBurden, scoringResult.aiNarrativeInputs?.formInputs ?? {}).estimatedTestCategories,
+        specialistRequired:      scoringResult.validationBurden.specialistRequired,
+      },
+      formInputs: n.formInputs,
+    },
+  };
+
+  return {
+    system: SYSTEM_PROMPT,
+    user: JSON.stringify(payload, null, 2),
+  };
+}
+
+async function callClaudeApi(prompt, timeoutMs) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  let response;
   try {
-    console.log("RAW BODY:", JSON.stringify(req.body, null, 2));
+    response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      signal: controller.signal,
+      headers: {
+        'x-api-key':         process.env.ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+        'content-type':      'application/json',
+      },
+      body: JSON.stringify({
+        model:      CLAUDE_MODEL,
+        max_tokens: 2048,
+        system:     prompt.system,
+        messages:   [{ role: 'user', content: prompt.user }],
+      }),
+    });
+  } finally {
+    clearTimeout(timer);
+  }
 
-    const input = normalizeInput(req.body);
+  if (!response.ok) {
+    throw new Error(`Claude API ${response.status}: ${await response.text()}`);
+  }
 
-    const preliminaryContext = interpretInputContext(input);
-    const finalMaterial = resolveMaterialTransition(input, preliminaryContext);
-    input.bio_material = finalMaterial;
+  const data = await response.json();
+  const text = (data.content ?? [])
+    .filter(b => b.type === 'text')
+    .map(b => b.text)
+    .join('');
 
-    const context        = interpretInputContext(input);
-    const scores         = calculateScores(input, context);
-    const constraint     = getConstraint(scores);
-    const decision       = determineDecision(scores.total);
-    const allowSpecializedNarrative = decision.level === "MODERATE";
-    const decisionBand   = determineDecisionBand(scores.total);
-    const economic       = calculateEconomic(scores.total);
-    const constraintArch = buildConstraintArchitecture(scores);
+  const cleaned = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '').trim();
+  return JSON.parse(cleaned);
+}
 
-    const risk       = generateRisk(scores, constraintArch, input, context, decision);
-    const processing = generateProcessing(scores, constraint);
-    const product    = generateProduct(scores);
-    const quality    = generateQuality(scores);
+const REQUIRED_NARRATIVE_KEYS = [
+  'exec_summary',
+  'application_analysis',
+  'processing_behaviour',
+  'risk_analysis',
+  'regulatory_burden',
+  'validation_summary',
+  'recommended_next_step',
+];
 
-    let narrative     = null;
-    let mechanismData = null;
+function validateNarrativeSections(sections) {
+  if (!sections || typeof sections !== 'object') return ['sections is not an object'];
 
-    try {
-      narrative = await callClaudeForNarrative(input, scores, constraint);
-    } catch (e) {
-      if (e.name === "AbortError") console.warn("[Claude TIMEOUT] narrative");
-      else console.warn("[Claude ERROR] narrative:", e.message);
+  const violations = [];
+
+  for (const key of REQUIRED_NARRATIVE_KEYS) {
+    if (typeof sections[key] !== 'string' || !sections[key].trim()) {
+      violations.push(`missing or empty section: ${key}`);
     }
+  }
 
-    try {
-      mechanismData = await callClaudeForMechanism(input, scores, constraint);
-    } catch (e) {
-      if (e.name === "AbortError") console.warn("[Claude TIMEOUT] mechanism");
-      else console.warn("[Claude ERROR] mechanism:", e.message);
+  for (const [key, text] of Object.entries(sections)) {
+    if (typeof text !== 'string') continue;
+    for (const pattern of PROHIBITED_PATTERNS) {
+      pattern.lastIndex = 0;
+      const match = pattern.exec(text);
+      if (match) {
+        violations.push(`prohibited phrase in "${key}": "${match[0]}"`);
+      }
     }
+  }
 
-    const specialized_exec = allowSpecializedNarrative
-      ? generateExecutiveSpecialized(input, scores, context, constraintArch, economic)
-      : null;
+  return violations;
+}
 
-    let exec_summary =
-      specialized_exec ||
-      (allowSpecializedNarrative ? narrative?.executive_summary : null) ||
-      generateExecutive(scores, decision, economic, constraint);
-    if (decision.level === "MODERATE") {
-      exec_summary = exec_summary.replace(
-        /Deployment Decision:\s*CONDITIONAL GO.*/i,
-        "Deployment Decision: CONDITIONAL GO — Controlled pilot validation required prior to commercial commitment."
+const DECISION_OPENERS = {
+  proceed_controlled_validation:
+    'The technical risk profile of this material transition is assessed as manageable under structured pilot conditions.',
+  conditional_technical_review:
+    'The technical risk profile of this material transition indicates one or more dimensions requiring resolution before pilot testing can be responsibly initiated.',
+  hold_for_material_evidence:
+    'The technical risk profile of this material transition indicates critical data gaps or conflicting technical parameters that prevent responsible pilot design at this stage.',
+  not_recommended_reformulation:
+    'The application conditions described exceed the current technical performance envelope of the candidate material class under review.',
+  proceed_specialist_review:
+    'The technical risk profile of this material transition does not indicate fundamental incompatibilities with the candidate material class at this stage.',
+  proceed_regulatory_caution:
+    'The technical risk profile of this material transition indicates elevated risk dimensions requiring specialist review before any validation activity begins.',
+  not_recommended_specialist_reassessment:
+    'The described application presents conditions that are not compatible with the candidate material class, or critical safety-relevant information is absent.',
+};
+
+const BURDEN_NARRATIVE = {
+  low_medium:
+    'The indicated validation programme is estimated to be of low-to-medium complexity. A targeted test programme addressing the specific contact scenario and material class characteristics should be designed by a qualified specialist.',
+  medium:
+    'The indicated validation programme is estimated to be of medium complexity. A structured programme covering migration or extractables characterisation, processing compatibility assessment, and applicable regulatory framework requirements is indicated.',
+  high:
+    'The indicated validation programme is estimated to be of high complexity. A comprehensive programme requiring third-party laboratory engagement, regulatory specialist input, and formal compliance pathway design is indicated before commercial use.',
+  very_high:
+    'The indicated validation programme is estimated to be of very high complexity. Material reformulation or alternative selection, comprehensive analytical testing, formal regulatory engagement, and supplier qualification are all indicated before this transition can be advanced.',
+  critical:
+    'The validation complexity for this application is assessed as critical. A specialist reassessment of the material selection and application design is required before any validation programme can be responsibly structured.',
+};
+
+function buildFallbackExecSummary(decision, scoring, riskProfile, hardTriggers) {
+  const opener = DECISION_OPENERS[decision.band] ?? 'The material transition risk profile has been assessed.';
+  const scoreStatement =
+    ` This initial technical screening assigned a risk score of ${scoring.finalScore} out of 100, ` +
+    `placing this project in the "${decision.label}" category.`;
+  const floorNote = scoring.floorApplied
+    ? ` The weighted score of ${scoring.rawScore} was elevated to ${scoring.finalScore} by an active technical review flag.`
+    : '';
+  const primaryDriver = riskProfile.primaryRiskDriver
+    ? ` The primary risk contributor is ${String(riskProfile.primaryRiskDriver.label).toLowerCase()}, ` +
+      `scoring ${riskProfile.primaryRiskDriver.score} of ${riskProfile.primaryRiskDriver.maxScore} available points.`
+    : '';
+  const triggerNote = hardTriggers.length > 0
+    ? ` ${hardTriggers.length} technical review flag${hardTriggers.length > 1 ? 's are' : ' is'} active and should be reviewed before this transition proceeds.`
+    : ' No technical review flags were activated during this screening.';
+
+  return opener + scoreStatement + floorNote + primaryDriver + triggerNote +
+    ` Recommended immediate action: ${decision.immediateAction}`;
+}
+
+function buildFallbackApplicationAnalysis(route, formInputs, targetMarkets) {
+  const mktList = (targetMarkets ?? []).map(m => MARKET_LABEL[m] ?? m).join(', ') || 'the specified target market(s)';
+
+  if (route === 'food') {
+    const fwList = (targetMarkets ?? []).map(m => FOOD_FRAMEWORK[m]).filter(Boolean).join('; ') ||
+      'the applicable regulatory framework(s)';
+    return (
+      `The packaging application involves direct food contact with "${displayValue('food_type', formInputs.food_type)}" ` +
+      `at a maximum contact temperature of "${displayValue('contact_temp', formInputs.contact_temp)}" and an expected contact duration ` +
+      `of "${displayValue('contact_duration', formInputs.contact_duration)}". This combination determines the applicable food simulant class ` +
+      `and migration test conditions under the relevant regulatory frameworks. ` +
+      `The target markets — ${mktList} — indicate the following frameworks apply: ${fwList}. ` +
+      `Each jurisdiction defines overall migration limits and substance-specific migration limits against which the candidate material must be characterised.`
+    );
+  }
+
+  if (route === 'medical') {
+    const fwList = (targetMarkets ?? []).map(m => MEDICAL_FRAMEWORK[m]).filter(Boolean).join('; ') ||
+      'the applicable regulatory framework(s)';
+    return (
+      `The described application involves a "${displayValue('device_type', formInputs.device_type)}" with ` +
+      `patient contact classified as "${displayValue('patient_contact', formInputs.patient_contact)}" and a contact duration of ` +
+      `"${displayValue('contact_duration_med', formInputs.contact_duration_med)}". Under ISO 109109-1, this combination determines the applicable biological evaluation category. ` +
+      `The target markets — ${mktList} — indicate the following regulatory frameworks apply: ${fwList}. A qualified regulatory affairs specialist is required to confirm the appropriate pathway.`
+    ).replace('ISO 109109-1', 'ISO 10993-1');
+  }
+
+  return 'Application analysis could not be generated for the specified route.';
+}
+
+function buildFallbackProcessingBehaviour(route, formInputs, candidateMaterial) {
+  const matList = displayValue('candidate_material', candidateMaterial ?? []) || 'the candidate material class';
+
+  if (route === 'food') {
+    const barriers = (formInputs.barrier_layer ?? [])
+      .filter(b => b !== 'none' && b !== 'unknown')
+      .map(b => displayValue('barrier_layer', b))
+      .join(', ') || 'no complex barrier layers';
+
+    return (
+      `The current process operates with a heat-seal temperature range of "${displayValue('seal_temp', formInputs.seal_temp)}" ` +
+      `and an in-pack process of "${displayValue('inpack_process', formInputs.inpack_process)}". For the candidate material class (${matList}), ` +
+      `compatibility with the available processing window is a key transition risk. The current barrier system includes: ${barriers}. ` +
+      `Processing compatibility must be characterised on production-representative equipment before pilot validation is designed.`
+    );
+  }
+
+  if (route === 'medical') {
+    const steril = formInputs.sterilisation_medical;
+    if (steril === 'none_required' || steril === 'none' || !steril) {
+      return (
+        `No sterilisation method is specified for the described healthcare application. ` +
+        `For the candidate material class (${matList}), the primary processing review should focus on material identification, dimensional stability, supplier evidence, and performance under the intended storage and handling conditions.`
       );
     }
 
-    const specialized_primary = allowSpecializedNarrative
-      ? generatePrimaryRiskSpecialized(scores, context, constraintArch)
-      : null;
+    return (
+      `The intended sterilisation method is "${displayValue('sterilisation_medical', formInputs.sterilisation_medical)}". ` +
+      `For the candidate material class (${matList}), sterilisation compatibility is a critical transition risk dimension. ` +
+      `Dimensional stability, aging, and material performance under the described contact conditions should be reviewed before validation planning.`
+    );
+  }
 
-    const specialized_secondary = allowSpecializedNarrative
-      ? generateSecondaryRiskSpecialized(scores, context, constraintArch)
-      : null;
+  return 'Processing behaviour assessment could not be generated for the specified route.';
+}
 
-    const primary_risk_body =
-      specialized_primary ||
-      (allowSpecializedNarrative ? narrative?.risk_primary : null) ||
-      risk.primary;
+function buildFallbackRiskAnalysis(riskProfile, hardTriggers, scoring) {
+  const parts = [];
 
-    const secondary_risk_body =
-      specialized_secondary ||
-      (allowSpecializedNarrative ? narrative?.risk_secondary : null) ||
-      risk.secondary;
+  if (riskProfile.primaryRiskDriver) {
+    const pd = riskProfile.primaryRiskDriver;
+    parts.push(`The primary risk contributor in this screening is ${beautifyTechnicalText(pd.label).toLowerCase()}, scoring ${pd.score} out of a maximum ${pd.maxScore} points in this dimension.`);
+    if (pd.contributingFactors?.length) {
+      parts.push(`Contributing factors in this dimension: ${pd.contributingFactors.map(beautifyTechnicalText).join('; ')}.`);
+    }
+  }
 
-    const deterministic_mechanism   = generateMechanism(input, constraint, context);
-    const deterministic_deviations  = generateExpectedDeviations(input, scores, context, constraintArch);
+  if (riskProfile.secondaryRiskDriver) {
+    const sd = riskProfile.secondaryRiskDriver;
+    parts.push(`The secondary risk contributor is ${beautifyTechnicalText(sd.label).toLowerCase()}, contributing ${sd.score} of ${sd.maxScore} points.`);
+    if (sd.contributingFactors?.length) {
+      parts.push(beautifyTechnicalText(sd.contributingFactors[0]));
+    }
+  }
 
-    const mechanism_body =
-      !allowSpecializedNarrative || shouldForceDeterministicMechanism(context)
-        ? deterministic_mechanism
-        : (mechanismData?.mechanism || deterministic_mechanism);
+  if (hardTriggers.length > 0) {
+    parts.push(`The following technical review ${hardTriggers.length > 1 ? 'flags were' : 'flag was'} activated:`);
+    for (const t of hardTriggers) {
+      parts.push(`[${String(t.severity).toUpperCase()} — ${t.label ?? t.id}] ${t.description}`);
+    }
+  }
 
-    const expected_devs_raw  = mechanismData?.expected_deviations;
-    const expected_devs_html =
-      !allowSpecializedNarrative || shouldForceDeterministicDeviations(context)
-        ? deterministic_deviations
-        : (
-            Array.isArray(expected_devs_raw)
-              ? expected_devs_raw
-                  .filter(Boolean)
-                  .map((d) => `<li>${String(d).trim().slice(0, 220)}</li>`)
-                  .join("\n")
-              : deterministic_deviations
-          );
+  if (scoring.floorApplied && scoring.floorReason) {
+    parts.push(`The final score of ${scoring.finalScore} reflects an upward adjustment from the weighted score of ${scoring.rawScore}, applied because the active technical review flag "${scoring.floorReason}" imposes a minimum score floor for this application type.`);
+  } else if (hardTriggers.length === 0) {
+    parts.push('No technical review flags were activated during this screening. The risk score reflects the aggregate of weighted category contributions only.');
+  }
 
-    const proc_window_note =
-      (allowSpecializedNarrative ? narrative?.processing_window_note : null) ||
-      processing.processingWindow;
+  return parts.join(' ');
+}
 
-    const specialized_app_implication = allowSpecializedNarrative
-      ? generateApplicationImplicationSpecialized(decisionBand, context, constraintArch, input)
-      : null;
+function buildFallbackRegulatoryBurden(formInputs, route, targetMarkets, nMarkets) {
+  const frameworkMap = route === 'food' ? FOOD_FRAMEWORK : MEDICAL_FRAMEWORK;
+  const mktItems = (targetMarkets ?? []).map(m => {
+    const fw = frameworkMap[m];
+    return fw ? `${MARKET_LABEL[m] ?? m} (${fw})` : (MARKET_LABEL[m] ?? m);
+  });
 
-    const specialized_next_step = allowSpecializedNarrative
-      ? generateNextStepSpecialized(decisionBand, constraintArch, context, scores, input)
-      : null;
+  const mktSentence = mktItems.length > 0
+    ? `The target market scope covers ${nMarkets} jurisdiction${nMarkets !== 1 ? 's' : ''}: ${mktItems.join('; ')}.`
+    : 'The target market scope has not been fully defined.';
 
-    const app_implication =
-      specialized_app_implication ||
-      (allowSpecializedNarrative ? narrative?.application_implication : null) ||
-      generateApplicationImplicationV2(decisionBand, context, constraintArch, input);
+  const complexityNote = nMarkets >= 4
+    ? ' A multi-jurisdictional compliance programme requires parallel engagement across frameworks with materially different positive list status, submission requirements, and timelines.'
+    : nMarkets >= 2
+    ? ' A multi-market programme requires careful sequencing of regulatory activities, as positive list status for biodegradable materials and submission timelines vary by jurisdiction.'
+    : ' A single-market compliance programme has a more bounded regulatory scope, though specialist input is required to confirm the documentation pathway.';
 
-    const next_step_body =
-      specialized_next_step ||
-      (allowSpecializedNarrative ? narrative?.next_step : null) ||
-      generateNextStepV2(decisionBand, constraintArch, context, scores, input);
+  const classNote = (route === 'medical' && formInputs.device_class && formInputs.device_class !== 'unknown')
+    ? ` The indicated device classification (${String(formInputs.device_class).toUpperCase().replace('_', ' ')}) determines the material change assessment pathway and submission requirements under each applicable framework.`
+    : '';
 
-    const materialLabels = resolveMaterialLabels(input, context, narrative);
-    const visualizationTemps = resolveVisualizationTemperatures(context);
+  return mktSentence + complexityNote + classNote +
+    ' Regulatory affairs specialist input is required before validation activities begin.';
+}
 
-    const htmlData = {
-      assessment_type:    "Technical Hypothesis",
-      application:         safe(input.application),
-      current_material_label: materialLabels.currentMaterialLabel,
-      target_material_label: materialLabels.targetMaterialLabel,
-      conceptual_note: "Illustrative comparison only. Temperature values and scores are conceptual indicators of relative processing tolerance, not recommended operating conditions.",
-      material_transition: input.bio_material,
-      report_date:         new Date().toISOString().split("T")[0],
 
-      subtitle_note:
-        "For manufacturers evaluating biodegradable material transition using existing processing equipment." +
-        "<br>This report enables early-stage decision-making without requiring immediate engineering trials.",
+function isMedicalNonSterileLowExposure(input) {
+  if (input?.route !== 'medical') return false;
+  const med = input.medical ?? {};
+  const steril = med.sterilisation_medical ?? '';
+  const device = med.device_type ?? '';
+  const patient = med.patient_contact ?? '';
+  return (
+    device === 'packaging_non_sterile' &&
+    (steril === 'none_required' || steril === 'none' || steril === '') &&
+    (patient === 'none' || patient === 'unknown')
+  );
+}
 
-      compatibility_level: decision.level,
-      executive_summary:   exec_summary,
-      key_risk:            primary_risk_body,
+function refineValidationBurdenForApplication(validationBurden, input) {
+  const refined = {
+    ...(validationBurden ?? {}),
+    estimatedTestCategories: [...((validationBurden?.estimatedTestCategories) ?? [])],
+  };
 
-      processing_window:    proc_window_note,
-      thermal_behavior:     processing.thermalBehavior,
-      flow_characteristics: processing.flowCharacteristics,
+  if (!isMedicalNonSterileLowExposure(input)) return refined;
 
-      mechanical_behavior:     product.mechanical,
-      surface_quality:          product.surface,
-      structural_consistency:   product.structural,
-      application_implication:  app_implication,
-
-      primary_risk_title:   getPrimaryRiskTitle(constraint),
-      primary_risk:          primary_risk_body,
-      secondary_risk_title: "Process Interaction Risk",
-      secondary_risk:        secondary_risk_body,
-      mechanism:             mechanism_body,
-
-      stability:           quality.stability,
-      stability_note:      quality.stabilityNote,
-      consistency:         quality.consistency,
-      consistency_note:    quality.consistencyNote,
-      expected_deviations: expected_devs_html,
-
-      pha_score: scores.total,
-
-      base_image: visualBaseDataUri,
-      dynamic_overlay: generateOverlay(scores, visualizationTemps),
-
-      next_step:      next_step_body,
-      decision:       decision.decision,
-      economic_impact: economic,
-
-      call_to_action:
-        "Request a Technical Screening Report (Equivalent: $200) — Delivered within 48 hours",
-    };
-
-    const html = injectHtml(htmlTemplate, htmlData);
-
-    const pdf = await Promise.race([
-      renderPdf(html),
-      globalTimeout(45000),
-    ]);
-
-    latestPdfBuffer = pdf;
-
-    // Create a user-specific download URL without changing the existing PDF logic.
-    cleanupExpiredReports();
-    const reportId = crypto.randomUUID();
-
-    reportStore.set(reportId, {
-      pdf,
-      email: safe(input.email, "").trim(),
-      company_name: safe(input.company_name, ""),
-      createdAt: Date.now(),
+  refined.estimatedTestCategories = refined.estimatedTestCategories
+    .filter(item => {
+      const s = String(item).toLowerCase();
+      if (s.includes('sterile barrier')) return false;
+      if (s.includes('sterilisation compatibility')) return false;
+      if (s.includes('sterilization compatibility')) return false;
+      if (s.includes('sterilisation validation')) return false;
+      if (s.includes('sterilization validation')) return false;
+      if (s.includes('accelerated aging study') || s.includes('accelerated ageing study')) return false;
+      return true;
     });
 
-    // Send the report by email if Resend is configured.
-    // Email failure does not block PDF generation.
-    try {
-      await sendReportEmails({ pdf, input, scores, decision, reportId });
-    } catch (emailErr) {
-      console.warn("[Email delivery failed]", emailErr.message);
+  if (!refined.estimatedTestCategories.length) {
+    refined.estimatedTestCategories = [
+      'Supplier evidence and material characterisation review',
+      'ISO 10993-1 applicability screening based on no-patient-contact use',
+      'Processing compatibility and dimensional stability check under intended use conditions',
+      'Packaging performance review against customer and distribution requirements',
+    ];
+  }
+
+  return refined;
+}
+
+function buildFallbackValidationSummary(validationBurden) {
+  const levelText = BURDEN_NARRATIVE[validationBurden.level] ?? 'The validation programme scope has not been determined.';
+  const tests = (validationBurden.estimatedTestCategories ?? []).slice(0, 5);
+  const testStr = tests.length > 0 ? ` Indicated test categories include: ${tests.join('; ')}.` : '';
+  const spNote  = validationBurden.specialistRequired
+    ? ' A qualified specialist is indicated before this programme is designed.'
+    : '';
+
+  return levelText + testStr + spNote;
+}
+
+
+function buildNonSterileMedicalValidationSummary(validationBurden) {
+  const tests = (validationBurden.estimatedTestCategories ?? []).slice(0, 5);
+  const testStr = tests.length > 0 ? ` Indicated review categories include: ${tests.join('; ')}.` : '';
+
+  return (
+    'For this non-sterile, no-patient-contact healthcare packaging scenario, the indicated validation scope is bounded. ' +
+    'The review should focus on supplier evidence, ISO 10993-1 applicability screening, material characterisation, processing compatibility, and packaging performance under intended storage and handling conditions.' +
+    testStr +
+    ' A qualified medical-material and regulatory specialist should confirm the final scope before customer submission or validation planning.'
+  );
+}
+
+function buildNonSterileMedicalNextStep(decision, validationBurden) {
+  const specialists = [];
+  if (validationBurden.specialistRequired)                 specialists.push('materials and processing specialist');
+  if (validationBurden.regulatorySpecialistRequired)       specialists.push('regulatory affairs specialist');
+  if (validationBurden.biocompatibilitySpecialistRequired) specialists.push('biocompatibility toxicologist');
+
+  const spNote = specialists.length > 0
+    ? ` Specialist disciplines to be engaged: ${specialists.join('; ')}.`
+    : '';
+
+  return (
+    `${decision.immediateAction} ` +
+    `For this non-sterile, no-patient-contact healthcare packaging use, the next paid technical work package should be bounded and evidence-focused: ` +
+    `1) confirm supplier TDS, composition disclosure status, material identification, and quality-system evidence; ` +
+    `2) confirm the ISO 10993-1 applicability rationale for no-patient-contact use and determine whether any limited extractables/leachables review is needed; ` +
+    `3) review processing compatibility, dimensional stability, and packaging performance under intended storage and handling conditions; ` +
+    `4) confirm customer, distribution, and documentation requirements before any validation activity is initiated; ` +
+    `5) issue a specialist review decision gate identifying whether the project can proceed to targeted validation, requires additional supplier evidence, or should remain at screening stage.` +
+    spNote
+  );
+}
+
+function buildFallbackNextStep(decision, hardTriggers, validationBurden) {
+  const activeReviewFlags = hardTriggers
+    .filter(t => t.floorScore !== null)
+    .map(t => t.label ?? t.id)
+    .join('; ');
+
+  const flagNote = activeReviewFlags
+    ? ` First, resolve the active technical review flag condition(s): ${activeReviewFlags}.`
+    : '';
+
+  const specialists = [];
+  if (validationBurden.specialistRequired)                 specialists.push('materials and processing specialist');
+  if (validationBurden.regulatorySpecialistRequired)       specialists.push('regulatory affairs specialist');
+  if (validationBurden.biocompatibilitySpecialistRequired) specialists.push('biocompatibility toxicologist');
+
+  const spNote = specialists.length > 0
+    ? ` Specialist disciplines to be engaged: ${specialists.join('; ')}.`
+    : '';
+
+  const testScope = (validationBurden.estimatedTestCategories ?? []).slice(0, 4).join('; ');
+
+  return (
+    `${decision.immediateAction}${flagNote} ` +
+    `For a commercial-grade transition review, the next step should be structured as a paid technical work package: ` +
+    `1) collect and screen final supplier evidence, including TDS, composition disclosure status, declarations, and available test data; ` +
+    `2) define the validation scope against the declared application and target market(s)` +
+    (testScope ? `, including ${testScope}` : '') + `; ` +
+    `3) review processing compatibility and identify the minimum pilot conditions required to avoid premature scale-up; ` +
+    `4) issue a pilot-readiness decision gate identifying whether the project should proceed, pause for evidence, or require material/process redesign.` +
+    spNote
+  );
+}
+
+function deterministicFallbackNarrative(scoringResult) {
+  const { decision, scoring, hardTriggers, riskProfile, validationBurden, aiNarrativeInputs } = scoringResult;
+  const { formInputs, route } = aiNarrativeInputs;
+  const targetMarkets = formInputs.target_markets ?? [];
+  const nMarkets = formInputs.n_markets ?? 0;
+  const refinedValidationBurden = refineValidationBurdenForApplication(validationBurden, formInputs);
+
+  return {
+    source: 'fallback',
+    sections: {
+      exec_summary:          buildFallbackExecSummary(decision, scoring, riskProfile, hardTriggers),
+      application_analysis:  buildFallbackApplicationAnalysis(route, formInputs, targetMarkets),
+      processing_behaviour:  buildFallbackProcessingBehaviour(route, formInputs, formInputs.candidate_material),
+      risk_analysis:         buildFallbackRiskAnalysis(riskProfile, hardTriggers, scoring),
+      regulatory_burden:     buildFallbackRegulatoryBurden(formInputs, route, targetMarkets, nMarkets),
+      validation_summary:    buildFallbackValidationSummary(refinedValidationBurden),
+      recommended_next_step: buildFallbackNextStep(decision, hardTriggers, refinedValidationBurden),
+    },
+  };
+}
+
+async function tryClaudeNarrative(scoringResult) {
+  if (!AI_ENABLED || !process.env.ANTHROPIC_API_KEY) {
+    console.log('[server_advanced] AI narrative unavailable — using deterministic fallback.');
+    return deterministicFallbackNarrative(scoringResult);
+  }
+
+  const prompt = buildClaudePrompt(scoringResult);
+
+  try {
+    const sections = await callClaudeApi(prompt, CLAUDE_TIMEOUT_MS);
+    const violations = validateNarrativeSections(sections);
+
+    if (violations.length > 0) {
+      console.warn('[server_advanced] Claude narrative validation failed:', violations, '— using fallback.');
+      return deterministicFallbackNarrative(scoringResult);
     }
 
-    // Tally Webhook / LP return flow:
-    // Use /generate-report?delivery=email to avoid forcing a browser PDF response.
-    if (req.query.delivery === "email") {
-      return res.json({
-        ok: true,
-        message: "Report generated and email delivery attempted.",
-        report_id: reportId,
-        compatibility_level: decision.level,
-        composite_score: scores.total,
+    console.log('[server_advanced] Claude narrative accepted.');
+    return { source: 'claude', sections };
+
+  } catch (err) {
+    const reason = err.name === 'AbortError' ? 'timeout' : err.message;
+    console.warn(`[server_advanced] Claude narrative failed (${reason}) — using deterministic fallback.`);
+    return deterministicFallbackNarrative(scoringResult);
+  }
+}
+
+function levelFromScore(score, thresholds) {
+  if (score >= thresholds.high) return 'High';
+  if (score >= thresholds.structured) return 'Structured';
+  if (score >= thresholds.conditional) return 'Conditional';
+  return 'Low';
+}
+
+function buildEvidenceMeta(scoringResult) {
+  const c = scoringResult.confidence ?? {};
+  const b = c.breakdown ?? {};
+
+  const evidence = Number.isFinite(b.evidence) ? b.evidence : 75;
+  const clarity = Number.isFinite(b.clarity) ? b.clarity : 75;
+  const assumption = Number.isFinite(b.assumptionDependency) ? b.assumptionDependency : 25;
+
+  const dataCompletenessScore = Math.round((0.60 * evidence) + (0.40 * clarity));
+  const evidenceStrengthScore = Math.round(evidence);
+  const assumptionRelianceScore = Math.round(assumption);
+
+  let assumptionLevel = 'Low';
+  if (assumptionRelianceScore >= 70) assumptionLevel = 'Very High';
+  else if (assumptionRelianceScore >= 45) assumptionLevel = 'High';
+  else if (assumptionRelianceScore >= 20) assumptionLevel = 'Moderate';
+
+  const dataLevel = levelFromScore(dataCompletenessScore, { high: 85, structured: 70, conditional: 50 });
+  const evidenceLevel = levelFromScore(evidenceStrengthScore, { high: 85, structured: 70, conditional: 50 });
+
+  const missingDrivers = [];
+  if (evidenceStrengthScore < 85) missingDrivers.push('supplier / material evidence');
+  if (clarity < 85) missingDrivers.push('application or processing clarity');
+  if (assumptionRelianceScore >= 20) missingDrivers.push('unresolved assumptions');
+
+  return {
+    dataCompleteness: {
+      score: dataCompletenessScore,
+      level: dataLevel,
+      basis: 'Derived from material evidence availability and application / processing clarity.',
+    },
+    evidenceStrength: {
+      score: evidenceStrengthScore,
+      level: evidenceLevel,
+      basis: 'Derived from TDS availability, supplier data status, and route-specific supplier quality indicators.',
+    },
+    assumptionReliance: {
+      score: assumptionRelianceScore,
+      level: assumptionLevel,
+      basis: missingDrivers.length
+        ? `Main dependency: ${missingDrivers.join(', ')}.`
+        : 'No material assumption dependency was identified from the submitted fields.',
+    },
+  };
+}
+
+function buildIndustryPathway(input, scoringResult) {
+  const fmt = input.product_format ?? 'unspecified';
+  const route = input.route;
+
+  const pathwayMap = {
+    film_flexible_packaging: 'Flexible Packaging Pathway',
+    flexible_packaging: 'Flexible Packaging Pathway',
+    film: 'Flexible Packaging Pathway',
+    rigid_packaging: 'Rigid Packaging Pathway',
+    sheet_thermoforming: 'Sheet / Thermoforming Pathway',
+    injection_moulding: 'Injection Moulding Pathway',
+    injection_molding: 'Injection Moulding Pathway',
+    agricultural_film: 'Agricultural Film Pathway',
+    medical_packaging: 'Medical Packaging Pathway',
+    sterile_barrier_packaging: 'Medical Sterile Packaging Pathway',
+    device_component: 'Medical Device Component Pathway',
+  };
+
+  let label = pathwayMap[fmt] ?? (route === 'medical' ? 'Medical / Healthcare Pathway' : 'Food Packaging Pathway');
+  if (route === 'medical' && input.medical?.device_type === 'sterile_barrier_packaging') {
+    label = 'Medical Sterile Packaging Pathway';
+  }
+  if (route === 'food' && (fmt === 'film' || fmt === 'film_flexible_packaging' || fmt === 'flexible_packaging')) {
+    label = 'Flexible Food Packaging Pathway';
+  }
+
+  const burdenLevel = scoringResult.validationBurden?.level;
+  const burden = BURDEN_LEVEL_DISPLAY[burdenLevel] ?? scoringResult.validationBurden?.levelDisplay ?? burdenLevel ?? 'to be confirmed';
+  const primary = scoringResult.riskProfile?.primaryRiskDriver?.label ?? 'application-specific transition risk';
+
+  return {
+    label,
+    productFormat: displayValue('product_format', fmt),
+    implementationBurden: burden,
+    primaryConstraint: beautifyTechnicalText(primary),
+    nextGate: scoringResult.decision?.immediateAction ?? 'Define evidence package and validation gate before pilot planning.',
+  };
+}
+
+function buildStandardsLinkage(input, scoringResult) {
+  const rows = [];
+
+  if (input.route === 'food') {
+    const food = input.food ?? {};
+    const markets = input.target_markets ?? [];
+
+    const migrationRefs = [];
+    if (markets.includes('eu')) migrationRefs.push('EU Regulation 10/2011');
+    if (markets.includes('us')) migrationRefs.push('FDA 21 CFR food contact framework');
+    if (markets.includes('uk')) migrationRefs.push('UK Food Contact Materials Regulations');
+    if (markets.includes('canada')) migrationRefs.push('Health Canada / Canadian food packaging framework');
+    if (markets.includes('japan')) migrationRefs.push('MHLW Notification 370');
+    if (markets.includes('china')) migrationRefs.push('GB 4806 series');
+    if (markets.includes('india')) migrationRefs.push('FSSAI food-contact packaging framework');
+    if (markets.includes('anz')) migrationRefs.push('FSANZ / Australia-New Zealand food packaging framework');
+    if (markets.includes('asean') || markets.includes('sea')) migrationRefs.push('ASEAN national food-contact frameworks');
+    if (markets.includes('gcc') || markets.includes('middle_east')) migrationRefs.push('GSO / national GCC food-contact frameworks');
+
+    rows.push({
+      condition: `Food contact scenario: ${displayValue('food_type', food.food_type)} / ${displayValue('contact_temp', food.contact_temp)} / ${displayValue('contact_duration', food.contact_duration)}`,
+      validationCategory: 'Overall and specific migration test scope',
+      reference: migrationRefs.length ? migrationRefs.join('; ') : 'Target-market food-contact framework to be confirmed',
+      reason: 'Food type, contact temperature, and contact duration determine simulant selection and worst-case migration conditions.',
+    });
+
+    if (food.seal_temp || food.inpack_process) {
+      rows.push({
+        condition: `Processing window: seal ${displayValue('seal_temp', food.seal_temp)}; in-pack process ${displayValue('inpack_process', food.inpack_process)}`,
+        validationCategory: 'Seal strength, hot-tack, thermal stability, and process-window verification',
+        reference: 'ASTM F88 / ASTM F2029 / internal process validation protocol',
+        reason: 'Biopolymer transitions are sensitive to heat-seal temperature, thermal history, and line-speed conditions.',
       });
     }
 
-    // Default direct POST behaviour remains unchanged: return PDF download.
-    res.setHeader("Content-Type",        "application/pdf");
-    res.setHeader("Content-Disposition", "attachment; filename=fairvia-report.pdf");
-    res.setHeader("Content-Length",      pdf.length);
-    res.send(pdf);
+    const barriers = Array.isArray(food.barrier_layer) ? food.barrier_layer.filter(b => !['none', 'unknown'].includes(b)) : [];
+    if (barriers.length) {
+      rows.push({
+        condition: `Barrier structure: ${displayValue('barrier_layer', barriers)}`,
+        validationCategory: 'OTR / WVTR and barrier retention after processing',
+        reference: 'ASTM D3985 / ASTM F1249 / ISO 15106 as applicable',
+        reason: 'Barrier layers must be validated against shelf-life and distribution conditions after material substitution.',
+      });
+    }
 
-  } catch (err) {
-    console.error("[PDF ERROR]", { message: err.message, stack: err.stack, input: req.body });
-    res.status(500).json({ error: "PDF generation failed", detail: err.message });
+    if (input.eol_claim && !['none', 'tbd', 'not_sure'].includes(input.eol_claim)) {
+      rows.push({
+        condition: `End-of-life claim: ${displayValue('eol_claim', input.eol_claim)}`,
+        validationCategory: 'Compostability / biodegradation claim substantiation',
+        reference: 'EN 13432 / ISO 17088 / ASTM D6400 / OECD biodegradation methods as applicable',
+        reason: 'Environmental claims require a recognised test route and certification basis before commercial communication.',
+      });
+    }
+
+    return rows;
+  }
+
+  const medical = input.medical ?? {};
+  rows.push({
+    condition: `Patient contact: ${displayValue('patient_contact', medical.patient_contact)} / ${displayValue('contact_duration_med', medical.contact_duration_med)}`,
+    validationCategory: 'Biological evaluation planning',
+    reference: 'ISO 10993-1 / ISO 10993-18 / ISO 10993-17 as applicable',
+    reason: 'Patient-contact nature and duration define the biological evaluation category and extractables/leachables scope.',
+  });
+
+  if (medical.sterilisation_medical && !['none', 'none_required'].includes(medical.sterilisation_medical)) {
+    rows.push({
+      condition: `Sterilisation method: ${displayValue('sterilisation_medical', medical.sterilisation_medical)}`,
+      validationCategory: 'Sterilisation compatibility and validation pathway',
+      reference: 'ISO 11135 / ISO 11137 / ISO 17665 as applicable',
+      reason: 'Sterilisation can change polymer chemistry, mechanical retention, extractables profile, and sterile barrier performance.',
+    });
+  }
+
+  if (medical.device_type === 'sterile_barrier_packaging') {
+    rows.push({
+      condition: 'Sterile barrier packaging application',
+      validationCategory: 'Sterile barrier integrity, seal characterisation, aging, and distribution simulation',
+      reference: 'ISO 11607 / ASTM F1980 / ASTM F88 / ASTM D4169 as applicable',
+      reason: 'Sterile barrier systems must retain package integrity through sterilisation, aging, distribution, and handling.',
+    });
+  }
+
+  return rows;
+}
+
+function buildExecutiveSnapshot(scoringResult, input) {
+  const primary = scoringResult.riskProfile?.primaryRiskDriver?.label || 'Application-specific transition risk';
+  const secondary = scoringResult.riskProfile?.secondaryRiskDriver?.label || 'evidence and validation planning';
+  const decision = scoringResult.decision?.label || 'Decision pending';
+  const burden = BURDEN_LEVEL_DISPLAY[scoringResult.validationBurden?.level] ?? scoringResult.validationBurden?.level ?? 'To be confirmed';
+  const evidence = scoringResult.confidence?.breakdown?.evidence;
+
+  const nextEvidence = evidence !== undefined && evidence < 85
+    ? 'Supplier evidence, TDS, declarations, and applicable test data should be assembled before pilot planning.'
+    : 'Existing evidence is sufficient for screening, but final supplier documentation and validation scope should still be confirmed.';
+
+  if (input.route === 'food') {
+    const keyOpportunity = 'The project can be evaluated through a bounded food-contact transition pathway using contact scenario, processing window, material evidence, and claim-position checks.';
+    const keyLimitation = `${primary} is the main limitation identified by the deterministic engine.`;
+    const implementationBurden = `${burden}. Implementation burden is mainly linked to ${String(secondary).toLowerCase()}.`;
+    const decisionRecommendation = `${decision}: ${scoringResult.decision?.immediateAction ?? 'Define validation gate before pilot planning.'}`;
+
+    return {
+      keyOpportunity,
+      keyLimitation,
+      implementationBurden,
+      decisionRecommendation,
+      requiredNextEvidence: nextEvidence,
+      primaryOpportunity: keyOpportunity,
+      coreConstraint: keyLimitation,
+      implementationRisk: implementationBurden,
+    };
+  }
+
+  const keyOpportunity = 'The project can be advanced as a specialist healthcare material review if the application boundary, supplier quality position, and validation pathway are clearly defined.';
+  const keyLimitation = `${primary} is the main limitation identified by the deterministic engine and should be reviewed with medical-material and regulatory specialist oversight.`;
+  const implementationBurden = `${burden}. Implementation burden is mainly linked to ${String(secondary).toLowerCase()}.`;
+  const decisionRecommendation = `${decision}: ${scoringResult.decision?.immediateAction ?? 'Define specialist review gate before validation planning.'}`;
+
+  return {
+    keyOpportunity,
+    keyLimitation,
+    implementationBurden,
+    decisionRecommendation,
+    requiredNextEvidence: nextEvidence,
+    primaryOpportunity: keyOpportunity,
+    coreConstraint: keyLimitation,
+    implementationRisk: implementationBurden,
+  };
+}
+
+function buildStandardsReferences(input) {
+  if (input.route === 'food') {
+    const refs = [];
+    const markets = input.target_markets ?? [];
+    if (markets.includes('eu')) refs.push('EU Regulation 10/2011');
+    if (markets.includes('uk')) refs.push('UK Food Contact Materials Regulations');
+    if (markets.includes('us')) refs.push('FDA 21 CFR food contact framework');
+    if (markets.includes('canada')) refs.push('Health Canada / Canadian food packaging framework');
+    if (markets.includes('japan')) refs.push('MHLW Notification 370');
+    if (markets.includes('china')) refs.push('GB 4806 series');
+    if (markets.includes('india')) refs.push('FSSAI food-contact packaging framework');
+    if (markets.includes('anz')) refs.push('FSANZ / Australia-New Zealand food packaging framework');
+    if (markets.includes('asean') || markets.includes('sea')) refs.push('ASEAN national food-contact frameworks');
+    if (markets.includes('gcc') || markets.includes('middle_east')) refs.push('GSO / national GCC food-contact frameworks');
+    if (input.food?.barrier_layer?.some?.(b => !['none', 'unknown'].includes(b))) {
+      refs.push('ASTM D3985 / ASTM F1249 / ISO 15106 — barrier performance references');
+    }
+    if (input.food?.seal_temp || input.food?.inpack_process) {
+      refs.push('ASTM F88 / ASTM F2029 — seal strength and hot-tack references');
+    }
+    if (input.eol_claim && !['none', 'tbd', 'not_sure'].includes(input.eol_claim)) {
+      refs.push('EN 13432 / ISO 17088 / ASTM D6400 — compostability claim references');
+    }
+    return refs.length ? refs : ['Food contact migration framework — target market dependent'];
+  }
+
+  const refs = ['ISO 10993-1 / ISO 10993-18 / ISO 10993-17 — biological evaluation and toxicological risk framework'];
+  const steril = input.medical?.sterilisation_medical ?? '';
+  if (!['none_required', 'none', ''].includes(steril)) {
+    refs.push('ISO 11135 / ISO 11137 / ISO 17665 — sterilisation pathway as applicable');
+  }
+  if (input.medical?.device_type === 'sterile_barrier_packaging') {
+    refs.push('ISO 11607 / ASTM F1980 / ASTM F88 / ASTM D4169 — sterile barrier, aging, seal, and distribution references');
+  } else if (!isMedicalNonSterileLowExposure(input)) {
+    refs.push('ISO 11607 — sterile barrier packaging where applicable');
+  }
+  return refs;
+}
+
+function buildPdfDataObject(scoringResult, narrativeResult, input) {
+  const now = new Date();
+  const reportId = generateReportId();
+
+  const categoryArray = Object.entries(scoringResult.scoring.categoryBreakdown).map(([key, val]) => ({
+    key,
+    label:               cleanDisplayText(beautifyTechnicalText(val.label)),
+    score:               val.score,
+    maxScore:            val.maxScore,
+    contributingFactors: (val.contributingFactors ?? []).map(v => cleanDisplayText(beautifyTechnicalText(v))),
+  }));
+
+  const executiveSnapshot = scoringResult.executive ?? buildExecutiveSnapshot(scoringResult, input);
+  const standardsReferences = scoringResult.standards ?? buildStandardsReferences(input);
+  const evidenceMeta = buildEvidenceMeta(scoringResult);
+  const standardsLinkage = buildStandardsLinkage(input, scoringResult);
+  const industryPathway = buildIndustryPathway(input, scoringResult);
+  const refinedValidationBurden = refineValidationBurdenForApplication(scoringResult.validationBurden, input);
+  const isNonSterileLowExposureMedical = isMedicalNonSterileLowExposure(input);
+
+  return {
+    reportMeta: {
+      reportId,
+      reportDate:        now.toISOString().split('T')[0],
+      reportDateDisplay: formatDateDisplay(now),
+      reportVersion:     SERVER_VERSION,
+      engineVersion:     ENGINE_VERSION,
+      route:             input.route,
+      routeLabel:        ROUTE_LABEL[input.route] ?? input.route,
+      companyName:       input.company_name ?? 'Confidential',
+      projectName:       input.project_name ?? 'Unspecified Project',
+      narrativeSource:   narrativeResult.source,
+      targetMarkets:     (input.target_markets ?? []).map(m => MARKET_LABEL[m] ?? m),
+      reportLanguage:    input.report_language ?? 'en',
+    },
+
+    scoring: {
+      finalScore:    scoringResult.scoring.finalScore,
+      rawScore:      scoringResult.scoring.rawScore,
+      baselineScore: scoringResult.scoring.baselineScore,
+      floorApplied:  scoringResult.scoring.floorApplied,
+      floorReason:   scoringResult.scoring.floorReason,
+      categoryArray,
+      scoreBarWidth: `${scoringResult.scoring.finalScore}%`,
+    },
+
+    decision: {
+      band:            scoringResult.decision.band,
+      label:           scoringResult.decision.label,
+      color:           scoringResult.decision.color,
+      immediateAction: scoringResult.decision.immediateAction,
+      badgeClass:      `decision-${scoringResult.decision.color}`,
+    },
+
+    confidence: scoringResult.confidence ?? {
+      score: 75,
+      level: 'Moderate',
+      rationale: 'Confidence is estimated from the available input evidence and declared application clarity.',
+      breakdown: {},
+    },
+
+    hardTriggers: scoringResult.hardTriggers.map(t => ({
+      ...t,
+      label:       cleanDisplayText(beautifyTechnicalText(t.label)),
+      description: cleanDisplayText(beautifyTechnicalText(t.description)),
+    })),
+    hasHardTriggers: scoringResult.hardTriggers.length > 0,
+
+    riskProfile: {
+      primaryRiskDriver:   beautifyRiskDriver(scoringResult.riskProfile.primaryRiskDriver),
+      secondaryRiskDriver: beautifyRiskDriver(scoringResult.riskProfile.secondaryRiskDriver),
+      topRiskFactors:      (scoringResult.riskProfile.topRiskFactors ?? []).map(v => cleanDisplayText(beautifyTechnicalText(v))),
+    },
+
+    validationBurden: {
+      level:                              scoringResult.validationBurden.level,
+      levelDisplay:                       BURDEN_LEVEL_DISPLAY[scoringResult.validationBurden.level] ?? scoringResult.validationBurden.level,
+      estimatedTestCategories:            (refinedValidationBurden.estimatedTestCategories ?? []).map(v => cleanDisplayText(beautifyTechnicalText(v))),
+      specialistRequired:                 scoringResult.validationBurden.specialistRequired,
+      regulatorySpecialistRequired:       scoringResult.validationBurden.regulatorySpecialistRequired ?? false,
+      biocompatibilitySpecialistRequired: scoringResult.validationBurden.biocompatibilitySpecialistRequired ?? false,
+    },
+
+    narrative: {
+      exec_summary:          cleanDisplayText(beautifyTechnicalText(narrativeResult.sections.exec_summary)),
+      application_analysis:  cleanDisplayText(beautifyTechnicalText(narrativeResult.sections.application_analysis)),
+      processing_behaviour:  cleanDisplayText(beautifyTechnicalText(narrativeResult.sections.processing_behaviour)),
+      risk_analysis:         cleanDisplayText(beautifyTechnicalText(narrativeResult.sections.risk_analysis)),
+      regulatory_burden:     cleanDisplayText(beautifyTechnicalText(narrativeResult.sections.regulatory_burden)),
+      validation_summary:    cleanDisplayText(beautifyTechnicalText(
+        isNonSterileLowExposureMedical
+          ? buildNonSterileMedicalValidationSummary(refinedValidationBurden)
+          : narrativeResult.sections.validation_summary
+      )),
+      recommended_next_step: cleanDisplayText(beautifyTechnicalText(
+        isNonSterileLowExposureMedical
+          ? buildNonSterileMedicalNextStep(scoringResult.decision, refinedValidationBurden)
+          : narrativeResult.sections.recommended_next_step
+      )),
+    },
+
+    sections: {
+      showImplantStop:  false,
+      showHardTriggers: scoringResult.hardTriggers.length > 0,
+      showFloorNote:    scoringResult.scoring.floorApplied,
+      isFoodRoute:      input.route === 'food',
+      isMedicalRoute:   input.route === 'medical',
+    },
+
+    executive: executiveSnapshot,
+    evidenceMeta,
+    standards: standardsReferences,
+    standardsLinkage,
+    industryPathway,
+    disclaimer: REPORT_DISCLAIMER,
+  };
+}
+
+function injectDataIntoTemplate(pdfData) {
+  const template = fs.readFileSync(TEMPLATE_PATH, 'utf8');
+  const jsonStr = JSON.stringify(pdfData).replace(/<\/script>/gi, '<\\/script>');
+  const injection = `<script type="application/json" id="fv-report-data">${jsonStr}</script>`;
+
+  const result = template.replace('<!-- REPORT_DATA_INJECTION -->', injection);
+
+  if (result === template) {
+    throw new Error('template_advanced.html is missing the required <!-- REPORT_DATA_INJECTION --> placeholder.');
+  }
+
+  return result;
+}
+
+async function renderHtmlToPdf(html) {
+  let browser = null;
+
+  try {
+    browser = await puppeteer.launch({ args: PUPPETEER_ARGS });
+    const page = await browser.newPage();
+    await page.setContent(html, { waitUntil: 'networkidle0' });
+
+    return await page.pdf({
+      format:          'A4',
+      printBackground: true,
+      margin: { top: '18mm', right: '16mm', bottom: '18mm', left: '16mm' },
+    });
+  } finally {
+    if (browser) await browser.close();
   }
 }
 
-// ============================================================
-// RESEARCH DEMO ROUTES
-// Payment-free demo route for researchers / technical reviewers
-// This does NOT affect the paid production flow.
-// Access is protected by TEST_ROUTE_KEY.
-// ============================================================
-
-const DEMO_ACCESS_KEY = process.env.TEST_ROUTE_KEY || "fairvia-test-2026";
-
-function isDemoAccessAllowed(req) {
-  const keyFromQuery = req.query?.key || "";
-  const keyFromBody = req.body?.access_token || "";
-  return keyFromQuery === DEMO_ACCESS_KEY || keyFromBody === DEMO_ACCESS_KEY;
+async function renderPdfFromTemplate(pdfData) {
+  return renderHtmlToPdf(injectDataIntoTemplate(pdfData));
 }
 
-app.get("/research-demo", (req, res) => {
-  if (!isDemoAccessAllowed(req)) {
-    return res.status(403).send("Demo access denied.");
-  }
+function generateImplantReferralHtml(scoringResult, input) {
+  const reportId = generateReportId();
+  const dateStr  = formatDateDisplay(new Date());
+  const company  = input.company_name ?? 'Confidential';
+  const project  = input.project_name ?? 'Unspecified Project';
+  const msg      = scoringResult.referralMessage ?? '';
 
-  const demoKey = String(req.query.key || "");
+  const medical = input.medical ?? {};
+  const markets = Array.isArray(input.target_markets) && input.target_markets.length
+    ? input.target_markets.map(m => displayValue('target_markets', m)).join(', ')
+    : 'unspecified';
 
-  res.setHeader("Content-Type", "text/html; charset=utf-8");
+  const candidate = displayValue('candidate_material', input.candidate_material ?? []);
+  const current   = displayValue('current_material', input.current_material);
+  const device    = displayValue('device_type', medical.device_type);
+  const contact   = displayValue('patient_contact', medical.patient_contact);
+  const duration  = displayValue('contact_duration_med', medical.contact_duration_med);
+  const steril    = displayValue('sterilisation_medical', medical.sterilisation_medical);
+  const medGrade  = displayValue('medical_grade_supplier', medical.medical_grade_supplier);
+  const iso13485  = displayValue('iso_13485_supplier', medical.iso_13485_supplier);
 
-  res.send(`<!DOCTYPE html>
+  return `<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>FairVia™ | Research Demo Assessment</title>
-  <style>
-    :root {
-      --ink: #173766;
-      --ink-soft: #425f82;
-      --ink-muted: #748dad;
-      --blue: #2952a3;
-      --bg: #f4f7fb;
-      --surface: #ffffff;
-      --line: rgba(23,55,102,0.12);
-      --line-soft: rgba(23,55,102,0.07);
-    }
-
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-
-    body {
-      font-family: Arial, Helvetica, sans-serif;
-      color: var(--ink);
-      background:
-        linear-gradient(var(--line-soft) 1px, transparent 1px),
-        linear-gradient(90deg, var(--line-soft) 1px, transparent 1px),
-        var(--bg);
-      background-size: 42px 42px;
-      line-height: 1.6;
-      -webkit-font-smoothing: antialiased;
-    }
-
-    .page {
-      min-height: 100vh;
-      padding: 34px 18px 54px;
-    }
-
-    .wrap {
-      width: 100%;
-      max-width: 960px;
-      margin: 0 auto;
-    }
-
-    .header {
-      margin-bottom: 18px;
-      padding: 28px 30px;
-      border: 1px solid var(--line);
-      border-radius: 16px;
-      background: rgba(255,255,255,0.94);
-      box-shadow: 0 14px 34px rgba(23,55,102,0.08);
-    }
-
-    .eyebrow {
-      margin-bottom: 8px;
-      color: var(--blue);
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: 0.14em;
-      text-transform: uppercase;
-    }
-
-    h1 {
-      margin-bottom: 10px;
-      font-size: clamp(26px, 4vw, 38px);
-      line-height: 1.15;
-      font-weight: 650;
-    }
-
-    .lead {
-      max-width: 780px;
-      color: var(--ink-soft);
-      font-size: 14.5px;
-    }
-
-    .demo-notice {
-      margin-top: 16px;
-      padding: 14px 16px;
-      border: 1px solid rgba(41,82,163,0.18);
-      border-radius: 12px;
-      background: #eef5ff;
-      color: #31537f;
-      font-size: 13px;
-      line-height: 1.55;
-    }
-
-    form {
-      overflow: hidden;
-      border: 1px solid var(--line);
-      border-radius: 16px;
-      background: var(--surface);
-      box-shadow: 0 14px 34px rgba(23,55,102,0.08);
-    }
-
-    .section {
-      padding: 22px 28px;
-      border-bottom: 1px solid var(--line-soft);
-    }
-
-    .section:last-child { border-bottom: none; }
-
-    .section-title {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      margin-bottom: 16px;
-      font-size: 15px;
-      font-weight: 700;
-    }
-
-    .section-title span {
-      display: inline-grid;
-      place-items: center;
-      width: 24px;
-      height: 24px;
-      border-radius: 999px;
-      background: #eef5ff;
-      color: var(--blue);
-      font-size: 12px;
-      font-weight: 700;
-    }
-
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 14px 16px;
-    }
-
-    .field { display: flex; flex-direction: column; gap: 6px; }
-    .field.full { grid-column: 1 / -1; }
-
-    label {
-      color: var(--ink);
-      font-size: 12.5px;
-      font-weight: 700;
-    }
-
-    .required { color: #c44636; }
-
-    input, select, textarea {
-      width: 100%;
-      min-height: 42px;
-      padding: 10px 12px;
-      border: 1px solid rgba(23,55,102,0.16);
-      border-radius: 9px;
-      background: #fff;
-      color: var(--ink);
-      font: inherit;
-      font-size: 14px;
-      outline: none;
-    }
-
-    textarea {
-      min-height: 86px;
-      resize: vertical;
-    }
-
-    input:focus, select:focus, textarea:focus {
-      border-color: var(--blue);
-      box-shadow: 0 0 0 3px rgba(41,82,163,0.10);
-    }
-
-    .hint {
-      color: var(--ink-muted);
-      font-size: 11.5px;
-      line-height: 1.45;
-    }
-
-    .submit-area {
-      padding: 24px 28px;
-      background: #f8fafd;
-    }
-
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      min-height: 46px;
-      padding: 0 24px;
-      border: 0;
-      border-radius: 9px;
-      background: linear-gradient(135deg, #244f9f 0%, #2f65c8 100%);
-      color: #fff;
-      font-size: 14px;
-      font-weight: 700;
-      cursor: pointer;
-    }
-
-    .btn:disabled {
-      opacity: .62;
-      cursor: not-allowed;
-    }
-
-    .status {
-      margin-top: 14px;
-      color: var(--ink-soft);
-      font-size: 13.5px;
-    }
-
-    @media (max-width: 720px) {
-      .page { padding: 20px 12px 40px; }
-      .header, .section, .submit-area { padding: 22px 18px; }
-      .grid { grid-template-columns: 1fr; }
-      .field.full { grid-column: auto; }
-    }
-  </style>
+<meta charset="UTF-8">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  @page { size: A4; margin: 0; }
+  body { font-family: Arial, Helvetica, sans-serif; font-size: 10.5pt; color: #10233f; background: #fff; line-height: 1.55; }
+  .page { width: 210mm; min-height: 297mm; padding: 22mm 23mm 18mm; page-break-after: always; position: relative; }
+  .page:last-child { page-break-after: auto; }
+  .cover { background: linear-gradient(135deg, rgba(42,87,135,.96), rgba(10,33,59,.98)); color: #fff; padding: 20mm 23mm 18mm; }
+  .cover-kicker { font-size: 8.5pt; letter-spacing: .22em; text-transform: uppercase; color: rgba(255,255,255,.64); margin-bottom: 18mm; }
+  .cover-grid { display: grid; grid-template-columns: 1.15fr .85fr; gap: 18mm; align-items: end; border-bottom: 2px solid rgba(255,255,255,.28); padding-bottom: 18mm; }
+  .brand { font-size: 33pt; font-weight: 800; letter-spacing: -0.04em; line-height: 1; }
+  .report-title { margin-top: 7mm; font-size: 15pt; color: rgba(255,255,255,.78); font-weight: 400; }
+  .meta { text-align: right; font-size: 10pt; color: rgba(255,255,255,.78); line-height: 1.8; }
+  .meta strong { display: block; color: #fff; font-size: 11pt; }
+  .notice-card { margin-top: 18mm; background: rgba(255,255,255,.96); color: #10233f; border-left: 5px solid #b8392f; box-shadow: 0 14px 38px rgba(5,20,40,.22); padding: 12mm; }
+  .notice-label { font-size: 8pt; letter-spacing: .18em; text-transform: uppercase; color: #b8392f; font-weight: 800; margin-bottom: 4mm; }
+  .notice-title { font-size: 19pt; line-height: 1.22; color: #7f1d1d; font-weight: 800; margin-bottom: 6mm; }
+  .notice-body { font-size: 11.2pt; line-height: 1.7; color: #1d2d48; }
+  .section-head { display: flex; align-items: center; gap: 8mm; margin-bottom: 8mm; padding-bottom: 4mm; border-bottom: 1.5px solid #c8d4e3; }
+  .num { width: 11mm; height: 11mm; border-radius: 3mm; background: linear-gradient(135deg, #315f94, #0c2949); color: #e5bd50; display: inline-flex; align-items: center; justify-content: center; font-weight: 800; font-size: 9pt; }
+  h2 { font-size: 14pt; letter-spacing: .14em; text-transform: uppercase; color: #0c223e; }
+  h3 { font-size: 11.5pt; margin: 7mm 0 3mm; color: #14365f; }
+  p { margin-bottom: 4mm; }
+  .box { border: 1px solid #d2ddea; background: linear-gradient(180deg, #fbfdff, #f7faff); padding: 7mm; margin: 5mm 0; }
+  .risk-box { border: 1.5px solid #d8a33a; border-left: 5px solid #b8392f; background: #fffaf0; padding: 7mm; margin: 6mm 0; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5mm; }
+  .kv { border: 1px solid #d7e0ec; background: #f7faff; padding: 4.5mm; }
+  .kv-label { font-size: 7.3pt; letter-spacing: .16em; text-transform: uppercase; color: #7183a0; margin-bottom: 1.5mm; font-weight: 800; }
+  .kv-value { font-size: 10.2pt; font-weight: 700; color: #10233f; }
+  .step-list { counter-reset: step; margin-top: 4mm; }
+  .step { counter-increment: step; display: grid; grid-template-columns: 12mm 1fr; gap: 4mm; margin: 4mm 0; align-items: start; }
+  .step::before { content: counter(step, decimal-leading-zero); font-weight: 800; color: #315f94; letter-spacing: .08em; }
+  .footer { position: absolute; left: 23mm; right: 23mm; bottom: 11mm; border-top: 1px solid #dce4ef; padding-top: 3mm; color: #7a8ca7; font-size: 8pt; display: flex; justify-content: space-between; }
+  .disclaimer { font-size: 8.4pt; color: #5a6880; line-height: 1.55; background: #f7faff; border-left: 4px solid #315f94; padding: 6mm; margin-top: 6mm; }
+  .emphasis { color: #7f1d1d; font-weight: 800; }
+</style>
 </head>
-
 <body>
-  <main class="page">
-    <div class="wrap">
-      <header class="header">
-        <div class="eyebrow">FairVia™ Research Demo</div>
-        <h1>Equipment Compatibility Assessment Demo</h1>
-        <p class="lead">
-statusEl.textContent = "This is a demo assessment. The PDF report has been generated and sent to the email address provided.";        
-</p>
-        <div class="demo-notice">
-          No payment is required for this demo. Submitted information is used only to generate a demo report for review.
-          Please do not enter confidential formulations, proprietary recipes, or sensitive production know-how.
-        </div>
-      </header>
-
-      <form id="fairvia-demo-form">
-        <input type="hidden" name="access_token" value="${demoKey}" />
-
-        <section class="section">
-          <div class="section-title"><span>1</span>Contact Information</div>
-          <div class="grid">
-            <div class="field">
-              <label>Company name <span class="required">*</span></label>
-              <input name="company_name" required placeholder="Company name" />
-            </div>
-            <div class="field">
-              <label>Contact person <span class="required">*</span></label>
-              <input name="contact_person" required placeholder="Your name" />
-            </div>
-            <div class="field full">
-              <label>Email address <span class="required">*</span></label>
-              <input name="email" type="email" required placeholder="name@company.com" />
-              <div class="hint">The demo PDF report will be sent to this email address.</div>
-            </div>
-          </div>
-        </section>
-
-        <section class="section">
-          <div class="section-title"><span>2</span>Product Overview</div>
-          <div class="grid">
-            <div class="field">
-              <label>Project stage</label>
-              <select name="project_stage">
-                <option value="">Select one</option>
-                <option value="Early investigation">Early investigation</option>
-                <option value="Pre-commercial validation">Pre-commercial validation</option>
-                <option value="Pilot preparation">Pilot preparation</option>
-                <option value="Commercial production review">Commercial production review</option>
-                <option value="Not specified">Not specified</option>
-              </select>
-            </div>
-            <div class="field">
-              <label>Product type <span class="required">*</span></label>
-              <input name="product_type" required placeholder="film pouch / rigid tray / container" />
-            </div>
-            <div class="field full">
-              <label>Application <span class="required">*</span></label>
-              <input name="application" required placeholder="frozen food packaging / hot-fill use / shopping bag" />
-            </div>
-          </div>
-        </section>
-
-        <section class="section">
-          <div class="section-title"><span>3</span>Current Setup</div>
-          <div class="grid">
-            <div class="field">
-              <label>Current material <span class="required">*</span></label>
-              <input name="material" required placeholder="PP / PET / LDPE" />
-            </div>
-            <div class="field">
-              <label>Processing method <span class="required">*</span></label>
-              <select name="processing" required>
-                <option value="">Select one</option>
-                <option value="Blown film extrusion">Blown film extrusion</option>
-                <option value="Cast film extrusion">Cast film extrusion</option>
-                <option value="Injection molding">Injection molding</option>
-                <option value="Thermoforming">Thermoforming</option>
-                <option value="Blow molding">Blow molding</option>
-                <option value="Other / Not sure">Other / Not sure</option>
-              </select>
-            </div>
-            <div class="field full">
-              <label>Equipment type <span class="required">*</span></label>
-              <input name="equipment" required placeholder="blown film line / injection molding line" />
-            </div>
-          </div>
-        </section>
-
-        <section class="section">
-          <div class="section-title"><span>4</span>Transition Goal</div>
-          <div class="grid">
-            <div class="field full">
-              <label>Target biodegradable material</label>
-              <input name="bio_material" placeholder="PLA / PHA-based compound / PBAT blend" />
-            </div>
-
-            <div class="field">
-              <label>Why are you considering this transition?</label>
-              <select name="transition_goal">
-                <option value="">Select one</option>
-                <option value="Sustainability goals">Sustainability goals</option>
-                <option value="Regulatory compliance">Regulatory compliance</option>
-                <option value="Customer request">Customer request</option>
-                <option value="Branding / market positioning">Branding / market positioning</option>
-                <option value="Cost exploration">Cost exploration</option>
-                <option value="Not sure yet">Not sure yet</option>
-              </select>
-            </div>
-
-            <div class="field">
-              <label>Main technical concern <span class="required">*</span></label>
-              <input name="concern" required placeholder="heat resistance / flow stability / seal strength" />
-            </div>
-
-            <div class="field full">
-              <label>Known issues with the current product or process</label>
-              <textarea name="issues" placeholder="warpage, unstable sealing, thickness variation, poor output consistency"></textarea>
-            </div>
-
-            <div class="field full">
-              <label>Additional notes</label>
-              <textarea name="notes" placeholder="no equipment modification preferred, high-speed production, hot-fill use"></textarea>
-            </div>
-          </div>
-        </section>
-
-        <section class="section">
-          <div class="section-title"><span>5</span>Optional Technical Details</div>
-          <div class="grid">
-            <div class="field">
-              <label>Screw diameter</label>
-              <input name="screw_diameter" placeholder="Example: 65 mm" />
-            </div>
-
-            <div class="field">
-              <label>L/D ratio</label>
-              <input name="ld_ratio" placeholder="Example: 28:1" />
-            </div>
-
-            <div class="field full">
-              <label>Die / mold information</label>
-              <input name="die_mold" placeholder="flat die / 3-layer die / cavity mold" />
-            </div>
-
-            <div class="field">
-              <label>What matters most for this product?</label>
-              <select name="requirement_focus">
-                <option value="">Select one</option>
-                <option value="VISUAL">Visual appearance</option>
-                <option value="ENVIRONMENT">Environmental condition</option>
-                <option value="PRODUCT_STABILITY">Product stability</option>
-                <option value="MECHANICAL">Mechanical performance</option>
-                <option value="NOT_SURE">Not sure</option>
-              </select>
-            </div>
-
-            <div class="field">
-              <label>Which area is most critical?</label>
-              <select name="risk_focus">
-                <option value="">Select one</option>
-                <option value="PROCESSING_STABILITY">Processing stability</option>
-                <option value="THERMAL_RESISTANCE">Thermal resistance</option>
-                <option value="DIMENSIONAL_ACCURACY">Dimensional accuracy</option>
-                <option value="SURFACE_QUALITY">Surface quality</option>
-                <option value="SEAL_PERFORMANCE">Seal performance</option>
-                <option value="NOT_SURE">Not sure</option>
-              </select>
-            </div>
-          </div>
-        </section>
-
-        <div class="submit-area">
-          <button id="submit-btn" class="btn" type="submit">Generate Demo PDF Report</button>
-          <div id="status" class="status"></div>
-        </div>
-      </form>
-    </div>
-  </main>
-
-  <script>
-    const form = document.getElementById("fairvia-demo-form");
-    const button = document.getElementById("submit-btn");
-    const statusEl = document.getElementById("status");
-
-    form.addEventListener("submit", async (event) => {
-      event.preventDefault();
-
-      button.disabled = true;
-      statusEl.textContent = "Generating the demo report. Please wait...";
-
-      const formData = new FormData(form);
-      const payload = Object.fromEntries(formData.entries());
-
-      try {
-        const response = await fetch("/generate-demo-report", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
-        });
-
-        const result = await response.json().catch(() => null);
-
-        if (!response.ok) {
-          throw new Error(result && (result.detail || result.error) ? (result.detail || result.error) : "Demo report generation failed.");
-        }
-
-        statusEl.textContent = "Demo report generated. Please check the email inbox.";
-
-      } catch (error) {
-        console.error(error);
-        statusEl.textContent = "Demo report generation failed. Please contact FairVia support.";
-        button.disabled = false;
-      }
-    });
-  </script>
+<section class="page cover">
+  <div class="cover-kicker">IL NAUTICO CO., LTD. · ADVANCED TECHNICAL SCREENING</div>
+  <div class="cover-grid">
+    <div><div class="brand">FairVia&#8482;</div><div class="report-title">Medical Material Referral Report</div></div>
+    <div class="meta"><strong>${reportId}</strong><div>${company}</div><div>${project}</div><div>${dateStr}</div><div>Engine v${ENGINE_VERSION}</div></div>
+  </div>
+  <div class="notice-card"><div class="notice-label">Specialist referral required</div><div class="notice-title">Outside Automated Screening Scope — Implantable Application</div><div class="notice-body">This request has been identified as involving an implantable, absorbable, or long-term internal-contact medical application. The case has therefore been stopped before ordinary scoring. This is a controlled safety outcome: the project requires specialist medical-material, biological evaluation, and regulatory review before any validation, design, or commercial planning activity is initiated.</div></div>
+</section>
+<section class="page">
+  <div class="section-head"><div class="num">01</div><h2>Referral Decision Summary</h2></div>
+  <div class="risk-box"><h3>Decision</h3><p class="emphasis">This project is outside the scope of the automated FairVia&#8482; Advanced Technical Screening workflow.</p><p>${msg}</p></div>
+  <div class="grid">
+    <div class="kv"><div class="kv-label">Application type</div><div class="kv-value">${device}</div></div>
+    <div class="kv"><div class="kv-label">Patient contact</div><div class="kv-value">${contact}</div></div>
+    <div class="kv"><div class="kv-label">Contact duration</div><div class="kv-value">${duration}</div></div>
+    <div class="kv"><div class="kv-label">Target markets</div><div class="kv-value">${markets}</div></div>
+    <div class="kv"><div class="kv-label">Current material</div><div class="kv-value">${current}</div></div>
+    <div class="kv"><div class="kv-label">Candidate material</div><div class="kv-value">${candidate}</div></div>
+  </div>
+  <div class="box"><h3>Why the ordinary score is intentionally not shown</h3><p>For implantable or long-term internal-contact applications, a numerical transition score may create a false impression that material feasibility can be compared using ordinary processing, supplier, or documentation indicators. These factors require a specialist pathway rather than an automated score.</p></div>
+  <div class="footer"><span>FairVia&#8482; · Il Nautico Co., Ltd.</span><span>${reportId}</span></div>
+</section>
+<section class="page">
+  <div class="section-head"><div class="num">02</div><h2>Reason for Specialist Referral</h2></div>
+  <div class="box"><h3>Technical basis</h3><p>The selected medical use case indicates implantable or long-term internal contact. This category is materially different from ordinary packaging, external device components, or non-patient-contact healthcare uses.</p><p>The submitted evidence status also indicates that medical-grade supplier confirmation and ISO 13485 alignment are incomplete or not fully confirmed.</p></div>
+  <div class="grid">
+    <div class="kv"><div class="kv-label">Sterilisation method</div><div class="kv-value">${steril}</div></div>
+    <div class="kv"><div class="kv-label">Medical-grade supplier</div><div class="kv-value">${medGrade}</div></div>
+    <div class="kv"><div class="kv-label">ISO 13485 supplier status</div><div class="kv-value">${iso13485}</div></div>
+    <div class="kv"><div class="kv-label">Workflow result</div><div class="kv-value">Terminated before scoring</div></div>
+  </div>
+  <div class="risk-box"><h3>Implication for the client</h3><p>This output should be used as a formal screening result: the case has been routed to a higher-evidence pathway because the application category exceeds the safe boundary of automated initial screening.</p></div>
+  <div class="footer"><span>Referral Report · Outside Automated Screening Scope</span><span>${dateStr}</span></div>
+</section>
+<section class="page">
+  <div class="section-head"><div class="num">03</div><h2>Recommended Specialist Pathway</h2></div>
+  <div class="box"><h3>Immediate next actions</h3><div class="step-list"><div class="step">Confirm whether the intended use is truly implantable, absorbable, or long-term internal contact, and define the patient-contact category under ISO 10993-1.</div><div class="step">Collect material-specific evidence: medical-grade history, composition disclosure, residuals/additives profile, degradation-product information, supplier quality-system documentation, and change-control policy.</div><div class="step">Define the biological evaluation and toxicological risk assessment pathway, including ISO 10993-1, ISO 10993-18, extractables/leachables, and degradation-product assessment where applicable.</div><div class="step">Review sterilisation compatibility, aging, mechanical retention, dimensional stability, and packaging or sterile-barrier implications before any prototype validation is planned.</div><div class="step">Decide whether the project should proceed as a specialist regulatory/material feasibility review, be redesigned for a non-implantable application, or be placed outside FairVia automated screening scope.</div></div></div>
+  <div class="risk-box"><h3>Commercial pathway</h3><p>Recommended next service: <strong>Specialist Medical Material Feasibility Scoping</strong>. This should be handled as a separate specialist review, not as a standard automated compatibility assessment.</p></div>
+  <div class="disclaimer">${REPORT_DISCLAIMER}</div>
+  <div class="footer"><span>FairVia&#8482; / Il Nautico Co., Ltd.</span><span>${reportId} · ${dateStr}</span></div>
+</section>
 </body>
-</html>`);
-});
+</html>`;
+}
 
-app.post("/generate-demo-report", async (req, res) => {
-  try {
-    if (!isDemoAccessAllowed(req)) {
-      return res.status(403).json({
-        ok: false,
-        error: "demo_access_denied"
-      });
-    }
 
-    req.query = {
-      ...(req.query || {}),
-      delivery: "email",
-      demo: "true"
-    };
-
-    req.body = {
-      ...(req.body || {}),
-      project_stage: req.body?.project_stage || "Research demo",
-      notes: `${req.body?.notes || ""}\n\n[Research Demo] Payment-free technical review demo.`
-    };
-
-    return await handleReport(req, res);
-
-  } catch (err) {
-    console.error("[Research Demo ERROR]", err);
-    return res.status(500).json({
-      ok: false,
-      error: "research_demo_failed",
-      detail: err.message
-    });
-  }
-});
 // ══════════════════════════════════════════════════════════════
-// EMAIL DELIVERY
+// EMAIL HELPERS
 // ══════════════════════════════════════════════════════════════
+
+function isValidEmail(value) {
+  return typeof value === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+}
+
+function publicBaseUrlFromRequest(req) {
+  if (PUBLIC_BASE_URL) return PUBLIC_BASE_URL.replace(/\/$/, '');
+  const proto = req.headers['x-forwarded-proto'] || req.protocol || 'https';
+  const host = req.headers['x-forwarded-host'] || req.get('host');
+  return host ? `${proto}://${host}` : '';
+}
+
+function storeAdvancedReport(reportId, pdfBuffer, input) {
+  cleanupExpiredAdvancedReports();
+  advancedReportStore.set(reportId, {
+    pdf: pdfBuffer,
+    email: input?.email || '',
+    company_name: input?.company_name || '',
+    createdAt: Date.now(),
+  });
+}
 
 async function sendResendEmail(payload) {
   if (!RESEND_API_KEY) {
-    console.warn("[Email skipped] RESEND_API_KEY not configured");
+    console.warn('[server_advanced] Email skipped — RESEND_API_KEY not configured.');
     return { skipped: true };
   }
 
-  const res = await fetchFn("https://api.resend.com/emails", {
-    method: "POST",
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
     headers: {
-      "Content-Type": "application/json",
+      'Content-Type': 'application/json',
       Authorization: `Bearer ${RESEND_API_KEY}`,
     },
     body: JSON.stringify(payload),
   });
 
-  if (!res.ok) {
-    const detail = await res.text().catch(() => "");
-    throw new Error(`Resend API error: ${res.status} ${detail}`);
+  if (!response.ok) {
+    const detail = await response.text().catch(() => '');
+    throw new Error(`Resend API error: ${response.status} ${detail}`);
   }
 
-  return res.json().catch(() => ({}));
+  return response.json().catch(() => ({}));
 }
 
-
-async function sendPaidAccessEmail({ to, name, formUrl }) {
-  if (!RESEND_API_KEY) {
-    console.warn("[Paid access email skipped] RESEND_API_KEY not configured");
-    return { skipped: true };
-  }
-
-  const safeName = name && name !== "—" ? name : "Client";
-
-  const cleanFormUrl = String(formUrl || "")
-    .replace(/^PUBLIC_BASE_URL=/, "")
-    .trim();
-
-  const html = `
-  <div style="margin:0;padding:0;background:#f4f7fb;font-family:Arial,Helvetica,sans-serif;color:#173766;">
-    <div style="max-width:680px;margin:0 auto;padding:32px 20px;">
-      <div style="background:#ffffff;border:1px solid #dbe5f1;border-radius:10px;overflow:hidden;">
-        <div style="padding:28px 32px;border-bottom:1px solid #e6edf5;">
-          <div style="font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:#2952a3;font-weight:700;">
-            FairVia™ Paid Assessment Access
-          </div>
-          <h1 style="margin:12px 0 0;font-size:24px;line-height:1.3;color:#173766;font-weight:600;">
-            Equipment Compatibility Assessment
-          </h1>
-        </div>
-
-        <div style="padding:30px 32px;">
-          <p style="margin:0 0 18px;font-size:15px;line-height:1.7;">
-            Dear ${safeName},
-          </p>
-
-          <p style="margin:0 0 18px;font-size:15px;line-height:1.7;">
-            Thank you for completing your payment for the FairVia™ Equipment Compatibility Assessment.
-          </p>
-
-          <p style="margin:0 0 22px;font-size:15px;line-height:1.7;">
-            Your secure assessment form is now available. Please use the link below to submit the technical information required for your assessment.
-          </p>
-
-          <p style="margin:24px 0;">
-            <a href="${cleanFormUrl}" style="display:inline-block;background:#2952a3;color:#ffffff;padding:13px 20px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;">
-              Open assessment form
-            </a>
-          </p>
-
-          <div style="margin:26px 0;padding:16px 18px;background:#f0f6ff;border:1px solid #dbe8fb;border-radius:8px;">
-            <p style="margin:0 0 8px;font-size:13px;line-height:1.6;color:#425f82;">
-              For your reference, the same access link is also provided below:
-            </p>
-            <p style="margin:0;word-break:break-all;font-size:13px;line-height:1.6;color:#2952a3;">
-              ${cleanFormUrl}
-            </p>
-          </div>
-
-          <p style="margin:0 0 18px;font-size:15px;line-height:1.7;">
-            After the form is submitted, your FairVia™ Technical Hypothesis Report will be generated and delivered to the email address provided.
-          </p>
-
-          <p style="margin:0 0 18px;font-size:15px;line-height:1.7;">
-            This access link is associated with your paid assessment and should not be shared publicly.
-          </p>
-
-          <p style="margin:26px 0 0;font-size:15px;line-height:1.7;">
-            Best regards,<br>
-            FairVia™ Technical Assessment Team<br>
-            Il Nautico Co., Ltd.
-          </p>
-        </div>
-      </div>
-    </div>
-  </div>`;
-
-  const text =
-`Dear ${safeName},
-
-Thank you for completing your payment for the FairVia™ Equipment Compatibility Assessment.
-
-Your secure assessment form is now available. Please use the link below to submit the technical information required for your assessment.
-
-${cleanFormUrl}
-
-After the form is submitted, your FairVia™ Technical Hypothesis Report will be generated and delivered to the email address provided.
-
-This access link is associated with your paid assessment and should not be shared publicly.
-
-Best regards,
-FairVia™ Technical Assessment Team
-Il Nautico Co., Ltd.`;
-
-  return sendResendEmail({
-    from: FROM_EMAIL,
-    to,
-    subject: "Your FairVia™ Assessment Access Link",
-    html,
-    text,
-  });
-}
-
-async function sendReportEmails({ pdf, input, scores, decision, reportId }) {
-  if (!RESEND_API_KEY) {
-    console.warn("[Email skipped] RESEND_API_KEY not configured");
-    return;
-  }
-
-  const userEmail = safe(input.email, "").trim();
-  const companyName = safe(input.company_name, "Not specified");
-  const contactPerson = safe(input.contact_person, "Client");
-  const recipientName = contactPerson && contactPerson !== "—" ? contactPerson : "Client";
-
-  const downloadUrl =
-    PUBLIC_BASE_URL && reportId
-      ? `${PUBLIC_BASE_URL.replace(/\/$/, "")}/download-report/${reportId}`
-      : "";
+async function sendAdvancedReportEmails({ req, pdfBuffer, input, pdfData, scoringResult, reportId }) {
+  const userEmail = String(input?.email || '').trim();
+  const contactName = input?.contact_person || input?.company_name || 'Client';
+  const companyName = input?.company_name || 'Not specified';
+  const routeLabel = ROUTE_LABEL[input?.route] || input?.route || 'Advanced Technical Screening';
+  const score = scoringResult?.scoring?.finalScore ?? '—';
+  const decisionLabel = scoringResult?.decision?.label || scoringResult?.decision?.band || '—';
+  const confidence = pdfData?.confidence?.score ?? scoringResult?.confidence?.score ?? null;
+  const baseUrl = publicBaseUrlFromRequest(req);
+  const downloadUrl = baseUrl && reportId
+    ? `${baseUrl}/download-advanced-report/${encodeURIComponent(reportId)}`
+    : '';
 
   const attachment = {
-    filename: "FairVia-Equipment-Compatibility-Assessment-Report.pdf",
-    content: Buffer.from(pdf).toString("base64"),
+    filename: `FairVia-Advanced-Technical-Screening-${reportId}.pdf`,
+    content: Buffer.from(pdfBuffer).toString('base64'),
   };
 
-  const userSubject = "FairVia™ Equipment Compatibility Assessment Report";
+  const subject = 'FairVia™ Advanced Technical Screening Report';
 
-  const userText = `Dear ${recipientName},
+  const text = `Dear ${contactName},
 
-Thank you for completing the FairVia™ Equipment Compatibility Assessment.
+Thank you for completing the FairVia™ Advanced Technical Screening form.
 
-Your Technical Hypothesis Report has been generated and is attached to this email as a PDF.
+Your Advanced Technical Screening Report has been generated and is attached to this email as a PDF.
 
 Assessment summary:
-- Compatibility Level: ${decision.level}
-- Composite Score: ${scores.total}/100
+- Report ID: ${reportId}
+- Route: ${routeLabel}
+- Risk Score: ${score}/100
+- Decision: ${decisionLabel}${confidence !== null ? `\n- Confidence: ${confidence}%` : ''}
 
-${downloadUrl ? `You may also access the report using the secure download link below:\n${downloadUrl}\n\n` : ""}This report is intended to support early-stage technical decision-making before material procurement, pilot validation, or commercial production changes.
-
-For follow-up review or a detailed Engineering Compatibility Assessment, please contact FairVia™.
+${downloadUrl ? `You may also access the report using the secure download link below:\n${downloadUrl}\n\n` : ''}This report is an initial technical screening output. It does not constitute regulatory approval, product certification, or final compliance determination.
 
 Best regards,
-
 FairVia™ Technical Assessment Team
 Il Nautico Co., Ltd.
-Contact: info@ilnautico.com`;
+info@ilnautico.com`;
 
-  const userHtml = `
+  const html = `
 <div style="margin:0;padding:0;background:#f4f7fb;font-family:Arial,Helvetica,sans-serif;color:#173766;">
   <div style="max-width:680px;margin:0 auto;padding:32px 20px;">
-    <div style="background:#ffffff;border:1px solid #dbe5f1;border-radius:10px;overflow:hidden;">
+    <div style="background:#ffffff;border:1px solid #dbe5f1;overflow:hidden;">
       <div style="padding:28px 32px;border-bottom:1px solid #e6edf5;">
-        <div style="font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:#2952a3;font-weight:700;">
-          FairVia™ Technical Assessment
-        </div>
-        <h1 style="margin:12px 0 0;font-size:24px;line-height:1.3;color:#173766;font-weight:600;">
-          Equipment Compatibility Assessment Report
-        </h1>
+        <div style="font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:#2952a3;font-weight:700;">FairVia™ Advanced Technical Screening</div>
+        <h1 style="margin:12px 0 0;font-size:24px;line-height:1.3;color:#173766;font-weight:600;">Your report is ready</h1>
       </div>
-
       <div style="padding:30px 32px;">
-        <p style="margin:0 0 18px;font-size:15px;line-height:1.7;">
-          Dear ${recipientName},
-        </p>
-
-        <p style="margin:0 0 18px;font-size:15px;line-height:1.7;">
-          Thank you for completing the FairVia™ Equipment Compatibility Assessment.
-          Your Technical Hypothesis Report has been generated and is attached to this email as a PDF.
-        </p>
-
-        <div style="margin:24px 0;padding:18px 20px;background:#f0f6fc;border:1px solid #d7e5f5;border-radius:8px;">
-          <div style="font-size:13px;color:#748dad;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.08em;">
-            Assessment summary
-          </div>
+        <p style="margin:0 0 18px;font-size:15px;line-height:1.7;">Dear ${contactName},</p>
+        <p style="margin:0 0 18px;font-size:15px;line-height:1.7;">Thank you for completing the FairVia™ Advanced Technical Screening form. Your report has been generated and is attached to this email as a PDF.</p>
+        <div style="margin:24px 0;padding:18px 20px;background:#f0f6fc;border:1px solid #d7e5f5;">
+          <div style="font-size:13px;color:#748dad;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.08em;">Assessment summary</div>
           <div style="font-size:15px;line-height:1.8;color:#173766;">
-            <strong>Compatibility Level:</strong> ${decision.level}<br>
-            <strong>Composite Score:</strong> ${scores.total}/100
+            <strong>Report ID:</strong> ${reportId}<br>
+            <strong>Route:</strong> ${routeLabel}<br>
+            <strong>Risk Score:</strong> ${score}/100<br>
+            <strong>Decision:</strong> ${decisionLabel}${confidence !== null ? `<br><strong>Confidence:</strong> ${confidence}%` : ''}
           </div>
         </div>
-
-        ${downloadUrl
-          ? `<p style="margin:0 0 10px;font-size:15px;line-height:1.7;">
-              You may also access the report using the secure download link below:
-            </p>
-            <p style="margin:0 0 24px;">
-              <a href="${downloadUrl}" style="display:inline-block;padding:12px 18px;background:#2952a3;color:#ffffff;text-decoration:none;border-radius:6px;font-size:14px;font-weight:600;">
-                Download report
-              </a>
-            </p>
-            <p style="margin:0 0 24px;font-size:12px;line-height:1.6;color:#748dad;word-break:break-all;">
-              ${downloadUrl}
-            </p>`
-          : ""}
-
-        <p style="margin:0 0 18px;font-size:15px;line-height:1.7;">
-          This report is intended to support early-stage technical decision-making before material procurement,
-          pilot validation, or commercial production changes.
-        </p>
-
-        <p style="margin:0 0 24px;font-size:15px;line-height:1.7;">
-          For follow-up review or a detailed Engineering Compatibility Assessment, please contact FairVia™.
-        </p>
-
-        <div style="padding-top:20px;border-top:1px solid #e6edf5;font-size:14px;line-height:1.7;color:#425f82;">
-          Best regards,<br>
-          <strong style="color:#173766;">FairVia™ Technical Assessment Team</strong><br>
-          Il Nautico Co., Ltd.<br>
-          Contact: <a href="mailto:info@ilnautico.com" style="color:#2952a3;text-decoration:none;">info@ilnautico.com</a>
-        </div>
+        ${downloadUrl ? `<p style="margin:0 0 10px;font-size:15px;line-height:1.7;">You may also access the report using the secure download link below:</p><p style="margin:0 0 22px;"><a href="${downloadUrl}" style="display:inline-block;padding:12px 18px;background:#2952a3;color:#ffffff;text-decoration:none;font-size:14px;font-weight:700;">Download report</a></p><p style="margin:0 0 24px;font-size:12px;line-height:1.6;color:#748dad;word-break:break-all;">${downloadUrl}</p>` : ''}
+        <p style="margin:0 0 18px;font-size:15px;line-height:1.7;">This report is intended to support early-stage technical decision-making before pilot validation, material procurement, or commercial production changes.</p>
+        <div style="padding-top:20px;border-top:1px solid #e6edf5;font-size:14px;line-height:1.7;color:#425f82;">Best regards,<br><strong style="color:#173766;">FairVia™ Technical Assessment Team</strong><br>Il Nautico Co., Ltd.<br><a href="mailto:info@ilnautico.com" style="color:#2952a3;text-decoration:none;">info@ilnautico.com</a></div>
       </div>
     </div>
-
-    <p style="margin:18px 0 0;font-size:11px;line-height:1.6;color:#748dad;">
-      This email was generated in response to a submitted FairVia™ diagnostic form.
-      The attached report is intended for confidential pre-commercial technical review.
-    </p>
   </div>
 </div>`;
 
-  const adminBody = `New FairVia™ Technical Hypothesis Report generated.
-
-Company: ${companyName}
-Contact: ${contactPerson}
-Email: ${userEmail || "Not provided"}
-
-Application: ${safe(input.application)}
-Current Material: ${safe(input.material)}
-Target Material: ${safe(input.bio_material)}
-Processing: ${safe(input.processing)}
-Equipment: ${safe(input.equipment)}
-Primary Concern: ${safe(input.concern)}
-
-Compatibility Level: ${decision.level}
-Composite Score: ${scores.total}/100
-
-${downloadUrl ? `Download URL: ${downloadUrl}` : ""}`;
-
   const jobs = [];
 
-  if (userEmail && userEmail.includes("@")) {
-    jobs.push(
-      sendResendEmail({
-        from: FROM_EMAIL,
-        to: userEmail,
-        subject: userSubject,
-        text: userText,
-        html: userHtml,
-        attachments: [attachment],
-      })
-    );
+  if (isValidEmail(userEmail)) {
+    jobs.push(sendResendEmail({
+      from: FROM_EMAIL,
+      to: userEmail,
+      subject,
+      text,
+      html,
+      attachments: [attachment],
+    }));
   } else {
-    console.warn("[Email skipped] user email missing or invalid:", userEmail);
+    console.warn('[server_advanced] Result email skipped — missing or invalid user email:', userEmail);
   }
 
-  if (ADMIN_EMAIL && ADMIN_EMAIL.includes("@")) {
-    jobs.push(
-      sendResendEmail({
-        from: FROM_EMAIL,
-        to: ADMIN_EMAIL,
-        subject: "New FairVia™ Equipment Compatibility Assessment Report",
-        text: adminBody,
-        attachments: [attachment],
-      })
-    );
+  if (isValidEmail(ADMIN_EMAIL)) {
+    const adminText = `New FairVia™ Advanced Technical Screening report generated.
+
+Report ID: ${reportId}
+Company: ${companyName}
+Contact: ${contactName}
+Email: ${userEmail || 'Not provided'}
+Route: ${routeLabel}
+Score: ${score}/100
+Decision: ${decisionLabel}
+${downloadUrl ? `Download URL: ${downloadUrl}` : ''}`;
+
+    jobs.push(sendResendEmail({
+      from: FROM_EMAIL,
+      to: ADMIN_EMAIL,
+      subject: `New FairVia™ Advanced Report — ${companyName}`,
+      text: adminText,
+      attachments: [attachment],
+    }));
   }
 
   const results = await Promise.allSettled(jobs);
-
-  for (const r of results) {
-    if (r.status === "rejected") {
-      console.warn("[Email ERROR]", r.reason?.message || r.reason);
+  for (const result of results) {
+    if (result.status === 'rejected') {
+      console.warn('[server_advanced] Email delivery error:', result.reason?.message || result.reason);
     }
   }
 }
 
-// ══════════════════════════════════════════════════════════════
-// PDF RENDERER
-// ══════════════════════════════════════════════════════════════
+function extractAccessTokenFromPayload(raw) {
+  const fields = raw?.data?.fields;
+  if (!Array.isArray(fields)) return '';
+  const found = fields.find(f => f?.key === 'access_token');
+  return String(found?.value || '').trim();
+}
 
-async function renderPdf(html) {
-  const browser = await getBrowser();
-  const page    = await browser.newPage();
-  if (!page) throw new Error("Puppeteer page creation failed");
+function isDemoAccessAllowed(req) {
+  const queryKey = String(req.query?.key || '').trim();
+  const bodyKey = extractAccessTokenFromPayload(req.body);
+  return queryKey === TEST_ROUTE_KEY || bodyKey === TEST_ROUTE_KEY;
+}
 
-  let closed = false;
-  const safeClose = async () => {
-    if (!closed) { closed = true; await page.close().catch(() => {}); }
-  };
+const app = express();
+app.use(express.json({ limit: '2mb' }));
 
-  page.on("error",     safeClose);
-  page.on("pageerror", safeClose);
+app.get('/advanced-access', (_req, res) => {
+  res.sendFile(path.join(__dirname, 'advanced-access.html'));
+});
 
+async function handleAdvancedWebhook(req, res) {
+  if (!verifyTallySignature(req)) {
+    console.warn('[server_advanced] Webhook signature verification failed.');
+    return errorResponse(res, 401, 'UNAUTHORIZED', 'Webhook signature verification failed.');
+  }
+
+  let input;
   try {
-    await page.setContent(html, { waitUntil: "networkidle0", timeout: 30000 })
-      .catch(() => { throw new Error("HTML render timeout — networkidle0 not reached within 30s"); });
-
-    await page.evaluate(async () => await document.fonts.ready);
-
-    return await page.pdf({ format: "A4", printBackground: true });
-  } finally {
-    await safeClose();
-  }
-}
-
-// ══════════════════════════════════════════════════════════════
-// AUXILIARY ROUTES
-// ══════════════════════════════════════════════════════════════
-
-let latestPdfBuffer = null;
-
-const reportStore = new Map();
-const REPORT_TTL_MS = 1000 * 60 * 60 * 24; // 24 hours
-
-function cleanupExpiredReports() {
-  const now = Date.now();
-
-  for (const [reportId, item] of reportStore.entries()) {
-    if (!item?.createdAt || now - item.createdAt > REPORT_TTL_MS) {
-      reportStore.delete(reportId);
-    }
-  }
-}
-
-app.get("/download-report/:reportId", (req, res) => {
-  cleanupExpiredReports();
-
-  const { reportId } = req.params;
-  const item = reportStore.get(reportId);
-
-  if (!item || !item.pdf) {
-    return res.status(404).send("Report not found or expired.");
-  }
-
-  res.setHeader("Content-Type", "application/pdf");
-  res.setHeader(
-    "Content-Disposition",
-    "attachment; filename=FairVia-Technical-Hypothesis-Report.pdf"
-  );
-  res.setHeader("Content-Length", item.pdf.length);
-  res.send(item.pdf);
-});
-
-
-app.get("/paid-access", (_req, res) => {
-  res.sendFile(path.join(__dirname, "paid-access.html"));
-});
-app.get("/paid-access.html", (_req, res) => {
-  res.sendFile(path.join(__dirname, "paid-access.html"));
-});
-
-app.get("/report-ready", (_req, res) => {
-  res.sendFile(path.join(__dirname, "report-ready.html"));
-});
-
-app.get("/report-ready.html", (_req, res) => {
-  res.sendFile(path.join(__dirname, "report-ready.html"));
-});
-
-app.get("/latest-pdf", (_req, res) => {
-  if (!latestPdfBuffer) return res.status(404).send("No PDF generated yet.");
-  res.setHeader("Content-Type",        "application/pdf");
-  res.setHeader("Content-Disposition", "inline; filename=fairvia-report.pdf");
-  res.send(latestPdfBuffer);
-});
-
-app.get("/health", (_req, res) => {
-  res.json({ status: "ok", timestamp: new Date().toISOString() });
-});
-
-// ══════════════════════════════════════════════════════════════
-// START
-// ══════════════════════════════════════════════════════════════
-
-const PORT = process.env.PORT || 8080;
-
-app.listen(PORT, () => {
-  console.log(`[FairVia] Server running on port ${PORT}`);})
-  const html_3man =`;
-<!DOCTYPE html>
-<html>
-<head>
-<meta charset="UTF-8">
-<title>FairVia Report</title>
-</head>
-
-<body>
-<h1>{{client_name}}</h1>
-<p>{{client_company}}</p>
-<p>{{client_country}}</p>
-
-<h2>Feasibility: {{feasibility_level}}</h2>
-
-<p>{{executive_summary_overview}}</p>
-<p>{{executive_summary_findings}}</p>
-<p>{{executive_summary_conclusion}}</p>
-Editing server.js file contents
-
-</body>
-</html>
-;
-const html = 
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>FairVia™ Technical Screening Report</title>
-<style>
-
-/* ── Reset ── */
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
-
-/* ── Page setup ── */
-@page {
-  size: A4;
-  margin: 0;
-}
-
-html {
-  width: 210mm;
-  background: #ffffff;
-}
-
-body {
-  width: 210mm;
-  background: #ffffff;
-  font-family: Georgia, "Times New Roman", serif;
-  color: #2c2c2c;
-  font-size: 10pt;
-  line-height: 1.6;
-  -webkit-print-color-adjust: exact;
-  print-color-adjust: exact;
-  margin: 0;
-}
-
-/* ── Page container ── */
-.page {
-  display: flex;
-  flex-direction: column;
-  width: 210mm;
-  height: 297mm;
-  box-sizing: border-box;
-  page-break-after: always;
-  background: #ffffff;
-  position: relative;
-}
-
-.page:last-child {
-  page-break-after: auto;
-}
-
-/* ── Page body grows to push footer down ── */
-.page-body {
-  flex: 1;
-  min-height: 0;
-  padding: 8mm 14mm 14mm;
-}
-
-/* ── Page footer: always at bottom ── */
-.page-footer {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  width: 100%;
-  background: #17263c;
-}
-
-.page-footer-gold {
-  height: 1px;
-  background: #b4965a;
-  opacity: 0.6;
-}
-
-.page-footer-inner {
-  padding: 3mm 14mm;
-  display: flex;
-  justify-content: space-between;
-}
-
-.page-footer-left {
-  font-size: 6.5pt;
-  color: rgba(255,255,255,0.45);
-  letter-spacing: 0.06em;
-}
-
-.page-footer-right {
-  font-size: 6.5pt;
-  color: #b4965a;
-}
-
-/* ═══════════════════════════════════════════
-   COVER PAGE
-═══════════════════════════════════════════ */
-
-.cover {
-  background: #17263c;
-}
-
-.cover-inner {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  padding: 0;
-}
-
-.cover-header {
-  padding: 10mm 14mm 0;
-  display: block;
-}
-
-.cover-brand {
-  font-family: Georgia, serif;
-  font-size: 8pt;
-  color: #b4965a;
-  letter-spacing: 0.25em;
-  text-transform: uppercase;
-  display: block;
-  margin-bottom: 1mm;
-}
-
-.cover-service {
-  font-size: 7pt;
-  color: rgba(255,255,255,0.5);
-  letter-spacing: 0.15em;
-  text-transform: uppercase;
-  display: block;
-}
-
-.cover-gold-rule {
-  margin: 8mm 14mm 0;
-  height: 1px;
-  background: #b4965a;
-  opacity: 0.4;
-}
-
-.cover-main {
-  padding: 16mm 14mm 0;
-  display: block;
-  flex: 1;
-}
-
-.cover-report-type {
-  font-size: 7.5pt;
-  color: #b4965a;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  display: block;
-  margin-bottom: 5mm;
-}
-
-.cover-title {
-  font-family: Georgia, serif;
-  font-size: 28pt;
-  font-weight: normal;
-  color: #ffffff;
-  line-height: 1.15;
-  display: block;
-  margin-bottom: 3mm;
-}
-
-.cover-subtitle {
-  font-family: Georgia, serif;
-  font-size: 13pt;
-  font-weight: normal;
-  color: #b4965a;
-  letter-spacing: 0.03em;
-  display: block;
-  margin-bottom: 12mm;
-}
-
-.cover-divider {
-  width: 20mm;
-  height: 2px;
-  background: #b4965a;
-  display: block;
-  margin-bottom: 10mm;
-}
-
-.cover-client-box {
-  background: rgba(180, 150, 90, 0.12);
-  border-left: 3px solid #b4965a;
-  padding: 6mm 8mm;
-  display: block;
-  margin-bottom: 12mm;
-}
-
-.cover-client-label {
-  font-size: 7pt;
-  color: #b4965a;
-  letter-spacing: 0.15em;
-  text-transform: uppercase;
-  display: block;
-  margin-bottom: 2mm;
-}
-
-.cover-client-name {
-  font-size: 13pt;
-  color: #ffffff;
-  font-weight: normal;
-  display: block;
-  margin-bottom: 1.5mm;
-}
-
-.cover-client-detail {
-  font-size: 8.5pt;
-  color: rgba(255,255,255,0.6);
-  display: block;
-  margin-bottom: 0.8mm;
-}
-
-.cover-meta-grid {
-  display: block;
-}
-
-.cover-meta-row {
-  padding: 2.5mm 0;
-  border-top: 1px solid rgba(180,150,90,0.25);
-  display: block;
-  overflow: hidden;
-}
-
-.cover-meta-row:last-child {
-  border-bottom: 1px solid rgba(180,150,90,0.25);
-}
-
-.cover-meta-label {
-  font-size: 7pt;
-  color: rgba(255,255,255,0.45);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  float: left;
-  width: 38mm;
-  display: inline-block;
-}
-
-.cover-meta-value {
-  font-size: 8.5pt;
-  color: rgba(255,255,255,0.85);
-  display: inline-block;
-}
-
-.cover-badge-area {
-  padding: 10mm 14mm 0;
-  display: block;
-}
-
-.cover-badge-label {
-  font-size: 7pt;
-  color: rgba(255,255,255,0.45);
-  letter-spacing: 0.15em;
-  text-transform: uppercase;
-  display: block;
-  margin-bottom: 3mm;
-}
-
-.cover-badge {
-  display: inline-block;
-  padding: 3mm 8mm;
-  border: 1.5px solid #b4965a;
-  font-size: 11pt;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
-.cover-badge.level-low      { color: #6db07a; border-color: #6db07a; }
-.cover-badge.level-moderate { color: #c4963e; border-color: #c4963e; }
-.cover-badge.level-high     { color: #c0614a; border-color: #c0614a; }
-
-/* Cover footer */
-.cover-footer {
-  background: #17263c;
-  border-top: 1px solid rgba(180,150,90,0.25);
-  padding: 5mm 14mm;
-  display: flex;
-  justify-content: space-between;
-  flex-shrink: 0;
-}
-
-.cover-footer-left {
-  font-size: 7pt;
-  color: rgba(255,255,255,0.35);
-  letter-spacing: 0.08em;
-}
-
-.cover-footer-right {
-  font-size: 7pt;
-  color: rgba(255,255,255,0.35);
-  letter-spacing: 0.08em;
-}
-
-/* ═══════════════════════════════════════════
-   CONTENT PAGES — header strip
-═══════════════════════════════════════════ */
-
-.page-header {
-  background: #17263c;
-  padding: 4mm 14mm;
-  flex-shrink: 0;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  overflow: hidden;
-}
-
-.page-header-left {
-  font-size: 6.5pt;
-  color: rgba(255,255,255,0.55);
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  line-height: 1.4;
-}
-
-.page-header-right {
-  font-size: 6.5pt;
-  color: #b4965a;
-  letter-spacing: 0.08em;
-  line-height: 1.4;
-}
-
-.page-header-gold {
-  height: 1.5px;
-  background: #b4965a;
-  flex-shrink: 0;
-}
-
-/* ── Section elements ── */
-
-.section {
-  break-inside: avoid;
-  page-break-inside: avoid;
-  margin-bottom: 7mm;
-  display: block;
-}
-
-.section-label {
-  font-size: 6.5pt;
-  color: #b4965a;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  display: block;
-  margin-bottom: 1mm;
-}
-
-.section-title {
-  font-family: Georgia, serif;
-  font-size: 14pt;
-  font-weight: normal;
-  color: #17263c;
-  display: block;
-  margin-bottom: 1.5mm;
-}
-
-.section-rule-full {
-  height: 1px;
-  background: #b4965a;
-  display: block;
-  margin-bottom: 5mm;
-}
-
-/* ── Body text ── */
-.body-text {
-  font-size: 9.5pt;
-  color: #2c2c2c;
-  line-height: 1.65;
-  text-align: justify;
-  display: block;
-  margin-bottom: 3mm;
-}
-
-/* ── Info table ── */
-.info-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 9pt;
-  margin-bottom: 4mm;
-}
-
-.info-table tr:nth-child(odd) td  { background: #f5f3ee; }
-.info-table tr:nth-child(even) td { background: #ffffff; }
-
-.info-table td {
-  padding: 2.5mm 4mm;
-  vertical-align: top;
-  border-bottom: 0.5px solid #ddd6c8;
-}
-
-.info-table td:first-child {
-  width: 44mm;
-  font-size: 8pt;
-  font-weight: bold;
-  color: #17263c;
-  white-space: nowrap;
-}
-
-.info-table td:last-child { color: #2c2c2c; }
-
-.info-table tr:last-child td { border-bottom: 1.5px solid #b4965a; }
-
-/* ── Executive Summary blocks ── */
-.summary-block {
-  border-left: 3px solid #b4965a;
-  padding-left: 4mm;
-  margin-bottom: 4mm;
-}
-
-.summary-heading {
-  display: block;
-  font-size: 8pt;
-  font-weight: bold;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: #b4965a;
-  margin-bottom: 1.5mm;
-}
-
-/* ── Feasibility scale ── */
-.feasibility-scale {
-  display: block;
-  margin-bottom: 4mm;
-}
-
-.feasibility-scale-label {
-  font-size: 7pt;
-  color: #b4965a;
-  letter-spacing: 0.15em;
-  text-transform: uppercase;
-  display: block;
-  margin-bottom: 2mm;
-}
-
-.feasibility-row {
-  display: block;
-  width: 72mm;
-  padding: 2mm 4mm;
-  margin-bottom: 1.2mm;
-  border-radius: 2px;
-  font-size: 9pt;
-  overflow: hidden;
-}
-
-.feasibility-row.inactive {
-  background: #f5f3ee;
-  border: 0.5px solid #ddd6c8;
-  color: #9a9088;
-}
-
-.feasibility-row.active {
-  background: #17263c;
-  border: 1px solid #b4965a;
-  color: #ffffff;
-}
-
-.feasibility-dot {
-  display: inline-block;
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  margin-right: 3mm;
-  vertical-align: middle;
-  position: relative;
-  top: -1px;
-}
-
-.feasibility-row.active   .feasibility-dot { background: #b4965a; }
-.feasibility-row.inactive .feasibility-dot { background: transparent; border: 1px solid #c8bfb0; }
-
-.feasibility-text {
-  font-size: 8.5pt;
-  letter-spacing: 0.06em;
-  vertical-align: middle;
-}
-
-.feasibility-row.active   .feasibility-text { font-weight: bold; }
-.feasibility-row.inactive .feasibility-text { font-weight: normal; }
-
-/* ── Risk indicator cards ── */
-.risk-grid {
-  display: block;
-  overflow: hidden;
-  margin-bottom: 4mm;
-  clear: both;
-}
-
-.risk-card {
-  float: left;
-  width: 58mm;
-  margin-right: 3mm;
-  border-radius: 2px;
-  overflow: hidden;
-  break-inside: avoid;
-  page-break-inside: avoid;
-}
-
-.risk-card:last-child { margin-right: 0; }
-
-.risk-card-accent { height: 3px; display: block; }
-
-.risk-card-body { padding: 3mm 3.5mm; }
-
-.risk-card-aspect {
-  font-size: 6.5pt;
-  font-weight: bold;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  display: block;
-  margin-bottom: 2mm;
-}
-
-.risk-badge {
-  display: inline-block;
-  padding: 1mm 3mm;
-  border-radius: 2px;
-  font-size: 7pt;
-  font-weight: bold;
-  color: #ffffff;
-  letter-spacing: 0.06em;
-  margin-bottom: 2mm;
-}
-
-.risk-note { font-size: 7pt; line-height: 1.45; display: block; }
-
-.risk-high .risk-card-accent  { background: #8b2500; }
-.risk-high .risk-card-body    { background: #fff3f0; }
-.risk-high .risk-card-aspect  { color: #8b2500; }
-.risk-high .risk-badge        { background: #8b2500; }
-.risk-high .risk-note         { color: #6b3028; }
-
-.risk-moderate .risk-card-accent { background: #8a6800; }
-.risk-moderate .risk-card-body   { background: #fffbee; }
-.risk-moderate .risk-card-aspect { color: #8a6800; }
-.risk-moderate .risk-badge       { background: #8a6800; }
-.risk-moderate .risk-note        { color: #6b5420; }
-
-.risk-low .risk-card-accent  { background: #2e7d52; }
-.risk-low .risk-card-body    { background: #f2faf5; }
-.risk-low .risk-card-aspect  { color: #2e7d52; }
-.risk-low .risk-badge        { background: #2e7d52; }
-.risk-low .risk-note         { color: #245c3c; }
-
-/* ── Score table ── */
-.score-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 9pt;
-  margin-bottom: 4mm;
-}
-
-.score-table th {
-  background: #17263c;
-  color: #b4965a;
-  font-size: 7pt;
-  font-weight: bold;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  padding: 2.5mm 4mm;
-  text-align: left;
-}
-
-.score-table td {
-  padding: 2.5mm 4mm;
-  border-bottom: 0.5px solid #ddd6c8;
-  vertical-align: top;
-}
-
-.score-table tr:nth-child(odd) td  { background: #f5f3ee; }
-.score-table tr:nth-child(even) td { background: #ffffff; }
-.score-table tr:last-child td      { border-bottom: 1.5px solid #b4965a; }
-
-.score-pill {
-  display: inline-block;
-  padding: 0.5mm 3mm;
-  border-radius: 2px;
-  font-size: 7.5pt;
-  font-weight: bold;
-  color: #ffffff;
-}
-
-.score-pill.high     { background: #8b2500; }
-.score-pill.moderate { background: #8a6800; }
-.score-pill.low      { background: #2e7d52; }
-.score-pill.na       { background: #7a8a9a; }
-
-/* ── Considerations ── */
-.consideration {
-  break-inside: avoid;
-  page-break-inside: avoid;
-  margin-bottom: 4mm;
-  padding-bottom: 4mm;
-  border-bottom: 0.5px solid #ddd6c8;
-  display: block;
-}
-
-.consideration:last-child { border-bottom: none; margin-bottom: 0; }
-
-.consideration-number {
-  font-size: 7pt;
-  color: #b4965a;
-  letter-spacing: 0.1em;
-  font-weight: bold;
-  display: block;
-  margin-bottom: 0.5mm;
-}
-
-.consideration-title {
-  font-size: 10pt;
-  font-weight: bold;
-  color: #17263c;
-  display: block;
-  margin-bottom: 1.5mm;
-}
-
-.consideration-body {
-  font-size: 9pt;
-  color: #2c2c2c;
-  line-height: 1.6;
-  text-align: justify;
-  display: block;
-}
-
-/* ── Recommendation box ── */
-.recommendation-box {
-  background: #f5f3ee;
-  border-left: 3px solid #b4965a;
-  padding: 5mm 6mm;
-  display: block;
-  margin-bottom: 4mm;
-  break-inside: avoid;
-  page-break-inside: avoid;
-}
-
-.recommendation-text {
-  font-size: 9.5pt;
-  color: #2c2c2c;
-  line-height: 1.65;
-  text-align: justify;
-  display: block;
-}
-
-/* ── Disclaimer ── */
-.disclaimer-box {
-  background: #f5f3ee;
-  border: 0.5px solid #ddd6c8;
-  padding: 4mm 5mm;
-  display: block;
-}
-
-.disclaimer-text {
-  font-size: 7.5pt;
-  color: #7a8070;
-  line-height: 1.55;
-  font-style: italic;
-  text-align: justify;
-  display: block;
-}
-
-/* ── Signature block ── */
-.sig-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-top: 5mm;
-}
-
-.sig-table td {
-  width: 33.33%;
-  padding: 2.5mm 4mm;
-  border: 0.5px solid #ddd6c8;
-}
-
-.sig-table .sig-header td {
-  background: #f5f3ee;
-  font-size: 6.5pt;
-  color: #9a9088;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  border-bottom: 1px solid #b4965a;
-}
-
-.sig-table .sig-values td {
-  background: #ffffff;
-  font-size: 8.5pt;
-  font-weight: bold;
-  color: #17263c;
-}
-
-.sig-table .sig-values .gold-text { color: #b4965a; }
-
-/* ── Utility ── */
-.clearfix::after { content: ''; display: table; clear: both; }
-.gold-text  { color: #b4965a; }
-.navy-text  { color: #17263c; }
-.muted-text { color: #9a9088; }
-
-</style>
-</head>
-<body>
-
-<!-- ═══════════════════════════════════════════════════════
-     PAGE 1 — COVER
-═══════════════════════════════════════════════════════ -->
-<div class="page cover">
-
-  <div class="cover-inner">
-    <div class="cover-header">
-      <span class="cover-brand">FairVia™</span>
-      <span class="cover-service">Technical Advisory Services &nbsp;|&nbsp; Il Nautico Co., Ltd.</span>
-    </div>
-    <div class="cover-gold-rule"></div>
-
-    <div class="cover-main">
-      <span class="cover-report-type">Material Feasibility Screening Report</span>
-      <span class="cover-title">Material &amp; Processing<br>Feasibility Screening</span>
-      <span class="cover-subtitle">Material Transition Decision Brief</span>
-      <span class="cover-divider"></span>
-
-      <div class="cover-client-box">
-        <span class="cover-client-label">Prepared for</span>
-        <span class="cover-client-name">{{client_name}}</span>
-        <span class="cover-client-detail"><strong>Company:</strong> {{client_company}}</span>
-        <span class="cover-client-detail"><strong>Country:</strong> {{client_country}}</span>
-      </div>
-
-      <div class="cover-meta-grid">
-        <div class="cover-meta-row">
-          <span class="cover-meta-label">Report No.</span>
-          <span class="cover-meta-value">{{report_id}}</span>
-        </div>
-        <div class="cover-meta-row">
-          <span class="cover-meta-label">Date Issued</span>
-          <span class="cover-meta-value">{{report_date}}</span>
-        </div>
-        <div class="cover-meta-row">
-          <span class="cover-meta-label">Document Type</span>
-          <span class="cover-meta-value">Preliminary Screening — Strategic Advisory</span>
-        </div>
-        <div class="cover-meta-row">
-          <span class="cover-meta-label">Classification</span>
-          <span class="cover-meta-value">Strictly Confidential</span>
-        </div>
-      </div>
-    </div>
-
-    <div class="cover-badge-area">
-      <span class="cover-badge-label">Overall Feasibility Assessment</span>
-      <span class="cover-badge {{feasibility_class}}">&#11044;&nbsp; {{feasibility_level}}</span>
-    </div>
-  </div><!-- /cover-inner -->
-
-  <div class="cover-footer">
-    <span class="cover-footer-left">© Il Nautico Co., Ltd. — FairVia™ Technical Advisory</span>
-    <span class="cover-footer-right">Page 1</span>
-  </div>
-
-</div>
-
-<!-- ═══════════════════════════════════════════════════════
-     PAGE 2 — CLIENT INFORMATION + EXECUTIVE SUMMARY
-═══════════════════════════════════════════════════════ -->
-<div class="page content">
-
-    <div class="page-header">
-      <span class="page-header-left">FairVia™ &nbsp;|&nbsp; Technical Advisory Services</span>
-      <span class="page-header-right">Strictly Confidential</span>
-    </div>
-    <div class="page-header-gold"></div>
-
-    <div class="page-body">
-
-      <div class="section">
-        <span class="section-label">Section 1</span>
-        <span class="section-title">Client Information &amp; Application Overview</span>
-        <div class="section-rule-full"></div>
-        <table class="info-table">
-          <tr><td>Application</td>          <td>{{application}}</td></tr>
-          <tr><td>Current Material</td>     <td>{{current_material}}</td></tr>
-          <tr><td>Processing Method</td>    <td>{{processing_method}}</td></tr>
-          <tr><td>Target Material</td>      <td>{{bio_material}}</td></tr>
-          <tr><td>Processing Equipment</td> <td>{{equipment}}</td></tr>
-          <tr><td>Production Scale</td>     <td>{{production_scale}}</td></tr>
-          <tr><td>Project Objective</td>    <td>{{project_stage}}</td></tr>
-          <tr><td>Submission Reference</td> <td>{{submission_reference}}</td></tr>
-        </table>
-      </div>
-
-      <div class="section">
-        <span class="section-label">Section 2</span>
-        <span class="section-title">Executive Summary</span>
-        <div class="section-rule-full"></div>
-        <div class="summary-block">
-          <span class="summary-heading">Overview</span>
-          <p class="body-text">{{executive_summary_overview}}</p>
-        </div>
-        <div class="summary-block">
-          <span class="summary-heading">Key Findings</span>
-          <p class="body-text">{{executive_summary_findings}}</p>
-        </div>
-        <div class="summary-block">
-          <span class="summary-heading">Assessment Conclusion</span>
-          <p class="body-text">{{executive_summary_conclusion}}</p>
-        </div>
-      </div>
-
-      <div class="section">
-        <span class="section-label">Section 3</span>
-        <span class="section-title">Feasibility Level</span>
-        <div class="section-rule-full"></div>
-        <div class="feasibility-scale">
-          <span class="feasibility-scale-label">Feasibility Level</span>
-          <div class="feasibility-row inactive">
-            <span class="feasibility-dot"></span>
-            <span class="feasibility-text">LOW</span>
-          </div>
-          <div class="feasibility-row active">
-            <span class="feasibility-dot"></span>
-            <span class="feasibility-text">{{feasibility_level}}</span>
-          </div>
-          <div class="feasibility-row inactive">
-            <span class="feasibility-dot"></span>
-            <span class="feasibility-text">HIGH</span>
-          </div>
-        </div>
-        <p class="body-text">{{feasibility_explanation}}</p>
-      </div>
-
-    </div><!-- /page-body -->
-
-  <div class="page-footer">
-    <div class="page-footer-gold"></div>
-    <div class="page-footer-inner">
-      <span class="page-footer-left">© Il Nautico Co., Ltd. — FairVia™ Technical Advisory &nbsp;|&nbsp; {{report_id}}</span>
-      <span class="page-footer-right">Page 2</span>
-    </div>
-  </div>
-
-</div>
-
-<!-- ═══════════════════════════════════════════════════════
-     PAGE 3 — RISK INDICATOR + SCORE TABLE
-═══════════════════════════════════════════════════════ -->
-<div class="page content">
-
-    <div class="page-header">
-      <span class="page-header-left">FairVia™ &nbsp;|&nbsp; Technical Advisory Services</span>
-      <span class="page-header-right">Strictly Confidential</span>
-    </div>
-    <div class="page-header-gold"></div>
-
-    <div class="page-body">
-
-      <div class="section">
-        <span class="section-label">Technical Risk Indicator</span>
-        <span class="section-title">Risk Profile Summary</span>
-        <div class="section-rule-full"></div>
-        <div class="risk-grid clearfix">
-          <div class="risk-card {{thermal_risk_class}}">
-            <span class="risk-card-accent"></span>
-            <div class="risk-card-body">
-              <span class="risk-card-aspect">Thermal Stability</span>
-              <span class="risk-badge">{{thermal_risk}}</span>
-              <span class="risk-note">{{thermal_note}}</span>
-            </div>
-          </div>
-          <div class="risk-card {{processing_risk_class}}">
-            <span class="risk-card-accent"></span>
-            <div class="risk-card-body">
-              <span class="risk-card-aspect">Processing Behaviour</span>
-              <span class="risk-badge">{{processing_risk}}</span>
-              <span class="risk-note">{{processing_note}}</span>
-            </div>
-          </div>
-          <div class="risk-card {{equipment_risk_class}}">
-            <span class="risk-card-accent"></span>
-            <div class="risk-card-body">
-              <span class="risk-card-aspect">Equipment Compatibility</span>
-              <span class="risk-badge">{{equipment_risk}}</span>
-              <span class="risk-note">{{equipment_note}}</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="section">
-        <span class="section-label">Section 4</span>
-        <span class="section-title">Risk Band &amp; Score Summary</span>
-        <div class="section-rule-full"></div>
-        <table class="score-table">
-          <thead>
-            <tr>
-              <th>Evaluation Area</th>
-              <th>Assessment</th>
-              <th>Risk Level</th>
-              <th>Notes</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td>Thermal Stability</td>
-              <td>{{score_thermal_assessment}}</td>
-              <td><span class="score-pill {{score_thermal_class}}">{{score_thermal_level}}</span></td>
-              <td>{{score_thermal_note}}</td>
-            </tr>
-            <tr>
-              <td>Processing Behaviour</td>
-              <td>{{score_processing_assessment}}</td>
-              <td><span class="score-pill {{score_processing_class}}">{{score_processing_level}}</span></td>
-              <td>{{score_processing_note}}</td>
-            </tr>
-            <tr>
-              <td>Equipment Compatibility</td>
-              <td>{{score_equipment_assessment}}</td>
-              <td><span class="score-pill {{score_equipment_class}}">{{score_equipment_level}}</span></td>
-              <td>{{score_equipment_note}}</td>
-            </tr>
-            <tr>
-              <td>Material Certification</td>
-              <td>{{score_cert_assessment}}</td>
-              <td><span class="score-pill {{score_cert_class}}">{{score_cert_level}}</span></td>
-              <td>{{score_cert_note}}</td>
-            </tr>
-            <tr>
-              <td>End-of-Life Compliance</td>
-              <td>{{score_eol_assessment}}</td>
-              <td><span class="score-pill {{score_eol_class}}">{{score_eol_level}}</span></td>
-              <td>{{score_eol_note}}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-    </div><!-- /page-body -->
-
-  <div class="page-footer">
-    <div class="page-footer-gold"></div>
-    <div class="page-footer-inner">
-      <span class="page-footer-left">© Il Nautico Co., Ltd. — FairVia™ Technical Advisory &nbsp;|&nbsp; {{report_id}}</span>
-      <span class="page-footer-right">Page 3</span>
-    </div>
-  </div>
-
-</div>
-
-<!-- ═══════════════════════════════════════════════════════
-     PAGE 4 — TECHNICAL OBSERVATIONS + POTENTIAL RISKS
-═══════════════════════════════════════════════════════ -->
-<div class="page content">
-
-    <div class="page-header">
-      <span class="page-header-left">FairVia™ &nbsp;|&nbsp; Technical Advisory Services</span>
-      <span class="page-header-right">Strictly Confidential</span>
-    </div>
-    <div class="page-header-gold"></div>
-
-    <div class="page-body">
-
-      <div class="section">
-        <span class="section-label">Section 5</span>
-        <span class="section-title">Key Technical Observations</span>
-        <div class="section-rule-full"></div>
-        <div class="consideration">
-          <span class="consideration-number">01</span>
-          <span class="consideration-title">{{obs_1_title}}</span>
-          <span class="consideration-body">{{obs_1_body}}</span>
-        </div>
-        <div class="consideration">
-          <span class="consideration-number">02</span>
-          <span class="consideration-title">{{obs_2_title}}</span>
-          <span class="consideration-body">{{obs_2_body}}</span>
-        </div>
-        <div class="consideration">
-          <span class="consideration-number">03</span>
-          <span class="consideration-title">{{obs_3_title}}</span>
-          <span class="consideration-body">{{obs_3_body}}</span>
-        </div>
-      </div>
-
-      <div class="section">
-        <span class="section-label">Section 6</span>
-        <span class="section-title">Potential Risks</span>
-        <div class="section-rule-full"></div>
-        <div class="consideration">
-          <span class="consideration-number">Risk 01</span>
-          <span class="consideration-title">{{risk_1_title}}</span>
-          <span class="consideration-body">{{risk_1_body}}</span>
-        </div>
-        <div class="consideration">
-          <span class="consideration-number">Risk 02</span>
-          <span class="consideration-title">{{risk_2_title}}</span>
-          <span class="consideration-body">{{risk_2_body}}</span>
-        </div>
-      </div>
-
-    </div><!-- /page-body -->
-
-  <div class="page-footer">
-    <div class="page-footer-gold"></div>
-    <div class="page-footer-inner">
-      <span class="page-footer-left">© Il Nautico Co., Ltd. — FairVia™ Technical Advisory &nbsp;|&nbsp; {{report_id}}</span>
-      <span class="page-footer-right">Page 4</span>
-    </div>
-  </div>
-
-</div>
-
-<!-- ═══════════════════════════════════════════════════════
-     PAGE 5 — RECOMMENDATION + DISCLAIMER
-═══════════════════════════════════════════════════════ -->
-<div class="page content">
-
-    <div class="page-header">
-      <span class="page-header-left">FairVia™ &nbsp;|&nbsp; Technical Advisory Services</span>
-      <span class="page-header-right">Strictly Confidential</span>
-    </div>
-    <div class="page-header-gold"></div>
-
-    <div class="page-body">
-
-      <div class="section">
-        <span class="section-label">Section 7</span>
-        <span class="section-title">Suggested Next Step</span>
-        <div class="section-rule-full"></div>
-        <div class="recommendation-box">
-          <p class="recommendation-text">{{strategic_recommendation}}</p>
-        </div>
-      </div>
-
-      <div class="section">
-        <span class="section-label">Section 8</span>
-        <span class="section-title">Professional Disclaimer</span>
-        <div class="section-rule-full"></div>
-        <div class="disclaimer-box">
-          <p class="disclaimer-text">{{disclaimer}}</p>
-        </div>
-      </div>
-
-      <table class="sig-table">
-        <tr class="sig-header">
-          <td>Prepared by</td>
-          <td>Report Status</td>
-          <td>Date Issued</td>
-        </tr>
-        <tr class="sig-values">
-          <td>FairVia™ Technical Advisory</td>
-          <td class="gold-text">Preliminary — For Client Review</td>
-          <td>{{report_date}}</td>
-        </tr>
-      </table>
-
-    </div><!-- /page-body -->
-
-  <div class="page-footer">
-    <div class="page-footer-gold"></div>
-    <div class="page-footer-inner">
-      <span class="page-footer-left">© Il Nautico Co., Ltd. — FairVia™ Technical Advisory &nbsp;|&nbsp; {{report_id}}</span>
-      <span class="page-footer-right">Page 5</span>
-    </div>
-  </div>
-
-</div>
-
-</body>
-</html>
-`;
-
-// =========================
-// メイン
-// =========================
-app.post("/generate-report", async (req, res) => {
-  console.log("🔥 REQUEST HIT");
-
-  try {
-    const fields = Array.isArray(req.body)
-      ? req.body
-      : req.body?.fields || req.body?.data?.fields || [];
-
-    const email =
-      fields.find((f) => f.type === "INPUT_EMAIL")?.value ||
-      req.body?.email ||
-      "";
-
-    const processing = getValue(fields, "processing");
-    const currentMaterial = getValue(fields, "material");
-    const bioMaterial = getValue(fields, "biodegradable");
-
-    const clientName = getValue(fields, "client name");
-    const company = getValue(fields, "company name");
-    const country = getValue(fields, "country");
-    const equipment = getValue(fields, "equipment");
-    const productionScale = getValue(fields, "production");
-    const projectStage = getValue(fields, "project");
-    const submissionReference = "Auto-generated";
-
-    const text = [
-      processing,
-      currentMaterial,
-      bioMaterial,
-      projectStage
-    ].join(" ").toLowerCase();
-
-    // =========================
-    // 判定（確定ロジック）
-    // =========================
-    const isInjection = text.includes("injection");
-    const isPP = text.includes("pp");
-    const isBio = text.includes("pla") || text.includes("bio");
-
-    let finalFeasibility = "MODERATE";
-
-    if (isInjection && isPP && isBio) {
-      finalFeasibility = "LOW";
-    }
-
-    console.log("RESULT:", finalFeasibility);
-
-    // =========================
-    // Riskロジック
-    // =========================
-    const isLow = finalFeasibility === "LOW";
-
-    const thermalRisk = isLow ? "HIGH RISK" : "MODERATE";
-    const thermalNote = isLow
-      ? "Thermal behaviour requires careful validation under controlled conditions prior to implementation."
-      : "Thermal behaviour should be validated under controlled conditions prior to implementation.";
-
-    const processingRisk = isLow ? "HIGH RISK" : "MODERATE";
-    const processingNote = isLow
-      ? "Processing stability risk is elevated under the proposed transition scenario and should be carefully validated."
-      : "Processing stability remains subject to confirmation through pilot evaluation.";
-
-    const equipmentRisk = isLow ? "HIGH RISK" : "MODERATE";
-    const equipmentNote = isLow
-      ? "Existing equipment may require adjustment before stable conversion can be reliably achieved."
-      : "Equipment suitability should be confirmed prior to any production commitment.";
-
-    // =========================
-    // Score
-    // =========================
-    const scoreThermalAssessment = isLow
-      ? "Critical review required"
-      : "Conditional review required";
-    const scoreThermalLevel = isLow ? "HIGH RISK" : "MODERATE";
-    const scoreThermalNote = isLow
-      ? "Thermal mismatch may materially affect process stability."
-      : "Thermal response remains dependent on confirmed process conditions.";
-
-    const scoreProcessingAssessment = isLow
-      ? "High transition sensitivity"
-      : "Moderate transition sensitivity";
-    const scoreProcessingLevel = isLow ? "HIGH RISK" : "MODERATE";
-    const scoreProcessingNote = isLow
-      ? "Process consistency may deteriorate under current assumptions."
-      : "Process consistency remains to be confirmed in controlled validation.";
-
-    const scoreEquipmentAssessment = isLow
-      ? "Compatibility gap likely"
-      : "Compatibility to be confirmed";
-    const scoreEquipmentLevel = isLow ? "HIGH RISK" : "MODERATE";
-    const scoreEquipmentNote = isLow
-      ? "Equipment readiness may be insufficient without adjustment."
-      : "Equipment capability should be reviewed before scale-up.";
-
-    const html = injectHtml(htmlTemplate, {
-      client_name: clientName || "",
-      client_company: company || "",
-      client_country: country || "",
-
-      application: processing || "",
-      current_material: currentMaterial || "",
-      processing_method: processing || "",
-      bio_material: bioMaterial || "",
-      equipment: equipment || "",
-      production_scale: productionScale || "",
-      project_stage: projectStage || "",
-      submission_reference: submissionReference,
-
-      feasibility_level: finalFeasibility,
-      FEASIBILITY_LEVEL: finalFeasibility,
-　　　　score_cert_assessment: "To be confirmed",
-　　　　score_cert_level: "MODERATE",
-　　　　score_cert_note: "Material certification status should be verified prior to implementation.",
-
-score_eol_assessment: "To be confirmed",
-score_eol_level: "MODERATE",
-score_eol_note: "End-of-life compliance should be evaluated based on regional regulatory requirements.",
-      report_date: new Date().toISOString().split("T")[0],
-      report_id: "FV-" + Date.now(),
-
-      executive_summary_overview: SUMMARY_OVERVIEW,
-      executive_summary_findings: SUMMARY_FINDINGS,
-      executive_summary_conclusion: SUMMARY_CONCLUSION,
-
-      feasibility_explanation: FEASIBILITY_EXPLANATION,
-
-      thermal_risk: thermalRisk,
-      thermal_note: thermalNote,
-      processing_risk: processingRisk,
-      processing_note: processingNote,
-      equipment_risk: equipmentRisk,
-      equipment_note: equipmentNote,
-
-      score_thermal_assessment: scoreThermalAssessment,
-      score_thermal_level: scoreThermalLevel,
-      score_thermal_note: scoreThermalNote,
-
-      score_processing_assessment: scoreProcessingAssessment,
-      score_processing_level: scoreProcessingLevel,
-      score_processing_note: scoreProcessingNote,
-
-      score_equipment_assessment: scoreEquipmentAssessment,
-      score_equipment_level: scoreEquipmentLevel,
-      score_equipment_note: scoreEquipmentNote,
-
-      obs_1_title: OBS_1_TITLE,
-      obs_1_body: OBS_1_BODY,
-      obs_2_title: OBS_2_TITLE,
-      obs_2_body: OBS_2_BODY,
-      obs_3_title: OBS_3_TITLE,
-      obs_3_body: OBS_3_BODY,
-
-      risk_1_title: RISK_1_TITLE,
-      risk_1_body: RISK_1_BODY,
-      risk_2_title: RISK_2_TITLE,
-      risk_2_body: RISK_2_BODY,
-
-      strategic_recommendation: STRATEGIC_RECOMMENDATION,
-      disclaimer: DISCLAIMER
-    });
-
-    const browser = await puppeteer.launch({
-  headless: true,
-  args: [
-    "--no-sandbox",
-    "--disable-setuid-sandbox",
-    "--disable-dev-shm-usage",
-    "--disable-gpu"
-  ]
-});
-    
-    await page.setContent(html, { waitUntil: "networkidle0" });
-
-    const pdf = await page.pdf({
-  format: "A4",
-  printBackground: true
-});
-
-fs.writeFileSync("/tmp/latest.pdf", pdf);
-
-await browser.close();
-
-    if (!email) {
-      console.log("⚠️ NO EMAIL");
-      return res.json({ success: false });
-    }
-
-    await resend.emails.send({
-      from: "FairVia <info@ilnautico.com>",
-      to: email,
-      subject: "FairVia Report",
-     html: `<p>Your report result: <b>${finalFeasibility}</b></p>`,
-      attachments: [
-        {
-          filename: "report.pdf",
-          content: pdf.toString("base64"),
-          encoding: "base64"
-        }
-      ]
-    });
-
-    console.log("✅ MAIL SENT");
-
-    res.json({ success: true });
+    input = normalizeTallyPayload(req.body);
+    input = normalizeInputForScoring(input);
 
   } catch (err) {
-    console.error("❌ ERROR:", err);
-    res.status(500).json({ error: "Server Error" });
+    const code = err.code ?? 'INVALID_PAYLOAD';
+    console.warn(`[server_advanced] Payload normalisation error (${code}):`, err.message);
+    return errorResponse(res, 400, code, err.message);
   }
-});
 
-app.post("/generate-tier2", async (req, res) => {
+  console.log(`[server_advanced] Webhook received — route: ${input.route}, company: ${input.company_name ?? 'unknown'}`);
+
+  let scoringResult;
   try {
-    console.log("🔥 TIER2 REQUEST HIT");
-
-    const fields =req.body.answers
-    ? mapTallyToFields(req.body.answers)
-    : req.body.data?.fields || [];
-
-    const application = getValue(fields, "application");
-    const currentMaterial = getValue(fields, "material");
-    const bioMaterial = getValue(fields, "biodegradable");
-    const processing = getValue(fields, "processing");
-    const equipment = getValue(fields, "equipment");
-    const productionScale = getValue(fields, "production");
-    const projectStage = getValue(fields, "project");
-    const technicalConcern = getValue(fields, "concern");
-
-    const claudeReport = await generateClaudeHypothesis({
-      application,
-      material: currentMaterial,
-      bioMaterial,
-      processing,
-      equipment,
-      scale: productionScale,
-      stage: projectStage,
-      concern: technicalConcern
-    });
-
-    console.log("✅ CLAUDE GENERATED");
-
-    res.json({
-      success: true,
-      report: claudeReport
-    });
-
+    scoringResult = input.route === 'food'
+      ? calculateFoodContactRisk(input)
+      : calculateMedicalHealthcareRisk(input);
   } catch (err) {
-    console.error("❌ TIER2 ERROR:", err);
-    res.status(500).json({ error: "Tier2 generation failed" });
+    console.error('[server_advanced] Scoring engine error:', err);
+    return errorResponse(res, 500, 'SCORING_ERROR', 'Scoring engine encountered an unexpected error.');
   }
-});
-app.get("/generate-pdf", async (req, res) => {
+
+  if (scoringResult.workflowStatus === 'terminated') {
+    console.log('[server_advanced] Implant application detected — generating referral PDF, skipping Claude.');
+    const referralReportId = generateReportId();
+
+    try {
+      const referralHtml = generateImplantReferralHtml(scoringResult, input);
+      const referralBuffer = await renderHtmlToPdf(referralHtml);
+      fs.writeFileSync(PDF_OUTPUT_PATH, referralBuffer);
+      storeAdvancedReport(referralReportId, referralBuffer, input);
+      await sendAdvancedReportEmails({
+        req,
+        pdfBuffer: referralBuffer,
+        input,
+        pdfData: { confidence: null },
+        scoringResult,
+        reportId: referralReportId,
+      }).catch(emailErr => console.warn('[server_advanced] Referral email delivery failed:', emailErr.message));
+      console.log(`[server_advanced] Referral PDF saved to ${PDF_OUTPUT_PATH}`);
+    } catch (pdfErr) {
+      console.error('[server_advanced] Referral PDF generation failed:', pdfErr);
+      return errorResponse(res, 500, 'PDF_ERROR', 'Referral PDF generation failed.');
+    }
+
+    return res.status(200).json({
+      success:           true,
+      workflowStatus:    'terminated',
+      terminationReason: scoringResult.terminationReason,
+      reportId:          referralReportId,
+      timestamp:         new Date().toISOString(),
+    });
+  }
+
+  const narrativeResult = await tryClaudeNarrative(scoringResult);
+  const pdfData = buildPdfDataObject(scoringResult, narrativeResult, input);
+
+  let pdfBuffer;
   try {
-    res.send("PDF route working");
-  } catch (err) {
-    res.status(500).send("error");
+    pdfBuffer = await renderPdfFromTemplate(pdfData);
+  } catch (renderErr) {
+    console.error('[server_advanced] PDF render failed:', renderErr);
+    return errorResponse(res, 500, 'PDF_ERROR', 'PDF rendering failed. Report has not been generated.');
   }
+
+  try {
+    fs.writeFileSync(PDF_OUTPUT_PATH, pdfBuffer);
+    storeAdvancedReport(pdfData.reportMeta.reportId, pdfBuffer, input);
+    await sendAdvancedReportEmails({
+      req,
+      pdfBuffer,
+      input,
+      pdfData,
+      scoringResult,
+      reportId: pdfData.reportMeta.reportId,
+    }).catch(emailErr => console.warn('[server_advanced] Email delivery failed:', emailErr.message));
+    console.log(`[server_advanced] PDF saved — reportId: ${pdfData.reportMeta.reportId}, score: ${pdfData.scoring.finalScore}, band: ${pdfData.decision.band}`);
+  } catch (writeErr) {
+    console.error('[server_advanced] PDF write failed:', writeErr);
+    return errorResponse(res, 500, 'PDF_WRITE_ERROR', 'PDF was generated but could not be saved to disk.');
+  }
+
+  return res.status(200).json({
+    success:          true,
+    reportId:         pdfData.reportMeta.reportId,
+    route:            input.route,
+    finalScore:       scoringResult.scoring.finalScore,
+    decisionBand:     scoringResult.decision.band,
+    decisionLabel:    scoringResult.decision.label,
+    confidence:       pdfData.confidence,
+    hardTriggerCount: scoringResult.hardTriggers.length,
+    narrativeSource:  narrativeResult.source,
+    emailDelivery:    isValidEmail(input.email) && !!RESEND_API_KEY ? 'attempted' : 'skipped',
+    workflowStatus:   'scored',
+    timestamp:        new Date().toISOString(),
+  });
+}
+
+app.post('/advanced-webhook', handleAdvancedWebhook);
+
+app.get('/advanced-access-demo', (req, res) => {
+  if (!isDemoAccessAllowed(req)) {
+    return res.status(403).send('Advanced demo access denied.');
+  }
+  res.sendFile(path.join(__dirname, 'advanced-access.html'));
 });
+
+app.post('/generate-advanced-demo-report', async (req, res) => {
+  if (!isDemoAccessAllowed(req)) {
+    return res.status(403).json({ success: false, error: 'DEMO_ACCESS_DENIED', message: 'Invalid or missing demo access key.' });
+  }
+  req.query = { ...(req.query || {}), demo: 'true', delivery: 'email' };
+  return handleAdvancedWebhook(req, res);
+});
+
+app.get('/latest-advanced-pdf', (_req, res) => {
+  if (!fs.existsSync(PDF_OUTPUT_PATH)) {
+    return res.status(404).json({
+      success:   false,
+      error:     'NOT_FOUND',
+      message:   'No Advanced screening PDF has been generated yet.',
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', 'inline; filename="fairvia-advanced-screening.pdf"');
+
+  res.sendFile(path.resolve(PDF_OUTPUT_PATH), (err) => {
+    if (err) {
+      console.error('[server_advanced] PDF serve error:', err);
+    }
+  });
+});
+
+
+app.get('/download-advanced-report/:reportId', (req, res) => {
+  cleanupExpiredAdvancedReports();
+
+  const item = advancedReportStore.get(req.params.reportId);
+  if (!item?.pdf) {
+    return res.status(404).send('Advanced report not found or expired.');
+  }
+
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `attachment; filename="FairVia-Advanced-Technical-Screening-${req.params.reportId}.pdf"`);
+  res.setHeader('Content-Length', item.pdf.length);
+  return res.send(item.pdf);
+});
+
+app.get('/health', (_req, res) => {
+  res.status(200).json({
+    status:        'ok',
+    service:       'fairvia-advanced',
+    version:       SERVER_VERSION,
+    engineVersion: ENGINE_VERSION,
+    aiEnabled:     AI_ENABLED && !!process.env.ANTHROPIC_API_KEY,
+    model:         CLAUDE_MODEL,
+    timestamp:     new Date().toISOString(),
+  });
+});
+
+app.use((req, res) => {
+  res.status(404).json({
+    success:   false,
+    error:     'NOT_FOUND',
+    message:   `No route: ${req.method} ${req.path}`,
+    timestamp: new Date().toISOString(),
+  });
+});
+
+process.on('unhandledRejection', (reason) => {
+  console.error('[server_advanced] Unhandled rejection:', reason);
+});
+
+try {
+  validateEnvironment();
+} catch (err) {
+  console.error(err.message);
+  process.exit(1);
+}
+
+app.listen(ADVANCED_PORT, () => {
+  console.log(`[server_advanced] Listening on port ${ADVANCED_PORT}`);
+  console.log(`  POST http://localhost:${ADVANCED_PORT}/advanced-webhook`);
+  console.log(`  GET  http://localhost:${ADVANCED_PORT}/advanced-access`);
+  console.log(`  GET  http://localhost:${ADVANCED_PORT}/advanced-access-demo?key=...`);
+  console.log(`  POST http://localhost:${ADVANCED_PORT}/generate-advanced-demo-report`);
+  console.log(`  GET  http://localhost:${ADVANCED_PORT}/latest-advanced-pdf`);
+  console.log(`  GET  http://localhost:${ADVANCED_PORT}/download-advanced-report/:reportId`);
+  console.log(`  GET  http://localhost:${ADVANCED_PORT}/health`);
+});
+
+module.exports = app;
